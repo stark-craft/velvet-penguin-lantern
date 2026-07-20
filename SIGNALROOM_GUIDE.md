@@ -335,7 +335,7 @@ policy before enabling a source.
 The published repository is:
 
 ```text
-https://github.com/stark-craft/news-intelligence-platform
+https://github.com/stark-craft/velvet-penguin-lantern
 ```
 
 Recommended prerequisites:
@@ -349,8 +349,8 @@ Recommended prerequisites:
 Clone and enter the repository:
 
 ```powershell
-git clone https://github.com/stark-craft/news-intelligence-platform.git
-cd news-intelligence-platform
+git clone https://github.com/stark-craft/velvet-penguin-lantern.git
+cd velvet-penguin-lantern
 ```
 
 Create a Python environment and install every backend, ML, and test dependency:
