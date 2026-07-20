@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+runtime/*
+!runtime/.gitkeep
+models/**/*.pkl
+models/**/manifest.json
+models/**/*.manifest.json
+models/**/*.tmp
+models/**/*.sha256
+.env
+!.env.example

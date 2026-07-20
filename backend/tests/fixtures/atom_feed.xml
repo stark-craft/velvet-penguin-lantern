@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Technology</title>
+  <entry>
+    <title>OpenAI launches a new enterprise research system</title>
+    <link rel="self" href="https://feeds.example.com/items/42" />
+    <link rel="alternate" href="https://www.example.com/News/OpenAI-Launch?utm_source=rss&amp;id=42#top" />
+    <published>2026-07-09T06:30:00+05:30</published>
+    <summary><![CDATA[OpenAI introduced a research system for enterprise teams.]]></summary>
+  </entry>
+</feed>

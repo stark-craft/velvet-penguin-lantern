@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "sites": [
+    {
+      "id": "indian-broadcasting-world",
+      "name": "Indian Broadcasting World",
+      "enabled": true,
+      "category": "Broadcast / DTH / Cable",
+      "homepage": "https://www.indianbroadcastingworld.com/",
+      "region": "India",
+      "timezone": "Asia/Kolkata",
+      "allowed_domains": [
+        "indianbroadcastingworld.com"
+      ],
+      "max_links": 100,
+      "allow_deep_scan": true,
+      "manual_deep_scan_candidate": false
+    },
+    {
+      "id": "bestmediainfo",
+      "name": "BestMediaInfo",
+      "enabled": true,
+      "category": "Media / Broadcasting",
+      "homepage": "https://bestmediainfo.com/",
+      "region": "India",
+      "timezone": "Asia/Kolkata",
+      "allowed_domains": [
+        "bestmediainfo.com"
+      ],
+      "max_links": 100,
+      "allow_deep_scan": true,
+      "manual_deep_scan_candidate": false
+    },
+    {
+      "id": "exchange4media",
+      "name": "Exchange4Media",
+      "enabled": true,
+      "category": "Media / Advertising / Broadcasting",
+      "homepage": "https://www.exchange4media.com/",
+      "region": "India",
+      "timezone": "Asia/Kolkata",
+      "allowed_domains": [
+        "exchange4media.com"
+      ],
+      "max_links": 100,
+      "allow_deep_scan": true,
+      "manual_deep_scan_candidate": false
+    },
+    {
+      "id": "storyboard18",
+      "name": "Storyboard18",
+      "enabled": true,
+      "category": "Media / Advertising / Broadcasting",
+      "homepage": "https://www.storyboard18.com/",
+      "region": "India",
+      "timezone": "Asia/Kolkata",
+      "allowed_domains": [
+        "storyboard18.com"
+      ],
+      "max_links": 100,
+      "allow_deep_scan": true,
+      "manual_deep_scan_candidate": false
+    },
+    {
+      "id": "home-technology-review",
+      "name": "Home Technology Review",
+      "enabled": true,
+      "category": "Broadcast / Home Technology / Media",
+      "homepage": "https://hometechnologyreview.com/news/",
+      "region": "India",
+      "timezone": "Asia/Kolkata",
+      "allowed_domains": [
+        "hometechnologyreview.com"
+      ],
+      "max_links": 100,
+      "allow_deep_scan": true,
+      "manual_deep_scan_candidate": false
+    }
+  ]
+}

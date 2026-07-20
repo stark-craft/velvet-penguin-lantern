@@ -1,0 +1,5 @@
+# Complete Signalroom Python environment: backend runtime, Hugging Face ML,
+# and the developer/test toolchain. Run from the repository root. This is
+# intentionally non-editable so a packaged Python runtime has no absolute .pth
+# reference back to the source machine.
+./backend[dev,ml]
