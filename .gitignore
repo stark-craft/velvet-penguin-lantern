@@ -58,6 +58,7 @@ next-env.d.ts
 # Local portable-release material and secrets.
 /signalroom.env.cmd
 /deployment/signalroom.env.cmd
+/scripts/windows/local-settings.ps1
 /python_embed/
 /node_embed/
 /logs/

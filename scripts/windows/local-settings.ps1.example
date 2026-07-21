@@ -1,0 +1,23 @@
+# Copy this file to local-settings.ps1 in the same folder, then edit the copy.
+# local-settings.ps1 is ignored by Git because it may contain company IPs and secrets.
+
+# Required for production-like identity hashing. Use at least 32 random characters.
+$env:SIGNALROOM_IP_HASH_SECRET = "development-only-change-this-secret"
+
+# Four-digit editorial PINs. Change both before sharing the application widely.
+$env:SIGNALROOM_APPROVAL_KEY = "2741"
+$env:SIGNALROOM_GATEKEEPER_KEY = "6384"
+
+# Comma-separated individual IP addresses or CIDR ranges. Empty means nobody is added.
+$env:SIGNALROOM_BROADCAST_IPS = ""
+$env:SIGNALROOM_ADMIN_IPS = ""
+$env:SIGNALROOM_DEVELOPER_IPS = "127.0.0.1,::1"
+
+# Local Hugging Face folders under backend\model_weights.
+$env:SIGNALROOM_HF_LOCAL_ONLY = "true"
+$env:SIGNALROOM_EMBEDDING_MODEL_PATH = "model_weights/all-MiniLM-L6-v2"
+$env:SIGNALROOM_SUMMARIZATION_MODEL_PATH = "model_weights/distilbart-cnn-12-6"
+
+# Optional: an absolute path to the legacy PowerPoint template.
+# You can omit this when template.pptx is placed in the repository root.
+# $env:SIGNALROOM_PPTX_TEMPLATE = "C:\scrappyV2\template.pptx"

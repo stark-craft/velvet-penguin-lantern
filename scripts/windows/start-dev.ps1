@@ -7,6 +7,11 @@ param(
 $ErrorActionPreference = "Stop"
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $Python = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+$LocalSettings = Join-Path $PSScriptRoot "local-settings.ps1"
+if (Test-Path -LiteralPath $LocalSettings -PathType Leaf) {
+    . $LocalSettings
+    Write-Host "Loaded local settings: $LocalSettings"
+}
 if (-not (Test-Path -LiteralPath $Python -PathType Leaf)) {
     throw "Missing virtual environment: $Python"
 }
@@ -29,6 +34,11 @@ $env:SIGNALROOM_HOST = "127.0.0.1"
 $env:SIGNALROOM_PORT = "8000"
 $env:SIGNALROOM_SCHEDULER_ENABLED = "false"
 $env:NEXT_PUBLIC_SIGNALROOM_DIRECT_API_PORT = "8000"
+if (-not $env:SIGNALROOM_HF_LOCAL_ONLY) { $env:SIGNALROOM_HF_LOCAL_ONLY = "true" }
+if (-not $env:SIGNALROOM_EMBEDDING_MODEL_PATH) { $env:SIGNALROOM_EMBEDDING_MODEL_PATH = "model_weights/all-MiniLM-L6-v2" }
+if (-not $env:SIGNALROOM_SUMMARIZATION_MODEL_PATH) { $env:SIGNALROOM_SUMMARIZATION_MODEL_PATH = "model_weights/distilbart-cnn-12-6" }
+if (-not $env:SIGNALROOM_APPROVAL_KEY) { $env:SIGNALROOM_APPROVAL_KEY = "2741" }
+if (-not $env:SIGNALROOM_GATEKEEPER_KEY) { $env:SIGNALROOM_GATEKEEPER_KEY = "6384" }
 
 Write-Host "newsScrapper development startup"
 Write-Host "Frontend URL: http://localhost:3000/"
