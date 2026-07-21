@@ -1,4 +1,4 @@
-# Signalroom Windows laptop deployment
+# newsScrapper Windows laptop deployment
 
 This is a deliberately small, single-machine deployment for an internal pilot.
 It launches three local processes: the API, one process-safe scheduler, and the
@@ -10,7 +10,7 @@ hours thereafter; each cycle runs Default and then Broadcast sequentially.
 Put these folders beside `start_signalroom.bat` on the server laptop:
 
 ```text
-Signalroom/
+newsScrapper/
 ├── start_signalroom.bat
 ├── signalroom.env.cmd
 ├── backend/                 # copy the complete backend folder
@@ -46,7 +46,7 @@ npm run build
 
 Use Node.js 22.13 or newer. Install and build on Windows, or on an equivalent
 Windows architecture: copying `node_modules` from macOS or Linux can leave
-native packages unusable. Signalroom's frontend uses server-side rendering, so
+native packages unusable. newsScrapper's frontend uses server-side rendering, so
 the release still needs Node at runtime; it is not a static-only bundle.
 
 Copy the project to the release's `frontend` folder, including the resulting
@@ -179,5 +179,5 @@ two cycles. A publisher run where every configured source is unreachable fails
 visibly; a reachable run with no keyword matches remains a valid empty run and
 preserves the previous briefing.
 
-To stop Signalroom, close the three titled process windows. Do not terminate all
+To stop newsScrapper, close the three titled process windows. Do not terminate all
 Python or Node processes globally because the laptop may run unrelated tools.

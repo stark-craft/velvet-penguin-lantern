@@ -121,6 +121,20 @@ def resolve_client_ip(
 
     peer = _parse_ip(peer_ip)
     if peer is None:
+        # Local Vinext adapters can omit the socket peer for their server-side
+        # fetch. Development accepts their explicit bridge marker so identity
+        # remains testable; production never takes this peerless shortcut.
+        proxy_marker = headers.get("x-signalroom-proxy") or headers.get(
+            "X-Signalroom-Proxy"
+        )
+        if (
+            settings.environment == "development"
+            and settings.trust_proxy_headers
+            and proxy_marker == "frontend-bff-v1"
+        ):
+            chain = _forwarded_chain(headers)
+            if chain:
+                return chain[0].compressed
         # Some ASGI/browser adapters omit the peer host.  Keep those requests
         # usable as an anonymous viewer without ever promoting them to the
         # loopback/developer allowlist.

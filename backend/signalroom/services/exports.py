@@ -15,12 +15,14 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import re
 import unicodedata
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 from uuid import UUID
 
@@ -31,12 +33,13 @@ from docx.shared import Inches as DocxInches
 from docx.shared import Pt, RGBColor as DocxRGBColor
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.shapes import MSO_SHAPE, PP_PLACEHOLDER
 from pptx.enum.text import MSO_AUTO_SIZE, PP_ALIGN
 from pptx.util import Inches, Pt as PptxPt
 from pydantic import Field, StringConstraints, field_validator
 from typing_extensions import Annotated
 
+from signalroom.branding import EXPORT_TITLE, PRODUCT_NAME
 from signalroom.models import ArticleRead, ProfileId, StrictModel
 from signalroom.storage import RecordNotFoundError, SQLiteRepository
 
@@ -319,10 +322,10 @@ def _render_xlsx(request: ExportRequest, records: Sequence[Mapping[str, Any]]) -
     )
     workbook.set_properties(
         {
-            "title": "Signalroom Intelligence Export",
+            "title": EXPORT_TITLE,
             "subject": f"{request.profile.value.title()} profile intelligence",
-            "author": "Signalroom",
-            "company": "Signalroom",
+            "author": PRODUCT_NAME,
+            "company": PRODUCT_NAME,
             "created": _FIXED_DOCUMENT_TIME,
         }
     )
@@ -345,7 +348,7 @@ def _render_xlsx(request: ExportRequest, records: Sequence[Mapping[str, Any]]) -
     overview.hide_gridlines(2)
     overview.set_column("A:A", 24)
     overview.set_column("B:B", 38)
-    overview.write("A1", "Signalroom Intelligence Export", header)
+    overview.write("A1", EXPORT_TITLE, header)
     overview.write("A3", "Profile", section)
     overview.write("B3", request.profile.value.title())
     overview.write("A4", "Articles", section)
@@ -431,14 +434,14 @@ def _docx_label(document: Document, label: str, value: Any) -> None:
 def _render_docx(request: ExportRequest, records: Sequence[Mapping[str, Any]]) -> bytes:
     document = Document()
     _set_docx_style(document)
-    document.core_properties.title = "Signalroom Intelligence Export"
+    document.core_properties.title = EXPORT_TITLE
     document.core_properties.subject = f"{request.profile.value.title()} profile intelligence"
-    document.core_properties.author = "Signalroom"
-    document.core_properties.last_modified_by = "Signalroom"
+    document.core_properties.author = PRODUCT_NAME
+    document.core_properties.last_modified_by = PRODUCT_NAME
     document.core_properties.created = _FIXED_DOCUMENT_TIME
     document.core_properties.modified = _FIXED_DOCUMENT_TIME
 
-    title = document.add_heading("Signalroom Intelligence Export", level=0)
+    title = document.add_heading(EXPORT_TITLE, level=0)
     title.runs[0].font.color.rgb = DocxRGBColor(52, 43, 118)
     document.add_paragraph(
         f"{request.profile.value.title()} profile · {len(records)} article"
@@ -530,14 +533,146 @@ def _pptx_background(slide: Any, color: str) -> None:
     fill.fore_color.rgb = RGBColor.from_string(color)
 
 
+def _pptx_template_path() -> Optional[Path]:
+    """Resolve the optional legacy template without depending on cwd.
+
+    Windows operators may place ``template.pptx`` in the repository root as
+    the legacy application expected. An explicit environment override remains
+    available for deployments that keep mutable assets outside the checkout.
+    """
+
+    configured = str(os.environ.get("SIGNALROOM_PPTX_TEMPLATE") or "").strip()
+    project_root = Path(__file__).resolve().parents[3]
+    candidates = (
+        Path(configured).expanduser() if configured else None,
+        project_root / "template.pptx",
+        project_root / "backend" / "template.pptx",
+    )
+    for candidate in candidates:
+        if candidate is not None and candidate.is_file():
+            return candidate.resolve()
+    return None
+
+
+def _legacy_layout(presentation: Presentation, name: str, fallback_index: int) -> Any:
+    return next(
+        (layout for layout in presentation.slide_layouts if layout.name == name),
+        presentation.slide_layouts[min(fallback_index, len(presentation.slide_layouts) - 1)],
+    )
+
+
+def _legacy_placeholder_map(layout: Any) -> Dict[str, int]:
+    markers = {
+        "#TITLE": "title",
+        "#SUMMARY": "summary",
+        "#LINK": "link",
+        "#INSIGHT": "insight",
+        "#DATE_HERE": "date",
+        "#TARGATED_SRID_TEAM": "team",
+        "#TARGETED_SRID_TEAM": "team",
+    }
+    result: Dict[str, int] = {}
+    for shape in layout.placeholders:
+        placeholder_type = shape.placeholder_format.type
+        if placeholder_type == PP_PLACEHOLDER.PICTURE:
+            result["picture"] = shape.placeholder_format.idx
+            continue
+        if not shape.has_text_frame:
+            continue
+        text = shape.text.strip().upper()
+        for marker, key in markers.items():
+            if marker in text:
+                result[key] = shape.placeholder_format.idx
+                break
+    return result
+
+
+def _legacy_set_text(shape: Any, value: str, *, size: Optional[int] = None) -> None:
+    frame = shape.text_frame
+    frame.clear()
+    paragraph = frame.paragraphs[0]
+    paragraph.text = value
+    if size is not None:
+        paragraph.font.size = PptxPt(size)
+
+
+def _render_template_pptx(
+    request: ExportRequest,
+    records: Sequence[Mapping[str, Any]],
+    template_path: Path,
+) -> bytes:
+    """Render the marker-based contract from the supplied legacy main.py."""
+
+    presentation = Presentation(str(template_path))
+    cover_layout = _legacy_layout(presentation, "CoverLayout", 0)
+    news_layout = _legacy_layout(presentation, "NewsLayout", 1)
+    placeholder_map = _legacy_placeholder_map(news_layout)
+    month_label = datetime.now().strftime("%b'%y")
+
+    cover = presentation.slides.add_slide(cover_layout)
+    for shape in cover.shapes:
+        if shape.has_text_frame and "#DATE_HERE" in shape.text.upper():
+            _legacy_set_text(shape, month_label)
+
+    for record in records:
+        slide = presentation.slides.add_slide(news_layout)
+        for shape in slide.placeholders:
+            index = shape.placeholder_format.idx
+            if index == placeholder_map.get("title"):
+                _legacy_set_text(shape, str(record.get("title") or "Untitled signal"))
+            elif index == placeholder_map.get("summary"):
+                summary = str(record.get("summary") or "Summary unavailable.")
+                frame = shape.text_frame
+                frame.clear()
+                sentences = [item.strip() for item in re.split(r"(?<=[.!?])\s+", summary) if item.strip()]
+                for sentence_index, sentence in enumerate(sentences or [summary]):
+                    paragraph = frame.paragraphs[0] if sentence_index == 0 else frame.add_paragraph()
+                    paragraph.text = sentence
+                    paragraph.level = 0
+                    paragraph.font.name = "Calibri"
+                    paragraph.font.size = PptxPt(18)
+            elif index == placeholder_map.get("link"):
+                _legacy_set_text(shape, str(record.get("article_url") or ""), size=10)
+            elif index == placeholder_map.get("insight"):
+                insight = str(record.get("insight") or record.get("intent") or "Unavailable")
+                _legacy_set_text(shape, f"Insight : {insight}", size=14)
+            elif index == placeholder_map.get("date"):
+                _legacy_set_text(shape, month_label)
+            elif index == placeholder_map.get("team"):
+                metadata = record.get("metadata") if isinstance(record.get("metadata"), Mapping) else {}
+                team = str(metadata.get("team") or "ALL")
+                _legacy_set_text(shape, f"Targeted SRID TEAM : {team}")
+            elif index == placeholder_map.get("picture") and request.include_images:
+                # Remote image fetching remains deliberately disabled in the
+                # export renderer. Preserve the template's picture frame and
+                # attach the source URL as its click target when one exists.
+                image_url = str(record.get("image_url") or "").strip()
+                if image_url:
+                    try:
+                        shape.click_action.hyperlink.address = image_url
+                    except (AttributeError, ValueError):
+                        pass
+
+    presentation.core_properties.title = EXPORT_TITLE
+    presentation.core_properties.subject = f"{request.profile.value.title()} profile intelligence"
+    presentation.core_properties.author = PRODUCT_NAME
+    presentation.core_properties.last_modified_by = PRODUCT_NAME
+    output = io.BytesIO()
+    presentation.save(output)
+    return _canonicalize_zip(output.getvalue())
+
+
 def _render_pptx(request: ExportRequest, records: Sequence[Mapping[str, Any]]) -> bytes:
+    template_path = _pptx_template_path()
+    if template_path is not None:
+        return _render_template_pptx(request, records, template_path)
     presentation = Presentation()
     presentation.slide_width = Inches(13.333)
     presentation.slide_height = Inches(7.5)
-    presentation.core_properties.title = "Signalroom Intelligence Export"
+    presentation.core_properties.title = EXPORT_TITLE
     presentation.core_properties.subject = f"{request.profile.value.title()} profile intelligence"
-    presentation.core_properties.author = "Signalroom"
-    presentation.core_properties.last_modified_by = "Signalroom"
+    presentation.core_properties.author = PRODUCT_NAME
+    presentation.core_properties.last_modified_by = PRODUCT_NAME
     presentation.core_properties.created = _FIXED_DOCUMENT_TIME
     presentation.core_properties.modified = _FIXED_DOCUMENT_TIME
 
@@ -557,7 +692,7 @@ def _render_pptx(request: ExportRequest, records: Sequence[Mapping[str, Any]]) -
     accent_bar.line.fill.background()
     _pptx_text(
         title_slide,
-        "SIGNALROOM · INTELLIGENCE EXPORT",
+        f"{PRODUCT_NAME.upper()} · INTELLIGENCE EXPORT",
         left=1.15,
         top=1.1,
         width=10.8,

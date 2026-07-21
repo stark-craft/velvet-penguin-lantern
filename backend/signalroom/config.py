@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Mapping, Optional, Tuple
@@ -86,6 +87,7 @@ class Settings(BaseModel):
     sites_dir: Path = Path("sites")
     model_dir: Path = Path("models")
     crawl_output_dir: Path = Path("runtime/crawls")
+    stream_crawler_logs: bool = True
 
     scheduler_enabled: bool = True
     schedule_interval_hours: int = Field(default=4, ge=1, le=168)
@@ -103,6 +105,8 @@ class Settings(BaseModel):
     summarization_model: str = "sshleifer/distilbart-cnn-12-6"
 
     admin_key: Optional[SecretStr] = None
+    approval_key: SecretStr = SecretStr("2741")
+    gatekeeper_key: SecretStr = SecretStr("6384")
     admin_emails: Tuple[str, ...] = ()
     analytics_emails: Tuple[str, ...] = ()
     admin_ips: Tuple[str, ...] = ()
@@ -128,6 +132,14 @@ class Settings(BaseModel):
         if normalized not in {"development", "test", "production"}:
             raise ValueError("environment must be development, test, or production")
         return normalized
+
+    @field_validator("approval_key", "gatekeeper_key")
+    @classmethod
+    def validate_editorial_key(cls, value: SecretStr) -> SecretStr:
+        key = value.get_secret_value()
+        if not re.fullmatch(r"\d{4}", key):
+            raise ValueError("editorial keys must contain exactly four digits")
+        return value
 
     @field_validator("timezone_name")
     @classmethod
@@ -212,8 +224,9 @@ class Settings(BaseModel):
         summarization_model_id = env.get(
             "SIGNALROOM_SUMMARIZATION_MODEL", "sshleifer/distilbart-cnn-12-6"
         )
+        environment = env.get("SIGNALROOM_ENV", "development")
         return cls(
-            environment=env.get("SIGNALROOM_ENV", "development"),
+            environment=environment,
             host=env.get("SIGNALROOM_HOST", "127.0.0.1"),
             port=int(env.get("SIGNALROOM_PORT", "8000")),
             cors_origins=_csv(env.get("SIGNALROOM_CORS_ORIGINS"))
@@ -231,6 +244,11 @@ class Settings(BaseModel):
             model_dir=Path(env.get("SIGNALROOM_MODEL_DIR", "models")),
             crawl_output_dir=Path(
                 env.get("SIGNALROOM_CRAWL_OUTPUT_DIR", "runtime/crawls")
+            ),
+            stream_crawler_logs=_boolean(
+                "SIGNALROOM_STREAM_CRAWLER_LOGS",
+                env.get("SIGNALROOM_STREAM_CRAWLER_LOGS"),
+                True,
             ),
             scheduler_enabled=_boolean(
                 "SIGNALROOM_SCHEDULER_ENABLED",
@@ -276,6 +294,8 @@ class Settings(BaseModel):
                 summarization_model_id,
             ),
             admin_key=_optional_secret(env.get("SIGNALROOM_ADMIN_KEY")),
+            approval_key=SecretStr(env.get("SIGNALROOM_APPROVAL_KEY", "2741")),
+            gatekeeper_key=SecretStr(env.get("SIGNALROOM_GATEKEEPER_KEY", "6384")),
             admin_emails=_csv(env.get("SIGNALROOM_ADMIN_EMAILS")),
             analytics_emails=_csv(env.get("SIGNALROOM_ANALYTICS_EMAILS")),
             admin_ips=_csv(env.get("SIGNALROOM_ADMIN_IPS")),
@@ -288,12 +308,16 @@ class Settings(BaseModel):
             trusted_proxy_ips=(
                 _csv(env.get("SIGNALROOM_TRUSTED_PROXY_IPS"))
                 if "SIGNALROOM_TRUSTED_PROXY_IPS" in env
-                else ("127.0.0.1", "::1")
+                else (
+                    ("127.0.0.1", "::1", "0.0.0.0")
+                    if environment.casefold() in {"development", "dev"}
+                    else ("127.0.0.1", "::1")
+                )
             ),
             trust_proxy_headers=_boolean(
                 "SIGNALROOM_TRUST_PROXY_HEADERS",
                 env.get("SIGNALROOM_TRUST_PROXY_HEADERS"),
-                False,
+                environment.casefold() in {"development", "dev"},
             ),
             trust_identity_headers=_boolean(
                 "SIGNALROOM_TRUST_IDENTITY_HEADERS",

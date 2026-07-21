@@ -171,7 +171,10 @@ class PipelineTests(unittest.TestCase):
             for source in clusters.items[0].metadata.get("sources") or []
         }
         self.assertEqual(source_article_ids, stored_article_ids)
-        self.assertEqual(len(self.repository.list_job_events(job_id)), 4)
+        events = self.repository.list_job_events(job_id)
+        self.assertGreaterEqual(len(events), 7)
+        self.assertTrue(any("MiniLM" in event.message for event in events))
+        self.assertTrue(any("gatekeeper" in event.message.casefold() for event in events))
 
     def test_same_canonical_article_can_join_both_profiles(self):
         first = self.pipeline.run_profile(profile_id="default")
@@ -182,6 +185,16 @@ class PipelineTests(unittest.TestCase):
             self.repository.list_articles(profile=ProfileId.DEFAULT).items[0].stable_id
         )
         self.assertEqual(set(article.profiles), {ProfileId.DEFAULT, ProfileId.BROADCAST})
+
+    def test_repeat_scheduler_run_reuses_source_provenance_ids(self):
+        first = self.pipeline.run_profile(profile_id="default", trigger="scheduler")
+        second = self.pipeline.run_profile(profile_id="default", trigger="scheduler")
+        self.assertEqual(first["counters"]["retained"], 1)
+        self.assertEqual(second["counters"]["retained"], 1)
+        articles = self.repository.list_articles(
+            profile=ProfileId.DEFAULT, page=PageParams(limit=10)
+        )
+        self.assertEqual(len(articles.items), 2)
 
     def test_queued_job_becomes_terminal_when_profile_is_busy(self):
         job = self.repository.create_job(CrawlJobCreate(profile=ProfileId.DEFAULT))

@@ -17,6 +17,7 @@ from signalroom.models import (
     BriefingSnapshotCreate,
     ClusterCreate,
     ClusterMemberCreate,
+    PageParams,
     ProfileId,
     make_stable_id,
 )
@@ -217,6 +218,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(me.status_code, 200)
         self.assertEqual(me.json()["active_profile"], "default")
         self.assertTrue(me.json()["actor_id"].startswith("anonymous:"))
+        self.assertEqual(me.json()["current_ip"], "203.0.113.8")
 
         profiles = self.client.get("/api/v1/profiles")
         self.assertEqual([item["id"] for item in profiles.json()], ["default"])
@@ -428,6 +430,7 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(saved.status_code, 200)
         self.assertEqual(saved.json()["display_name"], "Tony Stark")
         self.assertEqual(saved.json()["contact_email"], "tony@example.com")
+        self.assertFalse(saved.json()["pet_enabled"])
         self.assertTrue(saved.json()["actor_id"].startswith("anonymous:"))
 
         refreshed = self.client.get("/api/v1/me")
@@ -442,6 +445,23 @@ class ApiTests(unittest.TestCase):
         )
         self.assertEqual(invalid.status_code, 422)
 
+        event = self.client.post(
+            "/api/v1/events",
+            json={"event_type": "page_view", "session_id": str(uuid4()), "path": "/briefing"},
+        )
+        self.assertEqual(event.status_code, 201)
+        renamed = self.client.put(
+            "/api/v1/me/preferences",
+            json={"display_name": "Pepper Potts", "contact_email": None},
+        )
+        self.assertEqual(renamed.status_code, 200)
+        analytics = self.client.get(
+            "/api/v1/admin/analytics/detail?window_days=7",
+            headers=self.admin_headers,
+        )
+        self.assertEqual(analytics.status_code, 200)
+        self.assertEqual(analytics.json()["users"][0]["display_name"], "Pepper Potts")
+
     def test_actions_worklists_feedback_and_telemetry(self) -> None:
         action = self.client.post(
             f"/api/v1/articles/{self.article.id}/actions",
@@ -452,13 +472,19 @@ class ApiTests(unittest.TestCase):
 
         denied_approval = self.client.post(
             f"/api/v1/articles/{self.article.id}/actions",
-            json={"action": "approve"},
+            json={"action": "approve", "approval_key": "2741"},
         )
         self.assertEqual(denied_approval.status_code, 403)
         approved = self.client.post(
             f"/api/v1/articles/{self.article.id}/actions",
             headers=self.admin_headers,
-            json={"action": "approve"},
+            json={"action": "approve", "approval_key": "0000"},
+        )
+        self.assertEqual(approved.status_code, 403)
+        approved = self.client.post(
+            f"/api/v1/articles/{self.article.id}/actions",
+            headers=self.admin_headers,
+            json={"action": "approve", "approval_key": "2741"},
         )
         self.assertEqual(approved.status_code, 201)
         self.assertTrue(approved.json()["disposition"]["approved"])
@@ -469,6 +495,12 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(
             {item["action"] for item in viewer_actions.json()["items"]},
             {"select", "approve"},
+        )
+        notifications = self.client.get("/api/v1/notifications")
+        self.assertEqual(notifications.status_code, 200)
+        self.assertEqual(
+            {item["kind"] for item in notifications.json()},
+            {"briefing", "approval"},
         )
 
         worklist = self.client.get("/api/v1/worklists?state=selected")
@@ -552,22 +584,99 @@ class ApiTests(unittest.TestCase):
             {str(self.article.id), str(self.singleton_article.id)},
         )
 
-    def test_clear_review_returns_an_approved_article_to_new(self) -> None:
+    def test_only_submitter_or_admin_can_clear_shared_review(self) -> None:
+        submitted = self.client.post(
+            f"/api/v1/articles/{self.supporting_article.id}/actions",
+            json={"action": "mark_under_review"},
+        )
+        self.assertEqual(submitted.status_code, 201)
+        self.assertTrue(submitted.json()["disposition"]["under_review"])
+
+        shared = self.client.get(
+            "/api/v1/worklists?state=under_review", headers=self.admin_headers
+        )
+        self.assertEqual(shared.status_code, 200)
+        self.assertEqual(
+            shared.json()["items"][0]["disposition"]["actor_id"],
+            submitted.json()["action"]["actor_id"],
+        )
+
         approved = self.client.post(
             f"/api/v1/articles/{self.supporting_article.id}/actions",
             headers=self.admin_headers,
-            json={"action": "approve"},
+            json={"action": "approve", "approval_key": "2741"},
         )
         self.assertEqual(approved.status_code, 201)
         self.assertTrue(approved.json()["disposition"]["approved"])
 
         cleared = self.client.post(
             f"/api/v1/articles/{self.supporting_article.id}/actions",
+            headers=self.admin_headers,
             json={"action": "clear_review"},
         )
         self.assertEqual(cleared.status_code, 201)
         self.assertFalse(cleared.json()["disposition"]["approved"])
         self.assertFalse(cleared.json()["disposition"]["under_review"])
+
+    def test_gatekeeper_accepts_its_key_without_granting_admin_capability(self) -> None:
+        denied = self.client.get(
+            "/api/v1/gatekeeper/audit",
+            headers={"x-signalroom-gatekeeper-key": "0000"},
+        )
+        self.assertEqual(denied.status_code, 403)
+        allowed = self.client.get(
+            "/api/v1/gatekeeper/audit",
+            headers={"x-signalroom-gatekeeper-key": "6384"},
+        )
+        self.assertEqual(allowed.status_code, 200)
+        self.assertEqual(allowed.json()["profile"], "default")
+
+    def test_selected_and_saved_are_private_while_review_is_shared(self) -> None:
+        self.client.post(
+            f"/api/v1/articles/{self.article.id}/actions",
+            json={"action": "select"},
+        )
+        self.client.post(
+            f"/api/v1/articles/{self.article.id}/actions",
+            json={"action": "save"},
+        )
+        self.client.post(
+            f"/api/v1/articles/{self.article.id}/actions",
+            json={"action": "mark_under_review"},
+        )
+        self.assertEqual(
+            len(self.client.get("/api/v1/worklists?state=selected").json()["items"]), 1
+        )
+        self.assertEqual(
+            len(self.client.get("/api/v1/worklists?state=saved").json()["items"]), 1
+        )
+        self.assertEqual(
+            len(self.repository.list_worklist(
+                actor_id="a-different-user",
+                profile=ProfileId.DEFAULT,
+                state="selected",
+                page=PageParams(limit=25),
+            ).items),
+            0,
+        )
+        self.assertEqual(
+            len(self.repository.list_worklist(
+                actor_id="a-different-user",
+                profile=ProfileId.DEFAULT,
+                state="saved",
+                page=PageParams(limit=25),
+            ).items),
+            0,
+        )
+        self.assertEqual(
+            len(self.repository.list_worklist(
+                actor_id="a-different-user",
+                profile=ProfileId.DEFAULT,
+                state="under_review",
+                page=PageParams(limit=25),
+            ).items),
+            1,
+        )
 
     def test_admin_surfaces_require_capability_and_submit_durable_job(self) -> None:
         denied = self.client.get("/api/v1/admin/analytics")

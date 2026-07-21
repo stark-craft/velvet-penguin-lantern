@@ -32,6 +32,7 @@ export async function resolveAccessCapabilities(email: string | null): Promise<A
   const elevated = localPreview || emailAllowed || ipAllowed;
 
   return {
+    isAdmin: false,
     canViewAnalytics: elevated,
     canSwitchDeskProfile: elevated,
     canReviewGatekeeper: elevated,

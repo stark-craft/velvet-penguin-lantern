@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ScanJob } from "@/lib/signalroom-client";
+import type { DeskNotification, ScanJob } from "@/lib/signalroom-client";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { greetingFor } from "@/lib/personalization";
 import type { AdvancedFilters, Article, BriefingHistoryRecord, FeedbackCategory, FeedbackSubmission, InterestSignal, SourceRecord, ViewerProfile } from "@/types/news";
 import { Drawer, Icon, Modal, PriorityBadge, SafeImage, ScoreRing, SignalBadge, SourceBadge, StatusBadge } from "@/components/ui";
 
@@ -66,31 +68,39 @@ export function ProfileModal({
   viewer,
   accessLabel,
   onSave,
+  required = false,
 }: {
   open: boolean;
   onClose: () => void;
   viewer: ViewerProfile;
   accessLabel: string;
   onSave: (viewer: ViewerProfile) => Promise<void>;
+  required?: boolean;
 }) {
   const [displayName, setDisplayName] = useState(viewer.displayName);
   const [contactEmail, setContactEmail] = useState(viewer.contactEmail);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [petEnabled, setPetEnabled] = useState(viewer.petEnabled);
+  const [petKind, setPetKind] = useState(viewer.petKind);
+  const [petColor, setPetColor] = useState(viewer.petColor);
   const trimmedName = displayName.trim();
   const emailValid = !contactEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim());
   const firstName = trimmedName.split(/\s+/)[0] || "Analyst";
   const canSave = trimmedName.length > 0 && trimmedName.length <= 60 && emailValid;
-  const save = async () => { setSaving(true); setSaveError(null); try { await onSave({ ...viewer, displayName: trimmedName, contactEmail: contactEmail.trim() }); onClose(); } catch (reason) { setSaveError(reason instanceof Error ? reason.message : "Identity could not be saved"); } finally { setSaving(false); } };
-  return <Modal open={open} onClose={onClose} title="Your Signalroom identity" eyebrow="Personalize this desk" className="profile-modal" dialogId="profile-dialog" footer={<><button className="ghost-button" onClick={onClose} disabled={saving}>Cancel</button><button className="primary-button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Saving…" : "Save identity"} <Icon>✓</Icon></button></>}>
-    <div className="profile-preview"><div className="profile-preview-mark"><i /><i /><i /><i /></div><div><span>YOUR NEXT BRIEFING</span><h3>Good morning, {firstName}.</h3><p>Your name personalizes the desk’s greetings, ownership labels, and saved intelligence—without pretending the shared feed is different.</p></div></div>
+  const moment = greetingFor();
+  const save = async () => { setSaving(true); setSaveError(null); try { await onSave({ ...viewer, displayName: trimmedName, contactEmail: contactEmail.trim(), petEnabled, petKind, petColor }); onClose(); } catch (reason) { setSaveError(reason instanceof Error ? reason.message : "Identity could not be saved"); } finally { setSaving(false); } };
+  return <Modal open={open} onClose={required ? () => undefined : onClose} title={required ? `Make ${PRODUCT_NAME} yours` : `Your ${PRODUCT_NAME} identity`} eyebrow={required ? "One tiny introduction" : "Personalize this desk"} className="profile-modal" dialogId="profile-dialog" footer={<>{!required && <button className="ghost-button" onClick={onClose} disabled={saving}>Cancel</button>}<button className="primary-button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Saving…" : required ? "Enter my desk" : "Save identity"} <Icon>✓</Icon></button></>}>
+    <div className="profile-preview"><div className="profile-preview-mark"><i /><i /><i /><i /></div><div><span>{moment.symbol} YOUR NEXT BRIEFING</span><h3>{moment.greeting}, {firstName}.</h3><p>{required ? "Choose any unique name—real, fictional, serious, or wonderfully strange." : "Your name personalizes greetings and analytics without changing the shared feed."}</p></div></div>
     <div className="profile-form-grid">
-      <label className="field-label"><span>What should Signalroom call you?</span><input value={displayName} maxLength={60} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your preferred name" autoComplete="name" aria-required="true" /><small>{displayName.length}/60 · You can change this any time.</small></label>
+      <label className="field-label"><span>What should {PRODUCT_NAME} call you?</span><input value={displayName} maxLength={60} onChange={(event) => setDisplayName(event.target.value)} placeholder="Your preferred name" autoComplete="name" aria-required="true" /><small>{displayName.length}/60 · You can change this any time.</small></label>
       <label className="field-label"><span>Contact email <em>Optional</em></span><input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} placeholder="you@company.com" autoComplete="email" inputMode="email" aria-invalid={!emailValid} aria-describedby={!emailValid ? "profile-contact-error" : undefined} />{!emailValid && <small id="profile-contact-error" className="field-error">Enter a valid email address or leave this blank.</small>}</label>
       {viewer.accountEmail && <div className="account-identity-row"><span>Resolved identity</span><strong>{viewer.accountEmail}</strong><small>Read-only · supplied by the trusted company access layer.</small></div>}
+      <div className="account-identity-row"><span>Your current network address</span><strong>{viewer.currentIp}</strong><small>Visible only to you in this response. The backend stores only its protected pseudonym.</small></div>
+      <fieldset className="pet-picker"><legend>Desk companion <em>Optional</em></legend><label className="pet-toggle"><input type="checkbox" checked={petEnabled} onChange={(event) => setPetEnabled(event.target.checked)} /><span>Let a tiny companion live on my desk</span></label>{petEnabled && <><div className="pet-choice-row">{(["orbit", "pixel", "cloud"] as const).map((kind) => <button type="button" className={petKind === kind ? "active" : ""} key={kind} onClick={() => setPetKind(kind)}><span>{kind === "orbit" ? "•ᴗ•" : kind === "pixel" ? "•ﻌ•" : "˶ᵔ ᵕ ᵔ˶"}</span>{kind}</button>)}</div><div className="pet-color-row">{(["violet", "coral", "mint", "gold"] as const).map((color) => <button type="button" aria-label={`${color} companion`} className={`${color} ${petColor === color ? "active" : ""}`} key={color} onClick={() => setPetColor(color)} />)}</div></>}</fieldset>
       {saveError && <p className="field-error" role="alert">{saveError}</p>}
     </div>
-    <div className="identity-access-card"><span className="identity-access-icon"><Icon>⌾</Icon></span><div><strong>{accessLabel}</strong><p>Your network identity is captured automatically by the server. It is never editable here, and this screen does not reveal the raw address.</p></div><StatusBadge tone={accessLabel === "Standard desk" ? "neutral" : "approved"}>{viewer.roleLabel}</StatusBadge></div>
+    <div className="identity-access-card"><span className="identity-access-icon"><Icon>⌾</Icon></span><div><strong>{accessLabel}</strong><p>Your address is never editable. Activity is joined by a stable protected pseudonym, while analytics resolves your latest display name at read time.</p></div><StatusBadge tone={accessLabel === "Standard desk" ? "neutral" : "approved"}>{viewer.roleLabel}</StatusBadge></div>
     <p className="privacy-footnote"><Icon>◎</Icon>Display name and optional contact email are saved by the backend for this network-scoped identity.</p>
   </Modal>;
 }
@@ -123,10 +133,10 @@ export function FeedbackModal({
   const reset = () => { setRating(0); setCategory("Idea"); setMessage(""); setAllowFollowUp(false); setContactEmail(viewer.contactEmail); setIncludeContext(true); setReference(null); };
   const close = () => { if (reference) reset(); onClose(); };
   const submit = async () => { setSubmitting(true); setSubmitError(null); try { const id = await onSubmit({ rating, category, message: message.trim(), allowFollowUp, contactEmail: allowFollowUp && contactEmail.trim() ? contactEmail.trim() : undefined, includeContext, context: includeContext ? context : undefined }); setReference(id); } catch (error) { setSubmitError(error instanceof Error ? error.message : "Feedback could not be submitted"); } finally { setSubmitting(false); } };
-  return <Modal open={open} onClose={close} title={reference ? "Feedback received" : "Help shape Signalroom"} eyebrow={reference ? "Voice of customer" : `Voice of customer · ${viewer.displayName}`} className="feedback-modal" footer={reference ? <button className="primary-button" onClick={() => { reset(); onClose(); }}>Back to the desk <Icon>→</Icon></button> : <><button className="ghost-button" onClick={close}>Keep draft & close</button><button className="primary-button" disabled={!canSubmit || submitting} onClick={() => void submit()}>{submitting ? "Sending…" : "Send feedback"} <Icon>→</Icon></button></>}>
+  return <Modal open={open} onClose={close} title={reference ? "Feedback received" : `Help shape ${PRODUCT_NAME}`} eyebrow={reference ? "Voice of customer" : `Voice of customer · ${viewer.displayName}`} className="feedback-modal" footer={reference ? <button className="primary-button" onClick={() => { reset(); onClose(); }}>Back to the desk <Icon>→</Icon></button> : <><button className="ghost-button" onClick={close}>Keep draft & close</button><button className="primary-button" disabled={!canSubmit || submitting} onClick={() => void submit()}>{submitting ? "Sending…" : "Send feedback"} <Icon>→</Icon></button></>}>
     {reference ? <div className="feedback-success" role="status" aria-live="polite" tabIndex={-1}><span>✓</span><h3>Thank you. This is now part of the product conversation.</h3><p>Your note was saved with reference <strong>{reference}</strong>. The team can triage it alongside usage context without exposing article content or your raw IP.</p><div><span>Category</span><strong>{category}</strong><span>Rating</span><strong>{rating}/5</strong></div></div> : <>
       <div className="feedback-intro"><span className="feedback-orbit"><i /><b /><Icon>◉</Icon></span><div><h3>What was this experience like?</h3><p>Tell us what helped, what slowed you down, or what you wish existed. Specific feedback is more useful than polite feedback.</p></div></div>
-      <fieldset className="rating-fieldset"><legend>How useful is Signalroom today?</legend><div>{[[1,"Blocked"],[2,"Frustrating"],[3,"Okay"],[4,"Useful"],[5,"Excellent"]].map(([value,label]) => <button type="button" key={value} className={rating === value ? "active" : ""} aria-pressed={rating === value} onClick={() => setRating(value as number)}><strong>{value}</strong><span>{label}</span></button>)}</div></fieldset>
+      <fieldset className="rating-fieldset"><legend>How useful is {PRODUCT_NAME} today?</legend><div>{[[1,"Blocked"],[2,"Frustrating"],[3,"Okay"],[4,"Useful"],[5,"Excellent"]].map(([value,label]) => <button type="button" key={value} className={rating === value ? "active" : ""} aria-pressed={rating === value} onClick={() => setRating(value as number)}><strong>{value}</strong><span>{label}</span></button>)}</div></fieldset>
       <fieldset className="category-fieldset"><legend>What is this about?</legend><div>{categories.map((item) => <button type="button" className={category === item ? "active" : ""} aria-pressed={category === item} key={item} onClick={() => setCategory(item)}>{item}</button>)}</div></fieldset>
       <label className="feedback-message"><span>Your feedback</span><textarea value={message} maxLength={1200} onChange={(event) => setMessage(event.target.value)} placeholder="For example: I could not tell why two similar articles were clustered, or I loved how the dossier showed source provenance…" /><small>{message.length}/1200 · Minimum 8 characters</small></label>
       <div className="feedback-options"><label><input type="checkbox" checked={includeContext} onChange={(event) => setIncludeContext(event.target.checked)} /><span><strong>Include diagnostic context</strong><small>{context.page} · {context.profile} desk · {context.theme} theme{context.articleId ? " · current dossier" : ""}</small></span></label><label><input type="checkbox" checked={allowFollowUp} onChange={(event) => setAllowFollowUp(event.target.checked)} /><span><strong>The product team may follow up</strong><small>Only the contact address below is attached.</small></span></label>{allowFollowUp && <label className="followup-email"><span>Follow-up email</span><input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} placeholder="you@company.com" inputMode="email" aria-invalid={!emailValid} aria-describedby={!emailValid ? "feedback-contact-error" : undefined} />{!emailValid && <small id="feedback-contact-error" className="field-error">Enter a valid email or leave this blank.</small>}</label>}</div>
@@ -178,12 +188,38 @@ export function ExportModal({ open, onClose, onExport, selectedCount = 0 }: { op
   const run = async () => { setState("running"); setError(null); try { await onExport(format); setState("complete"); } catch (reason) { setError(reason instanceof Error ? reason.message : "Export failed"); setState("error"); } };
   const close = () => { setState("idle"); setError(null); onClose(); };
   return <Modal open={open} onClose={close} title={state === "complete" ? "Export downloaded" : state === "running" ? "Preparing export" : "Export intelligence"} eyebrow="Backend-generated output" className="export-modal" footer={state !== "running" ? <><button className="ghost-button" onClick={close}>Close</button>{state !== "complete" && <button className="primary-button" onClick={() => void run()}>Start export <Icon>→</Icon></button>}</> : undefined}>
-    {state === "idle" || state === "error" ? <><div className="format-grid">{formats.map(([id, icon, name]) => <button className={format === id ? "active" : ""} key={id} onClick={() => setFormat(id)}><span>{icon}</span><strong>{name}</strong><small>Generated by the Signalroom backend</small></button>)}</div><div className="export-summary"><Icon>↥</Icon><div><strong>{selectedCount ? `${selectedCount} selected articles` : "Current filtered articles"}</strong><span>Summaries, source links, images, and decision metadata are included.</span></div></div>{error && <p className="field-error" role="alert">{error}</p>}</> : state === "running" ? <div className="export-progress"><div className="file-animation"><span>{format[0].toUpperCase()}</span><i /><b /></div><h3>Generating the real file</h3><p>The download begins when the backend response is ready.</p></div> : <div className="export-complete"><span>✓</span><h3>Your export was downloaded</h3><p>The browser received the file generated by the backend.</p></div>}
+    {state === "idle" || state === "error" ? <><div className="format-grid">{formats.map(([id, icon, name]) => <button className={format === id ? "active" : ""} key={id} onClick={() => setFormat(id)}><span>{icon}</span><strong>{name}</strong><small>Generated by the {PRODUCT_NAME} backend</small></button>)}</div><div className="export-summary"><Icon>↥</Icon><div><strong>{selectedCount ? `${selectedCount} selected articles` : "Current filtered articles"}</strong><span>Summaries, source links, images, and decision metadata are included.</span></div></div>{error && <p className="field-error" role="alert">{error}</p>}</> : state === "running" ? <div className="export-progress"><div className="file-animation"><span>{format[0].toUpperCase()}</span><i /><b /></div><h3>Generating the real file</h3><p>The download begins when the backend response is ready.</p></div> : <div className="export-complete"><span>✓</span><h3>Your export was downloaded</h3><p>The browser received the file generated by the backend.</p></div>}
   </Modal>;
 }
 
-export function NotificationsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  return <Drawer open={open} onClose={onClose} title="Notifications" label="Desk activity" className="notification-drawer"><div className="notification-list"><p>No notification endpoint is configured. Signalroom does not show fabricated activity.</p></div></Drawer>;
+export function NotificationsDrawer({ open, onClose, items, readIds, onMarkAllRead, onOpenArticle }: { open: boolean; onClose: () => void; items: DeskNotification[]; readIds: Set<string>; onMarkAllRead: () => void; onOpenArticle: (id: string) => void }) {
+  return <Drawer open={open} onClose={onClose} title="Notifications" label="Desk activity" className="notification-drawer"><div className="notification-tabs"><strong>{items.filter((item) => !readIds.has(item.id)).length} unread</strong><button className="text-button" onClick={onMarkAllRead} disabled={!items.length}>Mark all read</button></div><div className="notification-list">{items.map((item) => <article className={readIds.has(item.id) ? "is-read" : ""} key={item.id}><span className={`notification-icon ${item.kind}`}>{item.kind === "briefing" ? "✦" : item.kind === "approval" ? "✓" : "⌕"}</span><div><strong>{item.title}</strong><p>{item.message}</p><time>{new Date(item.created_at).toLocaleString()}</time>{item.article_id && <button className="text-button" onClick={() => onOpenArticle(item.article_id!)}>Open dossier <Icon>→</Icon></button>}</div>{!readIds.has(item.id) && <i className="unread-dot" aria-label="Unread" />}</article>)}{!items.length && <p className="notification-empty">You’re all caught up. Fresh briefings, completed searches, and approvals will appear here.</p>}</div></Drawer>;
+}
+
+export function ApprovalModal({ open, articleTitle, onClose, onApprove }: { open: boolean; articleTitle: string; onClose: () => void; onApprove: (key: string) => Promise<void> }) {
+  const [key, setKey] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const approve = async () => { setSubmitting(true); setError(null); try { await onApprove(key); setKey(""); onClose(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Approval failed"); setKey(""); } finally { setSubmitting(false); } };
+  return <Modal open={open} onClose={onClose} title="Unlock approval" eyebrow="Editorial security check" className="approval-modal" footer={<><button className="ghost-button" onClick={onClose} disabled={submitting}>Keep under review</button><button className="primary-button approved-button" onClick={() => void approve()} disabled={key.length !== 4 || submitting}>{submitting ? "Checking key…" : "Approve signal"} <Icon>✓</Icon></button></>}>
+    <div className="approval-lock"><div className="approval-lock-mark"><span>✓</span><i /></div><div><h3>One deliberate decision.</h3><p>You’re moving <strong>{articleTitle}</strong> into the approved column. Enter the four-digit editorial key to continue.</p></div></div>
+    <label className="approval-key-field"><span>Approval key</span><input autoFocus value={key} onChange={(event) => setKey(event.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{4}" maxLength={4} aria-invalid={Boolean(error)} /><span className="approval-key-dots" aria-hidden="true">{[0, 1, 2, 3].map((index) => <i className={key.length > index ? "filled" : ""} key={index} />)}</span></label>
+    {error && <p className="field-error" role="alert">{error}</p>}
+    <p className="privacy-footnote"><Icon>⌾</Icon>The key is verified by the backend and is never stored in article history.</p>
+  </Modal>;
+}
+
+export function GatekeeperAccessModal({ open, onClose, onUnlock }: { open: boolean; onClose: () => void; onUnlock: (key: string) => Promise<void> }) {
+  const [key, setKey] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const unlock = async () => { setSubmitting(true); setError(null); try { await onUnlock(key); setKey(""); onClose(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Gatekeeper access failed"); setKey(""); } finally { setSubmitting(false); } };
+  return <Modal open={open} onClose={onClose} title="Enter the Gatekeeper" eyebrow="Protected AI review room" className="approval-modal gatekeeper-access-modal" footer={<><button className="ghost-button" onClick={onClose} disabled={submitting}>Return to briefing</button><button className="primary-button" onClick={() => void unlock()} disabled={key.length !== 4 || submitting}>{submitting ? "Verifying…" : "Unlock Gatekeeper"} <Icon>◎</Icon></button></>}>
+    <div className="approval-lock"><div className="approval-lock-mark gatekeeper-lock-mark"><span>◎</span><i /></div><div><h3>Relevance decisions live behind this door.</h3><p>Enter the four-digit Gatekeeper key to inspect retained, review, and dropped signals. The key stays only in this browser session.</p></div></div>
+    <label className="approval-key-field"><span>Gatekeeper key</span><input autoFocus value={key} onChange={(event) => setKey(event.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" autoComplete="off" pattern="[0-9]{4}" maxLength={4} aria-invalid={Boolean(error)} /><span className="approval-key-dots" aria-hidden="true">{[0, 1, 2, 3].map((index) => <i className={key.length > index ? "filled" : ""} key={index} />)}</span></label>
+    {error && <p className="field-error" role="alert">{error}</p>}
+    <p className="privacy-footnote"><Icon>⌾</Icon>The backend verifies this key. It is not written to analytics or editorial history.</p>
+  </Modal>;
 }
 
 export function SourceModal({ open, onClose, source, onSave }: { open: boolean; onClose: () => void; source: SourceRecord | null; onSave: (source: SourceRecord) => Promise<void> | void }) {

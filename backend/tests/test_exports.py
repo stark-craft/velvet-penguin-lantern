@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import unittest
 import zipfile
 from pathlib import Path
@@ -36,7 +37,7 @@ class ExportServiceTests(unittest.TestCase):
         self.retained = self._article(
             suffix="retained",
             profile=ProfileId.DEFAULT,
-            title="=Signalroom launch changes the market",
+            title="=newsScrapper launch changes the market",
             retained=True,
         )
         self.rejected = self._article(
@@ -153,7 +154,7 @@ class ExportServiceTests(unittest.TestCase):
         result = self.service.generate(self._request(ExportFormat.CSV))
         rows = list(csv.DictReader(io.StringIO(result.content.decode("utf-8-sig"))))
         self.assertEqual(result.media_type, "text/csv; charset=utf-8")
-        self.assertEqual(rows[0]["title"], "'=Signalroom launch changes the market")
+        self.assertEqual(rows[0]["title"], "'=newsScrapper launch changes the market")
         self.assertIn("https://wire.example/retained", rows[0]["source_urls"])
         self.assertEqual(rows[0]["keywords"], '["agent governance","enterprise AI"]')
 
@@ -175,7 +176,7 @@ class ExportServiceTests(unittest.TestCase):
                             for name in package.namelist()
                             if name.endswith(".xml")
                         ).decode("utf-8", errors="ignore")
-                    self.assertIn("Signalroom", xml)
+                    self.assertIn("newsScrapper", xml)
                     self.assertIn("https://wire.example/retained", xml)
                 elif export_format == ExportFormat.DOCX:
                     document = Document(io.BytesIO(first.content))
@@ -195,6 +196,31 @@ class ExportServiceTests(unittest.TestCase):
                     self.assertIn(self.retained.title, text)
                     self.assertIn("https://wire.example/retained", text)
                     self.assertIn("IMAGE URL", text)
+
+    def test_root_style_legacy_pptx_template_is_used_when_configured(self) -> None:
+        template_path = Path(self.temporary_directory.name) / "template.pptx"
+        template = Presentation()
+        signature_slide = template.slides.add_slide(template.slide_layouts[6])
+        signature_slide.shapes.add_textbox(0, 0, 100, 100).text = "LEGACY TEMPLATE SIGNATURE"
+        template.save(template_path)
+        previous = os.environ.get("SIGNALROOM_PPTX_TEMPLATE")
+        os.environ["SIGNALROOM_PPTX_TEMPLATE"] = str(template_path)
+        try:
+            result = self.service.generate(self._request(ExportFormat.PPTX))
+        finally:
+            if previous is None:
+                os.environ.pop("SIGNALROOM_PPTX_TEMPLATE", None)
+            else:
+                os.environ["SIGNALROOM_PPTX_TEMPLATE"] = previous
+        presentation = Presentation(io.BytesIO(result.content))
+        text = "\n".join(
+            shape.text
+            for slide in presentation.slides
+            for shape in slide.shapes
+            if hasattr(shape, "text")
+        )
+        self.assertEqual(len(presentation.slides), 3)
+        self.assertIn("LEGACY TEMPLATE SIGNATURE", text)
 
     def test_profile_membership_is_enforced_for_every_explicit_id(self) -> None:
         with self.assertRaises(ExportArticleNotFoundError):

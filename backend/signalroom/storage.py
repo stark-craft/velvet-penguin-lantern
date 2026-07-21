@@ -927,6 +927,16 @@ class SQLiteRepository:
             if row["article_id"] != str(article_id):
                 raise DuplicateRecordError("source stable ID belongs to a different article")
             return UUID(row["id"])
+        natural_row = connection.execute(
+            """
+            SELECT id FROM article_sources
+            WHERE article_id = ? AND profile = ? AND url = ?
+            """,
+            (str(article_id), source.profile.value, str(source.url)),
+        ).fetchone()
+        if natural_row:
+            # Compatibility with rows created by older job-scoped stable IDs.
+            return UUID(natural_row["id"])
         record_id = uuid4()
         try:
             connection.execute(
@@ -1579,6 +1589,53 @@ class SQLiteRepository:
             state["last_action_at"] = row["occurred_at"]
         return ArticleDisposition(**state)
 
+    def get_shared_disposition(
+        self, article_id: UUID, profile: ProfileId
+    ) -> ArticleDisposition:
+        rows = self.query(
+            """
+            SELECT actor_id, action, metadata_json, occurred_at, id
+            FROM article_actions
+            WHERE article_id = ? AND profile = ?
+              AND action IN ('mark_under_review', 'clear_review', 'approve')
+            ORDER BY occurred_at, id
+            """,
+            (str(article_id), ProfileId(profile).value),
+        )
+        owners: Dict[str, str] = {}
+        approved = False
+        current_actor = "shared"
+        last_action_at = None
+        for row in rows:
+            action = ArticleActionType(row["action"])
+            actor = str(row["actor_id"])
+            metadata = json_loads(row["metadata_json"], {})
+            if action == ArticleActionType.MARK_UNDER_REVIEW:
+                owners[actor] = row["occurred_at"]
+                approved = False
+                current_actor = actor
+            elif action == ArticleActionType.CLEAR_REVIEW:
+                if bool(metadata.get("clear_all_review")):
+                    owners.clear()
+                else:
+                    owners.pop(actor, None)
+                approved = False
+                current_actor = actor
+            elif action == ArticleActionType.APPROVE:
+                owners.clear()
+                approved = True
+                current_actor = actor
+            last_action_at = row["occurred_at"]
+        if owners:
+            current_actor = max(owners, key=lambda owner: (owners[owner], owner))
+        return ArticleDisposition(
+            article_id=article_id,
+            actor_id=current_actor,
+            under_review=bool(owners),
+            approved=approved,
+            last_action_at=last_action_at,
+        )
+
     def list_worklist(
         self,
         *,
@@ -1598,17 +1655,32 @@ class SQLiteRepository:
         }
         if state not in allowed_states:
             raise ValueError(f"unsupported worklist state: {state}")
-        article_rows = self.query(
-            """
-            SELECT DISTINCT article_id FROM article_actions
-            WHERE actor_id = ? AND profile = ? ORDER BY occurred_at DESC
-            """,
-            (actor_id, ProfileId(profile).value),
-        )
+        shared_state = state in {"under_review", "approved"}
+        if shared_state:
+            article_rows = self.query(
+                """
+                SELECT article_id, MAX(occurred_at) AS occurred_at FROM article_actions
+                WHERE profile = ? AND action IN ('mark_under_review', 'clear_review', 'approve')
+                GROUP BY article_id ORDER BY occurred_at DESC
+                """,
+                (ProfileId(profile).value,),
+            )
+        else:
+            article_rows = self.query(
+                """
+                SELECT DISTINCT article_id FROM article_actions
+                WHERE actor_id = ? AND profile = ? ORDER BY occurred_at DESC
+                """,
+                (actor_id, ProfileId(profile).value),
+            )
         worklist = []
         for row in article_rows:
             article_id = UUID(row["article_id"])
-            disposition = self.get_disposition(article_id, actor_id, profile)
+            disposition = (
+                self.get_shared_disposition(article_id, profile)
+                if shared_state
+                else self.get_disposition(article_id, actor_id, profile)
+            )
             matches = (
                 disposition.interesting is False
                 if state == "not_interested"

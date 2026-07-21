@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import logging
 import threading
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
@@ -35,6 +36,8 @@ from signalroom.services.classification import enrich_editorial_fields
 from signalroom.services.crawl_runner import CrawlResult, CrawlRunError, ScrapyRunner
 from signalroom.services.normalization import deduplicate_articles, normalize_article
 from signalroom.storage import SQLiteRepository
+
+logger = logging.getLogger(__name__)
 
 
 class PipelineBusyError(RuntimeError):
@@ -99,6 +102,13 @@ class PipelineService:
         message: str,
         payload: Optional[Dict[str, Any]] = None,
     ) -> None:
+        logger.info(
+            "[pipeline:%s:%s] %s%s",
+            job.profile.value,
+            event_type.value,
+            message,
+            f" | {payload}" if payload else "",
+        )
         self.repository.add_job_event(
             CrawlJobEventCreate(
                 job_id=job.id,
@@ -215,7 +225,6 @@ class PipelineService:
                 ArticleSourceCreate(
                     stable_id=make_stable_id(
                         "source",
-                        job.id,
                         profile.value,
                         source_id,
                         source_url,
@@ -357,6 +366,12 @@ class PipelineService:
                 f"{loaded.config.label} crawl started",
                 {"from_date": start.isoformat(), "to_date": end.isoformat()},
             )
+            self._event(
+                active_job,
+                CrawlJobEventType.PROGRESS,
+                "Crawler is loading source JSON and generating RSS/HTML entrypoints",
+                {"source_file": str(loaded.sources_path), "source_count": len(loaded.enabled_sites)},
+            )
 
             crawl = self._crawl(
                 loaded, active_job, start, end, active_keywords, active_sources
@@ -412,6 +427,12 @@ class PipelineService:
                 threshold=loaded.config.cluster_similarity_threshold,
                 embedder=self.embedder,
             )
+            self._event(
+                active_job,
+                CrawlJobEventType.PROGRESS,
+                "Loading MiniLM embeddings and starting semantic clustering",
+                {"model": self.settings.embedding_model_id},
+            )
             clustered = clusterer.cluster_with_metadata(normalized, profile=profile.value)
             clusters = clustered["clusters"]
             counters["clusters"] = len(clusters)
@@ -428,6 +449,15 @@ class PipelineService:
                 review_threshold=loaded.config.gatekeeper_review_threshold,
                 hard_drop_threshold=loaded.config.gatekeeper_drop_threshold,
                 prefetch_drop_threshold=loaded.config.prefetch_drop_threshold,
+            )
+            self._event(
+                active_job,
+                CrawlJobEventType.PROGRESS,
+                "Running gatekeeper decisions and summarization for each cluster",
+                {
+                    "gatekeeper_model_dir": str(self.settings.model_dir),
+                    "summarization_model": self.settings.summarization_model_id,
+                },
             )
             signals = [
                 build_cluster_signal(

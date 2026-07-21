@@ -27,9 +27,14 @@ export interface ViewerProfile {
   contactEmail: string;
   accountEmail: string | null;
   roleLabel: string;
+  currentIp: string;
+  petEnabled: boolean;
+  petKind: "orbit" | "pixel" | "cloud";
+  petColor: "violet" | "coral" | "mint" | "gold";
 }
 
 export interface AccessCapabilities {
+  isAdmin: boolean;
   canViewAnalytics: boolean;
   canSwitchDeskProfile: boolean;
   canReviewGatekeeper: boolean;
@@ -141,6 +146,8 @@ export interface WorkflowItem {
   title: string;
   category: string;
   owner: string;
+  ownerId: string;
+  canMove: boolean;
   team: string;
   priority: Priority;
   status: string;
@@ -172,6 +179,7 @@ export interface SourceRecord {
 
 export interface BackendMe {
   actor_id: string;
+  current_ip: string;
   identity: string | null;
   active_profile: DeskProfile;
   capabilities: BackendCapability[];
@@ -179,6 +187,9 @@ export interface BackendMe {
   preferences?: {
     display_name?: string | null;
     contact_email?: string | null;
+    pet_enabled?: boolean;
+    pet_kind?: "orbit" | "pixel" | "cloud";
+    pet_color?: "violet" | "coral" | "mint" | "gold";
   } | null;
 }
 
@@ -250,6 +261,7 @@ export type ArticleAction = "select" | "deselect" | "save" | "unsave" | "mark_un
 export interface ArticleDisposition {
   article_id: string;
   actor_id: string;
+  owner_display_name?: string | null;
   selected: boolean;
   saved: boolean;
   under_review: boolean;
@@ -293,8 +305,8 @@ export interface DetailedAnalytics {
   window_days: number;
   idle_cap_minutes: number;
   summary: AnalyticsRollup & { unique_actors: number; session_count: number; unattributed_event_count: number };
-  users: Array<AnalyticsRollup & { actor_id: string | null; session_count: number }>;
-  sessions: Array<AnalyticsRollup & { session_id: string; actor_id: string | null }>;
+  users: Array<AnalyticsRollup & { actor_id: string | null; display_name: string | null; session_count: number }>;
+  sessions: Array<AnalyticsRollup & { session_id: string; actor_id: string | null; display_name: string | null }>;
   coverage: Record<string, number | boolean>;
 }
 

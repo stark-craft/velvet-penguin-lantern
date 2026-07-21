@@ -106,6 +106,36 @@ class CrawlRunnerHealthTests(unittest.TestCase):
                     run_id="health-failed",
                 )
 
+    def test_no_entrypoint_error_includes_source_diagnostic_counts(self):
+        health = {
+            "configured": 107,
+            "enabled": 79,
+            "usable_entrypoints": 1,
+            "initial_requests": 0,
+            "attempted": 0,
+            "all_sources_failed": False,
+            "no_sources_attempted": True,
+            "source_files": [str(self.sites_dir / "default.json")],
+        }
+        with patch(
+            "signalroom.services.crawl_runner.subprocess.run",
+            side_effect=self._completed_crawl(health),
+        ):
+            with self.assertRaises(CrawlRunError) as raised:
+                self.runner.run(
+                    self.profile,
+                    date(2026, 7, 19),
+                    date(2026, 7, 20),
+                    run_id="no-entrypoints",
+                )
+
+        message = str(raised.exception)
+        self.assertIn("configured=107", message)
+        self.assertIn("enabled=79", message)
+        self.assertIn("usable_entrypoints=1", message)
+        self.assertIn("attempted=0", message)
+        self.assertIn("profile=default", message)
+
 
 if __name__ == "__main__":
     unittest.main()

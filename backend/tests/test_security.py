@@ -73,6 +73,25 @@ class SecurityTests(unittest.TestCase):
             )
             self.assertEqual(actual, "198.51.100.4")
 
+    def test_peerless_local_bridge_is_development_only(self) -> None:
+        headers = {
+            "x-signalroom-proxy": "frontend-bff-v1",
+            "x-forwarded-for": "127.0.0.1",
+        }
+        with TemporaryDirectory() as directory:
+            development = self.settings(
+                Path(directory), environment="development", trust_proxy_headers=True
+            )
+            production = self.settings(
+                Path(directory),
+                environment="production",
+                trust_proxy_headers=True,
+                cors_origins=("https://news.internal",),
+                ip_hash_secret=SecretStr("production-unique-secret-value-123456789"),
+            )
+            self.assertEqual(resolve_client_ip(None, headers, development), "127.0.0.1")
+            self.assertEqual(resolve_client_ip(None, headers, production), "0.0.0.0")
+
     def test_ip_hash_is_deterministic_and_does_not_embed_raw_ip(self) -> None:
         with TemporaryDirectory() as directory:
             settings = self.settings(Path(directory))
@@ -236,8 +255,8 @@ class ProfileLoaderTests(unittest.TestCase):
             Settings(root_dir=backend_root),
         )
         self.assertEqual(profile.sources_file, "broadcast_sites.json")
-        self.assertEqual(len(profile.sites), 5)
-        self.assertEqual(len(profile.enabled_sites), 5)
+        self.assertEqual(len(profile.sites), 59)
+        self.assertEqual(len(profile.enabled_sites), 59)
         self.assertTrue(all(site.allow_deep_scan for site in profile.sites))
         self.assertTrue(all(site.rss_url is None for site in profile.sites))
 

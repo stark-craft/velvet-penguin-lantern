@@ -25,7 +25,7 @@ function localAssetPaths(html) {
   );
 }
 
-test("the production worker renders the Signalroom application shell", async () => {
+test("the production worker renders the newsScrapper application shell", async () => {
   const response = await render();
   const html = await response.text();
 
@@ -33,7 +33,7 @@ test("the production worker renders the Signalroom application shell", async () 
   assert.match(response.headers.get("content-type") ?? "", /^text\/html/);
   assert.match(html, /^<!DOCTYPE html>/);
   assert.match(html, /<html lang="en" data-theme="light" data-profile="default">/);
-  assert.match(html, /<title>Signalroom — AI News Intelligence<\/title>/);
+  assert.match(html, /<title>newsScrapper — AI News Intelligence<\/title>/);
   assert.match(html, /AI News Intelligence/);
   assert.match(html, /Morning briefing/);
   assert.match(html, /Analyst/);

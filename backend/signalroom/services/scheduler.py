@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import errno
 import os
+import logging
 import threading
 from ctypes import wintypes
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,8 @@ from signalroom.models import (
     CrawlJobUpdate,
     PageParams,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SchedulerAlreadyRunning(RuntimeError):
@@ -137,7 +140,7 @@ class SchedulerProcessLock:
                 if attempt == 0 and self._remove_if_stale():
                     continue
                 raise SchedulerAlreadyRunning(
-                    f"Another Signalroom scheduler owns {self.path}"
+                    f"Another newsScrapper scheduler owns {self.path}"
                 )
 
     def _remove_if_stale(self) -> bool:
@@ -216,6 +219,7 @@ class MorningScheduler:
 
     def run_cycle(self) -> list:
         if not self._run_lock.acquire(blocking=False):
+            logger.warning("[scheduler] cycle skipped because another cycle is active")
             return [{"status": "skipped", "reason": "a scheduled run is already active"}]
         results = []
         try:
@@ -227,14 +231,22 @@ class MorningScheduler:
                 ),
                 key=lambda profile: int(_profile_value(profile, "schedule_order", 999)),
             )
+            logger.info(
+                "[scheduler] cycle started; profile order=%s",
+                ", ".join(str(getattr(_profile_value(item, "id", "default"), "value", _profile_value(item, "id", "default"))) for item in profiles),
+            )
             for profile in profiles:
                 profile_value = _profile_value(profile, "id", "default")
                 profile_id = str(getattr(profile_value, "value", profile_value))
                 try:
+                    logger.info("[scheduler] starting profile=%s", profile_id)
                     outcome = self.run_profile(profile_id=profile_id, trigger="scheduler")
                     results.append({"profile": profile_id, "status": "succeeded", "result": outcome})
+                    logger.info("[scheduler] profile=%s succeeded", profile_id)
                 except Exception as exc:  # The next profile should still receive its run.
                     results.append({"profile": profile_id, "status": "failed", "error": str(exc)})
+                    logger.exception("[scheduler] profile=%s failed", profile_id)
+            logger.info("[scheduler] cycle complete")
             return results
         finally:
             self._run_lock.release()
@@ -335,7 +347,7 @@ class MorningScheduler:
             job_options = {
                 "trigger": trigger,
                 "id": "signalroom-briefing-cycle",
-                "name": "Signalroom Default then Broadcast briefing",
+                "name": "newsScrapper Default then Broadcast briefing",
                 "replace_existing": True,
                 "coalesce": True,
                 "max_instances": 1,
@@ -351,6 +363,13 @@ class MorningScheduler:
                     ZoneInfo(timezone_name)
                 ) + timedelta(seconds=delay)
             self.scheduler.add_job(self.run_cycle, **job_options)
+            logger.info(
+                "[scheduler] registered %s-hour cycle in %s; run-on-start=%s delay=%ss",
+                interval_hours,
+                timezone_name,
+                bool(getattr(self.settings, "scheduler_run_on_start", True)),
+                _setting_int(self.settings, "scheduler_startup_delay_seconds", 10, 0),
+            )
             self.scheduler.start()
         except Exception:
             self.lock.release()

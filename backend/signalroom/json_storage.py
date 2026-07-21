@@ -730,7 +730,10 @@ class JSONRepository:
                 and row["profile"] == source.profile.value
                 and row["url"] == str(source.url)
             ):
-                raise DuplicateRecordError("article source URL already exists with another stable ID")
+                # Compatibility path for provenance rows written before source
+                # IDs stopped including the crawl-job UUID. The natural key is
+                # the same article/profile/URL, so reuse the immutable row.
+                return row["id"]
         source_id = str(uuid4())
         state["article_sources"][source_id] = {
             **source.model_dump(mode="json"),
@@ -967,6 +970,17 @@ class JSONRepository:
         state = self._read()
         return self._cluster_from_state(state, str(cluster_id))
 
+    def get_clusters_by_ids(self, cluster_ids: Iterable[UUID]) -> Tuple[ClusterRead, ...]:
+        """Resolve a briefing's cluster set from one immutable JSON snapshot."""
+
+        state = self._read()
+        models = []
+        for cluster_id in cluster_ids:
+            identifier = str(cluster_id)
+            if identifier in state["clusters"]:
+                models.append(self._cluster_from_state(state, identifier))
+        return tuple(models)
+
     def list_clusters(
         self,
         *,
@@ -1180,6 +1194,102 @@ class JSONRepository:
             **self._fold_actions(rows),
         )
 
+    def _shared_disposition_from_state(
+        self, state: Mapping[str, Any], article_id: UUID, profile: ProfileId
+    ) -> ArticleDisposition:
+        profile_value = ProfileId(profile).value
+        rows = sorted(
+            (
+                row
+                for row in state["actions"].values()
+                if row["article_id"] == str(article_id)
+                and row["profile"] == profile_value
+                and row["action"] in {
+                    ArticleActionType.MARK_UNDER_REVIEW.value,
+                    ArticleActionType.CLEAR_REVIEW.value,
+                    ArticleActionType.APPROVE.value,
+                }
+            ),
+            key=lambda item: (item["occurred_at"], item["id"]),
+        )
+        owners: Dict[str, str] = {}
+        approved = False
+        current_actor = "shared"
+        last_action_at = None
+        for row in rows:
+            action = ArticleActionType(row["action"])
+            actor = str(row["actor_id"])
+            metadata = row.get("metadata") or {}
+            if action == ArticleActionType.MARK_UNDER_REVIEW:
+                owners[actor] = row["occurred_at"]
+                approved = False
+                current_actor = actor
+            elif action == ArticleActionType.CLEAR_REVIEW:
+                if bool(metadata.get("clear_all_review")):
+                    owners.clear()
+                else:
+                    owners.pop(actor, None)
+                approved = False
+                current_actor = actor
+            elif action == ArticleActionType.APPROVE:
+                owners.clear()
+                approved = True
+                current_actor = actor
+            last_action_at = row["occurred_at"]
+        if owners:
+            current_actor = max(owners, key=lambda owner: (owners[owner], owner))
+        preference = state.get("viewer_preferences", {}).get(current_actor) or {}
+        owner_name = str(preference.get("display_name") or "").strip() or None
+        return ArticleDisposition(
+            article_id=article_id,
+            actor_id=current_actor,
+            owner_display_name=owner_name,
+            under_review=bool(owners),
+            approved=approved,
+            last_action_at=last_action_at,
+        )
+
+    def get_shared_disposition(
+        self, article_id: UUID, profile: ProfileId
+    ) -> ArticleDisposition:
+        snapshot = self._read()
+        profile_value = ProfileId(profile).value
+        if profile_value not in snapshot["article_profiles"].get(str(article_id), {}):
+            raise RecordNotFoundError(
+                f"article not found in profile {profile_value}: {article_id}"
+            )
+        return self._shared_disposition_from_state(snapshot, article_id, profile)
+
+    def get_dispositions_for_articles(
+        self,
+        article_ids: Iterable[UUID],
+        *,
+        actor_id: str,
+        profile: ProfileId,
+    ) -> Dict[str, Tuple[ArticleDisposition, ArticleDisposition]]:
+        """Return personal and shared states with one JSON read for feed rendering."""
+
+        snapshot = self._read()
+        profile_value = ProfileId(profile).value
+        result: Dict[str, Tuple[ArticleDisposition, ArticleDisposition]] = {}
+        for article_id in article_ids:
+            identifier = str(article_id)
+            rows = [
+                row
+                for row in snapshot["actions"].values()
+                if row["article_id"] == identifier
+                and row["profile"] == profile_value
+                and row["actor_id"] == actor_id
+            ]
+            personal = ArticleDisposition(
+                article_id=article_id,
+                actor_id=actor_id,
+                **self._fold_actions(rows),
+            )
+            shared = self._shared_disposition_from_state(snapshot, article_id, profile)
+            result[identifier] = (personal, shared)
+        return result
+
     def list_worklist(
         self,
         *,
@@ -1201,10 +1311,20 @@ class JSONRepository:
             raise ValueError(f"unsupported worklist state: {state}")
         snapshot = self._read()
         profile_value = ProfileId(profile).value
+        shared_state = state in {"under_review", "approved"}
+        shared_actions = {
+            ArticleActionType.MARK_UNDER_REVIEW.value,
+            ArticleActionType.CLEAR_REVIEW.value,
+            ArticleActionType.APPROVE.value,
+        }
         relevant = [
             row
             for row in snapshot["actions"].values()
-            if row["actor_id"] == actor_id and row["profile"] == profile_value
+            if row["profile"] == profile_value
+            and (
+                (shared_state and row["action"] in shared_actions)
+                or (not shared_state and row["actor_id"] == actor_id)
+            )
         ]
         latest: Dict[str, str] = {}
         for row in relevant:
@@ -1214,10 +1334,14 @@ class JSONRepository:
         items: List[WorklistItem] = []
         for article_id in sorted(latest, key=lambda key: (latest[key], key), reverse=True):
             rows = [row for row in relevant if row["article_id"] == article_id]
-            disposition = ArticleDisposition(
-                article_id=UUID(article_id),
-                actor_id=actor_id,
-                **self._fold_actions(rows),
+            disposition = (
+                self._shared_disposition_from_state(snapshot, UUID(article_id), profile)
+                if shared_state
+                else ArticleDisposition(
+                    article_id=UUID(article_id),
+                    actor_id=actor_id,
+                    **self._fold_actions(rows),
+                )
             )
             matches = (
                 disposition.interesting is False
@@ -1249,6 +1373,9 @@ class JSONRepository:
         *,
         display_name: str,
         contact_email: Optional[str] = None,
+        pet_enabled: bool = False,
+        pet_kind: str = "orbit",
+        pet_color: str = "violet",
     ) -> Dict[str, Any]:
         normalized_actor = actor_id.strip()
         normalized_name = display_name.strip()
@@ -1257,6 +1384,11 @@ class JSONRepository:
             raise ValueError("actor_id must contain between 1 and 200 characters")
         if not normalized_name or len(normalized_name) > 120:
             raise ValueError("display_name must contain between 1 and 120 characters")
+        normalized_name_key = normalized_name.casefold()
+        if pet_kind not in {"orbit", "pixel", "cloud"}:
+            raise ValueError("pet_kind is not supported")
+        if pet_color not in {"violet", "coral", "mint", "gold"}:
+            raise ValueError("pet_color is not supported")
         if normalized_email:
             local, separator, domain = normalized_email.rpartition("@")
             if (
@@ -1270,12 +1402,29 @@ class JSONRepository:
             normalized_email = f"{local}@{domain.casefold()}"
 
         def operation(state: Dict[str, Any]) -> Dict[str, Any]:
+            duplicate = next(
+                (
+                    row
+                    for owner, row in state["viewer_preferences"].items()
+                    if owner != normalized_actor
+                    and str(row.get("display_name", "")).strip().casefold()
+                    == normalized_name_key
+                ),
+                None,
+            )
+            if duplicate is not None:
+                raise DuplicateRecordError(
+                    "That display name is already in use. Kindly choose another name."
+                )
             now = _utc_text(self._now())
             previous = state["viewer_preferences"].get(normalized_actor)
             record = {
                 "actor_id": normalized_actor,
                 "display_name": normalized_name,
                 "contact_email": normalized_email,
+                "pet_enabled": bool(pet_enabled),
+                "pet_kind": pet_kind,
+                "pet_color": pet_color,
                 "created_at": previous["created_at"] if previous else now,
                 "updated_at": now,
             }

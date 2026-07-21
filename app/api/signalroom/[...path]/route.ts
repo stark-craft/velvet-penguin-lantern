@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -27,24 +28,28 @@ function backendOrigin(): URL {
 
 function safePath(parts: string[]): string {
   if (!parts.length || parts.some((part) => !part || part === "." || part === ".." || part.includes("/"))) {
-    throw new Error("Invalid Signalroom API path");
+    throw new Error(`Invalid ${PRODUCT_NAME} API path`);
   }
   return parts.map(encodeURIComponent).join("/");
 }
 
 function trustedClientIp(requestHeaders: Headers): string {
-  if (process.env.SIGNALROOM_TRUST_PROXY_IP_HEADERS !== "true") {
+  const mayUseForwardedHeaders = process.env.NODE_ENV !== "production"
+    || process.env.SIGNALROOM_TRUST_PROXY_IP_HEADERS === "true";
+  if (!mayUseForwardedHeaders) {
     return process.env.SIGNALROOM_LOCAL_CLIENT_IP ?? "127.0.0.1";
   }
-  // Enable this only when the frontend is itself behind a company-controlled
-  // reverse proxy that overwrites these headers. Browser input is never read
-  // from the request body or query string.
+  // Production reaches this branch only behind the authenticated company
+  // proxy check. Browsers cannot supply the value through a body or query.
   const candidate = requestHeaders.get("cf-connecting-ip")
     ?? requestHeaders.get("x-real-ip")
     ?? requestHeaders.get("x-forwarded-for")?.split(",")[0]
     ?? process.env.SIGNALROOM_LOCAL_CLIENT_IP
     ?? "127.0.0.1";
-  return candidate.trim().replace(/^::ffff:/, "").slice(0, 64);
+  const normalized = candidate.trim().replace(/^::ffff:/, "").slice(0, 64);
+  return normalized === "0.0.0.0" || normalized === "::"
+    ? process.env.SIGNALROOM_LOCAL_CLIENT_IP ?? "127.0.0.1"
+    : normalized;
 }
 
 async function proxy(request: Request, context: { params: Promise<{ path: string[] }> }) {
@@ -100,8 +105,8 @@ async function proxy(request: Request, context: { params: Promise<{ path: string
     return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
   } catch (error) {
     const message = error instanceof Error && error.name === "AbortError"
-      ? "The Signalroom backend timed out"
-      : "The Signalroom backend is unavailable";
+      ? `The ${PRODUCT_NAME} backend timed out`
+      : `The ${PRODUCT_NAME} backend is unavailable`;
     return Response.json({ detail: message }, { status: 502, headers: { "cache-control": "no-store" } });
   }
 }

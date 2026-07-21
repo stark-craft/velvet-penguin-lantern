@@ -1,6 +1,6 @@
-# Signalroom backend
+# newsScrapper backend
 
-Signalroom is the standalone backend for the AI news-intelligence interface. It crawls configured publishers, groups coverage of the same story, summarizes each story cluster, applies a learnable relevance gatekeeper, and persists immutable briefing snapshots plus each viewer's editorial actions.
+newsScrapper is the standalone backend for the AI news-intelligence interface. It crawls configured publishers, groups coverage of the same story, summarizes each story cluster, applies a learnable relevance gatekeeper, and persists immutable briefing snapshots plus each viewer's editorial actions.
 
 The frontend and backend are deliberately separate. This directory owns crawling, ML, scheduling, access policy, API contracts, and JSON runtime state; it does not contain frontend components or build tooling.
 

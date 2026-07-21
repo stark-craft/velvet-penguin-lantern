@@ -1,7 +1,8 @@
 @echo off
 setlocal EnableExtensions DisableDelayedExpansion
 
-rem Signalroom single-laptop launcher. Keep this file beside backend, frontend,
+rem newsScrapper single-laptop launcher. Internal SIGNALROOM_* variable names
+rem remain supported for deployment compatibility.
 rem and python_embed in the release folder described in README_WINDOWS.md.
 for %%I in ("%~dp0.") do set "DEPLOY_ROOT=%%~fI"
 set "BACKEND_DIR=%DEPLOY_ROOT%\backend"
@@ -48,17 +49,17 @@ for %%L in (backend scheduler frontend) do (
     if exist "%LOG_DIR%\%%L.log" move /y "%LOG_DIR%\%%L.log" "%LOG_DIR%\%%L.log.1" >nul
 )
 
-echo Starting Signalroom API on http://0.0.0.0:%SIGNALROOM_PORT% ...
-start "Signalroom API" /D "%BACKEND_DIR%" cmd /d /c ""%PYTHON_EXE%" main.py api --host %SIGNALROOM_HOST% --port %SIGNALROOM_PORT% >> "%LOG_DIR%\backend.log" 2>&1"
+echo Starting newsScrapper API on http://0.0.0.0:%SIGNALROOM_PORT% ...
+start "newsScrapper API" /D "%BACKEND_DIR%" cmd /d /c ""%PYTHON_EXE%" main.py api --host %SIGNALROOM_HOST% --port %SIGNALROOM_PORT% >> "%LOG_DIR%\backend.log" 2>&1"
 
 echo Starting four-hour scheduler in Default then Broadcast order ...
-start "Signalroom Scheduler" /D "%BACKEND_DIR%" cmd /d /c ""%PYTHON_EXE%" main.py scheduler >> "%LOG_DIR%\scheduler.log" 2>&1"
+start "newsScrapper Scheduler" /D "%BACKEND_DIR%" cmd /d /c ""%PYTHON_EXE%" main.py scheduler >> "%LOG_DIR%\scheduler.log" 2>&1"
 
-echo Starting built frontend on http://0.0.0.0:%SIGNALROOM_FRONTEND_PORT% ...
-start "Signalroom Frontend" /D "%FRONTEND_DIR%" cmd /d /c ""%NODE_EXE%" "%FRONTEND_DIR%\node_modules\vinext\dist\cli.js" start -H 0.0.0.0 -p %SIGNALROOM_FRONTEND_PORT% >> "%LOG_DIR%\frontend.log" 2>&1"
+echo Starting newsScrapper frontend on http://0.0.0.0:%SIGNALROOM_FRONTEND_PORT% ...
+start "newsScrapper Frontend" /D "%FRONTEND_DIR%" cmd /d /c ""%NODE_EXE%" "%FRONTEND_DIR%\node_modules\vinext\dist\cli.js" start -H 0.0.0.0 -p %SIGNALROOM_FRONTEND_PORT% >> "%LOG_DIR%\frontend.log" 2>&1"
 
 echo.
-echo Signalroom processes were launched in separate windows.
+echo newsScrapper processes were launched in separate windows.
 echo Open http://SERVER-IP:%SIGNALROOM_FRONTEND_PORT% from an allowed internal device.
 echo Logs: %LOG_DIR% ^(current .log and previous .log.1^)
 exit /b 0

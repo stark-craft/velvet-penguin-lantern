@@ -1,7 +1,8 @@
 "use client";
 
-import { navigation } from "@/data/mockData";
+import { navigation } from "@/lib/navigation";
 import { Icon } from "@/components/ui";
+import { PRODUCT_NAME } from "@/lib/brand";
 import type { ColorTheme, DeskProfile, ViewerProfile } from "@/types/news";
 
 const getInitials = (name: string) => {
@@ -25,7 +26,6 @@ export function Sidebar({
   profile,
   canSwitchProfile,
   canViewAnalytics,
-  canReviewGatekeeper,
   onProfileChange,
   onFeedback,
   sourceCount,
@@ -39,7 +39,6 @@ export function Sidebar({
   profile: DeskProfile;
   canSwitchProfile: boolean;
   canViewAnalytics: boolean;
-  canReviewGatekeeper: boolean;
   onProfileChange: (profile: DeskProfile) => void;
   onFeedback: () => void;
   sourceCount: number;
@@ -50,22 +49,21 @@ export function Sidebar({
     <aside id="signalroom-navigation" className={`sidebar ${collapsed ? "sidebar-collapsed" : ""}`} aria-label="Main navigation">
       <div className="brand">
         <div className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></div>
-        <div className="brand-type"><strong>SIGNALROOM</strong><span>INTELLIGENCE DESK</span></div>
+        <div className="brand-type"><strong>{PRODUCT_NAME}</strong><span>INTELLIGENCE DESK</span></div>
       </div>
       <nav className="nav-groups">
         {navigation.map((group) => (
           <div className="nav-group" key={group.group}>
             <span className="nav-label">{group.group}</span>
             {group.items.filter((item) =>
-              (item.id !== "analytics" || canViewAnalytics) &&
-              (!(["gatekeeper", "dropped"].includes(item.id)) || canReviewGatekeeper),
+              item.id !== "analytics" || canViewAnalytics,
             ).map((item) => (
               <button
                 key={item.id}
                 className={active === item.id ? "active" : ""}
                 onClick={() => onNavigate(item.id)}
                 aria-current={active === item.id ? "page" : undefined}
-                aria-label={item.id === "analytics" || item.id === "gatekeeper" || item.id === "dropped" ? `${item.label}, restricted` : item.label}
+                aria-label={item.id === "analytics" ? `${item.label}, restricted` : item.id === "gatekeeper" || item.id === "dropped" ? `${item.label}, password protected` : item.label}
               >
                 <Icon>{item.icon}</Icon><span className="nav-text">{item.label}</span>
                 {item.id === "dropped" && <span className="nav-count">{droppedCount}</span>}
@@ -86,6 +84,7 @@ export function Sidebar({
       <button className="sidebar-feedback" onClick={onFeedback} aria-label="Share product feedback" data-tooltip="Share product feedback">
         <Icon>◉</Icon><span className="nav-text"><strong>Share feedback</strong><small>Tell us what to improve</small></span>
       </button>
+      <div className="creator-credit nav-text"><span>Designed & engineered by</span><strong>Vineet Singh</strong><small>Chief Developer & Engineer</small></div>
       <div className="sidebar-health">
         <span className="pulse-dot" /><div><strong>{profile === "broadcast" ? "Broadcast desk live" : "Default desk live"}</strong><span>{sourceCount} enabled sources · {lastBriefingAt ? new Date(lastBriefingAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "no briefing yet"}</span></div>
       </div>

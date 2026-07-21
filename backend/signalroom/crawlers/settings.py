@@ -38,6 +38,6 @@ FEED_EXPORT_ENCODING = "utf-8"
 FEED_EXPORT_INDENT = 2
 
 # The address identifies the internal crawler without pretending to be a browser.
-USER_AGENT = "SignalroomNewsCrawler/1.0 (+internal-news-intelligence)"
+USER_AGENT = "newsScrapperCrawler/1.0 (+internal-news-intelligence)"
 
 LOG_LEVEL = "INFO"

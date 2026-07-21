@@ -23,7 +23,7 @@ from signalroom.models import (
     TelemetryEventType,
     make_stable_id,
 )
-from signalroom.storage import RecordNotFoundError, UnsafePayloadError
+from signalroom.storage import DuplicateRecordError, RecordNotFoundError, UnsafePayloadError
 
 
 class MutableClock:
@@ -229,6 +229,19 @@ class JsonStorageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             reopened.upsert_viewer_preference(
                 "viewer@example.com", display_name="Tony", contact_email="invalid"
+            )
+        updated = reopened.upsert_viewer_preference(
+            "viewer@example.com",
+            display_name="Iron Person",
+            pet_enabled=True,
+            pet_kind="pixel",
+            pet_color="mint",
+        )
+        self.assertTrue(updated["pet_enabled"])
+        self.assertEqual(updated["pet_kind"], "pixel")
+        with self.assertRaisesRegex(DuplicateRecordError, "already in use"):
+            reopened.upsert_viewer_preference(
+                "another-viewer@example.com", display_name="iron person"
             )
 
     def test_generic_payload_safety_is_enforced_by_json_runtime(self) -> None:

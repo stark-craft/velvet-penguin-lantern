@@ -1,4 +1,4 @@
-# Signalroom phase readiness
+# newsScrapper phase readiness
 
 This document distinguishes coded behavior from deployment operations. A phase
 marked **coded** has implementation and automated coverage in this repository;

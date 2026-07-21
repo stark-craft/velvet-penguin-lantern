@@ -9,6 +9,7 @@ pipeline in tests and in alternate process compositions.
 from __future__ import annotations
 
 import re
+import hmac
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -25,7 +26,6 @@ from signalroom.models import (
     AnalyticsSummary,
     ArticleActionCreate,
     ArticleActionRead,
-    ArticleActionRequest,
     ArticleActionType,
     ArticleDisposition,
     ArticleRead,
@@ -51,7 +51,7 @@ from signalroom.models import (
     WorklistItem,
 )
 from signalroom.profiles import ProfileRegistry
-from signalroom.security import Principal, require_capability, resolve_principal
+from signalroom.security import Principal, get_client_ip, require_capability, resolve_principal
 from signalroom.services.access import actor_id, resolve_profile
 from signalroom.services.analytics import DetailedAnalytics, build_detailed_analytics
 from signalroom.services.exports import (
@@ -87,6 +87,9 @@ class HealthResponse(ApiModel):
 class ViewerPreferenceWrite(ApiModel):
     display_name: str = Field(min_length=1, max_length=60)
     contact_email: Optional[str] = Field(default=None, max_length=254)
+    pet_enabled: bool = False
+    pet_kind: str = Field(default="orbit", pattern=r"^(orbit|pixel|cloud)$")
+    pet_color: str = Field(default="violet", pattern=r"^(violet|coral|mint|gold)$")
 
     @field_validator("contact_email")
     @classmethod
@@ -115,11 +118,21 @@ class ViewerPreferenceRead(ViewerPreferenceWrite):
 
 class MeResponse(ApiModel):
     actor_id: str
+    current_ip: str
     identity: Optional[str] = None
     active_profile: ProfileId
     capabilities: Tuple[Capability, ...]
     authentication_method: str
     preferences: Optional[ViewerPreferenceRead] = None
+
+
+class DeskNotification(ApiModel):
+    id: str
+    kind: str
+    title: str
+    message: str
+    created_at: datetime
+    article_id: Optional[str] = None
 
 
 class ProfileSummary(ApiModel):
@@ -136,12 +149,21 @@ class ArticleActionResult(ApiModel):
     disposition: ArticleDisposition
 
 
+class ArticleActionWrite(ApiModel):
+    action: ArticleActionType
+    note: Optional[str] = Field(default=None, max_length=2_000)
+    idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=200)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    approval_key: Optional[str] = Field(default=None, pattern=r"^\d{4}$")
+
+
 class BatchArticleActionRequest(ApiModel):
     article_ids: Tuple[UUID, ...] = Field(min_length=1, max_length=100)
     action: ArticleActionType
     note: Optional[str] = Field(default=None, max_length=2_000)
     idempotency_key: Optional[str] = Field(default=None, min_length=8, max_length=100)
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    approval_key: Optional[str] = Field(default=None, pattern=r"^\d{4}$")
 
 
 class JobSubmissionResponse(ApiModel):
@@ -383,6 +405,21 @@ require_analytics = capability_dependency(Capability.ANALYTICS)
 require_gatekeeper = capability_dependency(Capability.GATEKEEPER_REVIEW)
 
 
+def require_gatekeeper_access(
+    request: Request,
+    settings: Settings = Depends(_settings),
+    principal: Principal = Depends(current_principal),
+) -> Principal:
+    """Allow privileged reviewers or a session-supplied Gatekeeper key."""
+
+    if principal.can(Capability.GATEKEEPER_REVIEW):
+        return principal
+    supplied = request.headers.get("x-signalroom-gatekeeper-key") or ""
+    if not hmac.compare_digest(supplied, settings.gatekeeper_key.get_secret_value()):
+        raise HTTPException(status_code=403, detail="invalid gatekeeper key")
+    return principal
+
+
 def _active_profile(
     request: Request,
     principal: Principal,
@@ -499,13 +536,22 @@ def _article_status(
     actor: str,
 ) -> Tuple[str, bool]:
     disposition = repository.get_disposition(article.id, actor, profile)
+    shared_reader = getattr(repository, "get_shared_disposition", None)
+    shared = shared_reader(article.id, profile) if callable(shared_reader) else disposition
+    return _status_from_dispositions(disposition, shared)
+
+
+def _status_from_dispositions(
+    disposition: ArticleDisposition,
+    shared: ArticleDisposition,
+) -> Tuple[str, bool]:
     if disposition.hidden:
         return "Hidden", True
     if disposition.interesting is False:
         return "Not Interested", True
-    if disposition.approved:
+    if shared.approved:
         return "Approved", False
-    if disposition.under_review:
+    if shared.under_review:
         return "Under Review", False
     if disposition.selected:
         return "Selected", False
@@ -518,6 +564,7 @@ def _feed_article(
     profile: ProfileId,
     actor: str,
     timezone_name: str,
+    status_override: Optional[Tuple[str, bool]] = None,
 ) -> Tuple[FeedArticle, bool]:
     source_record = article.sources[0] if article.sources else None
     source = (
@@ -533,7 +580,7 @@ def _feed_article(
     if isinstance(article.metadata.get("intent_confidence"), (int, float)):
         confidence = round(float(article.metadata["intent_confidence"]) * 100)
     confidence = max(0, min(100, confidence))
-    status_label, hidden = _article_status(repository, article, profile, actor)
+    status_label, hidden = status_override or _article_status(repository, article, profile, actor)
     author_value = article.metadata.get("author") or ""
     if isinstance(author_value, (list, tuple)):
         author_value = ", ".join(str(item) for item in author_value)
@@ -713,6 +760,7 @@ def me(
     )
     return MeResponse(
         actor_id=actor_id(principal),
+        current_ip=get_client_ip(request, settings),
         identity=principal.identity,
         active_profile=active,
         capabilities=principal.capabilities,
@@ -759,8 +807,64 @@ def save_viewer_preferences(
         actor_id(principal),
         display_name=payload.display_name,
         contact_email=payload.contact_email,
+        pet_enabled=payload.pet_enabled,
+        pet_kind=payload.pet_kind,
+        pet_color=payload.pet_color,
     )
     return ViewerPreferenceRead.model_validate(preference)
+
+
+@router.get("/notifications", response_model=List[DeskNotification], tags=["identity"])
+def notifications(
+    request: Request,
+    profile: Optional[ProfileId] = Query(default=None),
+    settings: Settings = Depends(_settings),
+    repository: SQLiteRepository = Depends(_repository),
+    principal: Principal = Depends(require_read),
+) -> List[DeskNotification]:
+    active = _active_profile(request, principal, settings, profile)
+    actor = actor_id(principal)
+    items: List[DeskNotification] = []
+    briefing = repository.get_latest_briefing(active)
+    if briefing is not None:
+        items.append(
+            DeskNotification(
+                id=f"briefing:{briefing.id}",
+                kind="briefing",
+                title="Fresh briefing ready",
+                message=f"{len(briefing.article_ids)} retained signals are ready to explore.",
+                created_at=briefing.created_at,
+            )
+        )
+    selected = repository.list_worklist(
+        actor_id=actor,
+        profile=active,
+        state="selected",
+        page=PageParams(limit=100),
+    )
+    for worklist_item in selected.items:
+        approvals = repository.list_actions(
+            article_id=worklist_item.article.id,
+            profile=active,
+            page=PageParams(limit=100),
+        )
+        approval = next(
+            (item for item in approvals.items if item.action == ArticleActionType.APPROVE),
+            None,
+        )
+        if approval is None:
+            continue
+        items.append(
+            DeskNotification(
+                id=f"approval:{approval.id}",
+                kind="approval",
+                title="Selected signal approved",
+                message=worklist_item.article.title,
+                article_id=str(worklist_item.article.id),
+                created_at=approval.occurred_at,
+            )
+        )
+    return sorted(items, key=lambda item: item.created_at, reverse=True)[:30]
 
 
 @router.get("/profiles", response_model=List[ProfileSummary], tags=["identity"])
@@ -876,13 +980,26 @@ def feed(
     clusters: List[ClusterRead] = []
     cluster_ids = briefing.metadata.get("cluster_ids") or []
     if isinstance(cluster_ids, list):
+        valid_ids = []
         for identifier in cluster_ids:
             try:
-                cluster = repository.get_cluster(UUID(str(identifier)))
-            except (ValueError, RecordNotFoundError):
+                valid_ids.append(UUID(str(identifier)))
+            except ValueError:
                 continue
-            if cluster.profile == active and cluster.metadata.get("retained") is not False:
-                clusters.append(cluster)
+        bulk_clusters = getattr(repository, "get_clusters_by_ids", None)
+        candidates = (
+            bulk_clusters(valid_ids)
+            if callable(bulk_clusters)
+            else tuple(
+                repository.get_cluster(identifier)
+                for identifier in valid_ids
+            )
+        )
+        clusters = [
+            cluster
+            for cluster in candidates
+            if cluster.profile == active and cluster.metadata.get("retained") is not False
+        ]
     if not clusters and briefing.crawl_job_id is not None:
         clusters = [
             item
@@ -901,13 +1018,36 @@ def feed(
         if member.is_primary
     }
     visible_clusters = []
+    status_article_ids = {
+        article.id for article in briefing.articles
+    } | {
+        member.article_id
+        for cluster in multi_member_clusters
+        for member in cluster.members
+        if member.is_primary
+    }
+    bulk_dispositions = getattr(repository, "get_dispositions_for_articles", None)
+    disposition_map = (
+        bulk_dispositions(status_article_ids, actor_id=actor, profile=active)
+        if callable(bulk_dispositions)
+        else {}
+    )
+
+    def status_for(article: ArticleRead) -> Tuple[str, bool]:
+        pair = disposition_map.get(str(article.id))
+        return (
+            _status_from_dispositions(*pair)
+            if pair is not None
+            else _article_status(repository, article, active, actor)
+        )
+
     for cluster in multi_member_clusters:
         primary = next(
             (member.article for member in cluster.members if member.is_primary),
             None,
         )
         if primary is not None:
-            _, hidden = _article_status(repository, primary, active, actor)
+            _, hidden = status_for(primary)
             if hidden:
                 continue
         visible_clusters.append(_feed_cluster(cluster, settings.timezone_name))
@@ -922,6 +1062,7 @@ def feed(
             active,
             actor,
             settings.timezone_name,
+            status_override=status_for(article),
         )
         if not hidden:
             articles.append(mapped)
@@ -1067,7 +1208,7 @@ def get_cluster(
 )
 def record_article_action(
     article_id: UUID,
-    payload: ArticleActionRequest,
+    payload: ArticleActionWrite,
     request: Request,
     profile: Optional[ProfileId] = Query(default=None),
     settings: Settings = Depends(_settings),
@@ -1082,20 +1223,44 @@ def record_article_action(
             status_code=403,
             detail="capability required: gatekeeper_review",
         )
+    if payload.action == ArticleActionType.APPROVE and not hmac.compare_digest(
+        payload.approval_key or "", settings.approval_key.get_secret_value()
+    ):
+        raise HTTPException(status_code=403, detail="invalid approval key")
     _article_for_profile(repository, article_id, active)
     actor = actor_id(principal)
+    metadata = payload.model_dump(exclude={"approval_key"}).get("metadata", {})
+    if payload.action == ArticleActionType.CLEAR_REVIEW:
+        personal = repository.get_disposition(article_id, actor, active)
+        if not personal.under_review and not principal.can(Capability.ADMIN):
+            raise HTTPException(
+                status_code=403,
+                detail="only the submitting user or an administrator can remove this review",
+            )
+        if principal.can(Capability.ADMIN) and not personal.under_review:
+            metadata = {**metadata, "clear_all_review": True}
     recorded = repository.record_article_action(
         ArticleActionCreate(
-            **payload.model_dump(),
+            **payload.model_dump(exclude={"approval_key", "metadata"}),
             article_id=article_id,
             profile=active,
             actor_id=actor,
             ip_hash=principal.ip_hash,
+            metadata=metadata,
         )
     )
+    shared_actions = {
+        ArticleActionType.MARK_UNDER_REVIEW,
+        ArticleActionType.CLEAR_REVIEW,
+        ArticleActionType.APPROVE,
+    }
     return ArticleActionResult(
         action=recorded,
-        disposition=repository.get_disposition(article_id, actor, active),
+        disposition=(
+            repository.get_shared_disposition(article_id, active)
+            if payload.action in shared_actions
+            else repository.get_disposition(article_id, actor, active)
+        ),
     )
 
 
@@ -1150,12 +1315,26 @@ def record_batch_article_actions(
             status_code=403,
             detail="capability required: gatekeeper_review",
         )
+    if payload.action == ArticleActionType.APPROVE and not hmac.compare_digest(
+        payload.approval_key or "", settings.approval_key.get_secret_value()
+    ):
+        raise HTTPException(status_code=403, detail="invalid approval key")
     for article_id in payload.article_ids:
         _article_for_profile(repository, article_id, active)
 
     actor = actor_id(principal)
     results = []
     for article_id in payload.article_ids:
+        metadata = dict(payload.metadata)
+        if payload.action == ArticleActionType.CLEAR_REVIEW:
+            personal = repository.get_disposition(article_id, actor, active)
+            if not personal.under_review and not principal.can(Capability.ADMIN):
+                raise HTTPException(
+                    status_code=403,
+                    detail="only the submitting user or an administrator can remove this review",
+                )
+            if principal.can(Capability.ADMIN) and not personal.under_review:
+                metadata["clear_all_review"] = True
         idempotency_key = (
             f"{payload.idempotency_key}:{article_id}"
             if payload.idempotency_key
@@ -1169,14 +1348,22 @@ def record_batch_article_actions(
                 action=payload.action,
                 note=payload.note,
                 idempotency_key=idempotency_key,
-                metadata=payload.metadata,
+                metadata=metadata,
                 ip_hash=principal.ip_hash,
             )
         )
         results.append(
             ArticleActionResult(
                 action=recorded,
-                disposition=repository.get_disposition(article_id, actor, active),
+                disposition=(
+                    repository.get_shared_disposition(article_id, active)
+                    if payload.action in {
+                        ArticleActionType.MARK_UNDER_REVIEW,
+                        ArticleActionType.CLEAR_REVIEW,
+                        ArticleActionType.APPROVE,
+                    }
+                    else repository.get_disposition(article_id, actor, active)
+                ),
             )
         )
     return results
@@ -1422,7 +1609,7 @@ def gatekeeper_audit(
     limit: int = Query(default=100, ge=1, le=100),
     settings: Settings = Depends(_settings),
     repository: SQLiteRepository = Depends(_repository),
-    principal: Principal = Depends(require_gatekeeper),
+    principal: Principal = Depends(require_gatekeeper_access),
 ) -> GatekeeperAuditRead:
     active = _active_profile(request, principal, settings, profile)
     return get_gatekeeper_audit(

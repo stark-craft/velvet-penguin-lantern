@@ -71,8 +71,12 @@ TIMEZONE_ABBREVIATIONS = {
 BODY_SELECTORS = (
     "article [itemprop='articleBody'] p",
     "[itemprop='articleBody'] p",
+    "article .entry-content p",
+    ".entry-content p",
     "article .article-body p",
     "article .article-content p",
+    "article .post-content p",
+    ".post-content p",
     "article .story-body p",
     "main article p",
     "article p",
@@ -399,7 +403,12 @@ def extract_body(response: Any) -> Tuple[str, Dict[str, Any]]:
         score = len(body)
         if score > best[0]:
             best = (score, index, paragraphs, css)
-        if score >= 1200:
+        # Selectors are ordered from article-specific to broad fallbacks. Once
+        # a specific container contains a credible article, keep it instead of
+        # replacing it with a longer body-wide result full of footer/sidebar
+        # text. This also prevents site-wide keywords from creating false hits.
+        words = len(re.findall(r"\b\w+\b", body, flags=re.UNICODE))
+        if score >= 160 and words >= 25:
             break
 
     paragraphs = best[2]

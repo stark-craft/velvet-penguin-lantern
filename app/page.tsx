@@ -13,6 +13,10 @@ export default async function Home() {
     contactEmail: "",
     accountEmail: account?.email ?? null,
     roleLabel: capabilities.canViewAnalytics ? "Intelligence lead" : "Intelligence analyst",
+    currentIp: "Resolving…",
+    petEnabled: false,
+    petKind: "orbit" as const,
+    petColor: "violet" as const,
   };
   return <SignalroomApp initialViewer={viewer} capabilities={capabilities} />;
 }

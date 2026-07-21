@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AdvancedFilters, Article, SourceArticle, StoryCluster, ViewerProfile, ViewMode } from "@/types/news";
 import { ArticleSelectionToggle, EmptyState, Icon, PriorityBadge, SafeImage, ScoreRing, SignalBadge, SourceBadge, StatusBadge } from "@/components/ui";
+import { greetingFor } from "@/lib/personalization";
 
 export function MetricRibbon({ selectedCount, articles, clusters }: { selectedCount: number; articles: Article[]; clusters: StoryCluster[] }) {
   const [expanded, setExpanded] = useState(false);
@@ -280,8 +281,12 @@ export function BriefingView({
   onView: (view: ViewMode) => void; onQuery: (value: string) => void; onCategory: (value: string) => void; onTeam: (value: string) => void; onSort: (value: string) => void; onAdvanced: () => void; onClear: () => void;
   onOpen: (article: Article) => void; onOpenClusterSource: (source: SourceArticle) => void; onSave: (id: string) => void; onNotInterested: (id: string) => void; onWorkflow: (article: Article) => void; onExport: () => void; onNavigateWorkflow: () => void; onToggleSelected: (id: string) => void; onSelectVisible: (ids: string[]) => void; onStatus: (id: string, status: string) => void; advancedCount?: number; advancedFilters: AdvancedFilters; discoverMode?: boolean;
 }) {
-  const featured = articles[0];
-  const feedArticles = discoverMode ? articles : articles.slice(1);
+  const rankedArticles = [...articles].sort((left, right) => ((right.sourceArticles?.length ?? 1) - (left.sourceArticles?.length ?? 1)) || right.relevance - left.relevance || right.confidence - left.confidence);
+  const featured = discoverMode ? articles[0] : rankedArticles[0];
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => { const timer = window.setInterval(() => setClock(new Date()), 60_000); return () => window.clearInterval(timer); }, []);
+  const moment = greetingFor(clock);
+  const feedArticles = discoverMode ? articles : rankedArticles.filter((article) => article.id !== featured?.id);
   const firstName = viewer.displayName.trim().split(/\s+/)[0] || "Analyst";
   const clusterNeedle = query.trim().toLowerCase();
   const visibleClusters = clusters.filter((cluster) => {
@@ -311,22 +316,24 @@ export function BriefingView({
     return hours * 60 + minutes;
   };
   const feedItems: FeedItem[] = [
-    ...feedArticles.map((article) => ({ kind: "article" as const, id: article.id, priority: article.priority, time: toMinutes(article.published), score: sort === "Highest confidence" ? article.confidence : article.relevance, sourceCount: 1, article })),
-    ...visibleClusters.map((cluster) => ({ kind: "cluster" as const, id: cluster.id, priority: cluster.priority, time: toMinutes(cluster.timeRange), score: cluster.confidence, sourceCount: cluster.sources.length + 2, cluster })),
+    ...feedArticles.map((article) => ({ kind: "article" as const, id: article.id, priority: article.priority, time: toMinutes(article.published), score: sort === "Highest confidence" ? article.confidence : article.relevance, sourceCount: article.sourceArticles?.length ?? 1, article })),
+    ...visibleClusters.map((cluster) => ({ kind: "cluster" as const, id: cluster.id, priority: cluster.priority, time: toMinutes(cluster.timeRange), score: cluster.confidence, sourceCount: cluster.sources.length, cluster })),
   ];
   const priorityWeight = { critical: 4, high: 3, medium: 2, low: 1 };
   const sortedFeedItems = [...feedItems].sort((a, b) => {
+    if (!discoverMode) return b.sourceCount - a.sourceCount || b.score - a.score || b.time - a.time;
     if (sort === "Latest") return b.time - a.time;
     if (sort === "Oldest") return a.time - b.time;
     if (sort === "Highest priority") return priorityWeight[b.priority] - priorityWeight[a.priority] || b.score - a.score;
     if (sort === "Most sources") return b.sourceCount - a.sourceCount || b.score - a.score;
     return b.score - a.score;
   });
+  const displayedFeedItems = discoverMode ? sortedFeedItems : sortedFeedItems.slice(0, 4);
   const chronological = sort === "Latest" || sort === "Oldest";
-  const priorityItems = sortedFeedItems.filter((item) => item.priority === "critical" || item.priority === "high");
-  const moreItems = sortedFeedItems.filter((item) => item.priority !== "critical" && item.priority !== "high");
+  const priorityItems = displayedFeedItems.filter((item) => item.priority === "critical" || item.priority === "high");
+  const moreItems = displayedFeedItems.filter((item) => item.priority !== "critical" && item.priority !== "high");
   const sections = chronological
-    ? [{ number: "01", title: sort === "Latest" ? "Latest signals" : "Oldest first", copy: "Articles and clusters in publication order", items: sortedFeedItems }]
+    ? [{ number: "01", title: sort === "Latest" ? "Latest signals" : "Oldest first", copy: "Articles and clusters in publication order", items: displayedFeedItems }]
     : [
         { number: "01", title: "Priority signals", copy: "Critical and high-confidence stories first", items: priorityItems },
         { number: "02", title: "More intelligence", copy: "The rest of today’s retained desk", items: moreItems },
@@ -342,11 +349,11 @@ export function BriefingView({
     return <ArticleCard key={article.id} rank={rank} article={article} view={view} saved={saved.has(article.id)} approved={approved.has(article.id)} selected={selectedIds.has(article.id)} status={statusById[article.id] ?? article.status} onToggleSelected={() => onToggleSelected(article.id)} onUnderReview={() => onStatus(article.id, "Under Review")} onOpen={() => onOpen(article)} onSave={() => onSave(article.id)} onNotInterested={() => onNotInterested(article.id)} onWorkflow={() => onWorkflow(article)} />;
   };
   const selectableIds = articles.map((article) => article.id);
-  const visibleSignalCount = articles.length + visibleClusters.length;
+  const visibleSignalCount = discoverMode ? articles.length + visibleClusters.length : (featured ? 1 : 0) + displayedFeedItems.length;
   const hasResults = visibleSignalCount > 0;
   return (
     <div className="page-content briefing-page">
-      <div className="page-masthead personalized-masthead"><div><span className="eyebrow">{discoverMode ? `Signal stream · ${visibleSignalCount} visible` : `Morning intelligence · ${visibleSignalCount} ready`}</span><h1>{discoverMode ? `Explore the live desk, ${firstName}.` : `Good morning, ${firstName}.`}</h1><p>{discoverMode ? "Every retained signal, clustered and ranked as it arrives." : hasResults ? "Your latest backend-generated briefing is ready for review." : "No briefing has been generated for this profile yet."}</p><span className="personalization-note"><Icon>◎</Icon>Personalized workspace · shared desk intelligence</span></div><div className="masthead-actions"><button className="primary-button" onClick={onExport} disabled={!articles.length}><Icon>↥</Icon>Export briefing</button></div></div>
+      <div className="page-masthead personalized-masthead"><div><span className="eyebrow">{discoverMode ? `Signal stream · ${visibleSignalCount} visible` : `Current intelligence · ${visibleSignalCount} ready`}</span><h1>{discoverMode ? `Explore the live desk, ${firstName}.` : <><span className="greeting-symbol" aria-hidden="true">{moment.symbol}</span>{moment.greeting}, {firstName}.</>}</h1><p>{discoverMode ? "Every retained signal, clustered and ranked as it arrives." : hasResults ? moment.note : "No briefing has been generated for this profile yet."}</p><span className="personalization-note"><Icon>◎</Icon>Personalized workspace · shared desk intelligence</span></div><div className="masthead-actions"><button className="primary-button" onClick={onExport} disabled={!articles.length}><Icon>↥</Icon>Export briefing</button></div></div>
       {!discoverMode && featured && <><MetricRibbon selectedCount={selectedIds.size} articles={articles} clusters={clusters} /><div className="lead-grid"><FeaturedStory article={featured} saved={saved.has(featured.id)} selected={selectedIds.has(featured.id)} status={statusById[featured.id] ?? featured.status} onToggleSelected={() => onToggleSelected(featured.id)} onUnderReview={() => onStatus(featured.id, "Under Review")} onOpen={() => onOpen(featured)} onSave={() => onSave(featured.id)} onNotInterested={() => onNotInterested(featured.id)} /><AIDailyOverview firstName={firstName} articles={articles} /></div></>}
       <div className="feed-heading"><div><span className="eyebrow">{discoverMode ? "All retained intelligence" : "Intelligence stream"}</span><h2>{discoverMode ? "Latest signals" : "What else is moving"}</h2></div><span className="feed-updated"><i />Updated just now</span></div>
       <FilterBar query={query} category={category} team={team} view={view} sort={sort} resultCount={visibleSignalCount} advancedCount={advancedCount} allSelected={selectableIds.length > 0 && selectableIds.every((id) => selectedIds.has(id))} selectedCount={selectedIds.size} onSelectAll={() => onSelectVisible(selectableIds)} onQuery={onQuery} onCategory={onCategory} onTeam={onTeam} onView={onView} onSort={onSort} onAdvanced={onAdvanced} onClear={onClear} />

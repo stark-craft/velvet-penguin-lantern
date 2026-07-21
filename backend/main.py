@@ -1,4 +1,4 @@
-"""Signalroom application entry point and operational command-line interface.
+"""newsScrapper application entry point and operational command-line interface.
 
 Run ``python main.py --help`` from the backend directory for the available
 commands.  The module-level ``app`` is intentionally kept for
@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence
+from uuid import NAMESPACE_URL, uuid5
 
 from signalroom.app import create_app
 from signalroom.config import Settings
@@ -20,7 +22,13 @@ from signalroom.json_storage import JSONRepository
 from signalroom.ml.embeddings import EmbeddingService
 from signalroom.ml.summarizer import SummarizationService
 from signalroom.ml.training import TrainingDataError, train_gatekeeper
-from signalroom.models import ArticleActionType, PageParams, ProfileId
+from signalroom.models import (
+    ArticleActionType,
+    PageParams,
+    ProfileId,
+    TelemetryEventCreate,
+    TelemetryEventType,
+)
 from signalroom.profiles import LoadedProfile, ProfileRegistry
 from signalroom.services.pipeline import PipelineService
 from signalroom.services.scheduler import MorningScheduler, SchedulerAlreadyRunning
@@ -189,7 +197,7 @@ def _command_scheduler(arguments: argparse.Namespace) -> int:
         repository=repository,
     )
     print(
-        "Starting Signalroom scheduler every "
+        "Starting newsScrapper scheduler every "
         f"{settings.schedule_interval_hours} hours ({settings.timezone_name}); "
         "profiles run sequentially and startup recovery is enabled."
     )
@@ -212,7 +220,7 @@ def _command_run(arguments: argparse.Namespace) -> int:
     for profile in _active_profiles(profiles, arguments.profile):
         result = pipeline.run_profile(
             profile_id=profile.id,
-            trigger="manual",
+            trigger=arguments.trigger,
             requested_by=arguments.requested_by,
             from_date=arguments.from_date,
             to_date=arguments.to_date,
@@ -221,6 +229,112 @@ def _command_run(arguments: argparse.Namespace) -> int:
         )
         results.append(result)
     _json_output(results[0] if len(results) == 1 else results)
+    return 0
+
+
+def _command_preflight(arguments: argparse.Namespace) -> int:
+    """Validate source selection and generate requests without network access."""
+
+    from signalroom.crawlers.spiders.news_spider import NewsSpider
+
+    settings = _settings()
+    registry = ProfileRegistry.from_settings(settings)
+    results = []
+    failed = False
+    for loaded in _active_profiles(registry, arguments.profile):
+        spider = NewsSpider(
+            profile=loaded.id.value,
+            run_id=f"preflight_{loaded.id.value}",
+            keyword="",
+            match_all="true",
+            sites_file=str(loaded.sources_path),
+            target_sites=",".join(arguments.source or ()) or "All",
+            timezone_name=settings.timezone_name,
+            discovery_only="true",
+        )
+        requests = list(spider._iter_initial_requests())
+        diagnostics = dict(spider.source_diagnostics)
+        diagnostics["generated_request_urls"] = [request.url for request in requests[:10]]
+        diagnostics["generated_request_urls_truncated"] = len(requests) > 10
+        results.append(diagnostics)
+        failed = failed or bool(diagnostics["unmatched_source_overrides"])
+        failed = failed or (
+            int(diagnostics["selected_enabled"]) > 0 and not requests
+        )
+    _json_output(results[0] if len(results) == 1 else results)
+    return 2 if failed else 0
+
+
+def _command_seed_demo_analytics(_arguments: argparse.Namespace) -> int:
+    """Create repeatable local-only people/activity examples for UI validation."""
+
+    settings = _settings()
+    repository = JSONRepository(settings.storage_path)
+    people = (
+        ("demo:anaya-rao", "Anaya Rao", "anaya@example.test"),
+        ("demo:kabir-mehta", "Kabir Mehta", "kabir@example.test"),
+        ("demo:meera-iyer", "Meera Iyer", "meera@example.test"),
+        ("demo:arjun-kapoor", "Arjun Kapoor", "arjun@example.test"),
+        ("demo:zoya-khan", "Zoya Khan", "zoya@example.test"),
+        ("demo:dev-malhotra", "Dev Malhotra", "dev@example.test"),
+    )
+    paths = ("/briefing", "/discover", "/search", "/workflow", "/saved")
+    now = datetime.now(timezone.utc)
+    created_people = 0
+    created_events = 0
+    for person_index, (actor, name, email) in enumerate(people):
+        if repository.get_viewer_preference(actor) is None:
+            repository.upsert_viewer_preference(
+                actor,
+                display_name=name,
+                contact_email=email,
+                pet_enabled=person_index % 2 == 0,
+                pet_kind=("orbit", "pixel", "cloud")[person_index % 3],
+                pet_color=("violet", "coral", "mint", "gold")[person_index % 4],
+            )
+            created_people += 1
+        if repository.list_activity(actor_id=actor, page=PageParams(limit=1)).items:
+            continue
+        session = uuid5(NAMESPACE_URL, f"newsScrapper-demo-session:{actor}")
+        for event_index in range(8 + person_index):
+            event_type = (
+                TelemetryEventType.ARTICLE_ACTION
+                if event_index == 5
+                else TelemetryEventType.SEARCH
+                if event_index == 3
+                else TelemetryEventType.HEARTBEAT
+                if event_index % 4 == 0
+                else TelemetryEventType.PAGE_VIEW
+            )
+            properties: Dict[str, Any] = {}
+            if event_type == TelemetryEventType.ARTICLE_ACTION:
+                properties["action"] = ("select", "save", "mark_under_review")[
+                    person_index % 3
+                ]
+            elif event_type == TelemetryEventType.SEARCH:
+                properties["query"] = ("AI", "broadcast", "display")[person_index % 3]
+            repository.record_activity(
+                TelemetryEventCreate(
+                    event_type=event_type,
+                    session_id=session,
+                    profile=ProfileId.DEFAULT,
+                    actor_id=actor,
+                    path=paths[event_index % len(paths)],
+                    properties=properties,
+                    occurred_at=now
+                    - timedelta(days=person_index % 3, minutes=(event_index + 1) * 7),
+                )
+            )
+            created_events += 1
+    _json_output(
+        {
+            "people_available": len(people),
+            "people_created": created_people,
+            "events_created": created_events,
+            "storage": str(settings.storage_path),
+            "note": "Safe to run again; existing demo people are not duplicated.",
+        }
+    )
     return 0
 
 
@@ -267,7 +381,7 @@ def _command_warm_models(arguments: argparse.Namespace) -> int:
             model_identity=settings.embedding_model_id,
             local_files_only=local_files_only,
         )
-        embedder.encode_one("Signalroom model cache readiness check")
+        embedder.encode_one("newsScrapper model cache readiness check")
         status["embedding"] = embedder.status()
     if arguments.only in {"all", "summarization"}:
         summarizer = SummarizationService(
@@ -291,8 +405,8 @@ def _command_warm_models(arguments: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="signalroom",
-        description="Operate the Signalroom news-intelligence backend.",
+        prog="newsScrapper",
+        description="Operate the newsScrapper news-intelligence backend.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
@@ -325,7 +439,32 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--keyword", action="append", help="override keyword; repeatable")
     run_parser.add_argument("--source", action="append", help="limit to site ID; repeatable")
     run_parser.add_argument("--requested-by", default="local-cli")
+    run_parser.add_argument(
+        "--trigger",
+        choices=("manual", "scheduler"),
+        default="manual",
+        help="label this run as a manual test or scheduled cycle",
+    )
     run_parser.set_defaults(handler=_command_run)
+
+    preflight_parser = commands.add_parser(
+        "preflight", help="validate source entrypoints without crawling the network"
+    )
+    preflight_parser.add_argument(
+        "--profile",
+        choices=("default", "broadcast", "all"),
+        default="all",
+    )
+    preflight_parser.add_argument(
+        "--source", action="append", help="limit to a source ID; repeatable"
+    )
+    preflight_parser.set_defaults(handler=_command_preflight)
+
+    demo_parser = commands.add_parser(
+        "seed-demo-analytics",
+        help="add six repeatable fake users and activity rows for local UI testing",
+    )
+    demo_parser.set_defaults(handler=_command_seed_demo_analytics)
 
     train_parser = commands.add_parser(
         "train", help="train and atomically promote a profile gatekeeper"
@@ -373,6 +512,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Iterable[str]] = None) -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
     parser = build_parser()
     arguments = parser.parse_args(list(argv) if argv is not None else None)
     try:

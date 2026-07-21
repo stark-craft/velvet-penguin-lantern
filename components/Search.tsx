@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type { Article } from "@/types/news";
 import { ArticleSelectionToggle, EmptyState, Icon, SourceBadge, StatusBadge } from "@/components/ui";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 type SearchScope = "all" | "briefing" | "history" | "workflow" | "saved";
 type SearchSort = "relevance" | "latest" | "category" | "source";
@@ -67,8 +68,8 @@ export function SearchView({
         <form className="search-hero" onSubmit={submit}>
           <span className="eyebrow">Search the desk</span>
           <h2>Find the signal you remember.</h2>
-          <p>Results come only from intelligence already returned by the Signalroom backend.</p>
-          <label className="hero-search"><Icon>⌕</Icon><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search headlines, summaries, entities, sources, or keywords" /><kbd>↵</kbd></label>
+          <p>Results come only from intelligence already returned by the {PRODUCT_NAME} backend.</p>
+          <label className="hero-search"><Icon>⌕</Icon><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search headlines, summaries, entities, sources, or keywords" /><kbd>↵</kbd></label><button className="primary-button search-submit" type="submit" disabled={!query.trim()}>Search desk <Icon>→</Icon></button>
         </form>
         <div className="search-controls"><div><label>Scope<select value={scope} onChange={(event) => setScope(event.target.value as SearchScope)}>{Object.entries(scopeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Sort by<select value={sort} onChange={(event) => setSort(event.target.value as SearchSort)}><option value="relevance">Relevance</option><option value="latest">Latest publication</option><option value="category">Category</option><option value="source">Source</option></select></label></div><span><strong>{results.length}</strong> results in {scopeLabels[scope].toLowerCase()}</span></div>
         {!query && <EmptyState icon="⌕" title="Search the current profile" copy="Enter a phrase, then narrow the real result set by briefing, history, workflow, or saved status." />}

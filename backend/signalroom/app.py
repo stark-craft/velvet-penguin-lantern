@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from signalroom.api import BackgroundJobManager, router
+from signalroom.branding import PRODUCT_NAME
 from signalroom.config import Settings
 from signalroom.ml.training import TrainingDataError
 from signalroom.profiles import ProfileRegistry
@@ -131,7 +132,7 @@ def create_app(
             application.state.job_manager.shutdown(wait=False)
 
     application = FastAPI(
-        title="Signalroom API",
+        title=f"{PRODUCT_NAME} API",
         version="0.1.0",
         description="Profile-aware news intelligence and editorial workflow API.",
         lifespan=lifespan,

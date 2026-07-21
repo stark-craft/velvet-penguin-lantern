@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 import sys
 import uuid
@@ -8,6 +9,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional
+
+logger = logging.getLogger(__name__)
 
 
 class CrawlRunError(RuntimeError):
@@ -38,6 +41,32 @@ def _bounded_tail(value: str, length: int = 4000) -> str:
     return value[-length:]
 
 
+def _no_entrypoint_diagnostics(
+    source_health: Mapping[str, Any], *, profile: str, source_file: Path
+) -> str:
+    """Return stable, actionable counts for a zero-entrypoint crawl."""
+
+    def number(name: str) -> int:
+        try:
+            return max(0, int(source_health.get(name) or 0))
+        except (TypeError, ValueError):
+            return 0
+
+    reported_files = source_health.get("source_files")
+    if isinstance(reported_files, list) and reported_files:
+        file_text = ",".join(str(item) for item in reported_files)
+    else:
+        file_text = str(source_file)
+    return (
+        f"configured={number('configured')} "
+        f"enabled={number('enabled')} "
+        f"usable_entrypoints={number('usable_entrypoints')} "
+        f"initial_requests={number('initial_requests')} "
+        f"attempted={number('attempted')} "
+        f"profile={profile} source_file={file_text}"
+    )
+
+
 class ScrapyRunner:
     """Runs Scrapy out-of-process so Twisted never owns the FastAPI event loop."""
 
@@ -50,6 +79,7 @@ class ScrapyRunner:
         )
         self.timeout_seconds = int(getattr(settings, "crawler_timeout_seconds", 1800))
         self.keep_artifacts = bool(getattr(settings, "keep_crawl_artifacts", False))
+        self.stream_logs = bool(getattr(settings, "stream_crawler_logs", True))
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def run(
@@ -120,14 +150,22 @@ class ScrapyRunner:
         ]
 
         try:
-            completed = subprocess.run(
-                command,
-                cwd=str(self.backend_root),
-                capture_output=True,
-                text=True,
-                timeout=self.timeout_seconds,
-                check=False,
+            logger.info(
+                "[crawler:%s] launching Scrapy for %s through %s (%s keywords)",
+                profile_id,
+                from_date,
+                to_date,
+                len(active_keywords),
             )
+            run_options = {
+                "cwd": str(self.backend_root),
+                "text": True,
+                "timeout": self.timeout_seconds,
+                "check": False,
+            }
+            if not self.stream_logs:
+                run_options["capture_output"] = True
+            completed = subprocess.run(command, **run_options)
         except subprocess.TimeoutExpired as exc:
             raise CrawlRunError(
                 f"Crawl {run_id} exceeded the {self.timeout_seconds}-second timeout"
@@ -135,8 +173,8 @@ class ScrapyRunner:
         except OSError as exc:
             raise CrawlRunError(f"Could not start Scrapy for crawl {run_id}: {exc}") from exc
 
-        stdout_tail = _bounded_tail(completed.stdout)
-        stderr_tail = _bounded_tail(completed.stderr)
+        stdout_tail = _bounded_tail(getattr(completed, "stdout", ""))
+        stderr_tail = _bounded_tail(getattr(completed, "stderr", ""))
         if completed.returncode != 0:
             raise CrawlRunError(
                 f"Scrapy crawl {run_id} failed with exit code {completed.returncode}. "
@@ -176,7 +214,10 @@ class ScrapyRunner:
                     except OSError:
                         pass
             raise CrawlRunError(
-                f"Crawl {run_id} had no enabled source entrypoints to attempt"
+                f"Crawl {run_id} had no enabled source entrypoints to attempt; "
+                + _no_entrypoint_diagnostics(
+                    source_health, profile=profile_id, source_file=sites_file
+                )
             )
         if source_health.get("all_sources_failed"):
             failed = int(source_health.get("failed") or 0)
@@ -202,6 +243,13 @@ class ScrapyRunner:
             stderr_tail=stderr_tail,
             stats={str(key): int(value) for key, value in stats.items()},
             source_health=dict(source_health),
+        )
+        logger.info(
+            "[crawler:%s] complete: %s articles, %s/%s sources responded",
+            profile_id,
+            len(payload),
+            source_health.get("responded", 0),
+            source_health.get("attempted", 0),
         )
         if not self.keep_artifacts:
             for artifact in (output_file, stats_file):

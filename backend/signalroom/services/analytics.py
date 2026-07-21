@@ -75,6 +75,7 @@ class UserActivityRollup(ActivityRollup):
     # Null means the event stream had no safe stored actor identifier.  The
     # service never substitutes a network-derived identifier.
     actor_id: Optional[str] = None
+    display_name: Optional[str] = None
     session_count: int = Field(ge=1)
 
 
@@ -83,6 +84,7 @@ class SessionActivityRollup(ActivityRollup):
     # Null also covers the defensive case where a session contains multiple
     # actor IDs, because selecting one would be misleading.
     actor_id: Optional[str] = None
+    display_name: Optional[str] = None
 
 
 class AnalyticsCoverage(StrictModel):
@@ -343,9 +345,21 @@ class DetailedAnalyticsService:
             by_actor[_safe_actor_id(event.actor_id)].append(event)
             by_session[event.session_id].append(event)
 
+        preference_reader = getattr(self.repository, "get_viewer_preference", None)
+
+        def display_name_for(actor: Optional[str]) -> Optional[str]:
+            if actor is None or not callable(preference_reader):
+                return None
+            preference = preference_reader(actor)
+            if not preference:
+                return None
+            name = str(preference.get("display_name") or "").strip()
+            return name or None
+
         users = [
             UserActivityRollup(
                 actor_id=actor,
+                display_name=display_name_for(actor),
                 session_count=len({event.session_id for event in actor_events}),
                 **_rollup_values(actor_events, self.idle_cap),
             )
@@ -372,6 +386,7 @@ class DetailedAnalyticsService:
                 SessionActivityRollup(
                     session_id=session_id,
                     actor_id=session_actor,
+                    display_name=display_name_for(session_actor),
                     **_rollup_values(session_events, self.idle_cap),
                 )
             )

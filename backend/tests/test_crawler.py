@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import tempfile
 import unittest
@@ -156,6 +157,13 @@ class SpiderTests(unittest.TestCase):
         arguments.update(overrides)
         return NewsSpider(**arguments)
 
+    def write_sites(self, sites: list[dict]) -> None:
+        self.sites_file.write_text(json.dumps({"sites": sites}), encoding="utf-8")
+
+    @staticmethod
+    async def async_start_requests(spider: NewsSpider) -> list[Request]:
+        return [request async for request in spider.start()]
+
     def feed_response(self, spider: NewsSpider) -> XmlResponse:
         site = spider.sites[0]
         request = Request(
@@ -190,6 +198,179 @@ class SpiderTests(unittest.TestCase):
         entrypoints = list(feed_only.start_requests())
         self.assertEqual(len(entrypoints), 1)
         self.assertEqual(entrypoints[0].meta["fallback_urls"], [])
+
+    def test_homepage_deep_scan_generates_initial_request(self) -> None:
+        self.write_sites(
+            [
+                {
+                    "id": "homepage-source",
+                    "name": "Homepage Source",
+                    "enabled": True,
+                    "homepage": "https://example.com/news/",
+                    "allow_deep_scan": True,
+                }
+            ]
+        )
+        spider = self.spider()
+        requests = list(spider._iter_initial_requests())
+        self.assertEqual([request.url for request in requests], ["https://example.com/news/"])
+        self.assertEqual(requests[0].meta["entrypoint_kind"], "listing")
+        self.assertEqual(spider._sources_attempted, {"homepage-source"})
+
+    def test_disabled_source_generates_no_request(self) -> None:
+        self.write_sites(
+            [
+                {
+                    "id": "disabled-source",
+                    "name": "Disabled Source",
+                    "enabled": False,
+                    "rss_url": "https://example.com/feed.xml",
+                }
+            ]
+        )
+        spider = self.spider()
+        self.assertEqual(list(spider._iter_initial_requests()), [])
+        self.assertEqual(spider.source_diagnostics["configured"], 1)
+        self.assertEqual(spider.source_diagnostics["enabled"], 0)
+
+    def test_enabled_source_without_url_is_counted_not_silently_attempted(self) -> None:
+        self.write_sites(
+            [{"id": "missing-url", "name": "Missing URL", "enabled": True}]
+        )
+        spider = self.spider()
+        self.assertEqual(list(spider._iter_initial_requests()), [])
+        self.assertEqual(
+            spider.source_diagnostics["enabled_without_usable_entrypoints"], 1
+        )
+        self.assertEqual(
+            spider.source_diagnostics["sources_without_entrypoint_ids"], ["missing-url"]
+        )
+
+    def test_modern_async_start_matches_shared_generator(self) -> None:
+        compatibility_spider = self.spider(run_id="compatibility")
+        modern_spider = self.spider(run_id="modern")
+        compatibility = list(compatibility_spider._iter_initial_requests())
+        modern = asyncio.run(self.async_start_requests(modern_spider))
+        self.assertEqual(
+            [(item.url, item.priority, item.meta["entrypoint_kind"]) for item in modern],
+            [
+                (item.url, item.priority, item.meta["entrypoint_kind"])
+                for item in compatibility
+            ],
+        )
+        self.assertEqual(modern_spider._sources_attempted, {"example-tech"})
+
+    def test_initial_request_generation_is_guarded_against_double_start(self) -> None:
+        spider = self.spider()
+        self.assertEqual(len(list(spider._iter_initial_requests())), 1)
+        self.assertEqual(list(spider.start_requests()), [])
+        self.assertEqual(spider.source_diagnostics["initial_requests"], 1)
+
+    def test_repository_source_configuration_preflights_without_mutation(self) -> None:
+        sites_file = Path(__file__).parents[1] / "sites" / "sites.json"
+        before = sites_file.read_bytes()
+        spider = self.spider(
+            sites_file=str(sites_file),
+            target_sites="techcrunch",
+            run_id="repository-preflight",
+        )
+        requests = list(spider._iter_initial_requests())
+        self.assertEqual(spider.source_diagnostics["configured"], 107)
+        self.assertEqual(spider.source_diagnostics["enabled"], 79)
+        self.assertEqual(spider.source_diagnostics["source_ids_selected"], ["techcrunch"])
+        self.assertGreaterEqual(len(requests), 1)
+        self.assertEqual(spider._sources_attempted, {"techcrunch"})
+        self.assertEqual(sites_file.read_bytes(), before)
+
+    def test_broadcast_homepages_preflight_as_html_listings(self) -> None:
+        sites_file = Path(__file__).parents[1] / "sites" / "broadcast_sites.json"
+        before = sites_file.read_bytes()
+        spider = self.spider(
+            sites_file=str(sites_file),
+            run_id="broadcast-preflight",
+            profile="broadcast",
+        )
+        requests = list(spider._iter_initial_requests())
+        self.assertEqual(spider.source_diagnostics["configured"], 59)
+        self.assertEqual(spider.source_diagnostics["enabled"], 59)
+        self.assertEqual(len(requests), 59)
+        self.assertTrue(all(item.meta["entrypoint_kind"] == "listing" for item in requests))
+        self.assertEqual(sites_file.read_bytes(), before)
+
+    def test_mixed_rss_and_homepage_sources_generate_the_correct_request_modes(self) -> None:
+        self.write_sites(
+            [
+                {"id": "feed", "name": "Feed", "enabled": True, "rss_url": "https://example.com/feed.xml"},
+                {"id": "web", "name": "Web", "enabled": True, "homepage": "https://example.org/news/", "allow_deep_scan": True},
+            ]
+        )
+        spider = self.spider()
+        requests = list(spider._iter_initial_requests())
+        self.assertEqual([(item.url, item.meta["entrypoint_kind"]) for item in requests], [
+            ("https://example.com/feed.xml", "feed"),
+            ("https://example.org/news/", "listing"),
+        ])
+
+    def test_full_feed_crawl_checks_article_body_before_keyword_rejection(self) -> None:
+        spider = self.spider(keyword="provenance")
+        requests = list(spider.parse_feed(self.feed_response(spider)))
+        self.assertEqual(len(requests), 1)
+        response = HtmlResponse(
+            requests[0].url,
+            request=requests[0],
+            body=fixture("article.html"),
+            encoding="utf-8",
+            headers={"Content-Type": "text/html"},
+        )
+        records = list(spider.parse_article_page(response))
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["keyword_matches"], ["provenance"])
+
+    def test_footer_only_keyword_does_not_make_an_article_relevant(self) -> None:
+        spider = self.spider(keyword="OTT")
+        article_request = list(spider.parse_feed(self.feed_response(spider)))[0]
+        response = HtmlResponse(
+            article_request.url,
+            request=article_request,
+            body=b"""
+                <html><head>
+                  <meta property="article:published_time" content="2026-07-09T06:30:00+05:30">
+                </head><body>
+                  <article><div class="entry-content">
+                    <p>A filmmaker announced a festival premiere for a new drama. The cast discussed the story, production schedule, and international screening plans in a detailed press statement.</p>
+                    <p>The premiere will take place in September and the producers expect the independent film to reach audiences around the world.</p>
+                  </div></article>
+                  <footer><p>Our company covers broadcast, OTT, cable TV, IPTV, and connected TV every day.</p></footer>
+                </body></html>
+            """,
+            encoding="utf-8",
+            headers={"Content-Type": "text/html"},
+        )
+        self.assertEqual(list(spider.parse_article_page(response)), [])
+
+    def test_full_html_crawl_follows_candidate_when_keyword_is_only_in_body(self) -> None:
+        spider = self.spider(keyword="provenance")
+        site = spider.sites[0]
+        request = Request("https://www.example.com/", meta={"site": site, "entrypoint_kind": "listing", "fallback_urls": []})
+        listing = HtmlResponse(request.url, request=request, body=fixture("listing.html"), encoding="utf-8", headers={"Content-Type": "text/html"})
+        article_requests = list(spider.parse_listing_page(listing))
+        self.assertEqual(len(article_requests), 1)
+
+    def test_source_specific_keywords_override_profile_keywords(self) -> None:
+        self.write_sites([{
+            "id": "source-keywords",
+            "name": "Source Keywords",
+            "enabled": True,
+            "rss_url": "https://feeds.example.com/atom.xml",
+            "allowed_domains": ["example.com"],
+            "keywords": ["provenance"],
+            "timezone": "Asia/Kolkata",
+        }])
+        spider = self.spider(keyword="never-matches")
+        request = list(spider.parse_feed(self.feed_response(spider)))[0]
+        response = HtmlResponse(request.url, request=request, body=fixture("article.html"), encoding="utf-8", headers={"Content-Type": "text/html"})
+        records = list(spider.parse_article_page(response))
+        self.assertEqual(records[0]["keyword_matches"], ["provenance"])
 
     def test_duplicate_source_ids_are_rejected(self) -> None:
         source = {

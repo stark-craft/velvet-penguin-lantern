@@ -97,16 +97,27 @@ class NewsSpider(scrapy.Spider):
         self.keywords = self._parse_keywords(keyword)
         if not self.keywords and not self.match_all:
             raise ValueError("keyword cannot be empty unless match_all=true")
-        self.keyword_patterns = [
-            re.compile(r"(?<!\w)" + re.escape(value) + r"(?!\w)", re.IGNORECASE)
-            for value in self.keywords
-        ]
-
         self.target_sites = self._parse_targets(target_sites)
+        self.source_diagnostics: Dict[str, Any] = {
+            "profile": self.profile,
+            "source_files": [],
+            "configured": 0,
+            "enabled": 0,
+            "enabled_with_usable_entrypoints": 0,
+            "selected_enabled": 0,
+            "usable_entrypoints": 0,
+            "enabled_without_usable_entrypoints": 0,
+            "sources_without_entrypoint_ids": [],
+            "source_ids_selected": [],
+            "source_ids_rejected_by_override": [],
+            "unmatched_source_overrides": [],
+            "initial_requests": 0,
+        }
         self.sites = self._load_sites(sites_file)
         self._seen_discoveries: set = set()
         self._sources_attempted: set = set()
         self._sources_responded: set = set()
+        self._initial_requests_started = False
 
         self.logger.info(
             "crawler_initialized",
@@ -235,7 +246,10 @@ class NewsSpider(scrapy.Spider):
     def _load_sites(self, sites_file: str) -> List[Dict[str, Any]]:
         configured: List[Dict[str, Any]] = []
         source_ids = set()
-        for path in self._site_files(sites_file):
+        matched_targets = set()
+        source_paths = self._site_files(sites_file)
+        self.source_diagnostics["source_files"] = [str(path) for path in source_paths]
+        for path in source_paths:
             if path.suffix.casefold() != ".json":
                 raise ValueError("sites_file must reference JSON")
             if not path.is_file():
@@ -251,23 +265,79 @@ class NewsSpider(scrapy.Spider):
             for raw_site in payload:
                 if not isinstance(raw_site, dict):
                     raise ValueError("each source must be an object")
+                self.source_diagnostics["configured"] += 1
                 if not self._source_enabled(raw_site.get("enabled", True)):
+                    continue
+                self.source_diagnostics["enabled"] += 1
+                raw_name = clean_text(
+                    raw_site.get("name") or raw_site.get("source") or raw_site.get("title")
+                )
+                if not raw_name:
+                    raise ValueError("enabled source is missing name")
+                raw_id = clean_text(raw_site.get("id")) or self._source_slug(raw_name)
+                raw_urls = []
+                for key in (
+                    "rss_url",
+                    "feed_url",
+                    "feed",
+                    "rss",
+                    "homepage",
+                    "home_url",
+                    "base_url",
+                    "url",
+                ):
+                    raw_urls.extend(self._coerce_values(raw_site.get(key), key))
+                if not raw_urls:
+                    self.source_diagnostics["enabled_without_usable_entrypoints"] += 1
+                    self.source_diagnostics["sources_without_entrypoint_ids"].append(raw_id)
+                    self.logger.warning(
+                        "crawler_source_has_no_supported_url",
+                        extra={
+                            "event": "crawler_source_has_no_supported_url",
+                            "run_id": self.run_id,
+                            "profile": self.profile,
+                            "source_id": raw_id,
+                            "source_file": str(path),
+                        },
+                    )
                     continue
                 site = self._normalize_site(raw_site)
                 if site["id"] in source_ids:
                     raise ValueError(f"duplicate source id: {site['id']}")
                 source_ids.add(site["id"])
-                configured.append(site)
-
-        if self.target_sites:
-            configured = [
-                site
-                for site in configured
-                if any(
+                has_usable_entrypoint = bool(self._entrypoints_for_site(site))
+                if has_usable_entrypoint:
+                    self.source_diagnostics["enabled_with_usable_entrypoints"] += 1
+                else:
+                    self.source_diagnostics["enabled_without_usable_entrypoints"] += 1
+                    self.source_diagnostics["sources_without_entrypoint_ids"].append(
+                        site["id"]
+                    )
+                selected = not self.target_sites or any(
                     target == site["id"].casefold() or target in site["name"].casefold()
                     for target in self.target_sites
                 )
-            ]
+                if selected:
+                    configured.append(site)
+                    self.source_diagnostics["source_ids_selected"].append(site["id"])
+                    if self.target_sites:
+                        matched_targets.update(
+                            target
+                            for target in self.target_sites
+                            if target == site["id"].casefold()
+                            or target in site["name"].casefold()
+                        )
+                else:
+                    self.source_diagnostics["source_ids_rejected_by_override"].append(
+                        site["id"]
+                    )
+        self.source_diagnostics["selected_enabled"] = len(configured)
+        self.source_diagnostics["unmatched_source_overrides"] = sorted(
+            set(self.target_sites or ()) - matched_targets
+        )
+        for site in configured:
+            if self._entrypoints_for_site(site):
+                self.source_diagnostics["usable_entrypoints"] += 1
         return configured
 
     def _normalize_site(self, raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -329,6 +399,9 @@ class NewsSpider(scrapy.Spider):
             "manual_deep_scan_candidate": self._source_enabled(
                 raw.get("manual_deep_scan_candidate", False)
             ),
+            "keywords": self._parse_keywords(
+                ",".join(self._coerce_values(raw.get("keywords"), "keywords"))
+            ),
         }
 
     @staticmethod
@@ -345,18 +418,24 @@ class NewsSpider(scrapy.Spider):
     # Requests and routing
     # ------------------------------------------------------------------
 
-    def start_requests(self) -> Iterator[scrapy.Request]:
+    @staticmethod
+    def _entrypoints_for_site(site: Dict[str, Any]) -> List[Tuple[str, str]]:
+        endpoints: List[Tuple[str, str]] = []
+        endpoints.extend((url, "feed") for url in site["feed_urls"])
+        endpoints.extend((url, "auto") for url in site["automatic_urls"])
+        if not site["feed_urls"] and not site["automatic_urls"] and site["allow_deep_scan"]:
+            endpoints.extend((url, "listing") for url in site["listing_urls"])
+        return endpoints
+
+    def _iter_initial_requests(self) -> Iterator[scrapy.Request]:
+        """Generate entrypoints once for both modern and compatibility APIs."""
+
+        if self._initial_requests_started:
+            return
+        self._initial_requests_started = True
         self._inc("sites_loaded", len(self.sites))
         for site in self.sites:
-            endpoints: List[Tuple[str, str]] = []
-            endpoints.extend((url, "feed") for url in site["feed_urls"])
-            endpoints.extend((url, "auto") for url in site["automatic_urls"])
-            if (
-                not site["feed_urls"]
-                and not site["automatic_urls"]
-                and site["allow_deep_scan"]
-            ):
-                endpoints.extend((url, "listing") for url in site["listing_urls"])
+            endpoints = self._entrypoints_for_site(site)
 
             fallback_urls = (
                 site["listing_urls"] if site["allow_deep_scan"] else []
@@ -369,6 +448,7 @@ class NewsSpider(scrapy.Spider):
 
             for url, kind in endpoints:
                 self._inc("entrypoint_requests")
+                self.source_diagnostics["initial_requests"] += 1
                 yield scrapy.Request(
                     url,
                     callback=self.parse_entrypoint,
@@ -384,6 +464,17 @@ class NewsSpider(scrapy.Spider):
                         "signalroom_allowed_domains": site["allowed_domains"],
                     },
                 )
+
+    async def start(self):
+        """Scrapy 2.13+ asynchronous spider-start API."""
+
+        for request in self._iter_initial_requests():
+            yield request
+
+    def start_requests(self) -> Iterator[scrapy.Request]:
+        """Compatibility API retained for supported older Scrapy releases."""
+
+        yield from self._iter_initial_requests()
 
     def request_error(self, failure: Any) -> Iterator[scrapy.Request]:
         self._inc("request_errors")
@@ -494,8 +585,8 @@ class NewsSpider(scrapy.Spider):
                 continue
 
             excerpt = extract_feed_excerpt(entry)
-            matches = self._find_keywords(" ".join((title, excerpt, link)))
-            if not self.match_all and not matches:
+            matches = self._find_keywords(" ".join((title, excerpt, link)), site)
+            if self.discovery_only and not self.match_all and not matches:
                 self._inc("dropped_keyword_mismatch")
                 continue
 
@@ -550,8 +641,8 @@ class NewsSpider(scrapy.Spider):
             anchor_title = clean_text(anchor.xpath("string(.)").get()) or clean_text(
                 anchor.attrib.get("title", "")
             )
-            matches = self._find_keywords(" ".join((anchor_title, url)))
-            if not self.match_all and not matches:
+            matches = self._find_keywords(" ".join((anchor_title, url)), site)
+            if self.discovery_only and not self.match_all and not matches:
                 continue
             dedupe_key = (site["id"], "HTML", url)
             if dedupe_key in self._seen_discoveries:
@@ -649,7 +740,7 @@ class NewsSpider(scrapy.Spider):
             date_precision = discovery.get("date_precision", "missing")
 
         keyword_matches = self._find_keywords(
-            " ".join((title, excerpt, body_text, response.url))
+            " ".join((title, excerpt, body_text, response.url)), site
         )
         if not self.match_all and not keyword_matches:
             self._inc("dropped_keyword_mismatch")
@@ -765,10 +856,15 @@ class NewsSpider(scrapy.Spider):
             },
         }
 
-    def _find_keywords(self, text: str) -> List[str]:
+    def _find_keywords(self, text: str, site: Optional[Dict[str, Any]] = None) -> List[str]:
+        keywords = list((site or {}).get("keywords") or self.keywords)
+        patterns = [
+            re.compile(r"(?<!\w)" + re.escape(value) + r"(?!\w)", re.IGNORECASE)
+            for value in keywords
+        ]
         return [
             keyword
-            for keyword, pattern in zip(self.keywords, self.keyword_patterns)
+            for keyword, pattern in zip(keywords, patterns)
             if pattern.search(str(text or ""))
         ]
 
@@ -822,7 +918,7 @@ class NewsSpider(scrapy.Spider):
         }
         failed_sources = self._sources_attempted - self._sources_responded
         source_health = {
-            "configured": len(self.sites),
+            **self.source_diagnostics,
             "attempted": len(self._sources_attempted),
             "responded": len(self._sources_responded),
             "failed": len(failed_sources),

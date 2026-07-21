@@ -330,6 +330,7 @@ class ArticleActionRead(ArticleActionCreate):
 class ArticleDisposition(StrictModel):
     article_id: UUID
     actor_id: str
+    owner_display_name: Optional[str] = None
     selected: bool = False
     saved: bool = False
     under_review: bool = False

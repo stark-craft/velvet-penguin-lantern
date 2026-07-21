@@ -159,6 +159,18 @@ class DetailedAnalyticsTests(unittest.TestCase):
         self.assertNotIn("private-property-value", serialized)
         self.assertNotIn("properties", serialized)
 
+    def test_latest_display_name_labels_historical_activity_without_exposing_ip(self) -> None:
+        session = uuid4()
+        actor = "anonymous:stable-pseudonym"
+        self.record(session_id=session, actor_id=actor, occurred_at=self.end_at - timedelta(minutes=3))
+        if hasattr(self.repository, "upsert_viewer_preference"):
+            self.repository.upsert_viewer_preference(actor, display_name="Name A")
+            self.repository.upsert_viewer_preference(actor, display_name="Name B")
+        result = DetailedAnalyticsService(self.repository).build(profile=ProfileId.DEFAULT, end_at=self.end_at)
+        user = next(item for item in result.users if item.actor_id == actor)
+        expected = "Name B" if hasattr(self.repository, "upsert_viewer_preference") else None
+        self.assertEqual(user.display_name, expected)
+
     def test_unsafe_network_actor_is_not_exposed_as_a_user_identifier(self) -> None:
         self.record(
             session_id=uuid4(),

@@ -16,6 +16,7 @@ import type {
   SourceRecord,
   WorklistRecord,
 } from "@/types/news";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 function apiBase(): string {
   const directPort = process.env.NEXT_PUBLIC_SIGNALROOM_DIRECT_API_PORT?.trim()
@@ -44,7 +45,7 @@ async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null) as unknown;
-    throw new SignalroomApiError(apiErrorMessage(body, `Signalroom request failed (${response.status})`), response.status);
+    throw new SignalroomApiError(apiErrorMessage(body, `${PRODUCT_NAME} request failed (${response.status})`), response.status);
   }
   return response.json() as Promise<T>;
 }
@@ -53,6 +54,7 @@ const profileQuery = (profile: DeskProfile) => `profile=${encodeURIComponent(pro
 
 export const signalroomApi = {
   me: (profile?: DeskProfile) => api<BackendMe>(`me${profile ? `?${profileQuery(profile)}` : ""}`),
+  notifications: (profile: DeskProfile) => api<DeskNotification[]>(`notifications?${profileQuery(profile)}`),
   profiles: (profile?: DeskProfile) => api<BackendProfileSummary[]>(`profiles${profile ? `?${profileQuery(profile)}` : ""}`),
   feed: (profile: DeskProfile) => api<BackendFeed>(`feed?${profileQuery(profile)}`),
   sources: (profile: DeskProfile) => api<SourceApiRecord[]>(`sources?${profileQuery(profile)}`),
@@ -61,8 +63,8 @@ export const signalroomApi = {
   briefing: (profile: DeskProfile, id: string) => api<BriefingHistoryRecord>(`briefings/${id}?${profileQuery(profile)}`),
   article: (profile: DeskProfile, id: string) => api<RawArticle>(`articles/${id}?${profileQuery(profile)}`),
   articleActions: (profile: DeskProfile, id: string) => api<BackendPage<ArticleActionRecord>>(`articles/${id}/actions?${profileQuery(profile)}&limit=100`),
-  action: (profile: DeskProfile, id: string, action: ArticleAction, note?: string) => api<{ disposition: WorklistRecord["disposition"] }>(`articles/${id}/actions?${profileQuery(profile)}`, { method: "POST", body: JSON.stringify({ action, note: note || null }) }),
-  batchAction: (profile: DeskProfile, ids: string[], action: ArticleAction) => api<Array<{ disposition: WorklistRecord["disposition"] }>>(`article-actions/batch?${profileQuery(profile)}`, { method: "POST", body: JSON.stringify({ article_ids: ids, action }) }),
+  action: (profile: DeskProfile, id: string, action: ArticleAction, note?: string, approvalKey?: string) => api<{ disposition: WorklistRecord["disposition"] }>(`articles/${id}/actions?${profileQuery(profile)}`, { method: "POST", body: JSON.stringify({ action, note: note || null, approval_key: approvalKey || null }) }),
+  batchAction: (profile: DeskProfile, ids: string[], action: ArticleAction, approvalKey?: string) => api<Array<{ disposition: WorklistRecord["disposition"] }>>(`article-actions/batch?${profileQuery(profile)}`, { method: "POST", body: JSON.stringify({ article_ids: ids, action, approval_key: approvalKey || null }) }),
   feedback: (profile: DeskProfile, submission: Omit<FeedbackSubmission, "id" | "createdAt">) => api<VocResponse>(`feedback?${profileQuery(profile)}`, { method: "POST", body: JSON.stringify(feedbackPayload(submission)) }),
   event: (profile: DeskProfile, payload: EventPayload) => api<Record<string, unknown>>(`events?${profileQuery(profile)}`, { method: "POST", body: JSON.stringify(payload) }),
   scan: (profile: DeskProfile) => api<{ job: ScanJob }>("admin/scans", { method: "POST", body: JSON.stringify({ profile, kind: "manual", keywords: [], source_ids: [], parameters: {} }) }),
@@ -70,15 +72,16 @@ export const signalroomApi = {
   jobEvents: (id: string) => api<Array<Record<string, unknown>>>(`admin/jobs/${id}/events?limit=1000`),
   analytics: (profile: DeskProfile) => api<DetailedAnalytics>(`admin/analytics/detail?${profileQuery(profile)}&window_days=30`),
   feedbackInbox: (profile: DeskProfile) => api<BackendPage<VocResponse>>(`admin/feedback?${profileQuery(profile)}&limit=100`),
-  gatekeeper: (profile: DeskProfile) => api<GatekeeperAudit>(`gatekeeper/audit?${profileQuery(profile)}&limit=100`),
-  savePreferences: (payload: { display_name: string; contact_email: string | null }) => api<PreferenceResponse>("me/preferences", { method: "PUT", body: JSON.stringify(payload) }),
+  gatekeeper: (profile: DeskProfile, key?: string) => api<GatekeeperAudit>(`gatekeeper/audit?${profileQuery(profile)}&limit=100`, key ? { headers: { "x-signalroom-gatekeeper-key": key } } : undefined),
+  savePreferences: (payload: { display_name: string; contact_email: string | null; pet_enabled: boolean; pet_kind: string; pet_color: string }) => api<PreferenceResponse>("me/preferences", { method: "PUT", body: JSON.stringify(payload) }),
   createSource: (profile: DeskProfile, source: SourceRecord) => api<SourceApiRecord>(`sources?${profileQuery(profile)}`, { method: "POST", body: JSON.stringify(sourcePayload(source)) }),
   updateSource: (profile: DeskProfile, source: SourceRecord) => api<SourceApiRecord>(`sources/${encodeURIComponent(source.id)}?${profileQuery(profile)}`, { method: "PUT", body: JSON.stringify(sourcePayload(source)) }),
 };
 
 export interface ScanJob { id: string; status: "queued" | "running" | "succeeded" | "failed" | "cancelled"; counters: Record<string, number>; error: string | null; created_at: string; completed_at: string | null }
 export interface EventPayload { event_type: "page_view" | "article_open" | "article_action" | "search" | "export" | "heartbeat" | "feedback" | "profile_switch"; session_id: string; path?: string; article_id?: string; properties?: Record<string, string | number | boolean>; occurred_at?: string }
-export interface PreferenceResponse { actor_id: string; display_name: string; contact_email: string | null; updated_at: string }
+export interface PreferenceResponse { actor_id: string; display_name: string; contact_email: string | null; pet_enabled: boolean; pet_kind: "orbit" | "pixel" | "cloud"; pet_color: "violet" | "coral" | "mint" | "gold"; updated_at: string }
+export interface DeskNotification { id: string; kind: "briefing" | "approval" | "search"; title: string; message: string; created_at: string; article_id: string | null }
 export interface VocResponse { id: string; reference: string; actor_id: string | null; rating: number; category: string; message: string; allow_follow_up: boolean; include_diagnostics: boolean; contact_email: string | null; page: string | null; diagnostics: Record<string, unknown>; created_at: string }
 export interface SourceApiRecord { id: string; name: string; enabled: boolean; category: string; rss_url: string | null; homepage: string | null; url: string | null; region: string; timezone: string; max_links: number; allow_deep_scan: boolean; manual_deep_scan_candidate: boolean }
 
