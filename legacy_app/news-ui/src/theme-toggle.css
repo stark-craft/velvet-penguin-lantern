@@ -1,0 +1,427 @@
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(176, 163, 241, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #aeb6cf;
+  padding: 0 11px 0 9px;
+  font: inherit;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.theme-toggle:hover {
+  border-color: rgba(101, 175, 255, 0.34);
+  background: rgba(96, 165, 250, 0.1);
+  color: #edf5ff;
+  transform: translateY(-1px);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid #60a5fa;
+  outline-offset: 3px;
+}
+
+.theme-toggle-icon {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(96, 165, 250, 0.11);
+  color: #8dc3ff;
+}
+
+.theme-toggle-icon svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.theme-toggle-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1;
+}
+
+.theme-toggle-name {
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.theme-toggle-hint {
+  color: #6f7a94;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html[data-theme="light"] .theme-toggle {
+  border-color: rgba(90, 115, 148, 0.18);
+  background: rgba(246, 250, 254, 0.72);
+  color: #45566f;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+html[data-theme="light"] .theme-toggle:hover {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4fbe;
+}
+
+html[data-theme="light"] .theme-toggle-icon {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+html[data-theme="light"] .theme-toggle-hint {
+  color: #7a899e;
+}
+
+/*
+ * The legacy stylesheet has several highly specific dark cockpit rules.  Keep
+ * the light palette in this final stylesheet so the theme switch wins without
+ * changing the original component geometry or dark-mode presentation.
+ */
+html[data-theme="light"],
+html[data-theme="light"] body,
+html[data-theme="light"] #root,
+html[data-theme="light"] .resolution-root,
+html[data-theme="light"] .resolution-canvas {
+  color-scheme: light;
+  background: #eef3f8 !important;
+  color: #17243a !important;
+}
+
+html[data-theme="light"] body {
+  background-image:
+    radial-gradient(circle at 12% 0%, rgba(25, 118, 210, 0.12), transparent 34%),
+    radial-gradient(circle at 92% 14%, rgba(14, 165, 164, 0.09), transparent 30%) !important;
+}
+
+.app-shell[data-theme="light"] {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(238, 243, 248, 0.96)),
+    #eef3f8 !important;
+  color: #17243a !important;
+}
+
+.app-shell[data-theme="light"]::before,
+.app-shell[data-theme="light"] .product-atmosphere {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.app-shell[data-theme="light"] .design-header {
+  border-bottom-color: rgba(77, 101, 134, 0.16) !important;
+  background: rgba(248, 251, 255, 0.9) !important;
+  color: #17243a !important;
+  box-shadow: 0 12px 32px rgba(31, 48, 76, 0.08) !important;
+  backdrop-filter: blur(22px) saturate(145%);
+}
+
+.app-shell[data-theme="light"] .design-main,
+.app-shell[data-theme="light"] .page-stack,
+.app-shell[data-theme="light"] .workflow-page,
+.app-shell[data-theme="light"] .archive-search-page,
+.app-shell[data-theme="light"] .approved-page,
+.app-shell[data-theme="light"] .review-page,
+.app-shell[data-theme="light"] .scan-page,
+.app-shell[data-theme="light"] .voc-page-grid {
+  color: #17243a !important;
+}
+
+.app-shell[data-theme="light"] .command-nav a,
+.app-shell[data-theme="light"] .command-settings-trigger,
+.app-shell[data-theme="light"] .source-picker-trigger {
+  border-color: rgba(80, 104, 136, 0.14) !important;
+  background: rgba(255, 255, 255, 0.68) !important;
+  color: #53647d !important;
+}
+
+.app-shell[data-theme="light"] .command-nav a:hover,
+.app-shell[data-theme="light"] .command-settings-trigger:hover,
+.app-shell[data-theme="light"] .source-picker-trigger:hover {
+  border-color: rgba(37, 99, 235, 0.22) !important;
+  background: #ffffff !important;
+  color: #1f5dc4 !important;
+}
+
+.app-shell[data-theme="light"] .command-nav a.active,
+.app-shell[data-theme="light"] .command-nav a[aria-current="page"] {
+  border-color: rgba(37, 99, 235, 0.24) !important;
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: #174ea6 !important;
+}
+
+.app-shell[data-theme="light"] .profile-badge,
+.app-shell[data-theme="light"] .user-chip,
+.app-shell[data-theme="light"] .creator-credit {
+  color: #52647d !important;
+}
+
+.app-shell[data-theme="light"] .cockpit-top-card,
+.app-shell[data-theme="light"] .market-panel,
+.app-shell[data-theme="light"] .briefing-stream-panel,
+.app-shell[data-theme="light"] .latest-day-stage,
+.app-shell[data-theme="light"] .loaded-briefing-panel,
+.app-shell[data-theme="light"] .surface-panel,
+.app-shell[data-theme="light"] .workflow-console,
+.app-shell[data-theme="light"] .workflow-filter-rail,
+.app-shell[data-theme="light"] .workflow-metric,
+.app-shell[data-theme="light"] .workflow-empty,
+.app-shell[data-theme="light"] .workflow-article-frame,
+.app-shell[data-theme="light"] .approved-console,
+.app-shell[data-theme="light"] .review-console,
+.app-shell[data-theme="light"] .source-category-card,
+.app-shell[data-theme="light"] .source-coverage-card,
+.app-shell[data-theme="light"] .scan-console,
+.app-shell[data-theme="light"] .scan-summary,
+.app-shell[data-theme="light"] .scan-filter-rail,
+.app-shell[data-theme="light"] .scan-query-console,
+.app-shell[data-theme="light"] .scan-activity-log,
+.app-shell[data-theme="light"] .archive-search-console,
+.app-shell[data-theme="light"] .archive-query-panel,
+.app-shell[data-theme="light"] .archive-results-panel,
+.app-shell[data-theme="light"] .archive-run-strip,
+.app-shell[data-theme="light"] .voc-theme,
+.app-shell[data-theme="light"] .system-health {
+  border-color: rgba(87, 107, 138, 0.16) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  color: #17243a !important;
+  box-shadow:
+    0 18px 45px rgba(40, 58, 86, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+/* The carousel keeps its photographic treatment; the surrounding cockpit is light. */
+.app-shell[data-theme="light"] .hero-cluster-panel {
+  border-color: rgba(70, 96, 133, 0.2) !important;
+  background: linear-gradient(145deg, #15243a, #0c1728) !important;
+  color: #f4f8ff !important;
+  box-shadow: 0 22px 54px rgba(31, 48, 76, 0.17) !important;
+}
+
+.app-shell[data-theme="light"] .latest-signal-card,
+.app-shell[data-theme="light"] .image-feed-card,
+.app-shell[data-theme="light"] article:not(.hero-cluster-panel) {
+  border-color: rgba(87, 107, 138, 0.15) !important;
+  background: rgba(255, 255, 255, 0.84) !important;
+  color: #17243a !important;
+  box-shadow: 0 14px 32px rgba(40, 58, 86, 0.07) !important;
+}
+
+.app-shell[data-theme="light"] .command-settings-menu,
+.app-shell[data-theme="light"] .source-picker-dialog,
+.app-shell[data-theme="light"] .date-range-popover,
+.app-shell[data-theme="light"] .calendar-popover-scrim + *,
+.app-shell[data-theme="light"] .modal,
+.app-shell[data-theme="light"] .compact-dialog,
+.app-shell[data-theme="light"] .profile-dialog,
+.app-shell[data-theme="light"] .voc-modal,
+.app-shell[data-theme="light"] .approval-dialog,
+.app-shell[data-theme="light"] .selection-dialog,
+.app-shell[data-theme="light"] .export-modal,
+.app-shell[data-theme="light"] .dossier {
+  border-color: rgba(76, 99, 132, 0.18) !important;
+  background: #f9fbfe !important;
+  color: #17243a !important;
+  box-shadow: 0 28px 80px rgba(26, 42, 68, 0.2) !important;
+}
+
+.app-shell[data-theme="light"] .command-settings-item,
+.app-shell[data-theme="light"] .source-option,
+.app-shell[data-theme="light"] .dossier-tile,
+.app-shell[data-theme="light"] .dossier-section,
+.app-shell[data-theme="light"] .dossier-sources,
+.app-shell[data-theme="light"] .dossier-workflow,
+.app-shell[data-theme="light"] .dossier-feedback,
+.app-shell[data-theme="light"] .scan-query-capsule,
+.app-shell[data-theme="light"] .scan-telemetry,
+.app-shell[data-theme="light"] .scan-idle-stage,
+.app-shell[data-theme="light"] .archive-search-hero,
+.app-shell[data-theme="light"] .archive-search-metrics {
+  border-color: rgba(87, 107, 138, 0.15) !important;
+  background: rgba(238, 244, 250, 0.78) !important;
+  color: #17243a !important;
+}
+
+.app-shell[data-theme="light"] input,
+.app-shell[data-theme="light"] textarea,
+.app-shell[data-theme="light"] select,
+.app-shell[data-theme="light"] .dark-input,
+.app-shell[data-theme="light"] .dark-textarea,
+.app-shell[data-theme="light"] .archive-inline-search,
+.app-shell[data-theme="light"] .scan-query-input {
+  border-color: rgba(79, 102, 135, 0.2) !important;
+  background: #ffffff !important;
+  color: #17243a !important;
+  caret-color: #2563eb;
+}
+
+.app-shell[data-theme="light"] input::placeholder,
+.app-shell[data-theme="light"] textarea::placeholder {
+  color: #8390a2 !important;
+}
+
+.app-shell[data-theme="light"] .text-white,
+.app-shell[data-theme="light"] .text-slate-100,
+.app-shell[data-theme="light"] .text-slate-200,
+.app-shell[data-theme="light"] .text-slate-300,
+.app-shell[data-theme="light"] .panel-title,
+.app-shell[data-theme="light"] .scan-title,
+.app-shell[data-theme="light"] .dossier-title {
+  color: #17243a !important;
+}
+
+.app-shell[data-theme="light"] .hero-cluster-panel .text-white,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-100,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-200,
+.app-shell[data-theme="light"] .hero-cluster-panel .text-slate-300 {
+  color: #f4f8ff !important;
+}
+
+.app-shell[data-theme="light"] .text-slate-400,
+.app-shell[data-theme="light"] .text-slate-500,
+.app-shell[data-theme="light"] .text-slate-600,
+.app-shell[data-theme="light"] .muted,
+.app-shell[data-theme="light"] .sub,
+.app-shell[data-theme="light"] .panel-copy,
+.app-shell[data-theme="light"] .scan-field-help {
+  color: #65758b !important;
+}
+
+.app-shell[data-theme="light"] .btn-dark-secondary,
+.app-shell[data-theme="light"] .archive-clear-search,
+.app-shell[data-theme="light"] .date-range-trigger,
+.app-shell[data-theme="light"] .source-picker-manage {
+  border-color: rgba(75, 99, 132, 0.18) !important;
+  background: #edf3f9 !important;
+  color: #3f536e !important;
+}
+
+.app-shell[data-theme="light"] .kw-tag,
+.app-shell[data-theme="light"] .source-chip,
+.app-shell[data-theme="light"] .crawler-chip,
+.app-shell[data-theme="light"] .signal-chip,
+.app-shell[data-theme="light"] .tag {
+  border-color: rgba(37, 99, 235, 0.14) !important;
+  background: rgba(37, 99, 235, 0.08) !important;
+  color: #275da8 !important;
+}
+
+.app-shell[data-theme="light"] .modal-overlay,
+.app-shell[data-theme="light"] .profile-overlay,
+.app-shell[data-theme="light"] .voc-overlay,
+.app-shell[data-theme="light"] .source-picker-scrim,
+.app-shell[data-theme="light"] .calendar-popover-scrim {
+  background: rgba(40, 51, 70, 0.38) !important;
+  backdrop-filter: blur(9px);
+}
+
+/* Dialogs are rendered through a portal directly under <body>. */
+html[data-theme="light"] .modal,
+html[data-theme="light"] .compact-dialog,
+html[data-theme="light"] .profile-dialog,
+html[data-theme="light"] .voc-modal,
+html[data-theme="light"] .approval-dialog,
+html[data-theme="light"] .selection-dialog,
+html[data-theme="light"] .export-modal,
+html[data-theme="light"] .source-picker-dialog,
+html[data-theme="light"] .dossier {
+  border-color: rgba(76, 99, 132, 0.18) !important;
+  background: #f9fbfe !important;
+  color: #17243a !important;
+  box-shadow: 0 28px 80px rgba(26, 42, 68, 0.2) !important;
+}
+
+html[data-theme="light"] .modal-overlay,
+html[data-theme="light"] .profile-overlay,
+html[data-theme="light"] .voc-overlay,
+html[data-theme="light"] .source-picker-scrim,
+html[data-theme="light"] .calendar-popover-scrim {
+  background: rgba(40, 51, 70, 0.38) !important;
+  backdrop-filter: blur(9px);
+}
+
+html[data-theme="light"] .dossier-head,
+html[data-theme="light"] .dossier-rail,
+html[data-theme="light"] .dossier-reading,
+html[data-theme="light"] .dossier-tile,
+html[data-theme="light"] .dossier-section,
+html[data-theme="light"] .dossier-sources,
+html[data-theme="light"] .dossier-workflow,
+html[data-theme="light"] .dossier-feedback,
+html[data-theme="light"] .profile-dialog-content,
+html[data-theme="light"] .voc-theme {
+  border-color: rgba(87, 107, 138, 0.15) !important;
+  background: rgba(238, 244, 250, 0.78) !important;
+  color: #17243a !important;
+}
+
+html[data-theme="light"] .dossier .text-white,
+html[data-theme="light"] .dossier .text-slate-100,
+html[data-theme="light"] .dossier .text-slate-200,
+html[data-theme="light"] .dossier .text-slate-300,
+html[data-theme="light"] .dossier-title,
+html[data-theme="light"] .modal .panel-title {
+  color: #17243a !important;
+}
+
+html[data-theme="light"] .dossier .text-slate-400,
+html[data-theme="light"] .dossier .text-slate-500,
+html[data-theme="light"] .dossier .text-slate-600,
+html[data-theme="light"] .dossier .muted,
+html[data-theme="light"] .modal .muted {
+  color: #65758b !important;
+}
+
+html[data-theme="light"] .modal input,
+html[data-theme="light"] .modal textarea,
+html[data-theme="light"] .modal select,
+html[data-theme="light"] .profile-dialog input,
+html[data-theme="light"] .voc-modal textarea {
+  border-color: rgba(79, 102, 135, 0.2) !important;
+  background: #ffffff !important;
+  color: #17243a !important;
+}
+
+@media (max-width: 760px) {
+  .theme-toggle {
+    width: 38px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .theme-toggle-copy {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle {
+    transition: none;
+  }
+}
