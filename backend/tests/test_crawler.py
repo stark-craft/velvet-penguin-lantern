@@ -305,6 +305,8 @@ class SpiderTests(unittest.TestCase):
         self.assertEqual(spider.source_diagnostics["configured"], 107)
         self.assertEqual(spider.source_diagnostics["enabled"], 79)
         self.assertEqual(spider.source_diagnostics["source_ids_selected"], ["techcrunch"])
+        self.assertEqual(spider.source_diagnostics["entrypoint_kind_counts"]["feed"], 1)
+        self.assertEqual(spider.source_diagnostics["usable_entrypoint_urls"], 1)
         self.assertGreaterEqual(len(requests), 1)
         self.assertEqual(spider._sources_attempted, {"techcrunch"})
         self.assertEqual(sites_file.read_bytes(), before)
@@ -322,6 +324,11 @@ class SpiderTests(unittest.TestCase):
         self.assertEqual(spider.source_diagnostics["enabled"], 59)
         self.assertEqual(len(requests), 59)
         self.assertTrue(all(item.meta["entrypoint_kind"] == "listing" for item in requests))
+        self.assertEqual(
+            spider.source_diagnostics["entrypoint_kind_counts"],
+            {"feed": 0, "auto": 0, "listing": 59},
+        )
+        self.assertEqual(spider.source_diagnostics["usable_entrypoint_urls"], 59)
         self.assertEqual(sites_file.read_bytes(), before)
 
     def test_mixed_rss_and_homepage_sources_generate_the_correct_request_modes(self) -> None:
@@ -337,6 +344,14 @@ class SpiderTests(unittest.TestCase):
             ("https://example.com/feed.xml", "feed"),
             ("https://example.org/news/", "listing"),
         ])
+        self.assertEqual(
+            spider.source_diagnostics["entrypoint_kind_counts"],
+            {"feed": 1, "auto": 0, "listing": 1},
+        )
+        self.assertEqual(
+            spider.source_diagnostics["source_entrypoint_kinds"],
+            {"feed": ["feed"], "web": ["listing"]},
+        )
 
     def test_full_feed_crawl_checks_article_body_before_keyword_rejection(self) -> None:
         spider = self.spider(keyword="provenance")

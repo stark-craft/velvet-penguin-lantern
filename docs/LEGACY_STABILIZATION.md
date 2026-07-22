@@ -73,7 +73,7 @@ The baseline was run before changing behavior.
 | TypeScript typecheck | Pass |
 | Rendered production-worker tests | Pass, 3 tests |
 | Frontend ESLint | Pass |
-| Backend pytest suite | Pass, 124 tests |
+| Backend pytest suite | Pass, 126 tests after initial crawler hardening |
 | Backend Ruff check | Fail, 1,055 findings |
 
 The Ruff result is a tooling/configuration debt item. The suite currently mixes
@@ -90,12 +90,19 @@ Statuses are `open`, `in progress`, `verified`, or `deferred`.
 | ID | Defect or risk | Status |
 | --- | --- | --- |
 | CR-01 | Legacy spider performs poorly across the real source set and needs the stronger hybrid crawler mechanics. | open |
-| CR-02 | RSS/Atom sources and ordinary website URLs must work in the same run. | open |
+| CR-02 | RSS/Atom sources and ordinary website URLs must work in the same run. | verified offline; live validation pending |
 | CR-03 | Each source needs explicit counts for entrypoints, candidates, date matches, keyword matches, extraction success, and failure. | open |
 | CR-04 | Feed discovery, listing fallback, redirect handling, canonicalization, and publisher-domain boundaries require production validation. | open |
 | CR-05 | Date filtering must be based on defensible publication provenance and clearly report unknown dates. | open |
 | CR-06 | Default and broadcast source schemas/names must be adapted without overwriting their production files. | open |
 | CR-07 | Zero-result runs must distinguish no match, old content, unreachable source, blocked source, and extraction failure. | open |
+
+Current offline preflight confirms that the default profile has 107 configured
+sources, 79 enabled feed entrypoints, and no enabled source without a usable
+entrypoint. The broadcast profile has 59 configured and enabled HTML-listing
+entrypoints, also with no missing entrypoint. The mixed-mode fixture confirms
+that feed and HTML sources can be scheduled in one spider run without changing
+either source file.
 
 ### Backend and workflow
 

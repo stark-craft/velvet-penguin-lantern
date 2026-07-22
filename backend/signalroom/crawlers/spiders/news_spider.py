@@ -106,6 +106,9 @@ class NewsSpider(scrapy.Spider):
             "enabled_with_usable_entrypoints": 0,
             "selected_enabled": 0,
             "usable_entrypoints": 0,
+            "usable_entrypoint_urls": 0,
+            "entrypoint_kind_counts": {"feed": 0, "auto": 0, "listing": 0},
+            "source_entrypoint_kinds": {},
             "enabled_without_usable_entrypoints": 0,
             "sources_without_entrypoint_ids": [],
             "source_ids_selected": [],
@@ -336,8 +339,14 @@ class NewsSpider(scrapy.Spider):
             set(self.target_sites or ()) - matched_targets
         )
         for site in configured:
-            if self._entrypoints_for_site(site):
+            entrypoints = self._entrypoints_for_site(site)
+            if entrypoints:
                 self.source_diagnostics["usable_entrypoints"] += 1
+            kinds = sorted({kind for _url, kind in entrypoints})
+            self.source_diagnostics["source_entrypoint_kinds"][site["id"]] = kinds
+            self.source_diagnostics["usable_entrypoint_urls"] += len(entrypoints)
+            for _url, kind in entrypoints:
+                self.source_diagnostics["entrypoint_kind_counts"][kind] += 1
         return configured
 
     def _normalize_site(self, raw: Dict[str, Any]) -> Dict[str, Any]:
