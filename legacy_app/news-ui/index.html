@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sense.AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;display=swap" rel="stylesheet" />
+    <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&amp;display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --background: hsl(260, 87%, 3%);
+        --foreground: hsl(40, 6%, 95%);
+        --foreground-rgb: 243, 242, 240;
+        --hero-sub: hsl(40, 6%, 82%);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: "Geist", Arial, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      body.portal-active {
+        overflow: hidden;
+      }
+
+      .portal {
+        min-height: 100vh;
+        min-height: 100svh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        position: relative;
+        background: var(--background);
+      }
+
+      .portal[hidden],
+      .portal-view[hidden] {
+        display: none;
+      }
+
+      .portal-video {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0;
+      }
+
+      .hero-glow {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        z-index: 1;
+        width: 984px;
+        height: 527px;
+        transform: translate(-50%, -50%);
+        background: #030712;
+        opacity: 0.9;
+        filter: blur(82px);
+        pointer-events: none;
+      }
+
+      .hero-content {
+        position: relative;
+        z-index: 2;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        text-align: center;
+        padding: clamp(38px, 7vh, 84px) 24px 18px;
+      }
+
+      .portal-headline {
+        color: var(--foreground);
+        font-family: "General Sans", "Geist", Arial, sans-serif;
+        font-size: clamp(120px, 16vw, 220px);
+        font-weight: 500;
+        line-height: 1.02;
+        letter-spacing: -0.024em;
+      }
+
+      .gradient-word {
+        background: linear-gradient(to left, #6366f1, #a855f7, #fcd34d);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .portal-subtitle {
+        max-width: 36rem;
+        margin-top: 12px;
+        color: var(--hero-sub);
+        font-size: 1.125rem;
+        line-height: 2rem;
+        opacity: 0.8;
+      }
+
+      .portal-actions {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 28px;
+      }
+
+      .liquid-glass {
+        background: rgba(255, 255, 255, 0.01);
+        background-blend-mode: luminosity;
+        backdrop-filter: blur(4px);
+        border: none;
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .liquid-glass::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        padding: 1.4px;
+        background: linear-gradient(180deg,
+          rgba(255,255,255,0.45) 0%,
+          rgba(255,255,255,0.15) 20%,
+          rgba(255,255,255,0) 40%,
+          rgba(255,255,255,0) 60%,
+          rgba(255,255,255,0.15) 80%,
+          rgba(255,255,255,0.45) 100%
+        );
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
+      }
+
+      .portal-button {
+        border-radius: 9999px;
+        padding: 18px 36px;
+        color: var(--foreground);
+        font-family: inherit;
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        text-decoration: none;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .portal-button:focus-visible,
+      .waitlist-input:focus-visible {
+        outline: 2px solid rgba(165, 180, 252, 0.86);
+        outline-offset: 3px;
+      }
+
+      .product-button {
+        box-shadow:
+          inset 0 1px 1px rgba(255,255,255,0.1),
+          0 0 0 1px rgba(99,102,241,0.3);
+      }
+
+      .product-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 24px rgba(99,102,241,0.4);
+      }
+
+      .venture-button {
+        box-shadow:
+          inset 0 1px 1px rgba(255,255,255,0.1),
+          0 0 0 1px rgba(168,85,247,0.3);
+      }
+
+      .venture-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0 24px rgba(168,85,247,0.4);
+      }
+
+      .venture-view .portal-headline {
+        font-size: clamp(82px, 12vw, 166px);
+      }
+
+      .venture-kicker {
+        margin-bottom: 18px;
+        color: rgba(var(--foreground-rgb), 0.6);
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+      }
+
+      .venture-view .portal-subtitle {
+        max-width: 46rem;
+      }
+
+      .waitlist {
+        display: flex;
+        gap: 12px;
+        margin-top: 32px;
+        width: min(520px, 100%);
+      }
+
+      .waitlist-input {
+        min-width: 0;
+        flex: 1;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 9999px;
+        padding: 17px 23px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--foreground);
+        font: inherit;
+        backdrop-filter: blur(6px);
+      }
+
+      .waitlist-input::placeholder {
+        color: rgba(var(--foreground-rgb), 0.43);
+      }
+
+      .waitlist .portal-button {
+        padding-inline: 27px;
+      }
+
+      .waitlist-status {
+        min-height: 1.5rem;
+        margin-top: 16px;
+        color: rgba(216, 211, 255, 0.92);
+        font-size: 0.925rem;
+      }
+
+      @media (max-height: 760px) {
+        .portal-headline {
+          font-size: clamp(90px, 14vw, 156px);
+        }
+
+        .portal-subtitle {
+          margin-top: 8px;
+        }
+
+        .portal-actions,
+        .waitlist {
+          margin-top: 20px;
+        }
+
+      }
+
+      @media (max-width: 700px) {
+        .hero-glow {
+          width: 118vw;
+          height: 46vh;
+        }
+
+        .portal-headline {
+          font-size: clamp(70px, 22vw, 120px);
+        }
+
+        .venture-view .portal-headline {
+          font-size: clamp(54px, 18vw, 90px);
+        }
+
+        .portal-subtitle {
+          font-size: 1rem;
+          line-height: 1.65rem;
+        }
+
+        .portal-actions,
+        .waitlist {
+          flex-direction: column;
+          width: min(340px, 100%);
+        }
+
+        .portal-button,
+        .waitlist-input {
+          width: 100%;
+        }
+
+      }
+    </style>
+  </head>
+  <body>
+    <div class="portal" id="sense-portal">
+      <video
+        class="portal-video"
+        id="portal-video"
+        muted
+        playsinline
+        autoplay
+        aria-hidden="true"
+      >
+        <source
+          src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4"
+          type="video/mp4"
+        />
+      </video>
+      <div class="hero-glow" aria-hidden="true"></div>
+
+      <main class="hero-content portal-view sense-view" id="sense-view">
+        <h1 class="portal-headline"><span>Sense.</span><span class="gradient-word">AI</span></h1>
+        <p class="portal-subtitle">
+          Intelligent tools. Real-time signals.<br />
+          Built for the decisions that matter.
+        </p>
+        <div class="portal-actions">
+          <a class="portal-button liquid-glass product-button" href="/home">NewsScrapper</a>
+          <a class="portal-button liquid-glass venture-button" href="/venturelens">VentureLens</a>
+        </div>
+      </main>
+
+      <main class="hero-content portal-view venture-view" id="venture-view" hidden>
+        <div class="venture-kicker">Launching soon</div>
+        <h1 class="portal-headline"><span>Venture</span><span class="gradient-word">Lens</span></h1>
+        <p class="portal-subtitle">
+          Discover companies. Understand markets.<br />
+          Automate outreach.
+        </p>
+        <form class="waitlist" id="waitlist-form">
+          <input class="waitlist-input" id="waitlist-email" type="email" autocomplete="email" placeholder="Work email" required />
+          <button class="portal-button liquid-glass venture-button" type="submit">Join waitlist</button>
+        </form>
+        <p class="waitlist-status" id="waitlist-status" aria-live="polite"></p>
+      </main>
+
+    </div>
+    <div id="root" hidden></div>
+
+    <script type="module">
+      const cleanPath = window.location.pathname.replace(/\/+$/, "") || "/";
+      const isSenseLanding = cleanPath === "/";
+      const isVentureLens = cleanPath === "/venturelens";
+      const isPortal = isSenseLanding || isVentureLens;
+      const portal = document.getElementById("sense-portal");
+      const root = document.getElementById("root");
+
+      if (!isPortal) {
+        portal.remove();
+        root.hidden = false;
+        document.title = "NewsScrapper Intelligence | Sense.AI";
+        import("/src/main.jsx");
+      } else {
+        document.body.classList.add("portal-active");
+        document.title = isVentureLens ? "VentureLens | Sense.AI" : "Sense.AI";
+        document.getElementById("sense-view").hidden = isVentureLens;
+        document.getElementById("venture-view").hidden = !isVentureLens;
+
+        const video = document.getElementById("portal-video");
+        let fadeToken = 0;
+        let endingFadeStarted = false;
+
+        const opacity = () => Number.parseFloat(video.style.opacity || "0") || 0;
+        const setOpacity = (value) => {
+          video.style.opacity = String(Math.max(0, Math.min(1, value)));
+        };
+
+        const fade = (from, to, duration) => {
+          const token = ++fadeToken;
+          const startedAt = performance.now();
+          const frame = (now) => {
+            if (token !== fadeToken) return;
+            const progress = Math.min(1, (now - startedAt) / duration);
+            setOpacity(from + ((to - from) * progress));
+            if (progress < 1) requestAnimationFrame(frame);
+          };
+          requestAnimationFrame(frame);
+        };
+
+        video.addEventListener("play", () => {
+          endingFadeStarted = false;
+          fade(0, 1, 500);
+        });
+
+        const monitorEndFade = () => {
+          if (
+            !endingFadeStarted &&
+            !video.paused &&
+            Number.isFinite(video.duration) &&
+            video.duration > 0 &&
+            video.duration - video.currentTime <= 0.5
+          ) {
+            endingFadeStarted = true;
+            fade(opacity(), 0, 500);
+          }
+          requestAnimationFrame(monitorEndFade);
+        };
+        requestAnimationFrame(monitorEndFade);
+
+        video.addEventListener("ended", () => {
+          fadeToken += 1;
+          setOpacity(0);
+          window.setTimeout(() => {
+            video.currentTime = 0;
+            video.play().catch(() => {});
+          }, 100);
+        });
+
+        if (!video.paused) {
+          fade(0, 1, 500);
+        } else {
+          video.play().catch(() => {});
+        }
+
+        if (isVentureLens) {
+          const form = document.getElementById("waitlist-form");
+          const email = document.getElementById("waitlist-email");
+          const status = document.getElementById("waitlist-status");
+          const savedEmail = localStorage.getItem("senselens-waitlist-email");
+          if (savedEmail) {
+            email.value = savedEmail;
+            status.textContent = "You are already on the early access list.";
+          }
+          form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            localStorage.setItem("senselens-waitlist-email", email.value.trim());
+            status.textContent = "You are on the list. We will notify you at launch.";
+          });
+        }
+      }
+    </script>
+  </body>
+</html>

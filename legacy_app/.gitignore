@@ -1,0 +1,30 @@
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+news-ui/node_modules/
+news-ui/dist/
+local_miniLM_model
+local_bart_model
+flan-t5-local
+semantic_model
+ui_results_*.json
+clustered_results_*.json
+manual_search_logs.xlsx
+*.tmp
+
+# Runtime JSON/state. These files can contain user activity, display names,
+# editorial decisions, and generated publisher content. The backend recreates
+# them automatically on a fresh machine.
+intelligence_store/
+history_archive/
+dropped_articles.json
+not_interested_store*.json
+region_learning*.json
+seen_registry.json
+training_dataset.csv
+usage_tracker.json
+viewer_profiles.json
+workflow_store*.json

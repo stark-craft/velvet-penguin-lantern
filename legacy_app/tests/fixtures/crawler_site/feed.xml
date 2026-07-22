@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Broadcast Test Feed</title>
+    <item>
+      <title>DTH platform launches a new broadcast service</title>
+      <link>http://127.0.0.1:8765/rss-article.html</link>
+      <pubDate>Wed, 22 Jul 2026 09:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

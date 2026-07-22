@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Local RSS Publisher",
+    "url": "http://127.0.0.1:8765/feed.xml",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Local Website Publisher",
+    "url": "http://127.0.0.1:8765/index.html",
+    "enabled": true,
+    "allow_deep_scan": true
+  }
+]

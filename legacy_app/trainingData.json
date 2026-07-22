@@ -1,0 +1,50 @@
+[
+    {
+        "timestamp": "2026-04-22 22:29:28",
+        "keyword": [
+            "openai"
+        ],
+        "summary": "SpaceX said it has struck a deal with Cursor to develop a next-generation \u201ccoding and knowledge work AI,\u201d which includes a surprising provision \u2014 an option to buy the popular software development platform for $60 billion later this year. Partnering with and potentially purchasing a leader in the hottest AI product category can only be seen in the context of SpaceX\u2019s much-anticipated public offering. Investors seeking more value in the IPO might see its engagement with Cursor as another way to extract value from Elon Musk\u2019s increasingly sprawling tech conglomerate.",
+        "label": "interested"
+    },
+    {
+        "timestamp": "2026-04-22 22:29:31",
+        "keyword": [
+            "openai"
+        ],
+        "summary": "OpenAI has partnered with Infosys to integrate its artificial intelligence tools, including coding assistant Codex, into the Indian IT giant\u2019s Topaz AI platform. Infosys said the integration will be used to help its clients modernize software development, automate workflows and deploy AI systems at scale, initially focusing software engineering, legacy modernization, and DevOps. India\u2019s IT services firms face mounting pressure from a mix of slowing client spending and rapid advances in generative AI.",
+        "label": "interested"
+    },
+    {
+        "timestamp": "2026-04-22 22:29:37",
+        "keyword": [
+            "openai"
+        ],
+        "summary": "OpenAI now faces a criminal probe after ChatGPT advised a gunman ahead of a mass shooting at a university in Florida, where two people were killed and six were wounded last year. In a press release, Florida Attorney General James Uthmeier confirmed that the investigation into OpenAI\u2019s potential criminal liability was launched after reviewing shocking chat logs between ChatGPT and an account linked to the suspected gunman, Phoenix Ikner. The 20-year-old Florida State University student is currently awaiting trial \u201con multiple charges of murder and attempted murder,\u201d Politico reported.",
+        "label": "not_interested"
+    },
+    {
+        "timestamp": "2026-04-23 23:55:21",
+        "keyword": [],
+        "summary": "I've recently introduced a few friends to the power of a great robot vacuum. One of my friends calls hers a marriage saver, while the other was both thrilled and horrified by how many stains the vacuum's AI found on her floors. Personally, my robot vacuums keep me from wanting to set the litter box on fire, since my cat is on a mission to create his own navigational trail of litter through my home.",
+        "label": "not_interested"
+    },
+    {
+        "timestamp": "2026-05-23 22:52:42",
+        "keyword": [],
+        "summary": "T-Mobile for Business is the upgrade a small business owner will find useful, boasting unlimited plans, a super-fast 5G network, and customer service support whenever you need it. With no data overages, surprise fees, or annual service contracts, there\u2019s an affordable plan for any type of business. Plus, without an annual contract, you\u2019re never locked into anything long term, and as your business changes and grows, your plan can too.",
+        "label": "not_interested"
+    },
+    {
+        "timestamp": "2026-05-24 13:55:52",
+        "keyword": [],
+        "summary": "One of Berlin\u2019s rising-star, early stage startups, Peec AI, just crossed $10 million in annualized revenue, according to internal dashboard data seen and verified by TechCrunch. Peec AI raised its $21 million Series A six months ago. While CEO Marius Meiners wouldn\u2019t disclose its valuation to me at that time (only revealing that it was above $100 million), he did say the startup had grown its revenue to more than $4 million in the 10 months since its launch.",
+        "label": "not_interested"
+    },
+    {
+        "timestamp": "2026-05-24 13:56:00",
+        "keyword": [],
+        "summary": "The beauty of watching sports is that anything can happen, and it unfolds before your very eyes. In theory\u2014and usually in reality too\u2014sports outcomes are an ideal substrate for bets in the sense that they aren\u2019t in any way democratic, or corrupted by preference, or based on what a producer thinks will make a good story, and they\u2019re certainly not pre-recorded. This all tends not to be true of narrative TV, but lately that doesn\u2019t stop some of the world\u2019s most ill-advised bettors.",
+        "label": "not_interested"
+    }
+]

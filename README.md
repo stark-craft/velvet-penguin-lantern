@@ -1,5 +1,13 @@
 # newsScrapper
 
+## Active legacy-compatible application
+
+The current application—the FastAPI/Scrapy backend and Vite/React interface
+validated on macOS and prepared for the Windows server—is in [`legacy_app/`](legacy_app/).
+Use [`legacy_app/WINDOWS_SETUP.md`](legacy_app/WINDOWS_SETUP.md) for the Windows
+installation and launch steps. Model weights, `.env`, generated briefings, and
+user analytics are intentionally excluded from Git.
+
 newsScrapper is a local-first AI news-intelligence workspace. It crawls the
 configured Default and Broadcast publisher lists, clusters related coverage,
 summarizes story groups, applies a learnable gatekeeper, and exposes dossiers,
