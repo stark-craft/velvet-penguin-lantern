@@ -4,8 +4,8 @@ import TopBar from "./components/TopBar.jsx";
 import DesignViewport from "./components/DesignViewport.jsx";
 import VocFeedback from "./components/VocFeedback.jsx";
 import { useTracking } from "./utils/tracking.js";
-import { streamCrawl } from "./api.js";
-import { normalizeArticle, normalizeList } from "./utils/normalize.js";
+import { searchExtractedIntelligence } from "./api.js";
+import { normalizeList } from "./utils/normalize.js";
 import { trackAction } from "./utils/tracking.js";
 import FeedScreen from "./screens/FeedScreen.jsx";
 import ScanScreen from "./screens/ScanScreen.jsx";
@@ -56,10 +56,10 @@ function ProductAtmosphere({ live }) {
 export default function App() {
   const { pathname } = useLocation();
   useTracking(pathname);
-  const manualCloseRef = useRef(null);
+  const manualAbortRef = useRef(null);
   const [theme, setTheme] = useState(readStoredTheme);
   const [manualScan, setManualScan] = useState({
-    query: "Samsung OLED AI",
+    query: "",
     from: "",
     to: "",
     pickedSites: [],
@@ -69,6 +69,8 @@ export default function App() {
     cards: [],
     checked: {},
     logs: [],
+    archiveFiles: 0,
+    articlesSearched: 0,
   });
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -115,15 +117,17 @@ export default function App() {
     });
   };
   const stopManualScan = () => {
-    if (manualCloseRef.current) manualCloseRef.current();
-    manualCloseRef.current = null;
+    if (manualAbortRef.current) manualAbortRef.current.abort();
+    manualAbortRef.current = null;
     patchManualScan({ running: false, status: "Search stopped." });
     appendManualLog("Search stopped by user.", "warning");
   };
-  const startManualScan = ({ query, from, to, pickedSites }) => {
+  const startManualScan = async ({ query, from, to, pickedSites }) => {
     const keywords = query.trim();
     if (!keywords || manualScan.running) return;
-    if (manualCloseRef.current) manualCloseRef.current();
+    if (manualAbortRef.current) manualAbortRef.current.abort();
+    const controller = new AbortController();
+    manualAbortRef.current = controller;
     setManualScan((current) => ({
       ...current,
       query,
@@ -134,9 +138,10 @@ export default function App() {
       started: true,
       cards: [],
       checked: {},
-      status:
-        "Running Intelligence Scan · Crawling selected sources · Filtering articles · Clustering stories",
-      logs: [makeLog(`Search started for "${keywords}".`, "command")],
+      archiveFiles: 0,
+      articlesSearched: 0,
+      status: "Searching extracted intelligence archives...",
+      logs: [makeLog(`Local archive search started for "${keywords}".`, "command")],
     }));
     trackAction("search", {
       query: keywords,
@@ -145,83 +150,49 @@ export default function App() {
       target_sites: pickedSites.join(", "),
       screen: "scan",
     });
-    manualCloseRef.current = streamCrawl(
-      {
-        keywords,
-        from_date: from || undefined,
-        to_date: to || undefined,
-        target_sites: pickedSites.length ? pickedSites.join(",") : undefined,
-      },
-      ({ type, data }) => {
-        const eventType = type === "message" && data?.type ? data.type : type;
-        if (eventType === "job_started") {
-          appendManualLog(
-            `Crawler job connected${data?.job_id ? ` · ${data.job_id}` : ""}.`,
+    try {
+      const data = await searchExtractedIntelligence(
+        {
+          query: keywords,
+          from_date: from || undefined,
+          to_date: to || undefined,
+          target_sites: pickedSites.length ? pickedSites.join(",") : undefined,
+          limit: 250,
+        },
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      const list = normalizeList(data?.results || []);
+      const archiveFiles = Number(data?.archive_files_searched || 0);
+      const articlesSearched = Number(data?.articles_searched || 0);
+      const summary = `Search complete · ${list.length} matches from ${articlesSearched} stored articles`;
+      setManualScan((current) => ({
+        ...current,
+        cards: list,
+        status: summary,
+        running: false,
+        archiveFiles,
+        articlesSearched,
+        logs: [
+          ...(current.logs || []),
+          makeLog(
+            `Checked ${archiveFiles} extracted files and ${articlesSearched} stored articles.`,
             "active",
-          );
-        } else if (eventType === "status") {
-          const message =
-            typeof data === "string" ? data : data?.message || "Scanning...";
-          patchManualScan({ status: message });
-          appendManualLog(message, "active");
-        } else if (eventType === "card") {
-          const raw = data?.card || data?.event || data;
-          setManualScan((current) => {
-            const card = normalizeArticle(raw, current.cards.length);
-            if (!card) return current;
-            const log = makeLog(
-              `Signal surfaced: ${card.title.slice(0, 68)}${card.title.length > 68 ? "..." : ""}`,
-              "signal",
-            );
-            return {
-              ...current,
-              cards: [...current.cards, card],
-              logs: [...(current.logs || []), log].slice(-30),
-            };
-          });
-        } else if (eventType === "data") {
-          const arr = Array.isArray(data)
-            ? data
-            : data?.result ||
-              data?.results ||
-              data?.articles ||
-              data?.events ||
-              [];
-          const list = normalizeList(arr);
-          setManualScan((current) => ({
-            ...current,
-            cards: list.length ? list : current.cards,
-            status: `Search complete · ${list.length || current.cards.length} results clustered`,
-            running: false,
-            logs: [
-              ...(current.logs || []),
-              makeLog(
-                `Search complete · ${list.length || current.cards.length} results clustered.`,
-                "complete",
-              ),
-            ].slice(-30),
-          }));
-          if (manualCloseRef.current) {
-            manualCloseRef.current();
-            manualCloseRef.current = null;
-          }
-        } else if (eventType === "error") {
-          const message =
-            data?.error || data?.message || "Search connection interrupted.";
-          patchManualScan((current) => ({
-            status: message,
-            running: false,
-            logs: [...(current.logs || []), makeLog(message, "error")].slice(
-              -30,
-            ),
-          }));
-          if (manualCloseRef.current) {
-            manualCloseRef.current();
-            manualCloseRef.current = null;
-          }
-        }
-      },
-    );
+          ),
+          makeLog(`${list.length} matching signals returned. No crawler was launched.`, "complete"),
+        ].slice(-30),
+      }));
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      const message = error?.message || "Archive search failed.";
+      patchManualScan((current) => ({
+        status: message,
+        running: false,
+        logs: [...(current.logs || []), makeLog(message, "error")].slice(-30),
+      }));
+    } finally {
+      if (manualAbortRef.current === controller) manualAbortRef.current = null;
+    }
   };
   return (
     <DesignViewport>

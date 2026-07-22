@@ -2531,6 +2531,244 @@ def restore_to_briefing(request: Request, payload: dict = Body(...)):
 
 
 # ==========================================
+# --- READ-ONLY EXTRACTED INTELLIGENCE SEARCH ---
+# ==========================================
+def _archive_file_date(file_path: str):
+    """Return the briefing date encoded in an extracted archive filename."""
+
+    match = re.search(r"briefing_(\d{4}-\d{2}-\d{2})_", os.path.basename(file_path))
+    if not match:
+        return None
+    try:
+        return datetime.datetime.strptime(match.group(1), "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _article_archive_date(article: dict, fallback=None):
+    """Read an article date without making any network or crawler request."""
+
+    for key in ("date", "published_at", "publishedAt", "first_seen", "generated_at"):
+        value = str(article.get(key) or "").strip()
+        if not value:
+            continue
+        iso_candidate = value[:10]
+        try:
+            return datetime.datetime.strptime(iso_candidate, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+    return fallback
+
+
+def _article_source_names(article: dict):
+    names = []
+    primary = str(article.get("source") or article.get("src") or "").strip()
+    if primary:
+        names.append(primary)
+    for source in article.get("sources") or article.get("source_list") or []:
+        if isinstance(source, dict):
+            name = str(source.get("name") or source.get("title") or source.get("source") or "").strip()
+        else:
+            name = str(source).strip()
+        if name:
+            names.append(name)
+    return list(dict.fromkeys(names))
+
+
+def _archive_search_terms(query: str):
+    """Produce useful OR-search terms from natural text or comma-separated input."""
+
+    raw = str(query or "").strip().casefold()
+    if not raw:
+        return []
+    phrases = [part.strip() for part in raw.split(",") if part.strip()]
+    words = re.findall(r"[\w.+#-]{2,}", raw, flags=re.UNICODE)
+    return list(dict.fromkeys(phrases + words))
+
+
+def search_extracted_intelligence(
+    profile: str,
+    query: str,
+    from_date: str = None,
+    to_date: str = None,
+    target_sites: str = None,
+    limit: int = 250,
+):
+    """Search scheduler-produced JSON archives only.
+
+    This function deliberately has no Scrapy, subprocess, HTTP, enrichment, or
+    scheduler integration. It is the data boundary used by the UI's Deep Scan
+    screen so an interactive search can never launch an internet crawl.
+    """
+
+    terms = _archive_search_terms(query)
+    if not terms:
+        return {
+            "status": "error",
+            "message": "Enter at least one search term.",
+            "results": [],
+            "count": 0,
+            "profile": profile,
+            "search_scope": "extracted_archives_only",
+            "crawler_started": False,
+        }
+
+    try:
+        start = datetime.datetime.strptime(from_date, "%Y-%m-%d").date() if from_date else None
+        end = datetime.datetime.strptime(to_date, "%Y-%m-%d").date() if to_date else None
+    except ValueError:
+        return {
+            "status": "error",
+            "message": "Dates must use YYYY-MM-DD format.",
+            "results": [],
+            "count": 0,
+            "profile": profile,
+            "search_scope": "extracted_archives_only",
+            "crawler_started": False,
+        }
+    if start and end and start > end:
+        start, end = end, start
+
+    requested_sources = {
+        source.strip().casefold()
+        for source in str(target_sites or "").split(",")
+        if source.strip() and source.strip().casefold() != "all"
+    }
+
+    archive_files = [
+        file_path
+        for file_path in get_profile_history_files(profile)
+        if os.path.basename(file_path).startswith("briefing_")
+    ]
+    archive_files.sort(key=os.path.getmtime, reverse=True)
+
+    matches = {}
+    scanned_articles = 0
+    searchable_files = 0
+    for file_path in archive_files:
+        file_date = _archive_file_date(file_path)
+        try:
+            with open(file_path, "r", encoding="utf-8") as file_obj:
+                payload = json.load(file_obj)
+        except (OSError, ValueError, TypeError):
+            continue
+        if not isinstance(payload, list):
+            continue
+        searchable_files += 1
+        for raw_article in payload:
+            if not isinstance(raw_article, dict):
+                continue
+            scanned_articles += 1
+            article_date = _article_archive_date(raw_article, file_date)
+            if start and (article_date is None or article_date < start):
+                continue
+            if end and (article_date is None or article_date > end):
+                continue
+
+            source_names = _article_source_names(raw_article)
+            normalized_sources = {name.casefold() for name in source_names}
+            if requested_sources and not requested_sources.intersection(normalized_sources):
+                continue
+
+            title = str(raw_article.get("title") or "")
+            keywords = raw_article.get("keywords_found") or raw_article.get("keywords") or []
+            if not isinstance(keywords, list):
+                keywords = [keywords]
+            summary = " ".join(
+                str(raw_article.get(key) or "")
+                for key in ("master_summary", "summary", "ppt_summary", "snippet")
+            )
+            full_text = " ".join(
+                [
+                    title,
+                    summary,
+                    str(raw_article.get("full_contents") or raw_article.get("full_content") or ""),
+                    " ".join(str(value) for value in keywords),
+                    " ".join(source_names),
+                    str(raw_article.get("category") or ""),
+                    str(raw_article.get("region") or ""),
+                ]
+            ).casefold()
+            title_text = title.casefold()
+            keyword_text = " ".join(str(value) for value in keywords).casefold()
+            summary_text = summary.casefold()
+            matched_terms = [term for term in terms if term in full_text]
+            if not matched_terms:
+                continue
+
+            score = 0
+            whole_query = str(query or "").strip().casefold()
+            if whole_query and whole_query in title_text:
+                score += 18
+            for term in matched_terms:
+                if term in title_text:
+                    score += 9
+                if term in keyword_text:
+                    score += 7
+                if term in summary_text:
+                    score += 3
+                else:
+                    score += 1
+            score += min(int(raw_article.get("source_count") or len(source_names) or 1), 5)
+            score += min(int(raw_article.get("importance_score") or 0) // 20, 5)
+
+            article = apply_learned_region(dict(raw_article), profile)
+            article["search_score"] = score
+            article["matched_terms"] = matched_terms
+            article["archive_file"] = os.path.basename(file_path)
+            article["archive_date"] = article_date.isoformat() if article_date else None
+            article["search_scope"] = "extracted_archives_only"
+            stable_key = str(article.get("link") or article.get("url") or title).strip().casefold()
+            existing = matches.get(stable_key)
+            if existing is None or score > existing.get("search_score", 0):
+                matches[stable_key] = article
+
+    results = list(matches.values())
+    results.sort(
+        key=lambda article: (
+            int(article.get("search_score") or 0),
+            str(article.get("archive_date") or article.get("date") or ""),
+            int(article.get("importance_score") or 0),
+        ),
+        reverse=True,
+    )
+    results = results[:limit]
+    return {
+        "status": "success",
+        "results": results,
+        "count": len(results),
+        "profile": profile,
+        "query": query,
+        "from_date": start.isoformat() if start else None,
+        "to_date": end.isoformat() if end else None,
+        "archive_files_searched": searchable_files,
+        "articles_searched": scanned_articles,
+        "search_scope": "extracted_archives_only",
+        "crawler_started": False,
+    }
+
+
+@app.get("/archive/search")
+def search_archive(
+    request: Request,
+    query: str = Query(..., min_length=1),
+    from_date: str = Query(None),
+    to_date: str = Query(None),
+    target_sites: str = Query(None),
+    limit: int = Query(250, ge=1, le=500),
+):
+    profile = get_profile_for_request(request)
+    return search_extracted_intelligence(
+        profile=profile,
+        query=query,
+        from_date=from_date,
+        to_date=to_date,
+        target_sites=target_sites,
+        limit=limit,
+    )
+
+
+# ==========================================
 # --- HISTORY ENDPOINTS ---
 # ==========================================
 @app.get("/history/list")
@@ -3595,7 +3833,7 @@ async def crawl(
 # --- FRONTEND ROUTING ---
 # ==========================================
 API_ROUTES = {
-    "crawl", "train", "status", "briefing",
+    "archive", "crawl", "train", "status", "briefing",
     "export-excel", "export-ppt", "export-word",
     "sites", "latest-briefing", "workflow",
     "history", "not-interested", "region", "track", "analytics", "profile", "voc",

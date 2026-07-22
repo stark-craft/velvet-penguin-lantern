@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 const BACKEND = 'http://127.0.0.1:8000';
 
 const proxyPaths = [
-  '/crawl', '/latest-briefing', '/briefing', '/train',
+  '/archive', '/crawl', '/latest-briefing', '/briefing', '/train',
   '/not-interested', '/workflow', '/sites', '/history/',
   '/track', '/status', '/analytics', '/profile', '/viewer', '/region', '/voc', '/insight',
   '/gatekeeper', '/trends',

@@ -43,34 +43,15 @@ export const removeFromBriefing  = (title)   => jsonFetch('/briefing/remove',  {
 export const restoreToBriefing   = (article) => jsonFetch('/briefing/restore', { method:'POST', body: JSON.stringify({ article }) });
 export const getInsight = (article) => jsonFetch('/insight', { method:'POST', body: JSON.stringify(article) });
 
-// ---------- Crawl (SSE) ----------
-export function streamCrawl(params, onEvent) {
+// ---------- Read-only extracted intelligence search ----------
+export function searchExtractedIntelligence(params, signal) {
   const u = new URLSearchParams();
-  if (params.keywords)     u.set('keywords', params.keywords);
+  if (params.query)        u.set('query', params.query);
   if (params.from_date)    u.set('from_date', params.from_date);
   if (params.to_date)      u.set('to_date', params.to_date);
   if (params.target_sites) u.set('target_sites', params.target_sites);
-  u.set('session_id', params.session_id || getSessionId());
-  u.set('profile', selectedProfile());
-  const url = `${BASE}/crawl?${u.toString()}`;
-  const es = new EventSource(url);
-
-  const handle = (type) => (ev) => {
-    let data = ev.data;
-    try { data = JSON.parse(ev.data); } catch {}
-    onEvent({ type, data });
-  };
-  ['job_started','status','card','data','error'].forEach((t) => {
-    es.addEventListener(t, handle(t));
-  });
-  // Some servers emit unnamed messages
-  es.onmessage = (ev) => {
-    let data = ev.data;
-    try { data = JSON.parse(ev.data); } catch {}
-    onEvent({ type: 'message', data });
-  };
-  es.onerror = (e) => { onEvent({ type: 'error', data: { error: 'SSE connection lost' } }); };
-  return () => es.close();
+  if (params.limit)        u.set('limit', String(params.limit));
+  return jsonFetch(`/archive/search?${u.toString()}`, { signal });
 }
 
 // ---------- Train / votes ----------

@@ -78,6 +78,12 @@ export function normalizeArticle(raw, idx = 0) {
     seen_today:    raw.seen_today || 1,
     first_today:   raw.first_today || timeStr,
     last_today:    raw.last_today || timeStr,
+    // local extracted-intelligence search metadata
+    search_score:  Number(raw.search_score || 0),
+    matched_terms: Array.isArray(raw.matched_terms) ? raw.matched_terms : [],
+    archive_file:  raw.archive_file || '',
+    archive_date:  raw.archive_date || dateStr,
+    search_scope:  raw.search_scope || '',
   };
 }
 

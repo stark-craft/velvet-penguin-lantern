@@ -16,24 +16,31 @@ const fmt = (date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 
-const DEEP_SCAN_TOUR_KEY = 'deep-scan-tour-complete';
+const DEEP_SCAN_TOUR_KEY = 'local-deep-scan-tour-v1-complete';
 const DEEP_SCAN_TOUR_STEPS = [
   {
-    title: 'Enter investigation keywords',
-    text: 'Add one or more subjects separated by commas, for example: Samsung, OLED, Nvidia, robotics. The search keeps stories that match at least one keyword.',
+    title: 'Search the intelligence already collected',
+    text: 'Enter a company, product, technology, market, or phrase. Deep Scan checks the extracted JSON archives and never opens the web crawler.',
   },
   {
-    title: 'Start with today',
-    text: 'Deep Search now begins with today only. Open Date Range when you need older context or a wider investigation window.',
+    title: 'Choose the stored date window',
+    text: 'The search starts with today. Expand the date range to investigate older articles already retained in the local archive.',
   },
   {
-    title: 'Choose the source scope',
-    text: 'All active sources are searched by default. Narrow this control when you want a targeted investigation by publication or category.',
+    title: 'Filter by publication',
+    text: 'All stored publications are included by default. Select sources to filter the extracted results by their saved source metadata.',
   },
   {
-    title: 'Launch the investigation',
-    text: 'Run Deep Search crawls your selected sources for the keywords and time window, then streams and clusters the matching stories into this workspace.',
+    title: 'Run the local Deep Scan',
+    text: 'The result is produced only from scheduler-extracted briefing files. It does not start Scrapy, fetch a URL, or modify the homepage briefing.',
   },
+];
+
+const SUGGESTED_QUERIES = [
+  'Samsung',
+  'OLED',
+  'Artificial Intelligence',
+  'Broadcast regulation',
 ];
 
 function sourceName(source) {
@@ -65,8 +72,7 @@ function SourcePicker({ sites, selected, onApply }) {
   }, [open, selected]);
 
   const allNames = useMemo(() => sites.map(sourceName), [sites]);
-  const selectedCount = selected.length || allNames.length;
-  const label = selected.length ? `${selected.length} selected` : 'All active';
+  const label = selected.length ? `${selected.length} selected` : 'All stored sources';
 
   const visibleSites = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -106,7 +112,9 @@ function SourcePicker({ sites, selected, onApply }) {
       >
         <span>
           <span className="block text-sm font-semibold text-white">{label}</span>
-          <span className="block text-xs text-slate-500">{selectedCount} of {allNames.length || 0} sources</span>
+          <span className="block text-xs text-slate-500">
+            {selected.length ? `${selected.length} of ${allNames.length || 0} source filters` : `${allNames.length || 0} source filters available`}
+          </span>
         </span>
         <Icon name="chevD" size={15} />
       </button>
@@ -128,7 +136,7 @@ function SourcePicker({ sites, selected, onApply }) {
           <div className="source-picker-head shrink-0 flex items-center justify-between gap-3 border-b border-white/10 p-4">
             <div>
               <div className="text-sm font-semibold text-white">Source Picker</div>
-              <div className="mt-1 text-xs text-slate-500">Grouped by sites.json category</div>
+              <div className="mt-1 text-xs text-slate-500">Filter stored articles by their extracted source</div>
             </div>
             <button
               className="source-picker-manage text-sm font-semibold text-sky-200 hover:text-white"
@@ -148,7 +156,7 @@ function SourcePicker({ sites, selected, onApply }) {
             />
             <div className="flex flex-wrap gap-2">
               <button className="btn-dark-secondary h-9" onClick={() => setDraft(allNames)} type="button">Select all sources</button>
-              <button className="btn-dark-secondary h-9" onClick={() => setDraft([])} type="button">Use all active</button>
+              <button className="btn-dark-secondary h-9" onClick={() => setDraft([])} type="button">Use all stored sources</button>
             </div>
           </div>
 
@@ -206,7 +214,7 @@ function SourcePicker({ sites, selected, onApply }) {
 
           <div className="source-picker-foot shrink-0 flex items-center justify-between gap-3 border-t border-white/10 p-4">
             <div className="text-sm text-slate-500">
-              {draft.length ? `${draft.length} manually selected` : 'All active sources will be used'}
+              {draft.length ? `${draft.length} source filters selected` : 'All stored sources will be searched'}
             </div>
             <div className="flex gap-2">
               <button className="btn-dark-secondary h-9" onClick={() => setOpen(false)} type="button">Cancel</button>
@@ -218,7 +226,7 @@ function SourcePicker({ sites, selected, onApply }) {
                 }}
                 type="button"
               >
-                Apply selected sources
+                Apply source filter
               </button>
             </div>
           </div>
@@ -270,13 +278,13 @@ function DeepScanTour({ step, targetRef, onNext, onDismiss }) {
 
   return createPortal((
     <>
-      <button className="scan-tour-scrim fixed inset-0" onClick={onDismiss} type="button" aria-label="Skip Deep Search guide" />
+      <button className="scan-tour-scrim fixed inset-0" onClick={onDismiss} type="button" aria-label="Skip local Deep Scan guide" />
       <div
         className="scan-tour-spotlight fixed"
         style={{ left: `${bounds.left - 5}px`, top: `${bounds.top - 5}px`, width: `${bounds.width + 10}px`, height: `${bounds.height + 10}px` }}
       />
       <aside className="scan-tour-card fixed" style={{ left: `${left}px`, top: `${top}px` }} aria-live="polite">
-        <div className="scan-tour-progress">Deep Search Guide · {step + 1} of {DEEP_SCAN_TOUR_STEPS.length}</div>
+        <div className="scan-tour-progress">Local Deep Scan Guide · {step + 1} of {DEEP_SCAN_TOUR_STEPS.length}</div>
         <h3>{guide.title}</h3>
         <p>{guide.text}</p>
         <div className="scan-tour-actions">
@@ -292,13 +300,17 @@ function ScanActivityPanel({ running, logs, hasBatch }) {
   const [collapsed, setCollapsed] = useState(false);
   const recentLogs = (logs || []).slice(-7);
 
+  useEffect(() => {
+    if (!running && recentLogs.length > 0) setCollapsed(true);
+  }, [running]);
+
   return (
     <aside className={`scan-activity-panel ${running ? 'is-running' : ''} ${collapsed ? 'is-collapsed' : ''} ${hasBatch ? 'has-batch' : ''}`} aria-live="polite">
       <div className="scan-activity-head">
         <div>
           <span className={running ? 'scan-beacon active' : 'scan-beacon'} />
           <Icon name="terminal" size={15} />
-          <strong>Crawler Activity</strong>
+          <strong>Archive Search Activity</strong>
         </div>
         <button onClick={() => setCollapsed((value) => !value)} type="button">
           {collapsed ? 'Expand' : 'Minimize'}
@@ -315,7 +327,7 @@ function ScanActivityPanel({ running, logs, hasBatch }) {
             ))}
           </div>
           <div className="scan-activity-foot">
-            {running ? 'Live updates from the active crawl' : 'Latest manual search activity'}
+            {running ? 'Reading extracted JSON archives' : 'Latest local archive search'}
           </div>
         </>
       )}
@@ -326,7 +338,7 @@ function ScanActivityPanel({ running, logs, hasBatch }) {
 export default function ScanScreen({ manualScan, setManualScan, startManualScan, stopManualScan }) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const initialQ = params.get('q') || 'Samsung OLED AI';
+  const initialQ = params.get('q') || '';
   const today = new Date();
 
   const query = manualScan?.query ?? initialQ;
@@ -339,6 +351,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const cards = manualScan?.cards || [];
   const checked = manualScan?.checked || {};
   const logs = manualScan?.logs || [];
+  const archiveFiles = Number(manualScan?.archiveFiles || 0);
+  const articlesSearched = Number(manualScan?.articlesSearched || 0);
   const setQuery = (value) => setManualScan({ query: value });
   const setFrom = (value) => setManualScan({ from: value });
   const setTo = (value) => setManualScan({ to: value });
@@ -398,8 +412,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   }), [cards, resultFilter]);
   const groups = useMemo(() => groupedByDate(visibleCards), [visibleCards]);
   const highSignals = cards.filter((a) => scoreOf(a) >= 80).length;
-  const scanSourceLabel = pickedSites.length ? `${pickedSites.length} selected` : `${sites.length || 0} active`;
-  const scanStateLabel = running ? 'Scanning' : started ? 'Complete' : 'Ready';
+  const scanSourceLabel = pickedSites.length ? `${pickedSites.length} selected` : 'All stored';
+  const scanStateLabel = running ? 'Searching archive' : started ? 'Search complete' : 'Ready';
 
   const start = () => {
     const keywords = query.trim();
@@ -480,33 +494,39 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       <section className="scan-console deep-search-command relative z-[60]">
         <div className="scan-console-header">
           <div className="scan-title">
-            <div className="eyebrow">Deep Search / Manual Investigation</div>
-            <h1>Search news signals.</h1>
-            <p>Choose sources and a time window, then review results without changing the scheduled homepage briefing.</p>
+            <div className="eyebrow">Deep Scan / Extracted Intelligence</div>
+            <h1>Search what the system already knows.</h1>
+            <p>Investigate previously extracted news instantly—without starting the crawler or making an internet request.</p>
+            <div className="local-search-boundary" role="note">
+              <span className="local-search-lock"><Icon name="shield" size={14} /> Local-only</span>
+              <span>Read-only JSON archive</span>
+              <span>No crawler launch</span>
+              <span>No live web lookup</span>
+            </div>
           </div>
           <div className="scan-telemetry" aria-label="Investigation scope">
             <div className="scan-telemetry-head">
               <span className={running ? 'scan-beacon active' : 'scan-beacon'} />
               <span>{scanStateLabel}</span>
-              {running && <small>Live crawl in progress</small>}
+              {running && <small>Reading local files</small>}
             </div>
             <div className="scan-telemetry-grid">
               <div><strong>{scanSourceLabel}</strong><span>Source scope</span></div>
-              <div><strong>{cards.length}</strong><span>Signals surfaced</span></div>
-              <div><strong>{highSignals}</strong><span>High signal</span></div>
+              <div><strong>{cards.length}</strong><span>Matches found</span></div>
+              <div><strong>{archiveFiles || '—'}</strong><span>Files searched</span></div>
             </div>
-            <p>Session workspace. Results remain while you navigate this app and reset on browser refresh.</p>
+            <p>Session workspace. Results remain while you navigate and reset on browser refresh.</p>
           </div>
         </div>
 
         <div className="scan-query-console">
           <div className="scan-query-label">
             <Icon name="search" size={15} />
-            <span>Investigation query</span>
+            <span>Search extracted news</span>
             <button
               className="scan-field-help"
-              title="Enter comma-separated keywords to search for more than one subject."
-              aria-label="Help: investigation keywords"
+              title="Search titles, summaries, keywords, categories, regions, and saved source names."
+              aria-label="Help: extracted intelligence search"
               onClick={() => openTour(0)}
               type="button"
             >
@@ -521,32 +541,39 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
-                placeholder="Keywords separated by commas, e.g. Samsung, OLED, Nvidia, robotics"
+                placeholder="Search companies, products, markets, topics, or phrases..."
+                aria-label="Search extracted intelligence"
               />
             </label>
             <div className="scan-search-action" ref={searchRef}>
               <button
                 className="scan-field-help scan-search-help"
-                title="Start a streamed manual search using this query, date range, and source scope."
-                aria-label="Help: run deep search"
+                title="Search local extracted briefing files only. This never starts the crawler."
+                aria-label="Help: run local Deep Scan"
                 onClick={() => openTour(3)}
                 type="button"
               >
                 ?
               </button>
               {running ? (
-                <button className="scan-run scan-run-primary stop" onClick={stop} type="button"><Icon name="stop" /> Stop Scan</button>
+                <button className="scan-run scan-run-primary stop" onClick={stop} type="button"><Icon name="stop" /> Stop Search</button>
               ) : (
-                <button className="scan-run scan-run-primary" onClick={start} type="button"><Icon name="search" /> Run Deep Search</button>
+                <button className="scan-run scan-run-primary" onClick={start} type="button" disabled={!query.trim()}><Icon name="search" /> Run Local Deep Scan</button>
               )}
             </div>
+          </div>
+          <div className="scan-suggestions" aria-label="Suggested searches">
+            <span>Try a search</span>
+            {SUGGESTED_QUERIES.map((suggestion) => (
+              <button key={suggestion} onClick={() => setQuery(suggestion)} type="button">{suggestion}</button>
+            ))}
           </div>
           <div className="scan-command-controls">
             <div ref={dateRangeRef}>
               <DateRangePicker
                 from={from}
                 to={to}
-                helpText="Deep Search starts with today only. Choose a broader range when your investigation needs older signals."
+                helpText="Local Deep Scan starts with today. Choose a broader range to search older extracted briefing files."
                 onHelp={() => openTour(1)}
                 onChange={({ from: nextFrom, to: nextTo }) => {
                   setFrom(nextFrom);
@@ -559,7 +586,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                 <span>Sources</span>
                 <button
                   className="scan-field-help"
-                  title="Searches every active source unless you select specific publications here."
+                  title="Filters stored articles by their extracted source. It does not contact these publications."
                   aria-label="Help: source scope"
                   onClick={() => openTour(2)}
                   type="button"
@@ -570,8 +597,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               <SourcePicker sites={sites} selected={pickedSites} onApply={setPicked} />
             </div>
             <div className="scan-scope-note" aria-label="Manual search session behavior">
-              <span>Session Workspace</span>
-              <p>Results remain available while you navigate this session.</p>
+              <span>Read-only Search</span>
+              <p>The scheduled briefing and crawler remain untouched.</p>
             </div>
           </div>
         </div>
@@ -590,11 +617,11 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         <section className="scan-summary rounded-[22px] border border-white/10 bg-[#101827]/80 p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">Search Summary</h2>
+              <h2 className="text-lg font-semibold text-white">Local Search Summary</h2>
               <p className="mt-1 text-sm text-slate-400">
-                {cards.length} articles found · {cards.length} clusters · {highSignals} high-signal results
+                {cards.length} matches · {highSignals} high-signal results · {articlesSearched} stored articles checked
               </p>
-              <p className="mt-1 text-sm text-slate-500">Query: {query} · {from} to {to} · {pickedSites.length || 'All'} sources</p>
+              <p className="mt-1 text-sm text-slate-500">Query: {query} · {from} to {to} · {pickedSites.length || 'All'} stored sources · {archiveFiles} archive files</p>
             </div>
             <span className="text-sm text-slate-400">{status}</span>
           </div>
@@ -626,45 +653,53 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
             </div>
             <div className="article-grid grid gap-8 2xl:grid-cols-2">
               {items.map((item) => (
-                <ArticleCard
-                  key={item.id}
-                  item={item}
-                  variant={cardVariant(item)}
-                  vote={votes[item.id]}
-                  onVote={onVote}
-                  onSelect={setPendingSelect}
-                  onOpen={setOpen}
-                  onHide={(x) => onVote(x, 'down')}
-                  onCheck={onCheck}
-                  checked={!!checked[articleKey(item)]}
-                  isSelected={!!item.selected_by}
-                />
+                <div className="archive-result-item" key={item.id}>
+                  <div className="archive-match-strip">
+                    <span className="archive-match-label"><Icon name="search" size={12} /> Matched</span>
+                    <span className="archive-match-terms">
+                      {(item.matched_terms || []).slice(0, 4).map((term) => <em key={term}>{term}</em>)}
+                    </span>
+                    <span className="archive-match-score">Relevance {item.search_score || '—'}</span>
+                  </div>
+                  <ArticleCard
+                    item={item}
+                    variant={cardVariant(item)}
+                    vote={votes[item.id]}
+                    onVote={onVote}
+                    onSelect={setPendingSelect}
+                    onOpen={setOpen}
+                    onHide={(x) => onVote(x, 'down')}
+                    onCheck={onCheck}
+                    checked={!!checked[articleKey(item)]}
+                    isSelected={!!item.selected_by}
+                  />
+                </div>
               ))}
             </div>
           </div>
         )) : (
           <div className="scan-idle-stage">
             <div className={running ? 'scan-radar active' : 'scan-radar'} aria-hidden="true">
-              <span className="radar-ring one" />
+                <span className="radar-ring one" />
               <span className="radar-ring two" />
               <span className="radar-crosshair" />
               <Icon name={running ? 'refresh' : 'search'} size={23} />
             </div>
             <div className="scan-idle-copy">
-              <div className="eyebrow">{running ? 'Signal Acquisition Active' : started ? 'Investigation Complete' : 'Awaiting Investigation'}</div>
-              <h2>{running ? 'Sweeping selected intelligence sources' : started ? 'No signals matched this lens' : 'Define a target and begin scanning'}</h2>
+              <div className="eyebrow">{running ? 'Local Search Active' : started ? 'Archive Search Complete' : 'Extracted Intelligence Ready'}</div>
+              <h2>{running ? 'Reading the stored intelligence archive' : started ? 'No stored signals matched this search' : 'Search the news already collected'}</h2>
               <p>
                 {running
-                  ? 'Crawling sources, filtering candidate articles, and clustering coverage as results arrive.'
+                  ? 'Checking extracted briefing files and ranking matching articles. No crawler or internet connection is involved.'
                   : started
-                    ? 'Widen your date window, choose additional sources, or adjust the query to surface a new trail.'
-                    : 'Manual results stay in this workspace while you navigate and do not alter the scheduled homepage briefing.'}
+                    ? 'Widen the stored date window, remove a source filter, or try another subject.'
+                    : 'Search titles, summaries, keywords, sources, categories, and regions from the retained briefing files.'}
               </p>
             </div>
             {!running && (
               <div className="scan-idle-actions">
-                <button className="source-chip" onClick={() => setQuery('Samsung OLED AI')} type="button">Samsung OLED AI</button>
-                <button className="source-chip" onClick={() => setQuery('Semiconductor display investment')} type="button">Display investment</button>
+                <button className="source-chip" onClick={() => setQuery('Samsung OLED')} type="button">Samsung OLED</button>
+                <button className="source-chip" onClick={() => setQuery('Broadcast regulation')} type="button">Broadcast regulation</button>
               </div>
             )}
           </div>

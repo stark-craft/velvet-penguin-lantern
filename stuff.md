@@ -20,6 +20,7 @@ tested and fixed on the MacBook.
 - Kept TLS verification enabled and added Windows/custom-CA support.
 - Added hashed-IP analytics, viewer names, VOC, 30-day history retention, and exports.
 - Added a persistent Light/Dark theme button in the top navigation.
+- Restored Deep Scan as a read-only search across extracted briefing JSON files; it does not launch Scrapy or perform a live web search.
 - Added backend tests and crawler fixtures.
 
 ## Windows: first installation

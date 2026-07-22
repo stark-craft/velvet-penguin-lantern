@@ -1,0 +1,410 @@
+/* Local Deep Scan: read-only extracted intelligence search */
+.scan-page .deep-search-command {
+  overflow: hidden;
+  border: 1px solid rgba(92, 166, 255, 0.2);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.18), transparent 31rem),
+    radial-gradient(circle at 93% 10%, rgba(34, 211, 238, 0.08), transparent 24rem),
+    linear-gradient(145deg, rgba(8, 20, 39, 0.95), rgba(13, 29, 53, 0.92));
+  box-shadow:
+    0 30px 85px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.scan-page .scan-console-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 370px);
+  gap: clamp(26px, 5vw, 72px);
+  align-items: start;
+  padding: clamp(28px, 4vw, 52px);
+}
+
+.scan-page .scan-title h1 {
+  max-width: 760px;
+  margin-top: 10px;
+  font-size: clamp(30px, 4.2vw, 58px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.scan-page .scan-title > p {
+  max-width: 720px;
+  margin-top: 16px;
+  color: #a9bad0;
+  font-size: clamp(14px, 1.5vw, 17px);
+  line-height: 1.65;
+}
+
+.local-search-boundary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 24px;
+}
+
+.local-search-boundary > span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid rgba(148, 180, 220, 0.15);
+  border-radius: 999px;
+  background: rgba(8, 18, 34, 0.46);
+  color: #9fb0c7;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.025em;
+}
+
+.local-search-boundary .local-search-lock {
+  border-color: rgba(52, 211, 153, 0.24);
+  background: rgba(16, 185, 129, 0.1);
+  color: #a7f3d0;
+}
+
+.scan-page .scan-telemetry {
+  border: 1px solid rgba(121, 167, 224, 0.17);
+  border-radius: 22px;
+  background: rgba(7, 17, 32, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+}
+
+.scan-page .scan-query-console {
+  padding: clamp(24px, 3.5vw, 46px);
+  border-top: 1px solid rgba(148, 180, 220, 0.12);
+  background:
+    radial-gradient(ellipse at 22% 0%, rgba(37, 99, 235, 0.1), transparent 33rem),
+    rgba(5, 14, 28, 0.36);
+}
+
+.scan-page .scan-query-primary {
+  gap: 12px;
+}
+
+.scan-page .scan-query-capsule {
+  min-height: 64px;
+  border-color: rgba(121, 167, 224, 0.2);
+  border-radius: 18px;
+  background: rgba(5, 14, 28, 0.74);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.045),
+    0 18px 45px rgba(0, 0, 0, 0.18);
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.scan-page .scan-query-capsule:focus-within {
+  border-color: rgba(92, 166, 255, 0.62);
+  box-shadow:
+    0 0 0 4px rgba(37, 99, 235, 0.11),
+    0 22px 55px rgba(0, 0, 0, 0.24);
+  transform: translateY(-1px);
+}
+
+.scan-page .scan-query-input {
+  min-width: 0;
+  font-size: 16px;
+}
+
+.scan-page .scan-run.scan-run-primary {
+  min-width: 205px;
+  min-height: 64px;
+  justify-content: center;
+  border-radius: 18px;
+  background: linear-gradient(120deg, #3985ff, #2263d9);
+  color: #fff;
+  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.28);
+}
+
+.scan-page .scan-run.scan-run-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 22px 48px rgba(37, 99, 235, 0.36);
+}
+
+.scan-page .scan-run.scan-run-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+  filter: saturate(0.55);
+  box-shadow: none;
+}
+
+.scan-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.scan-suggestions > span {
+  margin-right: 2px;
+  color: #6f829d;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.scan-suggestions button {
+  min-height: 29px;
+  padding: 5px 11px;
+  border: 1px solid rgba(121, 167, 224, 0.16);
+  border-radius: 999px;
+  background: rgba(15, 31, 55, 0.66);
+  color: #afc1d9;
+  font-size: 11px;
+  font-weight: 600;
+  transition: 140ms ease;
+}
+
+.scan-suggestions button:hover {
+  border-color: rgba(92, 166, 255, 0.4);
+  background: rgba(37, 99, 235, 0.15);
+  color: #e4efff;
+  transform: translateY(-1px);
+}
+
+.scan-page .scan-command-controls {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(148, 180, 220, 0.1);
+}
+
+.scan-page .scan-scope-note {
+  min-height: 100%;
+  border-style: dashed;
+}
+
+.scan-page .scan-summary {
+  border-color: rgba(92, 166, 255, 0.18);
+  background:
+    radial-gradient(circle at 2% 50%, rgba(37, 99, 235, 0.12), transparent 24rem),
+    rgba(10, 24, 44, 0.84);
+}
+
+.scan-page .scan-filter-rail {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.archive-result-item {
+  overflow: hidden;
+  border: 1px solid rgba(92, 166, 255, 0.16);
+  border-radius: 24px;
+  background: rgba(8, 19, 35, 0.54);
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.18);
+}
+
+.archive-result-item > article {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.archive-match-strip {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 13px;
+  border-bottom: 1px solid rgba(121, 167, 224, 0.13);
+  background: rgba(7, 17, 32, 0.72);
+}
+
+.archive-match-label,
+.archive-match-score {
+  color: #8295af;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.archive-match-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #93c5fd;
+}
+
+.archive-match-terms {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.archive-match-terms em {
+  padding: 2px 7px;
+  border: 1px solid rgba(92, 166, 255, 0.17);
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.11);
+  color: #b8d6ff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.scan-page .scan-idle-stage {
+  min-height: 360px;
+  border: 1px dashed rgba(121, 167, 224, 0.19);
+  background:
+    radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.1), transparent 25rem),
+    rgba(7, 17, 32, 0.42);
+}
+
+.scan-page .scan-activity-panel {
+  border-color: rgba(92, 166, 255, 0.22);
+}
+
+/* Daylight counterpart */
+.app-shell[data-theme="light"] .scan-page .deep-search-command {
+  border-color: rgba(66, 111, 169, 0.2) !important;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(37, 99, 235, 0.1), transparent 31rem),
+    radial-gradient(circle at 93% 10%, rgba(14, 165, 233, 0.07), transparent 24rem),
+    linear-gradient(145deg, rgba(246, 250, 254, 0.96), rgba(224, 235, 247, 0.94)) !important;
+  box-shadow:
+    0 28px 72px rgba(36, 52, 78, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82) !important;
+}
+
+.app-shell[data-theme="light"] .scan-page .scan-title > p {
+  color: #52657c !important;
+}
+
+.app-shell[data-theme="light"] .local-search-boundary > span {
+  border-color: rgba(70, 101, 146, 0.16);
+  background: rgba(237, 244, 251, 0.84);
+  color: #53657c;
+}
+
+.app-shell[data-theme="light"] .local-search-boundary .local-search-lock {
+  border-color: rgba(5, 150, 105, 0.2);
+  background: rgba(5, 150, 105, 0.09);
+  color: #08795b;
+}
+
+.app-shell[data-theme="light"] .scan-page .scan-query-console {
+  background:
+    radial-gradient(ellipse at 22% 0%, rgba(37, 99, 235, 0.065), transparent 33rem),
+    rgba(224, 235, 247, 0.52) !important;
+}
+
+.app-shell[data-theme="light"] .scan-page .scan-query-capsule {
+  border-color: rgba(70, 101, 146, 0.2) !important;
+  background: rgba(249, 251, 253, 0.94) !important;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 16px 38px rgba(36, 52, 78, 0.1) !important;
+}
+
+.app-shell[data-theme="light"] .scan-suggestions > span {
+  color: #708198;
+}
+
+.app-shell[data-theme="light"] .scan-suggestions button {
+  border-color: rgba(70, 101, 146, 0.17);
+  background: rgba(232, 240, 249, 0.84);
+  color: #425770;
+}
+
+.app-shell[data-theme="light"] .scan-suggestions button:hover {
+  border-color: rgba(37, 99, 235, 0.28);
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4fbe;
+}
+
+.app-shell[data-theme="light"] .scan-page .scan-idle-stage {
+  border-color: rgba(70, 101, 146, 0.2) !important;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(37, 99, 235, 0.08), transparent 25rem),
+    rgba(235, 242, 249, 0.72) !important;
+}
+
+.app-shell[data-theme="light"] .archive-result-item {
+  border-color: rgba(70, 101, 146, 0.2);
+  background: rgba(237, 244, 251, 0.86);
+  box-shadow: 0 20px 46px rgba(36, 52, 78, 0.13);
+}
+
+.app-shell[data-theme="light"] .archive-match-strip {
+  border-bottom-color: rgba(70, 101, 146, 0.15);
+  background: rgba(226, 236, 247, 0.88);
+}
+
+.app-shell[data-theme="light"] .archive-match-label {
+  color: #1d5bbf;
+}
+
+.app-shell[data-theme="light"] .archive-match-score {
+  color: #677991;
+}
+
+.app-shell[data-theme="light"] .archive-match-terms em {
+  border-color: rgba(37, 99, 235, 0.18);
+  background: rgba(37, 99, 235, 0.09);
+  color: #2456a6;
+}
+
+html[data-theme="light"] .scan-tour-card {
+  border-color: rgba(70, 101, 146, 0.24) !important;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(37, 99, 235, 0.08), transparent 18rem),
+    linear-gradient(145deg, rgba(248, 251, 254, 0.99), rgba(226, 236, 247, 0.99)) !important;
+  color: #111c2f !important;
+  box-shadow: 0 30px 90px rgba(36, 52, 78, 0.25) !important;
+}
+
+html[data-theme="light"] .scan-tour-card h3 {
+  color: #111c2f !important;
+}
+
+html[data-theme="light"] .scan-tour-card p {
+  color: #53657c !important;
+}
+
+html[data-theme="light"] .scan-tour-scrim {
+  background: rgba(207, 220, 236, 0.68) !important;
+}
+
+@media (max-width: 980px) {
+  .scan-page .scan-console-header {
+    grid-template-columns: 1fr;
+  }
+
+  .scan-page .scan-telemetry {
+    max-width: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .scan-page .scan-console-header,
+  .scan-page .scan-query-console {
+    padding: 22px 18px;
+  }
+
+  .scan-page .scan-query-primary {
+    flex-direction: column;
+  }
+
+  .scan-page .scan-run.scan-run-primary {
+    width: 100%;
+    min-height: 54px;
+  }
+
+  .local-search-boundary > span:not(.local-search-lock) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-page .scan-query-capsule,
+  .scan-page .scan-run.scan-run-primary,
+  .scan-suggestions button {
+    transition: none;
+  }
+}
