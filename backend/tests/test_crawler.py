@@ -182,6 +182,33 @@ class SpiderTests(unittest.TestCase):
             headers={"Content-Type": "application/atom+xml"},
         )
 
+    def feed_response_without_date(self, spider: NewsSpider) -> XmlResponse:
+        site = spider.sites[0]
+        request = Request(
+            "https://feeds.example.com/atom.xml",
+            meta={
+                "site": site,
+                "entrypoint_kind": "feed",
+                "fallback_urls": site["listing_urls"],
+            },
+        )
+        return XmlResponse(
+            request.url,
+            request=request,
+            body=b"""<?xml version="1.0" encoding="utf-8"?>
+                <feed xmlns="http://www.w3.org/2005/Atom">
+                  <entry>
+                    <title>OpenAI launches a new enterprise research system</title>
+                    <link rel="alternate"
+                          href="https://www.example.com/News/OpenAI-Launch?id=42" />
+                    <summary>OpenAI introduced a research system.</summary>
+                  </entry>
+                </feed>
+            """,
+            encoding="utf-8",
+            headers={"Content-Type": "application/atom+xml"},
+        )
+
     def test_strict_run_configuration(self) -> None:
         with self.assertRaisesRegex(ValueError, "keyword cannot be empty"):
             self.spider(keyword="")
@@ -325,6 +352,30 @@ class SpiderTests(unittest.TestCase):
         records = list(spider.parse_article_page(response))
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["keyword_matches"], ["provenance"])
+
+    def test_full_feed_crawl_recovers_missing_feed_date_from_article(self) -> None:
+        spider = self.spider(keyword="provenance")
+        requests = list(spider.parse_feed(self.feed_response_without_date(spider)))
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0].meta["discovery"]["date_source"], "pending_article")
+        response = HtmlResponse(
+            requests[0].url,
+            request=requests[0],
+            body=fixture("article.html"),
+            encoding="utf-8",
+            headers={"Content-Type": "text/html"},
+        )
+        records = list(spider.parse_article_page(response))
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["published_at"], "2026-07-09T01:00:00Z")
+        self.assertEqual(records[0]["date_source"], "page_meta_datepublished")
+
+    def test_discovery_only_drops_feed_entry_without_a_verifiable_date(self) -> None:
+        spider = self.spider(discovery_only="true")
+        self.assertEqual(
+            list(spider.parse_feed(self.feed_response_without_date(spider))),
+            [],
+        )
 
     def test_footer_only_keyword_does_not_make_an_article_relevant(self) -> None:
         spider = self.spider(keyword="OTT")

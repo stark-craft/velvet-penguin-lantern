@@ -578,9 +578,17 @@ class NewsSpider(scrapy.Spider):
             )
             timestamp, precision = parse_datetime(raw_date, site["timezone"])
             if not timestamp:
-                self._inc("dropped_missing_or_invalid_date")
-                continue
-            if not self._date_in_range(timestamp):
+                # A missing feed date is not proof that an article is old.
+                # A full crawl can still recover a publication date from the
+                # article page. Discovery-only mode cannot perform that check,
+                # so it deliberately retains the strict drop behavior.
+                if self.discovery_only:
+                    self._inc("dropped_missing_or_invalid_date")
+                    continue
+                self._inc("feed_entries_pending_article_date")
+                date_source = "pending_article"
+                precision = "missing"
+            elif not self._date_in_range(timestamp):
                 self._inc("dropped_out_of_range")
                 continue
 
@@ -602,8 +610,8 @@ class NewsSpider(scrapy.Spider):
                 title=title,
                 title_source="feed_title",
                 excerpt=excerpt,
-                published_at=None if is_modified else timestamp,
-                modified_at=timestamp if is_modified else None,
+                published_at=None if is_modified or not timestamp else timestamp,
+                modified_at=timestamp if is_modified and timestamp else None,
                 raw_date=raw_date,
                 date_source=date_source,
                 date_precision=precision,
