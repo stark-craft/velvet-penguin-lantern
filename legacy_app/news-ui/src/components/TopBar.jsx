@@ -4,6 +4,7 @@ import Icon from "./Icon.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
 import { getAnalyticsAccess, getGatekeeperAccess, getProfile } from "../api.js";
 const mainNav = [
+  { to: "/scan", label: "Scan" },
   { to: "/selected", label: "Review Queue" },
   { to: "/approved", label: "Approved Briefing" },
 ];
@@ -20,9 +21,22 @@ function isLocalDevHost() {
   }
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 }
-export default function TopBar({ manualScan, theme, onToggleTheme }) {
+function initialsFor(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || "ME").toUpperCase();
+}
+
+export default function TopBar({
+  manualScan,
+  theme,
+  onToggleTheme,
+  viewer,
+  viewerLoading,
+  onEditProfile,
+}) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [profile, setProfile] = useState(
     localStorage.getItem("news-profile") || "default",
   );
@@ -66,6 +80,17 @@ export default function TopBar({ manualScan, theme, onToggleTheme }) {
       window.removeEventListener("storage", onProfile);
     };
   }, []);
+  useEffect(() => {
+    if (!open && !profileOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        setProfileOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, profileOpen]);
   useEffect(() => {
     let cancelled = false;
     async function checkPrivateAccess() {
@@ -151,7 +176,7 @@ export default function TopBar({ manualScan, theme, onToggleTheme }) {
               {item.to === "/scan" && manualScan?.running && (
                 <span
                   className="deep-scan-dot"
-                  aria-label="Deep Scan running"
+                  aria-label="Scan running"
                 />
               )}{" "}
             </NavLink>
@@ -160,11 +185,64 @@ export default function TopBar({ manualScan, theme, onToggleTheme }) {
         <div className="header-actions">
           {" "}
           <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+          <div className="viewer-control">
+            <button
+              aria-expanded={profileOpen}
+              aria-haspopup="dialog"
+              className="viewer-trigger"
+              onClick={() => {
+                setOpen(false);
+                setProfileOpen((current) => !current);
+              }}
+              title="Open your profile"
+              type="button"
+            >
+              <span className="viewer-avatar" aria-hidden="true">
+                {initialsFor(viewer?.display_name)}
+              </span>
+              <span className="viewer-trigger-copy">
+                <span>{viewerLoading ? "Loading profile" : viewer?.display_name || "Set up profile"}</span>
+                <small>Your desk</small>
+              </span>
+              <Icon name="chevD" size={14} />
+            </button>
+            {profileOpen && (
+              <div className="viewer-popover" role="dialog" aria-label="Your profile summary">
+                <div className="viewer-popover-head">
+                  <span className="viewer-avatar large" aria-hidden="true">
+                    {initialsFor(viewer?.display_name)}
+                  </span>
+                  <div>
+                    <strong>{viewer?.display_name || "Intelligence explorer"}</strong>
+                    <span>{viewer?.email || "No email added"}</span>
+                  </div>
+                </div>
+                <dl>
+                  <div><dt>Current IP</dt><dd>{viewer?.ip || "Detected by backend"}</dd></div>
+                  <div><dt>Active profile</dt><dd>{isBroadcast ? "Broadcast Intelligence" : "Default Intelligence"}</dd></div>
+                  <div><dt>Stored identity</dt><dd>Protected hash</dd></div>
+                </dl>
+                <button
+                  className="viewer-edit"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    onEditProfile?.();
+                  }}
+                  type="button"
+                >
+                  <Icon name="shield" size={15} /> Edit profile
+                </button>
+              </div>
+            )}
+          </div>
           <div className="relative">
             {" "}
             <button
               className="command-settings-trigger"
-              onClick={() => setOpen((current) => !current)}
+              onClick={() => {
+                setProfileOpen(false);
+                setOpen((current) => !current);
+              }}
               title="Settings"
               type="button"
             >

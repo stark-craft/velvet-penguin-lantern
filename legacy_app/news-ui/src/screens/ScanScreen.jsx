@@ -7,7 +7,7 @@ import DateRangePicker from '../components/DateRangePicker.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
-import { correctRegion, getSites, getNotInterested, rejectArticle, selectWorkflow, trainVote } from '../api.js';
+import { correctRegion, getSites, getViewerHidden, hideArticleForViewer, rejectArticle, selectWorkflow, trainVote } from '../api.js';
 import { trackAction } from '../utils/tracking.js';
 import { articleKey, cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
 
@@ -20,7 +20,7 @@ const DEEP_SCAN_TOUR_KEY = 'local-deep-scan-tour-v1-complete';
 const DEEP_SCAN_TOUR_STEPS = [
   {
     title: 'Search the intelligence already collected',
-    text: 'Enter a company, product, technology, market, or phrase. Deep Scan checks the extracted JSON archives and never opens the web crawler.',
+    text: 'Enter a company, product, technology, market, or phrase. Scan checks extracted JSON archives and never opens the web crawler.',
   },
   {
     title: 'Choose the stored date window',
@@ -31,7 +31,7 @@ const DEEP_SCAN_TOUR_STEPS = [
     text: 'All stored publications are included by default. Select sources to filter the extracted results by their saved source metadata.',
   },
   {
-    title: 'Run the local Deep Scan',
+    title: 'Instant local Scan',
     text: 'The result is produced only from scheduler-extracted briefing files. It does not start Scrapy, fetch a URL, or modify the homepage briefing.',
   },
 ];
@@ -237,7 +237,7 @@ function SourcePicker({ sites, selected, onApply }) {
   );
 }
 
-function DeepScanTour({ step, targetRef, onNext, onDismiss }) {
+function ScanTour({ step, targetRef, onNext, onDismiss }) {
   const [bounds, setBounds] = useState(null);
   const guide = DEEP_SCAN_TOUR_STEPS[step];
 
@@ -278,13 +278,13 @@ function DeepScanTour({ step, targetRef, onNext, onDismiss }) {
 
   return createPortal((
     <>
-      <button className="scan-tour-scrim fixed inset-0" onClick={onDismiss} type="button" aria-label="Skip local Deep Scan guide" />
+      <button className="scan-tour-scrim fixed inset-0" onClick={onDismiss} type="button" aria-label="Skip local Scan guide" />
       <div
         className="scan-tour-spotlight fixed"
         style={{ left: `${bounds.left - 5}px`, top: `${bounds.top - 5}px`, width: `${bounds.width + 10}px`, height: `${bounds.height + 10}px` }}
       />
       <aside className="scan-tour-card fixed" style={{ left: `${left}px`, top: `${top}px` }} aria-live="polite">
-        <div className="scan-tour-progress">Local Deep Scan Guide · {step + 1} of {DEEP_SCAN_TOUR_STEPS.length}</div>
+        <div className="scan-tour-progress">Local Scan Guide · {step + 1} of {DEEP_SCAN_TOUR_STEPS.length}</div>
         <h3>{guide.title}</h3>
         <p>{guide.text}</p>
         <div className="scan-tour-actions">
@@ -375,11 +375,27 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
   useEffect(() => {
     getSites().then((s) => setSites(Array.isArray(s) ? s : (s?.sites || []))).catch(() => {});
-    getNotInterested().then((d) => setHiddenCount(Number(d?.count ?? d?.items?.length ?? 0))).catch(() => {});
-    if (window.localStorage.getItem(DEEP_SCAN_TOUR_KEY) !== 'true') {
-      setTourStep(0);
-    }
+    getViewerHidden().then((d) => setHiddenCount(Number(d?.count ?? d?.items?.length ?? 0))).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const keywords = query.trim();
+    if (!keywords) {
+      if (running) stopManualScan();
+      setManualScan({
+        started: false,
+        running: false,
+        cards: [],
+        checked: {},
+        status: 'Start typing to search the local archive.'
+      });
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      startManualScan({ query, from, to, pickedSites });
+    }, 220);
+    return () => window.clearTimeout(timer);
+  }, [query, from, to, pickedSites.join('|')]);
 
   const dismissTour = () => {
     window.localStorage.setItem(DEEP_SCAN_TOUR_KEY, 'true');
@@ -417,7 +433,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
   const start = () => {
     const keywords = query.trim();
-    if (!keywords || running) return;
+    if (!keywords) return;
     startManualScan({ query, from, to, pickedSites });
   };
 
@@ -432,7 +448,6 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       if (v === 'down') {
         await rejectArticle(item);
         setCards((c) => c.filter((x) => x.id !== item.id));
-        setHiddenCount((n) => n + 1);
       } else if (v === 'up') {
         await trainVote(
           item.keywords_found || item.keywords || query,
@@ -444,9 +459,16 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
     } catch {}
   };
 
+  const hideArticle = async (item) => {
+    setCards((current) => current.filter((article) => articleKey(article) !== articleKey(item)));
+    setHiddenCount((count) => count + 1);
+    trackAction('hide_personal', item.title?.slice(0, 60));
+    try { await hideArticleForViewer(item); } catch {}
+  };
+
   const hideFromDossier = async (item) => {
     setOpen(null);
-    await onVote(item, 'down');
+    await hideArticle(item);
   };
 
   const selectFromDossier = (item) => {
@@ -494,9 +516,9 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       <section className="scan-console deep-search-command relative z-[60]">
         <div className="scan-console-header">
           <div className="scan-title">
-            <div className="eyebrow">Deep Scan / Extracted Intelligence</div>
-            <h1>Search what the system already knows.</h1>
-            <p>Investigate previously extracted news instantly—without starting the crawler or making an internet request.</p>
+            <div className="eyebrow">Scan / Local Intelligence</div>
+            <h1>Find any signal the moment you type.</h1>
+            <p>Every keystroke searches previously extracted news. The crawler and the public web always remain offline.</p>
             <div className="local-search-boundary" role="note">
               <span className="local-search-lock"><Icon name="shield" size={14} /> Local-only</span>
               <span>Read-only JSON archive</span>
@@ -549,7 +571,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               <button
                 className="scan-field-help scan-search-help"
                 title="Search local extracted briefing files only. This never starts the crawler."
-                aria-label="Help: run local Deep Scan"
+                aria-label="Help: run local Scan"
                 onClick={() => openTour(3)}
                 type="button"
               >
@@ -558,7 +580,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               {running ? (
                 <button className="scan-run scan-run-primary stop" onClick={stop} type="button"><Icon name="stop" /> Stop Search</button>
               ) : (
-                <button className="scan-run scan-run-primary" onClick={start} type="button" disabled={!query.trim()}><Icon name="search" /> Run Local Deep Scan</button>
+                <button className="scan-run scan-run-primary" onClick={start} type="button" disabled={!query.trim()}><Icon name="search" /> Search now</button>
               )}
             </div>
           </div>
@@ -573,7 +595,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               <DateRangePicker
                 from={from}
                 to={to}
-                helpText="Local Deep Scan starts with today. Choose a broader range to search older extracted briefing files."
+                helpText="Local Scan starts with today. Choose a broader range to search older extracted briefing files."
                 onHelp={() => openTour(1)}
                 onChange={({ from: nextFrom, to: nextTo }) => {
                   setFrom(nextFrom);
@@ -605,7 +627,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       </section>
 
       {tourStep !== null && (
-        <DeepScanTour
+        <ScanTour
           step={tourStep}
           targetRef={[queryRef, dateRangeRef, sourcesRef, searchRef][tourStep]}
           onNext={nextTourStep}
@@ -651,7 +673,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               <div className="h-px flex-1 bg-white/10" />
               <span className="text-sm text-slate-500">{items.length} results</span>
             </div>
-            <div className="article-grid grid gap-8 2xl:grid-cols-2">
+            <div className="article-grid scan-results-grid grid gap-6 lg:grid-cols-3">
               {items.map((item) => (
                 <div className="archive-result-item" key={item.id}>
                   <div className="archive-match-strip">
@@ -668,7 +690,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                     onVote={onVote}
                     onSelect={setPendingSelect}
                     onOpen={setOpen}
-                    onHide={(x) => onVote(x, 'down')}
+                    onHide={hideArticle}
                     onCheck={onCheck}
                     checked={!!checked[articleKey(item)]}
                     isSelected={!!item.selected_by}
@@ -714,7 +736,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         >
           <span>
             <span className="block text-sm font-semibold text-white">Review Hidden Signals</span>
-            <span className="mt-1 block text-xs text-slate-400">{hiddenCount} articles hidden from this search.</span>
+            <span className="mt-1 block text-xs text-slate-400">{hiddenCount} articles hidden only for you.</span>
           </span>
           <span className="btn-dark-secondary h-9">Open Hidden Review</span>
         </button>

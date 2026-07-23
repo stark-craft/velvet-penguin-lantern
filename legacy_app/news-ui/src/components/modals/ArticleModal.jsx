@@ -22,6 +22,7 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
       <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workflow</div>
       <div className="mt-2 text-base font-semibold text-white">{state}</div>
       {item.selected_by && <div className="mt-1 text-sm text-slate-400">Selected by {item.selected_by}</div>}
+      {item.approved_by && <div className="mt-1 text-sm text-slate-400">Approved by {item.approved_by}</div>}
       <div className="mt-4 flex flex-col gap-2">
         {!item.selected_by && !approved && !hidden && onSelect && (
           <button className="btn-dark-primary justify-center" onClick={() => onSelect(item)} type="button">

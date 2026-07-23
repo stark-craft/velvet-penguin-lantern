@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import ArticleCard from '../components/ArticleCard.jsx';
+import WorkflowBriefingCard from '../components/WorkflowBriefingCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import { correctRegion, exportExcel, exportPpt, exportWord, getWorkflow, removeWorkflow } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { trackAction } from '../utils/tracking.js';
-import { cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
+import { scoreOf } from '../utils/intelligence.js';
 
 function topValue(items, getter) {
   const counts = new Map();
@@ -41,8 +41,6 @@ export default function ApprovedScreen() {
     if (lens === 'Approved Today') return String(item.approved_at || item.date || '').slice(0, 10) === new Date().toISOString().slice(0, 10);
     return true;
   }), [items, lens]);
-  const groups = useMemo(() => groupedByDate(visibleItems), [visibleItems]);
-
   const onRemove = async (item) => {
     setItems((arr) => arr.filter((x) => x.title !== item.title));
     trackAction('remove_approved', item.title?.slice(0, 60));
@@ -148,29 +146,15 @@ export default function ApprovedScreen() {
           <p>Choose a different briefing lens to see other approved items.</p>
         </div>
       ) : (
-        <section className="space-y-8">
-          {Object.entries(groups).map(([day, group]) => (
-            <div key={day} className="space-y-4">
-              <div className="workflow-day-head">
-                <h2>{day}</h2>
-                <div />
-                <span>{group.length} approved</span>
-              </div>
-              <div className="article-grid grid gap-8 2xl:grid-cols-2">
-                {group.map((item) => (
-                  <div key={item.id} className="workflow-article-frame approved">
-                    <ArticleCard item={{ ...item, approved_at: item.approved_at || 'Approved' }} variant={cardVariant(item)} onOpen={setOpen} isSelected />
-                    <div className="workflow-article-actions">
-                      <span className="signal-chip selected">Approved</span>
-                      {item.selected_by && <span className="text-sm text-slate-400">Selected by {item.selected_by}</span>}
-                      {item.approved_at && <span className="text-sm text-slate-500">{item.approved_at}</span>}
-                      <button className="btn-dark-secondary h-9" onClick={() => setOpen(item)} type="button">Open Dossier</button>
-                      <button className="btn-dark-secondary h-9" onClick={() => onRemove(item)} type="button">Remove Approval</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+        <section className="workflow-card-grid">
+          {visibleItems.map((item) => (
+            <WorkflowBriefingCard
+              key={item.id}
+              item={{ ...item, approved_at: item.approved_at || 'Approved' }}
+              mode="approved"
+              onOpen={setOpen}
+              onRemove={onRemove}
+            />
           ))}
         </section>
       )}

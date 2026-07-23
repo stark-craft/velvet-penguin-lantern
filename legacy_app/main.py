@@ -172,6 +172,7 @@ NOT_INTERESTED_FILE = os.path.join(ROOT_DIR, "not_interested_store.json")
 NOT_INTERESTED_EXPIRY_HOURS = 22
 USAGE_TRACKER_FILE = os.path.join(ROOT_DIR, "usage_tracker.json")
 VIEWER_PROFILES_FILE = os.path.join(ROOT_DIR, "viewer_profiles.json")
+VIEWER_HIDDEN_FILE = os.path.join(ROOT_DIR, "viewer_hidden_store.json")
 IP_HASH_SECRET = os.environ.get("NEWSSCRAPPER_IP_HASH_SECRET", "development-only-change-this-secret")
 if APP_ENV in {"production", "prod"}:
     if IP_HASH_SECRET == "development-only-change-this-secret":
@@ -495,6 +496,7 @@ file_lock = threading.Lock()
 train_lock = threading.Lock()
 not_interested_lock = threading.Lock()
 tracker_lock = threading.Lock()
+viewer_hidden_lock = threading.Lock()
 region_learning_lock = threading.Lock()
 dropped_lock = threading.Lock()
 opinion_lock = threading.Lock()
@@ -1058,6 +1060,65 @@ def save_workflow_store(data, request: Request = None):
         json.dump(data, f, indent=4, ensure_ascii=False)
 
 
+def resolve_workflow_identities(store):
+    """Render editable viewer names from stable protected viewer identifiers."""
+    profiles = load_viewer_profiles()
+    resolved = {"selected": [], "approved": []}
+    for list_name in ("selected", "approved"):
+        for raw_item in store.get(list_name, []):
+            item = dict(raw_item)
+            selected_key = str(item.get("selected_by_id", "")).strip()
+            approved_key = str(item.get("approved_by_id", "")).strip()
+            if selected_key and selected_key in profiles:
+                item["selected_by"] = profiles[selected_key].get("display_name") or item.get("selected_by")
+            if approved_key and approved_key in profiles:
+                item["approved_by"] = profiles[approved_key].get("display_name") or item.get("approved_by")
+            resolved[list_name].append(item)
+    return resolved
+
+
+def refresh_workflow_identity(viewer_key, previous_name, display_name):
+    """Keep legacy copied names compatible while stable IDs become canonical."""
+    for workflow_file in set(WORKFLOW_FILES.values()):
+        if not os.path.exists(workflow_file):
+            continue
+        try:
+            with open(workflow_file, "r", encoding="utf-8") as handle:
+                store = json.load(handle)
+            changed = False
+            for list_name in ("selected", "approved"):
+                for item in store.get(list_name, []):
+                    selected_matches = (
+                        item.get("selected_by_id") == viewer_key
+                        or (
+                            previous_name
+                            and str(item.get("selected_by", "")).casefold()
+                            == str(previous_name).casefold()
+                        )
+                    )
+                    approved_matches = (
+                        item.get("approved_by_id") == viewer_key
+                        or (
+                            previous_name
+                            and str(item.get("approved_by", "")).casefold()
+                            == str(previous_name).casefold()
+                        )
+                    )
+                    if selected_matches:
+                        item["selected_by_id"] = viewer_key
+                        item["selected_by"] = display_name
+                        changed = True
+                    if approved_matches:
+                        item["approved_by_id"] = viewer_key
+                        item["approved_by"] = display_name
+                        changed = True
+            if changed:
+                with open(workflow_file, "w", encoding="utf-8") as handle:
+                    json.dump(store, handle, indent=4, ensure_ascii=False)
+        except Exception as error:
+            print(f"[IDENTITY] Could not refresh {workflow_file}: {error}", flush=True)
+
+
 # ==========================================
 # --- DROPPED ARTICLES DATA ---
 # ==========================================
@@ -1381,6 +1442,60 @@ def save_viewer_profiles(data):
 
 def get_viewer_profile(ip):
     return load_viewer_profiles().get(get_viewer_key(ip), {})
+
+
+def _article_identity(article):
+    """Return a stable, profile-independent identity for a stored article."""
+
+    if not isinstance(article, dict):
+        return ""
+    link = str(
+        article.get("canonical_link")
+        or article.get("link")
+        or article.get("url")
+        or ""
+    ).strip().casefold()
+    title = str(article.get("title") or "").strip().casefold()
+    raw = link or title
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest() if raw else ""
+
+
+def load_viewer_hidden_store():
+    if not os.path.exists(VIEWER_HIDDEN_FILE):
+        return {}
+    try:
+        with open(VIEWER_HIDDEN_FILE, "r", encoding="utf-8") as file_obj:
+            data = json.load(file_obj)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_viewer_hidden_store(data):
+    temp_file = f"{VIEWER_HIDDEN_FILE}.tmp"
+    with open(temp_file, "w", encoding="utf-8") as file_obj:
+        json.dump(data, file_obj, indent=2, ensure_ascii=False)
+    os.replace(temp_file, VIEWER_HIDDEN_FILE)
+
+
+def get_viewer_hidden_items(request, profile=None):
+    profile_name = profile or get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    store = load_viewer_hidden_store()
+    viewer_store = store.get(viewer_key, {})
+    items = viewer_store.get(profile_name, [])
+    return items if isinstance(items, list) else []
+
+
+def filter_viewer_hidden(items, request, profile=None):
+    hidden_keys = {
+        str(item.get("article_key") or _article_identity(item))
+        for item in get_viewer_hidden_items(request, profile)
+    }
+    return [
+        item for item in (items or [])
+        if _article_identity(item) not in hidden_keys
+    ]
 
 
 def get_today():
@@ -2259,7 +2374,7 @@ async def export_word(request: ExportRequest):
 @app.get("/workflow")
 def get_workflow(request: Request):
     profile = get_profile_for_request(request)
-    store = load_workflow_store(request)
+    store = resolve_workflow_identities(load_workflow_store(request))
     return {
         "selected": apply_learned_regions(store.get("selected", []), profile),
         "approved": apply_learned_regions(store.get("approved", []), profile),
@@ -2273,7 +2388,12 @@ def select_news(request: Request, item: dict = Body(...)):
     store = load_workflow_store(request)
     if any(i.get("title") == item.get("title") for i in store["selected"]):
         return {"status": "exists", "message": "Already selected", "profile": profile}
+    viewer_ip = get_client_ip(request)
+    viewer_key = get_viewer_key(viewer_ip)
+    viewer_name = get_viewer_profile(viewer_ip).get("display_name") or get_team_owner_for_ip(viewer_ip)
     item["profile"] = profile
+    item["selected_by_id"] = viewer_key
+    item["selected_by"] = viewer_name or str(item.get("selected_by", "")).strip() or "Unknown"
     store["selected"].append(item)
     save_workflow_store(store, request)
     return {"status": "success", "count": len(store["selected"]), "profile": profile}
@@ -2292,6 +2412,14 @@ def approve_news(request: Request, payload: dict = Body(...)):
         return {"status": "error", "message": "Item not found", "profile": profile}
     store["selected"] = [i for i in store["selected"] if i["title"] != item_title]
     item_to_approve["profile"] = profile
+    approver_ip = get_client_ip(request)
+    item_to_approve["approved_by_id"] = get_viewer_key(approver_ip)
+    item_to_approve["approved_by"] = (
+        get_viewer_profile(approver_ip).get("display_name")
+        or get_team_owner_for_ip(approver_ip)
+        or "Authorized user"
+    )
+    item_to_approve["approved_at"] = datetime.datetime.now().isoformat(timespec="minutes")
     store["approved"].append(item_to_approve)
     save_workflow_store(store, request)
     return {"status": "success", "message": "Approved", "profile": profile}
@@ -2465,9 +2593,10 @@ def get_latest_briefing(request: Request):
             with open(latest, "r", encoding="utf-8") as file_obj:
                 data = json.load(file_obj)
                 if data and len(data) > 0:
+                    visible_data = filter_viewer_hidden(data, request, profile)
                     return {
                         "status": "success",
-                        "result": apply_learned_regions(data, profile),
+                        "result": apply_learned_regions(visible_data, profile),
                         "type": "scheduler",
                         "source": "shared",
                         "profile": profile,
@@ -2597,7 +2726,7 @@ def search_extracted_intelligence(
     """Search scheduler-produced JSON archives only.
 
     This function deliberately has no Scrapy, subprocess, HTTP, enrichment, or
-    scheduler integration. It is the data boundary used by the UI's Deep Scan
+    scheduler integration. It is the data boundary used by the UI's Scan
     screen so an interactive search can never launch an internet crawl.
     """
 
@@ -2758,7 +2887,7 @@ def search_archive(
     limit: int = Query(250, ge=1, le=500),
 ):
     profile = get_profile_for_request(request)
-    return search_extracted_intelligence(
+    result = search_extracted_intelligence(
         profile=profile,
         query=query,
         from_date=from_date,
@@ -2766,6 +2895,10 @@ def search_archive(
         target_sites=target_sites,
         limit=limit,
     )
+    visible_results = filter_viewer_hidden(result.get("results", []), request, profile)
+    result["results"] = visible_results
+    result["count"] = len(visible_results)
+    return result
 
 
 # ==========================================
@@ -3211,6 +3344,85 @@ def add_not_interested(request: Request, background_tasks: BackgroundTasks, payl
     return {"status": "success", "message": "Moved to Not Interested", "count": len(store), "profile": profile, "retrain_scheduled": True}
 
 
+# ==========================================
+# --- PERSONAL HIDDEN SIGNALS ---
+# ==========================================
+@app.get("/viewer/hidden")
+def get_personal_hidden(request: Request):
+    profile = get_profile_for_request(request)
+    items = get_viewer_hidden_items(request, profile)
+    return {
+        "status": "success",
+        "items": apply_learned_regions(items, profile),
+        "count": len(items),
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "trains_bouncer": False,
+    }
+
+
+@app.post("/viewer/hidden")
+def hide_for_current_viewer(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    article_key = _article_identity(payload)
+    if not article_key:
+        raise HTTPException(status_code=400, detail="An article title or link is required.")
+
+    with viewer_hidden_lock:
+        store = load_viewer_hidden_store()
+        viewer_store = store.setdefault(viewer_key, {})
+        items = viewer_store.setdefault(profile, [])
+        if not any(
+            str(item.get("article_key") or _article_identity(item)) == article_key
+            for item in items
+        ):
+            entry = dict(payload)
+            entry["article_key"] = article_key
+            entry["hidden_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+            entry["hidden_scope"] = "current_viewer_only"
+            items.insert(0, entry)
+            save_viewer_hidden_store(store)
+
+    return {
+        "status": "success",
+        "message": "Hidden from your feed only.",
+        "count": len(items),
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "trains_bouncer": False,
+    }
+
+
+@app.post("/viewer/hidden/restore")
+def restore_for_current_viewer(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    target_key = str(payload.get("article_key") or _article_identity(payload))
+    if not target_key:
+        raise HTTPException(status_code=400, detail="An article title or link is required.")
+
+    with viewer_hidden_lock:
+        store = load_viewer_hidden_store()
+        viewer_store = store.setdefault(viewer_key, {})
+        items = viewer_store.get(profile, [])
+        remaining = [
+            item for item in items
+            if str(item.get("article_key") or _article_identity(item)) != target_key
+        ]
+        viewer_store[profile] = remaining
+        save_viewer_hidden_store(store)
+
+    return {
+        "status": "success",
+        "message": "Signal restored to your feed.",
+        "count": len(remaining),
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "trains_bouncer": False,
+    }
+
+
 @app.get("/not-interested")
 def get_not_interested(request: Request):
     profile = get_active_profile_name(request)
@@ -3363,6 +3575,7 @@ def update_viewer_profile(request: Request, payload: dict = Body(...)):
     viewer_key = get_viewer_key(ip)
     with tracker_lock:
         profiles = load_viewer_profiles()
+        previous_name = str(profiles.get(viewer_key, {}).get("display_name", "")).strip()
         duplicate = next((profile for key, profile in profiles.items() if key != viewer_key and str(profile.get("display_name", "")).casefold() == display_name.casefold()), None)
         if duplicate:
             raise HTTPException(status_code=409, detail="That display name is already in use. Please choose another one.")
@@ -3380,7 +3593,14 @@ def update_viewer_profile(request: Request, payload: dict = Body(...)):
                 device["ip_hash"] = viewer_key
                 device.pop("ip", None)
         save_tracker(tracker)
-    return {"status": "success", "display_name": display_name, "email": email, "ip_hash": viewer_key}
+        refresh_workflow_identity(viewer_key, previous_name, display_name)
+    return {
+        "status": "success",
+        "display_name": display_name,
+        "email": email,
+        "ip": ip,
+        "ip_hash": viewer_key,
+    }
 
 
 @app.get("/analytics")

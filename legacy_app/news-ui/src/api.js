@@ -3,23 +3,34 @@ import { getSessionId } from './utils/session.js';
 
 const BASE = import.meta.env.VITE_API_BASE || '';
 
-function selectedProfile() {
-  if (typeof window === 'undefined') return 'default';
-  return localStorage.getItem('news-profile') === 'broadcast' ? 'broadcast' : 'default';
+function selectedProfileOverride() {
+  if (typeof window === 'undefined') return '';
+  const value = localStorage.getItem('news-profile-override');
+  return value === 'broadcast' || value === 'default' ? value : '';
 }
 
 async function jsonFetch(url, opts = {}) {
+  const profileOverride = selectedProfileOverride();
   const res = await fetch(BASE + url, {
     ...opts,
     headers: {
       'Content-Type': 'application/json',
-      'X-Sense-Profile': selectedProfile(),
+      ...(profileOverride ? { 'X-Sense-Profile': profileOverride } : {}),
       ...(opts.headers || {}),
     },
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+    const contentType = res.headers.get('content-type') || '';
+    let detail = '';
+    if (contentType.includes('application/json')) {
+      const body = await res.json().catch(() => ({}));
+      detail = body?.detail || body?.message || '';
+    } else {
+      detail = await res.text().catch(() => '');
+    }
+    const error = new Error(detail || `${res.status} ${res.statusText}`);
+    error.status = res.status;
+    throw error;
   }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.text();
@@ -96,6 +107,15 @@ export async function unrejectArticle(article) {
   return res;
 }
 
+// ---------- Personal hidden signals ----------
+// These endpoints are viewer/IP-hash scoped. They never train the bouncer and
+// never remove an article from another user's feed.
+export const getViewerHidden = () => jsonFetch('/viewer/hidden');
+export const hideArticleForViewer = (article) =>
+  jsonFetch('/viewer/hidden', { method:'POST', body: JSON.stringify(article) });
+export const restoreArticleForViewer = (article) =>
+  jsonFetch('/viewer/hidden/restore', { method:'POST', body: JSON.stringify(article) });
+
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
 export const selectWorkflow = (article) =>
@@ -131,6 +151,15 @@ export const trackEvent = (fingerprint, action, detail) =>
 // ---------- Status ----------
 export const getStatus = () => jsonFetch('/status');
 export const getProfile = () => jsonFetch('/profile');
+export const getViewerProfile = () => jsonFetch('/viewer/profile');
+export const updateViewerProfile = (profile) =>
+  jsonFetch('/viewer/profile', {
+    method: 'POST',
+    body: JSON.stringify({
+      display_name: String(profile?.display_name || '').trim(),
+      email: String(profile?.email || '').trim(),
+    }),
+  });
 
 // ---------- Analytics ----------
 export const getAnalyticsAccess = () => jsonFetch('/analytics/access');

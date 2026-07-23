@@ -102,8 +102,8 @@ export default function SourcesScreen() {
   const warnings = sites.filter((s) => healthFor(s) === 'Warning').length;
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
+    <div className="source-control-page space-y-6">
+      <section className="source-control-hero rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Source Control</div>
@@ -114,14 +114,14 @@ export default function SourcesScreen() {
         </div>
       </section>
 
-      <section className="metric-grid grid gap-4 md:grid-cols-4">
+      <section className="source-control-metrics metric-grid grid gap-4 md:grid-cols-4">
         <div className="signal-stat"><span>Total Sources</span><strong>{sites.length}</strong></div>
         <div className="signal-stat"><span>Active</span><strong>{healthy}</strong></div>
         <div className="signal-stat"><span>Warnings</span><strong>{warnings}</strong></div>
         <div className="signal-stat"><span>Failed</span><strong>{failed}</strong></div>
       </section>
 
-      <section className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
+      <section className="source-add-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-lg font-semibold text-white">
             <Icon name="plus" /> Add Intelligence Source
@@ -160,7 +160,7 @@ export default function SourcesScreen() {
         {notice && <div className="mt-3 text-sm text-emerald-300">{notice}</div>}
       </section>
 
-      <section className="rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
+      <section className="source-filter-panel rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
         <input className="dark-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search sources..." />
         <div className="mt-3 flex flex-wrap gap-2">
           {filters.map((f) => (
@@ -184,7 +184,7 @@ export default function SourcesScreen() {
           <p className="mt-2 text-slate-400">Try clearing search or selecting All.</p>
         </div>
       ) : (
-        <section className="space-y-8">
+        <section className="source-groups space-y-8">
           {Object.entries(grouped).map(([category, group]) => (
             <div key={category} className="space-y-4">
               <div className="flex items-center gap-4">
@@ -192,13 +192,13 @@ export default function SourcesScreen() {
                 <div className="h-px flex-1 bg-white/10" />
                 <span className="text-sm text-slate-500">{group.length} sources</span>
               </div>
-              <div className="article-grid grid gap-8 2xl:grid-cols-2">
+              <div className="source-card-grid">
                 {group.map((source, i) => {
                   const name = sourceName(source);
                   const url = sourceUrl(source);
                   const health = healthFor(source);
                   return (
-                    <article key={`${name}-${i}`} className="rounded-[22px] border border-white/10 bg-[#101827]/75 p-5 shadow-cockpit">
+                    <article key={`${name}-${i}`} className="source-control-card rounded-[22px] border border-white/10 bg-[#101827]/75 p-5 shadow-cockpit">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <div className={health === 'Healthy' ? 'text-sm font-semibold text-emerald-300' : health === 'Failed' ? 'text-sm font-semibold text-red-300' : 'text-sm font-semibold text-amber-300'}>

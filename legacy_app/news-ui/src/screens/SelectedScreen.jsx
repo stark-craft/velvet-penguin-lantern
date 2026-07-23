@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import ArticleCard from '../components/ArticleCard.jsx';
+import WorkflowBriefingCard from '../components/WorkflowBriefingCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import DirectorKeyModal from '../components/modals/DirectorKeyModal.jsx';
 import { approveWorkflow, correctRegion, getWorkflow, removeWorkflow } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { trackAction } from '../utils/tracking.js';
-import { cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
+import { scoreOf } from '../utils/intelligence.js';
 
 function topValue(items, getter) {
   const counts = new Map();
@@ -43,8 +43,6 @@ export default function SelectedScreen() {
     if (lens === 'Selected Today') return String(item.selected_at || item.date || '').slice(0, 10) === new Date().toISOString().slice(0, 10);
     return true;
   }), [items, lens]);
-  const groups = useMemo(() => groupedByDate(visibleItems), [visibleItems]);
-
   const onApprove = (item) => setPending(item);
   const confirmApprove = async (item, key) => {
     setItems((arr) => arr.filter((x) => x.title !== item.title));
@@ -125,36 +123,16 @@ export default function SelectedScreen() {
           <p>Change the queue lens to view other selected signals.</p>
         </div>
       ) : (
-        <section className="space-y-8">
-          {Object.entries(groups).map(([day, group]) => (
-            <div key={day} className="space-y-4">
-              <div className="workflow-day-head">
-                <h2>{day}</h2>
-                <div />
-                <span>{group.length} selected</span>
-              </div>
-              <div className="article-grid grid gap-8 2xl:grid-cols-2">
-                {group.map((item) => (
-                  <div key={item.id} className="workflow-article-frame review">
-                    <ArticleCard
-                      item={item}
-                      variant={cardVariant(item)}
-                      onOpen={setOpen}
-                      isSelected
-                    />
-                    <div className="workflow-article-actions">
-                      <span className="signal-chip selected">Selected by {item.selected_by || 'team'}</span>
-                      {item.selected_at && <span className="text-sm text-slate-500">{item.selected_at}</span>}
-                      <button className="btn-dark-primary h-9" onClick={() => onApprove(item)} type="button">
-                        <Icon name="shield" /> Approve Briefing
-                      </button>
-                      <button className="btn-dark-secondary h-9" onClick={() => setOpen(item)} type="button">Open Dossier</button>
-                      <button className="btn-dark-secondary h-9" onClick={() => onRemove(item)} type="button">Remove</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+        <section className="workflow-card-grid">
+          {visibleItems.map((item) => (
+            <WorkflowBriefingCard
+              key={item.id}
+              item={item}
+              mode="review"
+              onOpen={setOpen}
+              onApprove={onApprove}
+              onRemove={onRemove}
+            />
           ))}
         </section>
       )}

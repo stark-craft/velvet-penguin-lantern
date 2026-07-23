@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Icon from '../components/Icon.jsx';
 
 const profiles = [
@@ -21,10 +21,12 @@ export default function TrendsScreen() {
   const [name, setName] = useState(localStorage.getItem('initiator-name') || 'Vineet');
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem('news-profile', profile);
-    window.dispatchEvent(new CustomEvent('news-profile-change', { detail: profile }));
-  }, [profile]);
+  const chooseProfile = (nextProfile) => {
+    setProfile(nextProfile);
+    localStorage.setItem('news-profile', nextProfile);
+    localStorage.setItem('news-profile-override', nextProfile);
+    window.dispatchEvent(new CustomEvent('news-profile-change', { detail: nextProfile }));
+  };
 
   const save = () => {
     localStorage.setItem('initiator-name', name.trim() || 'Vineet');
@@ -56,7 +58,7 @@ export default function TrendsScreen() {
                     : 'border-sky-300/35 bg-sky-400/[0.08]'
                   : 'border-white/10 bg-[#101827]/75 hover:border-white/20',
               ].join(' ')}
-              onClick={() => setProfile(p.id)}
+              onClick={() => chooseProfile(p.id)}
               type="button"
             >
               <div className="flex items-center justify-between gap-4">
