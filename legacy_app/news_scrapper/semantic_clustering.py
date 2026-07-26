@@ -38,6 +38,7 @@ BASE_DIR = NEWS_RUNTIME_DIR
 SEMANTIC_MODEL_DIR = model_path("semantic_model", "semantic_model")
 FALLBACK_MINILM_DIR = model_path("all-MiniLM-L6-v2", "local_miniLM_model")
 BART_MODEL_DIR = model_path("distilbart-cnn-12-6", "local_bart_model")
+SENTIMENT_MODEL_DIR = model_path("distilbert-sst-2")
 SEEN_REGISTRY_FILE = BASE_DIR / "seen_registry.json"
 DEFAULT_CLUSTER_DISTANCE_THRESHOLD = 0.32
 MAX_CLUSTER_TEXT_CHARS = 2200
@@ -114,22 +115,41 @@ class MinimalSemanticEngine:
             except Exception as e:
                 print(f"FUSION ENGINE: Semantic load failed ({e})", flush=True)
 
-        if SENTIMENT_AVAILABLE and not OFFLINE_ONLY:
-            # The sentiment pipeline is optional metadata. It currently uses a
-            # model name rather than a project-local model folder, so we skip it
-            # during offline proof runs. Clustering and BART summarization still
-            # run locally.
+        if SENTIMENT_AVAILABLE and (SENTIMENT_MODEL_DIR.exists() or not OFFLINE_ONLY):
             try:
                 print("FUSION ENGINE: Loading Sentiment Analyzer...", flush=True)
-                self.sentiment_analyzer = pipeline(
-                    "sentiment-analysis",
-                    model="distilbert-base-uncased-finetuned-sst-2-english",
-                    device=-1,
-                )
+                if SENTIMENT_MODEL_DIR.exists():
+                    # Passing a real filesystem directory keeps production
+                    # sentiment analysis local and works in offline mode.
+                    sentiment_source = str(SENTIMENT_MODEL_DIR)
+                    self.sentiment_analyzer = pipeline(
+                        "sentiment-analysis",
+                        model=sentiment_source,
+                        tokenizer=sentiment_source,
+                        device=-1,
+                    )
+                    print(
+                        f"FUSION ENGINE: Local sentiment model ready "
+                        f"({SENTIMENT_MODEL_DIR}).",
+                        flush=True,
+                    )
+                else:
+                    # Development convenience only. Production deployments
+                    # should install model_weights/distilbert-sst-2 and enable
+                    # SENSE_OFFLINE_ONLY=1.
+                    self.sentiment_analyzer = pipeline(
+                        "sentiment-analysis",
+                        model="distilbert-base-uncased-finetuned-sst-2-english",
+                        device=-1,
+                    )
             except Exception as e:
                 print(f"FUSION ENGINE: Sentiment load failed ({e})", flush=True)
         elif OFFLINE_ONLY:
-            print("FUSION ENGINE: Offline-only mode; sentiment analyzer skipped.", flush=True)
+            print(
+                "FUSION ENGINE: Offline-only mode and no local sentiment model "
+                f"found at {SENTIMENT_MODEL_DIR}; sentiment defaults to neutral.",
+                flush=True,
+            )
 
         if load_summarizer:
             self.load_bart_model()
