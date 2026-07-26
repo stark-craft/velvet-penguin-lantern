@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from semantic_clustering import MinimalSemanticEngine
+from news_scrapper.semantic_clustering import MinimalSemanticEngine
 
 
 class SemanticClusteringSafeguardTests(unittest.TestCase):

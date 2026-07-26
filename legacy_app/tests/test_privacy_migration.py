@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import main
+from news_scrapper import application as main
 
 
 class PrivacyMigrationTests(unittest.TestCase):

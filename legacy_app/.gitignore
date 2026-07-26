@@ -10,6 +10,10 @@ local_miniLM_model
 local_bart_model
 flan-t5-local
 semantic_model
+model_weights/*
+!model_weights/.gitkeep
+news_scrapper/runtime/
+venture_lens/runtime/
 ui_results_*.json
 clustered_results_*.json
 manual_search_logs.xlsx

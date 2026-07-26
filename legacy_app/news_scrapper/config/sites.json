@@ -1,0 +1,963 @@
+[
+  {
+    "name": "Huawei Central",
+    "url": "https://www.huaweicentral.com",
+    "domain": "huaweicentral.com",
+    "rss_url": "https://www.huaweicentral.com/feed/",
+    "category": "Mobile & OS Competitors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Android Authority",
+    "url": "https://www.androidauthority.com",
+    "domain": "androidauthority.com",
+    "rss_url": "https://www.androidauthority.com/feed/",
+    "category": "Mobile & OS Competitors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "MacRumors",
+    "url": "https://www.macrumors.com",
+    "domain": "macrumors.com",
+    "rss_url": "https://feeds.macrumors.com/MacRumors-All",
+    "category": "Mobile & OS Competitors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "XDA Developers",
+    "url": "https://www.xda-developers.com",
+    "domain": "xda-developers.com",
+    "rss_url": "https://www.xda-developers.com/feed/",
+    "category": "Mobile & OS Competitors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "SamMobile",
+    "url": "https://www.sammobile.com",
+    "domain": "sammobile.com",
+    "rss_url": "https://www.sammobile.com/feed/",
+    "category": "Samsung / Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Samsung Newsroom",
+    "url": "https://news.samsung.com/global",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/global/feed",
+    "category": "Samsung / Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "AnandTech",
+    "url": "https://www.anandtech.com",
+    "domain": "anandtech.com",
+    "rss_url": "https://www.anandtech.com/rss/",
+    "category": "Hardware & Semiconductors",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Tom's Hardware",
+    "url": "https://www.tomshardware.com",
+    "domain": "tomshardware.com",
+    "rss_url": "https://www.tomshardware.com/feeds/all",
+    "category": "Hardware & Semiconductors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "AI News",
+    "url": "https://www.artificialintelligence-news.com",
+    "domain": "artificialintelligence-news.com",
+    "rss_url": "https://www.artificialintelligence-news.com/feed/",
+    "category": "AI & ML",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "IEEE Spectrum - Robotics",
+    "url": "https://spectrum.ieee.org/robotics",
+    "domain": "spectrum.ieee.org",
+    "rss_url": "https://spectrum.ieee.org/rss/robotics/fulltext",
+    "category": "Robotics & Automation",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "DeepMind Blog",
+    "url": "https://deepmind.google/blog",
+    "domain": "deepmind.google",
+    "rss_url": "https://deepmind.google/blog/rss.xml",
+    "category": "AI & ML",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Robotics Business Review",
+    "url": "https://www.roboticsbusinessreview.com",
+    "domain": "roboticsbusinessreview.com",
+    "rss_url": "https://www.roboticsbusinessreview.com/feed/",
+    "category": "Robotics & Automation",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "The Robot Report",
+    "url": "https://www.therobotreport.com",
+    "domain": "therobotreport.com",
+    "rss_url": "https://www.therobotreport.com/feed/",
+    "category": "Robotics & Automation",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Wired - General Tech",
+    "url": "https://www.wired.com",
+    "domain": "wired.com",
+    "rss_url": "https://www.wired.com/feed/rss",
+    "category": "General Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Engadget",
+    "url": "https://www.engadget.com",
+    "domain": "engadget.com",
+    "rss_url": "https://www.engadget.com/rss.xml",
+    "category": "Consumer Tech & Devices",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Ars Technica",
+    "url": "https://arstechnica.com",
+    "domain": "arstechnica.com",
+    "rss_url": "https://feeds.arstechnica.com/arstechnica/index",
+    "category": "General Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "ZDNet",
+    "url": "https://www.zdnet.com",
+    "domain": "zdnet.com",
+    "rss_url": "https://www.zdnet.com/news/rss.xml",
+    "category": "Enterprise / Cloud",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Financial Times Tech",
+    "url": "https://www.ft.com/technology",
+    "domain": "ft.com",
+    "rss_url": "https://www.ft.com/technology?format=rss",
+    "category": "Strategic / Business",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Economic Times - Tech",
+    "url": "https://economictimes.indiatimes.com/tech",
+    "domain": "economictimes.indiatimes.com",
+    "rss_url": "https://economictimes.indiatimes.com/tech/rssfeeds/13357200.cms",
+    "category": "Strategic / Business",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Gadgets360 (NDTV)",
+    "url": "https://www.gadgets360.com",
+    "domain": "gadgets360.com",
+    "rss_url": "https://feeds.feedburner.com/gadgets360-latest",
+    "category": "Consumer Tech & Devices",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Indian Express - Technology",
+    "url": "https://indianexpress.com/section/technology/",
+    "domain": "indianexpress.com",
+    "rss_url": "https://indianexpress.com/section/technology/feed/",
+    "category": "India Tech & Consumer",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Indian Express - TechReviews",
+    "url": "https://indianexpress.com/section/technology/tech-reviews/",
+    "domain": "indianexpress.com",
+    "rss_url": "https://indianexpress.com/section/technology/tech-reviews/feed/",
+    "category": "India Tech & Consumer",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Indian Express - TechNews",
+    "url": "https://indianexpress.com/section/technology/tech-news-technology/",
+    "domain": "indianexpress.com",
+    "rss_url": "https://indianexpress.com/section/technology/tech-news-technology/feed/",
+    "category": "India Tech & Consumer",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Indian Express - AI News",
+    "url": "https://indianexpress.com/section/technology/artificial-intelligence/",
+    "domain": "indianexpress.com",
+    "rss_url": "https://indianexpress.com/section/technology/artificial-intelligence/feed/",
+    "category": "AI & ML",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Times of India - Tech",
+    "url": "https://timesofindia.indiatimes.com/technology",
+    "domain": "timesofindia.indiatimes.com",
+    "rss_url": "https://timesofindia.indiatimes.com/rssfeeds/66949542.cms",
+    "category": "India Tech & Consumer",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "MoneyControl - Technology",
+    "url": "https://www.moneycontrol.com/news/technology/",
+    "domain": "moneycontrol.com",
+    "rss_url": "https://www.moneycontrol.com/rss/technology.xml",
+    "category": "Strategic / Business",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "YourStory - AI/Startups",
+    "url": "https://yourstory.com",
+    "domain": "yourstory.com",
+    "rss_url": "https://yourstory.com/feed",
+    "category": "India Startups & AI",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Inc42",
+    "url": "https://inc42.com",
+    "domain": "inc42.com",
+    "rss_url": "https://inc42.com/feed/",
+    "category": "India Startups & AI",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Swarajya - Tech & Infra",
+    "url": "https://swarajyamag.com",
+    "domain": "swarajyamag.com",
+    "rss_url": "https://swarajyamag.com/feed",
+    "category": "Policy & Regulation",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "9to5Google",
+    "url": "https://9to5google.com",
+    "domain": "9to5google.com",
+    "rss_url": "https://9to5google.com/feed/",
+    "category": "Mobile & OS Competitors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "9to5Mac",
+    "url": "https://9to5mac.com",
+    "domain": "9to5mac.com",
+    "rss_url": "https://9to5mac.com/feed/",
+    "category": "Mobile & OS Competitors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "TechCrunch",
+    "url": "https://techcrunch.com",
+    "domain": "techcrunch.com",
+    "rss_url": "https://techcrunch.com/feed/",
+    "category": "Strategic / Business",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "CNet",
+    "url": "https://www.cnet.com",
+    "domain": "cnet.com",
+    "rss_url": "https://www.cnet.com/rss/news/",
+    "category": "Consumer Tech & Devices",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "The Verge",
+    "url": "https://www.theverge.com",
+    "domain": "theverge.com",
+    "rss_url": "https://www.theverge.com/rss/index.xml",
+    "category": "General Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Interesting Engineering",
+    "url": "https://interestingengineering.com",
+    "domain": "interestingengineering.com",
+    "rss_url": "https://interestingengineering.com/feed",
+    "category": "Research & Deep Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "EE Times",
+    "url": "https://www.eetimes.com",
+    "domain": "eetimes.com",
+    "rss_url": "https://www.eetimes.com/feed/",
+    "category": "Hardware & Semiconductors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Electronics For You",
+    "url": "https://www.electronicsforyou.biz",
+    "domain": "electronicsforyou.biz",
+    "rss_url": "https://www.electronicsforyou.biz/feed",
+    "category": "Hardware & Semiconductors",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "New Atlas",
+    "url": "https://newatlas.com",
+    "domain": "newatlas.com",
+    "rss_url": "https://newatlas.com/index.rss",
+    "category": "Research & Deep Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "TechPowerUp",
+    "url": "https://www.techpowerup.com",
+    "domain": "techpowerup.com",
+    "rss_url": "https://www.techpowerup.com/rss/news",
+    "category": "Hardware & Semiconductors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Exchange4Media",
+    "url": "https://www.exchange4media.com",
+    "domain": "exchange4media.com",
+    "rss_url": "https://www.exchange4media.com/rss/digital-news.xml",
+    "category": "Broadcast / OTT / Media",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "TCL India News",
+    "url": "https://www.tcl.com/in/en/news",
+    "domain": "tcl.com",
+    "category": "Display & TV Competitors",
+    "enabled": false,
+    "allow_deep_scan": false,
+    "manual_deep_scan_candidate": true
+  },
+  {
+    "name": "Gizbot (India Tech)",
+    "url": "https://www.gizbot.com",
+    "domain": "gizbot.com",
+    "rss_url": "https://www.gizbot.com/rss/gizbot-fb.xml",
+    "category": "Consumer Tech & Devices",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Device Next",
+    "url": "https://devicenext.com",
+    "domain": "devicenext.com",
+    "rss_url": "https://devicenext.com/feed/",
+    "category": "Consumer Tech & Devices",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Telecom Talk",
+    "url": "https://telecomtalk.info",
+    "domain": "telecomtalk.info",
+    "rss_url": "https://telecomtalk.info/feed/",
+    "category": "Telecom & Connectivity",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Communication Today",
+    "url": "https://www.communicationstoday.co.in",
+    "domain": "communicationstoday.co.in",
+    "rss_url": "https://www.communicationstoday.co.in/feed/",
+    "category": "Telecom & Connectivity",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Mirage News (Science/Tech)",
+    "url": "https://www.miragenews.com/news/technology/",
+    "domain": "miragenews.com",
+    "rss_url": "https://www.miragenews.com/news/technology/rss/",
+    "category": "Research & Deep Tech",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "CIO East India / Elets",
+    "url": "https://cio.eletsonline.com",
+    "domain": "cio.eletsonline.com",
+    "rss_url": "https://cio.eletsonline.com/feed/",
+    "category": "Enterprise / Cloud",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "MediaBrief",
+    "url": "https://mediabrief.com",
+    "domain": "mediabrief.com",
+    "rss_url": "https://mediabrief.com/feed/",
+    "category": "Broadcast / OTT / Media",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Semiconsult (Industry)",
+    "url": "https://www.semiconductor-digest.com",
+    "domain": "semiconductor-digest.com",
+    "rss_url": "https://www.semiconductor-digest.com/feed/",
+    "category": "Hardware & Semiconductors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "IEEE Spectrum - Computing",
+    "url": "https://spectrum.ieee.org/computing",
+    "domain": "spectrum.ieee.org",
+    "rss_url": "https://spectrum.ieee.org/feeds/topic/computing.rss",
+    "category": "Research & Deep Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "MeitY Newsroom",
+    "url": "https://www.meity.gov.in",
+    "domain": "meity.gov.in",
+    "rss_url": "https://www.meity.gov.in/rss.xml",
+    "category": "Policy & Regulation",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Department of Telecom (DoT)",
+    "url": "https://dot.gov.in",
+    "domain": "dot.gov.in",
+    "rss_url": "https://dot.gov.in/rss.xml",
+    "category": "Policy & Regulation",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "BIF (Broadband India Forum)",
+    "url": "https://broadbandindiaforum.com",
+    "domain": "broadbandindiaforum.com",
+    "rss_url": "https://broadbandindiaforum.com/feed/",
+    "category": "Telecom & Connectivity",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "TelecomLead",
+    "url": "https://www.telecomlead.com",
+    "domain": "telecomlead.com",
+    "rss_url": "https://www.telecomlead.com/feed",
+    "category": "Telecom & Connectivity",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Krutrim Blog",
+    "url": "https://blog.olakrutrim.com",
+    "domain": "blog.olakrutrim.com",
+    "rss_url": "https://blog.olakrutrim.com/feed/",
+    "category": "India Startups & AI",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Semiconductor Today",
+    "url": "https://www.semiconductor-today.com",
+    "domain": "semiconductor-today.com",
+    "rss_url": "https://www.semiconductor-today.com/rss.shtml",
+    "category": "Hardware & Semiconductors",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "The Telegraph UK - Technology",
+    "url": "https://www.telegraph.co.uk/technology/",
+    "domain": "telegraph.co.uk",
+    "rss_url": "https://www.telegraph.co.uk/technology/rss.xml",
+    "category": "Policy & Regulation",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "The Telegraph UK - Business",
+    "url": "https://www.telegraph.co.uk/business/",
+    "domain": "telegraph.co.uk",
+    "rss_url": "https://www.telegraph.co.uk/business/rss.xml",
+    "category": "Strategic / Business",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NYT World",
+    "url": "https://www.nytimes.com/section/world",
+    "domain": "nytimes.com",
+    "rss_url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "category": "Global News & Macro",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "MIT Tech Review",
+    "url": "https://www.technologyreview.com",
+    "domain": "technologyreview.com",
+    "rss_url": "https://www.technologyreview.com/feed/",
+    "category": "Research & Deep Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "MeitY (PIB India)",
+    "url": "https://pib.gov.in/AllRelease.aspx?MenuId=30",
+    "domain": "pib.gov.in",
+    "category": "Policy & Regulation",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "MediaNama (Policy)",
+    "url": "https://www.medianama.com",
+    "domain": "medianama.com",
+    "rss_url": "https://www.medianama.com/feed/",
+    "category": "Policy & Regulation",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Inc42 - AI News",
+    "url": "https://inc42.com/buzz/artificial-intelligence/",
+    "domain": "inc42.com",
+    "rss_url": "https://inc42.com/buzz/artificial-intelligence/feed/",
+    "category": "India Startups & AI",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "FlatPanelsHD (Displays)",
+    "url": "https://www.flatpanelshd.com",
+    "domain": "flatpanelshd.com",
+    "category": "Display & TV Competitors",
+    "enabled": false,
+    "allow_deep_scan": false,
+    "manual_deep_scan_candidate": true
+  },
+  {
+    "name": "Gizmochina (Xiaomi/TCL)",
+    "url": "https://www.gizmochina.com",
+    "domain": "gizmochina.com",
+    "rss_url": "https://www.gizmochina.com/feed/",
+    "category": "Consumer Tech & Devices",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "LG Global Newsroom",
+    "url": "https://www.lg.com/global/newsroom/",
+    "domain": "lg.com",
+    "category": "Display & TV Competitors",
+    "enabled": false,
+    "allow_deep_scan": false,
+    "manual_deep_scan_candidate": true
+  },
+  {
+    "name": "Sony Press Center",
+    "url": "https://www.sony.com/en/SonyInfo/News/press/",
+    "domain": "sony.com",
+    "category": "Display & TV Competitors",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "TCL Global News",
+    "url": "https://www.tcl.com/global/en/news",
+    "domain": "tcl.com",
+    "category": "Display & TV Competitors",
+    "enabled": false,
+    "allow_deep_scan": false,
+    "manual_deep_scan_candidate": true
+  },
+  {
+    "name": "CBS News",
+    "url": "https://www.cbsnews.com/technology/",
+    "domain": "cbsnews.com",
+    "rss_url": "https://www.cbsnews.com/latest/rss/technology",
+    "category": "General Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NewYork Times - Tech",
+    "url": "https://www.nytimes.com/section/technology",
+    "domain": "nytimes.com",
+    "rss_url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+    "category": "General Tech",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Google News",
+    "url": "https://news.google.com/topstories",
+    "domain": "news.google.com",
+    "rss_url": "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en",
+    "category": "Aggregators",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Wall Street Journal",
+    "url": "https://www.wsj.com",
+    "domain": "wsj.com",
+    "rss_url": "https://feeds.content.dowjones.io/public/rss/RSSWSJD",
+    "category": "Strategic / Business",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Wired - Latest AI",
+    "url": "https://www.wired.com/tag/artificial-intelligence/",
+    "domain": "wired.com",
+    "rss_url": "https://www.wired.com/feed/tag/ai/latest/rss",
+    "category": "AI & ML",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Hindustan Times - Tech",
+    "url": "https://www.hindustantimes.com/technology",
+    "domain": "hindustantimes.com",
+    "rss_url": "https://www.hindustantimes.com/feeds/rss/technology/rssfeed.xml",
+    "category": "India Tech & Consumer",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "startuppedia",
+    "url": "https://startuppedia.in",
+    "domain": "startuppedia.in",
+    "category": "India Startups & AI",
+    "enabled": false,
+    "allow_deep_scan": false,
+    "manual_deep_scan_candidate": true
+  },
+  {
+    "name": "startuppedia - Trending News",
+    "url": "https://startuppedia.in/trending",
+    "domain": "startuppedia.in",
+    "category": "India Startups & AI",
+    "enabled": false,
+    "allow_deep_scan": false,
+    "manual_deep_scan_candidate": true
+  },
+  {
+    "name": "TechRadar",
+    "url": "https://www.techradar.com",
+    "domain": "techradar.com",
+    "rss_url": "https://www.techradar.com/feeds.xml",
+    "category": "Consumer Tech & Devices",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "TechRadar - Television Feed",
+    "url": "https://www.techradar.com/televisions",
+    "domain": "techradar.com",
+    "rss_url": "https://www.techradar.com/feeds/tag/televisions",
+    "category": "Display & TV Competitors",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "ET Telecom",
+    "url": "https://telecom.economictimes.indiatimes.com",
+    "domain": "telecom.economictimes.indiatimes.com",
+    "rss_url": "https://telecom.economictimes.indiatimes.com/rss/devices",
+    "category": "Telecom & Connectivity",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "ET Telecom - Enterprise Service",
+    "url": "https://telecom.economictimes.indiatimes.com/enterprise-services",
+    "domain": "telecom.economictimes.indiatimes.com",
+    "rss_url": "https://telecom.economictimes.indiatimes.com/rss/enterprise-services",
+    "category": "Telecom & Connectivity",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "ET Telecom - Internet",
+    "url": "https://telecom.economictimes.indiatimes.com/internet",
+    "domain": "telecom.economictimes.indiatimes.com",
+    "rss_url": "https://telecom.economictimes.indiatimes.com/rss/internet",
+    "category": "Telecom & Connectivity",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "ET Telecom - Satcom",
+    "url": "https://telecom.economictimes.indiatimes.com/satcom",
+    "domain": "telecom.economictimes.indiatimes.com",
+    "rss_url": "https://telecom.economictimes.indiatimes.com/rss/satcom",
+    "category": "Telecom & Connectivity",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Korea Herald",
+    "url": "https://www.koreaherald.com/Business",
+    "domain": "koreaherald.com",
+    "category": "Strategic / Business",
+    "enabled": false,
+    "allow_deep_scan": false,
+    "manual_deep_scan_candidate": true
+  },
+  {
+    "name": "Nvidia NewsRoom - All News",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/releases.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Nvidia - Automotive",
+    "url": "https://nvidianews.nvidia.com/automotive",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/automotive.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Nvidia Newsroom - Cloud",
+    "url": "https://nvidianews.nvidia.com/cloud",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/cloud.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Nvidia Newsroom - Corporate",
+    "url": "https://nvidianews.nvidia.com/corporate",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/corporate.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Nvidia Newsroom - Enterprise HPC",
+    "url": "https://nvidianews.nvidia.com/enterprise-hpc",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/enterprise_hpc.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - AI Platforms / Deployment",
+    "url": "https://nvidianews.nvidia.com/ai",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - AR / VR",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/ar_vr.xml",
+    "category": "NVIDIA Official",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Computer Vision / Video Analytics",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/computer_vision_video_analytics.xml",
+    "category": "NVIDIA Official",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Content Creation / Rendering",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/content_creation_rendering.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Conversational All",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/conversational_all.xml",
+    "category": "NVIDIA Official",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Cybersecurity / Data Center / Cloud",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/cybersecurity_data_center_cloud.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Data Science",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/data_science.xml",
+    "category": "NVIDIA Official",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Development & Optimization",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/development_optimization.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Driving",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/driving.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Edge Computing",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/edge_computing.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Generative AI",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/generative_al.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Healthcare and Life Sciences",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/healthcare_and_life_sciences.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - MLOps",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/mlops.xml",
+    "category": "NVIDIA Official",
+    "enabled": false,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Models / Libraries / Frameworks",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/models_libraries_frameworks.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Networking / Communications",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/networking_communications.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Nvidia Newsroom - Robotics",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/robotics.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Simulation / Modeling / Design",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/simulation_modeling_design.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "NVIDIA Newsroom - Telecommunications",
+    "url": "https://nvidianews.nvidia.com",
+    "domain": "nvidianews.nvidia.com",
+    "rss_url": "https://nvidianews.nvidia.com/cats/telecommunications.xml",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  },
+  {
+    "name": "Nvidia Blogs",
+    "url": "https://blogs.nvidia.com",
+    "domain": "blogs.nvidia.com",
+    "rss_url": "https://feeds.feedburner.com/nvidiablog",
+    "category": "NVIDIA Official",
+    "enabled": true,
+    "allow_deep_scan": false
+  }
+]

@@ -11,13 +11,15 @@
     <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&amp;display=swap" rel="stylesheet" />
     <style>
       :root {
-        --background: #17212b;
-        --background-raised: #22303b;
+        --background: #172027;
+        --background-raised: #24313a;
+        --background-indigo: #24283b;
+        --background-warm: #302a35;
         --foreground: #edf1f2;
         --foreground-rgb: 237, 241, 242;
-        --hero-sub: #b9c6cc;
-        --portal-accent: #88afd2;
-        --portal-warm: #d4b77b;
+        --hero-sub: #c4ced2;
+        --portal-accent: #91b7d3;
+        --portal-warm: #dbc08b;
       }
 
       * {
@@ -50,9 +52,34 @@
         overflow: hidden;
         position: relative;
         background:
-          radial-gradient(circle at 20% 14%, rgba(116, 157, 190, 0.18), transparent 32%),
-          radial-gradient(circle at 82% 78%, rgba(107, 158, 142, 0.11), transparent 30%),
-          linear-gradient(145deg, var(--background-raised), var(--background) 58%);
+          radial-gradient(ellipse 66rem 44rem at 8% 0%, rgba(100, 151, 185, 0.24), transparent 62%),
+          radial-gradient(ellipse 52rem 40rem at 94% 12%, rgba(112, 104, 171, 0.17), transparent 62%),
+          radial-gradient(ellipse 58rem 38rem at 56% 112%, rgba(181, 137, 93, 0.12), transparent 66%),
+          linear-gradient(142deg, var(--background-raised) 0%, var(--background-indigo) 46%, var(--background-warm) 76%, var(--background) 100%);
+      }
+
+      .portal::before,
+      .portal::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+      }
+
+      .portal::before {
+        background:
+          linear-gradient(rgba(196, 218, 226, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(196, 218, 226, 0.022) 1px, transparent 1px),
+          radial-gradient(circle at 50% 42%, rgba(150, 190, 199, 0.07), transparent 34%);
+        background-size: 72px 72px, 72px 72px, auto;
+        mask-image: radial-gradient(ellipse at center, black 20%, transparent 76%);
+      }
+
+      .portal::after {
+        background:
+          linear-gradient(180deg, rgba(8, 14, 18, 0.08), transparent 32%, rgba(11, 13, 20, 0.24)),
+          radial-gradient(ellipse at center, transparent 35%, rgba(10, 14, 18, 0.24) 100%);
       }
 
       .portal[hidden],
@@ -68,7 +95,8 @@
         height: 100%;
         object-fit: cover;
         opacity: 0.08;
-        filter: saturate(0.55) contrast(0.9);
+        filter: saturate(0.46) contrast(0.86) brightness(0.72);
+        mix-blend-mode: soft-light;
       }
 
       .hero-glow {
@@ -79,9 +107,11 @@
         width: 984px;
         height: 527px;
         transform: translate(-50%, -50%);
-        background: rgba(42, 61, 76, 0.72);
-        opacity: 0.66;
-        filter: blur(96px);
+        background:
+          radial-gradient(ellipse at 38% 42%, rgba(89, 132, 161, 0.58), transparent 58%),
+          radial-gradient(ellipse at 67% 54%, rgba(120, 99, 151, 0.34), transparent 62%);
+        opacity: 0.72;
+        filter: blur(90px);
         pointer-events: none;
       }
 
@@ -351,20 +381,22 @@
       const cleanPath = window.location.pathname.replace(/\/+$/, "") || "/";
       const isSenseLanding = cleanPath === "/";
       const isVentureLens = cleanPath === "/venturelens";
-      const isPortal = isSenseLanding || isVentureLens;
+      const isPortal = isSenseLanding;
       const portal = document.getElementById("sense-portal");
       const root = document.getElementById("root");
 
       if (!isPortal) {
         portal.remove();
         root.hidden = false;
-        document.title = "NewsScrapper Intelligence | Sense.AI";
+        document.title = isVentureLens
+          ? "Venture Lens | Sense.AI"
+          : "NewsScrapper Intelligence | Sense.AI";
         import("/src/main.jsx");
       } else {
         document.body.classList.add("portal-active");
-        document.title = isVentureLens ? "VentureLens | Sense.AI" : "Sense.AI";
-        document.getElementById("sense-view").hidden = isVentureLens;
-        document.getElementById("venture-view").hidden = !isVentureLens;
+        document.title = "Sense.AI";
+        document.getElementById("sense-view").hidden = false;
+        document.getElementById("venture-view").hidden = true;
 
         const video = document.getElementById("portal-video");
         let fadeToken = 0;

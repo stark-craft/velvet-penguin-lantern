@@ -7,7 +7,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from starlette.requests import Request
 
-import main
+from news_scrapper import application as main
 
 
 def request_from(ip="10.0.0.25"):

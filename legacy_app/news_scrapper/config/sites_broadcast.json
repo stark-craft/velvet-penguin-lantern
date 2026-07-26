@@ -1,0 +1,415 @@
+[
+  {
+    "name": "Indian Broadcasting World",
+    "url": "https://www.indianbroadcastingworld.com/",
+    "category": "Broadcast / DTH / Cable",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "BestMediaInfo - Television",
+    "url": "https://bestmediainfo.com/mediainfo/television",
+    "category": "Media / Television / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Exchange4Media - Media & TV",
+    "url": "https://www.exchange4media.com/media-tv-news.html",
+    "category": "Media / Television / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Exchange4Media - Digital",
+    "url": "https://www.exchange4media.com/digital-news.html",
+    "category": "Media / Digital / Advertising",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Storyboard18 - Latest News",
+    "url": "https://www.storyboard18.com/latest-news",
+    "category": "Media / Advertising / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "HomeTechnologyReview - News",
+    "url": "https://hometechnologyreview.com/news/",
+    "category": "TV / Home Entertainment / Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "TechRadar Australia - Television News",
+    "url": "https://www.techradar.com/au/televisions/news",
+    "category": "TV / Display / Consumer Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "TechRadar New Zealand - Television News",
+    "url": "https://www.techradar.com/nz/televisions/news",
+    "category": "TV / Display / Consumer Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "TechRadar Singapore - Television News",
+    "url": "https://www.techradar.com/sg/televisions/news",
+    "category": "TV / Display / Consumer Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Light Reading - Regulatory & Politics",
+    "url": "https://www.lightreading.com/business-management/regulatory-politics",
+    "category": "Telecom / Regulation / Policy",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Light Reading - General",
+    "url": "https://www.lightreading.com/",
+    "category": "Telecom / Broadband / Video",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Asia-Pacific Broadcasting Union - News",
+    "url": "https://www.abu.org.my/news/",
+    "category": "Broadcast / Asia-Pacific / Industry",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Advanced Television - Articles",
+    "url": "https://www.advanced-television.com/category/articles/",
+    "category": "Broadcast / Pay TV / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Advanced Television - Press Releases",
+    "url": "https://www.advanced-television.com/category/press-releases/",
+    "category": "Broadcast / Pay TV / Press Releases",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Indian Television - Regulators",
+    "url": "https://indiantelevision.com/category/regulators/",
+    "category": "Broadcast / Regulation / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Indian Television - Cable TV",
+    "url": "https://indiantelevision.com/category/cable-tv/",
+    "category": "Broadcast / Cable TV / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Indian Television - DTH",
+    "url": "https://indiantelevision.com/category/dth/",
+    "category": "Broadcast / DTH / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "NextTV - Broadcasting & Cable",
+    "url": "https://www.nexttv.com/broadcasting-cable/news",
+    "category": "Broadcast / Cable / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Telecompaper - Asia",
+    "url": "https://www.telecompaper.com/asia",
+    "category": "Telecom / Asia / Regional",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Telecompaper - Oceania",
+    "url": "https://www.telecompaper.com/oceania",
+    "category": "Telecom / Oceania / Regional",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Telecompaper - Middle East",
+    "url": "https://www.telecompaper.com/middle-east",
+    "category": "Telecom / Middle East / Regional",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Broadband TV News - TV",
+    "url": "https://www.broadbandtvnews.com/category/tv/",
+    "category": "Broadcast / Pay TV / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Broadband TV News - Technology",
+    "url": "https://www.broadbandtvnews.com/category/tech/",
+    "category": "Broadcast / Technology / Platforms",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "APB+ News - News & Views",
+    "url": "https://apb-news.com/category/news-views/",
+    "category": "Broadcast / Asia-Pacific / Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "TV Technology - News",
+    "url": "https://www.tvtechnology.com/news",
+    "category": "Broadcast / Production / Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "TRAI - Regulations",
+    "url": "https://www.trai.gov.in/release-publication/regulations",
+    "category": "Regulation / Telecom / Broadcasting / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "TRAI - Press Releases",
+    "url": "https://www.trai.gov.in/notifications/press-release",
+    "category": "Regulation / Telecom / Broadcasting / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "DVB - News",
+    "url": "https://dvb.org/news-events/news/",
+    "category": "Broadcast Standards / DVB / Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "DVB Scene",
+    "url": "https://dvb.org/dvb-scene/",
+    "category": "Broadcast Standards / DVB / Industry",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Global Media Alliance - Regulatory News",
+    "url": "https://gma.trade/regulatory-news/",
+    "category": "Media / Regulation / Global",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Developing Telecoms - Asia Pacific",
+    "url": "https://www.developingtelecoms.com/regions/asia-pacific-telecommunications.html",
+    "category": "Telecom / Asia-Pacific / Emerging Markets",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Developing Telecoms - Middle East & North Africa",
+    "url": "https://www.developingtelecoms.com/regions/middle-east-north-africa-telecommunications.html",
+    "category": "Telecom / MENA / Emerging Markets",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Developing Telecoms - Regulation",
+    "url": "https://www.developingtelecoms.com/telecom-business/telecom-regulation.html",
+    "category": "Telecom / Regulation / Emerging Markets",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "EBU Technology & Innovation - News",
+    "url": "https://tech.ebu.ch/news",
+    "category": "Broadcast / Technology / Standards",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "EY India - Technology",
+    "url": "https://www.ey.com/en_in/technology",
+    "category": "Technology / Research / Consulting",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "BroadcastPro ME - News",
+    "url": "https://www.broadcastprome.com/category/news/",
+    "category": "Broadcast / Middle East / Production",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "CSI Magazine - News Archive",
+    "url": "https://www.csimagazine.com/csi/archive-news-list.php",
+    "category": "Broadcast / Cable / Satellite / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "EuropaWire - Technology",
+    "url": "https://news.europawire.eu/markets/technology/",
+    "category": "Technology / Europe / Press Releases",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "informitv - News",
+    "url": "https://informitv.com/news/",
+    "category": "Interactive TV / Streaming / Media",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "BuzzInContent - News",
+    "url": "https://www.buzzincontent.com/news",
+    "category": "Media / Content / Advertising",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Electronics Media - News",
+    "url": "https://www.electronicsmedia.info/news/",
+    "category": "Electronics / Technology / Industry",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Electronics Media - India Technology News",
+    "url": "https://www.electronicsmedia.info/technology-news-in-india/",
+    "category": "Electronics / Technology / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "EVENTFAQS India - News Articles",
+    "url": "https://in.eventfaqs.com/category/articles/news-articles/",
+    "category": "Media / Events / Entertainment",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "CIOL - News",
+    "url": "https://www.ciol.com/news",
+    "category": "Enterprise Technology / Digital / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "afaqs! - Media News",
+    "url": "https://www.afaqs.com/news/media",
+    "category": "Media / Advertising / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "MediaNama - News",
+    "url": "https://www.medianama.com/category/news/",
+    "category": "Digital Media / Policy / Technology",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "ET Telecom - Policy",
+    "url": "https://telecom.economictimes.indiatimes.com/news/policy",
+    "category": "Telecom / Policy / Regulation / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "TelecomTalk - DTH",
+    "url": "https://telecomtalk.info/category/dth/",
+    "category": "DTH / Telecom / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "MediaBrief - Television",
+    "url": "https://mediabrief.com/category/media/television/",
+    "category": "Media / Television / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Marketing-Interactive - News",
+    "url": "https://www.marketing-interactive.com/news",
+    "category": "Marketing / Media / Asia",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Marketing-Interactive - Technology",
+    "url": "https://www.marketing-interactive.com/tech",
+    "category": "Marketing / Technology / Asia",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Android Authority - News",
+    "url": "https://www.androidauthority.com/news/",
+    "category": "Consumer Technology / Android / Devices",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "Swarajya - Technology",
+    "url": "https://swarajyamag.com/section/tech",
+    "category": "Technology / Policy / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "What Hi-Fi? - News",
+    "url": "https://www.whathifi.com/news",
+    "category": "TV / Audio / Home Entertainment",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "FlatpanelsHD - News Archive",
+    "url": "https://www.flatpanelshd.com/newsarchive.php",
+    "category": "TV / Display / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "CABSAT - Industry Insights",
+    "url": "https://cabsat.com/news-articles-and-industry-insights",
+    "category": "Broadcast / Satellite / Middle East",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "VideoWeek - News",
+    "url": "https://videoweek.com/news/",
+    "category": "Video / Streaming / Advertising",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "KPI Indonesia - Main News",
+    "url": "https://kpi.go.id/news?kategori=berita-utama",
+    "category": "Broadcast / Regulation / Indonesia",
+    "enabled": true,
+    "allow_deep_scan": true
+  },
+  {
+    "name": "India Today - Technology News",
+    "url": "https://www.indiatoday.in/technology/news",
+    "category": "Technology / Consumer Electronics / India",
+    "enabled": true,
+    "allow_deep_scan": true
+  }
+]

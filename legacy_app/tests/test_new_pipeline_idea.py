@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from main_new_pipeline_idea import (
+from news_scrapper.experimental.new_pipeline_idea import (
     JsonCheckpointStore,
     NewPipelineIdea,
     PacedRateLimiter,

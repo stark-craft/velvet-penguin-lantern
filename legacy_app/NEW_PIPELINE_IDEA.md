@@ -2,7 +2,8 @@
 
 This is a parallel, opt-in design. It does not replace or modify the current
 `main.py`, Scrapy spider, scheduler, semantic clustering module, or adapters.
-Nothing in the production application imports `main_new_pipeline_idea.py`.
+Nothing in the production application imports
+`news_scrapper.experimental.new_pipeline_idea`.
 
 ## Proposed flow
 
@@ -57,7 +58,7 @@ services, but each is hard-capped at three requests per minute.
 From the `legacy_app` directory:
 
 ```powershell
-.\.venv\Scripts\python.exe .\main_new_pipeline_idea.py --show-flow
+.\.venv\Scripts\python.exe -m news_scrapper.experimental.new_pipeline_idea --show-flow
 ```
 
 That command prints the design and makes no network requests.
@@ -74,7 +75,7 @@ Only after reviewing the proposal:
 5. Run:
 
 ```powershell
-.\.venv\Scripts\python.exe .\main_new_pipeline_idea.py `
+.\.venv\Scripts\python.exe -m news_scrapper.experimental.new_pipeline_idea `
   --input .\discovered_articles.json `
   --output .\new_pipeline_idea_runtime\default\feed.json `
   --profile default `

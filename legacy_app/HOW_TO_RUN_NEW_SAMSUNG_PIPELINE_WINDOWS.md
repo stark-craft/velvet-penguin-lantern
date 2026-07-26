@@ -7,30 +7,35 @@ This guide intentionally uses very simple instructions.
 There are currently two different pipelines.
 
 1. `main.py` is the working Phase 1 backend.
-2. `main_new_pipeline_idea.py` is the new Samsung pipeline experiment.
+2. `news_scrapper\experimental\new_pipeline_idea.py` is the Samsung pipeline
+   experiment.
 
 They are separate.
 
 Do **not** erase `main.py`.
 
-Do **not** paste `main_new_pipeline_idea.py` inside `main.py`.
+Do **not** paste the experimental pipeline inside `main.py`.
 
-Do **not** rename `main_new_pipeline_idea.py` to `main.py`.
+Do **not** rename the experimental pipeline to `main.py`.
 
 The correct result is:
 
 ```text
 legacy_app
 ├── main.py
-├── main_new_pipeline_idea.py
-├── samsung_web_search_adapter.py
-├── samsung_chat_adapter.py
-├── article_metadata_adapter.py
-├── secure_http.py
+├── core
+│   └── secure_http.py
+├── news_scrapper
+│   ├── adapters
+│   │   ├── samsung_web_search.py
+│   │   ├── samsung_chat.py
+│   │   └── article_metadata.py
+│   └── experimental
+│       └── new_pipeline_idea.py
 └── .env
 ```
 
-The two main files stay beside each other.
+The working application and experimental pipeline are intentionally separated.
 
 ## What was changed in GitHub
 
@@ -92,7 +97,7 @@ git pull origin main
 5. Find the `legacy_app` folder.
 6. Copy the complete `legacy_app` folder to the server laptop.
 
-Do not copy only `main_new_pipeline_idea.py` into an old project unless the old
+Do not copy only `new_pipeline_idea.py` into an old project unless the old
 project already contains the three adapters, `secure_http.py`, the Scrapy
 project, the model folders and all requirements.
 
@@ -239,7 +244,7 @@ C:\scrappyV2\legacy_app
 2. Run:
 
 ```powershell
-.\.venv\Scripts\python.exe .\main_new_pipeline_idea.py --show-flow
+.\.venv\Scripts\python.exe -m news_scrapper.experimental.new_pipeline_idea --show-flow
 ```
 
 3. You should see seven stages ending with:
@@ -259,27 +264,27 @@ uses Samsung Web Search to extract the authoritative article information.
 1. Create this folder if it does not exist:
 
 ```text
-C:\scrappyV2\legacy_app\new_pipeline_idea_runtime\default
+C:\scrappyV2\legacy_app\news_scrapper\runtime\new_pipeline_idea\default
 ```
 
 2. Open PowerShell in:
 
 ```text
-C:\scrappyV2\legacy_app\news_aggregator
+C:\scrappyV2\legacy_app\news_scrapper\crawler
 ```
 
 3. Choose the date to scan. The example below uses `2026-07-24`.
 4. Run this command as one complete command:
 
 ```powershell
-..\.venv\Scripts\python.exe -m scrapy crawl news_spider -a keyword="AI,Samsung,display,semiconductor" -a from_date=2026-07-24 -a to_date=2026-07-24 -a target_sites=All -a sites_file="C:\scrappyV2\legacy_app\sites.json" -s ROBOTSTXT_OBEY=True -O "C:\scrappyV2\legacy_app\new_pipeline_idea_runtime\default\discovered_articles.json"
+..\.venv\Scripts\python.exe -m scrapy crawl news_spider -a keyword="AI,Samsung,display,semiconductor" -a from_date=2026-07-24 -a to_date=2026-07-24 -a target_sites=All -a sites_file="C:\scrappyV2\legacy_app\news_scrapper\config\sites.json" -s ROBOTSTXT_OBEY=True -O "C:\scrappyV2\legacy_app\news_scrapper\runtime\new_pipeline_idea\default\discovered_articles.json"
 ```
 
 5. Wait for the spider to finish.
 6. Open:
 
 ```text
-C:\scrappyV2\legacy_app\new_pipeline_idea_runtime\default
+C:\scrappyV2\legacy_app\news_scrapper\runtime\new_pipeline_idea\default
 ```
 
 7. Confirm that this file exists:
@@ -291,13 +296,13 @@ discovered_articles.json
 For the Broadcast profile, change:
 
 ```text
-sites.json
+news_scrapper\config\sites.json
 ```
 
 to:
 
 ```text
-sites_broadcast.json
+news_scrapper\config\sites_broadcast.json
 ```
 
 Also change the output folder from `default` to `broadcast`.
@@ -315,7 +320,7 @@ C:\scrappyV2\legacy_app
 2. Run:
 
 ```powershell
-.\.venv\Scripts\python.exe .\main_new_pipeline_idea.py --input .\new_pipeline_idea_runtime\default\discovered_articles.json --output .\new_pipeline_idea_runtime\default\feed.json --profile default --keywords "AI,Samsung,display,semiconductor" --allow-live-services
+.\.venv\Scripts\python.exe -m news_scrapper.experimental.new_pipeline_idea --input .\news_scrapper\runtime\new_pipeline_idea\default\discovered_articles.json --output .\news_scrapper\runtime\new_pipeline_idea\default\feed.json --profile default --keywords "AI,Samsung,display,semiconductor" --allow-live-services
 ```
 
 ### Broadcast profile
@@ -323,7 +328,7 @@ C:\scrappyV2\legacy_app
 Use:
 
 ```powershell
-.\.venv\Scripts\python.exe .\main_new_pipeline_idea.py --input .\new_pipeline_idea_runtime\broadcast\discovered_articles.json --output .\new_pipeline_idea_runtime\broadcast\feed.json --profile broadcast --keywords "broadcast,DTH,cable,OTT,television" --allow-live-services
+.\.venv\Scripts\python.exe -m news_scrapper.experimental.new_pipeline_idea --input .\news_scrapper\runtime\new_pipeline_idea\broadcast\discovered_articles.json --output .\news_scrapper\runtime\new_pipeline_idea\broadcast\feed.json --profile broadcast --keywords "broadcast,DTH,cable,OTT,television" --allow-live-services
 ```
 
 The `--allow-live-services` text is required. It confirms that Samsung API calls
@@ -395,7 +400,8 @@ The normal backend command has not changed:
 
 Running `main.py` starts the current working application.
 
-Running `main_new_pipeline_idea.py` starts one manual experimental pipeline run.
+Running `news_scrapper.experimental.new_pipeline_idea` starts one manual
+experimental pipeline run.
 
 They are different commands.
 
@@ -403,11 +409,11 @@ They are different commands.
 
 1. Pull the latest GitHub code.
 2. Keep `main.py` unchanged.
-3. Keep `main_new_pipeline_idea.py` beside `main.py`.
+3. Keep the experimental pipeline inside `news_scrapper\experimental`.
 4. Install `requirements.txt`.
 5. Put MiniLM in `local_miniLM_model` or `semantic_model`.
 6. Put the Samsung client, tokens and Chat model ID in `.env`.
 7. Run `--show-flow`.
 8. Run the spider to create `discovered_articles.json`.
-9. Run `main_new_pipeline_idea.py` with `--allow-live-services`.
+9. Run the experimental module with `--allow-live-services`.
 10. Read `feed.json`, `feed.quarantine.json` and `feed.report.json`.

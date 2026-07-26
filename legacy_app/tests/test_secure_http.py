@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import secure_http
+from core import secure_http
 
 
 class SecureHttpTests(unittest.TestCase):

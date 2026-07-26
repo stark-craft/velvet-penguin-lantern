@@ -170,12 +170,16 @@ production use does not need `npm run dev`.
 
 ## 8. Files you will edit later
 
-- Default sources: `sites.json`
-- Broadcast sources: `sites_broadcast.json`
-- Default keywords: `MORNING_KEYWORDS` near the top of `main.py`
-- Broadcast keywords: `BROADCAST_MORNING_KEYWORDS` near the top of `main.py`
+- Default sources: `news_scrapper\config\sites.json`
+- Broadcast sources: `news_scrapper\config\sites_broadcast.json`
+- Default keywords: `MORNING_KEYWORDS` near the top of
+  `news_scrapper\application.py`
+- Broadcast keywords: `BROADCAST_MORNING_KEYWORDS` near the top of
+  `news_scrapper\application.py`
 - All IPs, keys, scheduler controls, TLS, and internal API settings: `.env`
 
-History is stored under `intelligence_store\PROFILE\history` and is retained for
+History is stored under
+`news_scrapper\runtime\intelligence_store\PROFILE\history` and is retained for
 30 days by default. Workflow decisions are stored separately and are not erased
-when an old briefing file expires.
+when an old briefing file expires. Venture Lens caches are stored under
+`venture_lens\runtime`.

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from starlette.requests import Request
 
-import main
+from news_scrapper import application as main
 
 
 def request_from(ip="127.0.0.1", profile="default"):

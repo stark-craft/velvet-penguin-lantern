@@ -2,9 +2,9 @@ import os
 import unittest
 from unittest.mock import Mock, patch
 
-import article_metadata_adapter
-import samsung_chat_adapter
-import samsung_web_search_adapter
+from news_scrapper.adapters import article_metadata
+from news_scrapper.adapters import samsung_chat
+from news_scrapper.adapters import samsung_web_search
 
 
 class AdapterContractTests(unittest.TestCase):
@@ -21,8 +21,8 @@ class AdapterContractTests(unittest.TestCase):
             }]
         }
         env = {"SAMSUNG_WEB_SEARCH_TOKEN": "secret-token", "SAMSUNG_WEB_SEARCH_CLIENT": "client-name"}
-        with patch.dict(os.environ, env, clear=False), patch.object(samsung_web_search_adapter, "tls_verify", return_value=True), patch.object(samsung_web_search_adapter.requests, "post", return_value=response) as post:
-            item = samsung_web_search_adapter.enrich_article_with_web_search({
+        with patch.dict(os.environ, env, clear=False), patch.object(samsung_web_search, "tls_verify", return_value=True), patch.object(samsung_web_search.requests, "post", return_value=response) as post:
+            item = samsung_web_search.enrich_article_with_web_search({
                 "title": "DTH operator launches new broadcast service",
                 "link": "https://publisher.example/dth-service",
                 "snippet": "DTH broadcast launch",
@@ -41,8 +41,8 @@ class AdapterContractTests(unittest.TestCase):
             "status": "SUCCESS",
             "content": '{"title":"Broadcast update","summary":"Executive summary.","ppt_summary":"Slide summary.","why_it_matters":"Strategic impact.","category":"Broadcasting","region":"Local","importance_score":8}',
         }
-        with patch.object(samsung_chat_adapter, "CLIENT", "client-name"), patch.object(samsung_chat_adapter, "TOKEN", "secret-token"), patch.object(samsung_chat_adapter, "MODEL_ID", "model-id"), patch.object(samsung_chat_adapter, "tls_verify", return_value=True), patch.object(samsung_chat_adapter.requests, "post", return_value=response) as post:
-            item = samsung_chat_adapter.summarize_article_with_chat({"title": "Old title", "full_contents": "Broadcast article facts."})
+        with patch.object(samsung_chat, "CLIENT", "client-name"), patch.object(samsung_chat, "TOKEN", "secret-token"), patch.object(samsung_chat, "MODEL_ID", "model-id"), patch.object(samsung_chat, "tls_verify", return_value=True), patch.object(samsung_chat.requests, "post", return_value=response) as post:
+            item = samsung_chat.summarize_article_with_chat({"title": "Old title", "full_contents": "Broadcast article facts."})
         self.assertEqual(item["chat_summary_status"], "success")
         self.assertEqual(item["importance_score"], 80)
         request = post.call_args.kwargs
@@ -54,8 +54,8 @@ class AdapterContractTests(unittest.TestCase):
         response.url = "https://publisher.example/story"
         response.content = b'<html><head><meta property="og:image" content="/image.jpg"></head></html>'
         response.raise_for_status.return_value = None
-        with patch.object(article_metadata_adapter, "tls_verify", return_value=True), patch.object(article_metadata_adapter.requests, "get", return_value=response) as get:
-            item = article_metadata_adapter.enrich_article_image_metadata({"link": response.url})
+        with patch.object(article_metadata, "tls_verify", return_value=True), patch.object(article_metadata.requests, "get", return_value=response) as get:
+            item = article_metadata.enrich_article_image_metadata({"link": response.url})
         self.assertEqual(item["top_image"], "https://publisher.example/image.jpg")
         self.assertIs(get.call_args.kwargs["verify"], True)
 

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from scrapy.http import HtmlResponse, Request, XmlResponse
 
-from news_aggregator.news_aggregator.spiders.universal_spider import NewsSpider
+from news_scrapper.crawler.news_aggregator.spiders.universal_spider import NewsSpider
 
 
 def make_response(cls, url, body, meta=None, content_type=b"text/html"):
