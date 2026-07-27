@@ -145,7 +145,7 @@ BOUNCER_MODEL_FILENAMES = {
 }
 
 try:
-    current_dir = str(PROJECT_ROOT)
+    current_dir = str(NEWS_RUNTIME_DIR)
     model_folder = str(resolve_model_path("all-MiniLM-L6-v2", "local_miniLM_model"))
     bouncer_embedder = SentenceTransformer(model_folder)
     bouncer_models = {}
@@ -802,10 +802,24 @@ def fallback_why_it_matters(item):
     )
 
 
-def is_weak_generated_insight(insight, title):
-    generated_words = re.findall(r"[a-z0-9]+", str(insight or "").lower())
+def is_weak_generated_insight(insight, title, summary=""):
+    normalized_insight = " ".join(
+        re.findall(r"[a-z0-9]+", str(insight or "").lower())
+    )
+    normalized_summary = " ".join(
+        re.findall(r"[a-z0-9]+", str(summary or "").lower())
+    )
+    generated_words = normalized_insight.split()
     title_words = set(re.findall(r"[a-z0-9]+", str(title or "").lower()))
     if len(generated_words) < 9:
+        return True
+    # Local generation can occasionally echo the first summary sentence even
+    # when that sentence differs from the (sometimes generic) stored title.
+    if (
+        len(normalized_insight) >= 24
+        and normalized_summary
+        and normalized_insight in normalized_summary
+    ):
         return True
     overlap = sum(1 for word in generated_words if word in title_words)
     return overlap / max(len(generated_words), 1) > 0.7
@@ -826,7 +840,14 @@ def generate_why_it_matters(item, profile=DEFAULT_PROFILE):
     with insight_cache_lock:
         cached = insight_cache.get(cache_key)
     if cached:
-        return cached[0], f"{cached[1]}-cache"
+        cached_insight, cached_source = cached
+        if not is_weak_generated_insight(cached_insight, title, summary):
+            return cached_insight, f"{cached_source}-cache"
+        # Older application versions cached occasional headline echoes. Do not
+        # let those bypass the current quality gate for the lifetime of the
+        # server process.
+        with insight_cache_lock:
+            insight_cache.pop(cache_key, None)
 
     if not summary or not ensure_local_opinion_model():
         insight = fallback_why_it_matters(item)
@@ -854,7 +875,7 @@ def generate_why_it_matters(item, profile=DEFAULT_PROFILE):
                 )
             insight = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
             source = "flan-t5-local"
-            if is_weak_generated_insight(insight, title):
+            if is_weak_generated_insight(insight, title, summary):
                 insight = fallback_why_it_matters(item)
                 source = "fallback-after-flan"
         except Exception as e:
@@ -1532,6 +1553,10 @@ def matched_pipeline_keywords(item, keywords):
     return matches
 
 
+class WebSearchRuntimeFailure(RuntimeError):
+    """Signal that discovery-only candidates require a full Scrapy retry."""
+
+
 def run_bouncer_filter_on_items(items, profile=DEFAULT_PROFILE, stage="raw"):
     filtered_items = []
     dropped_count = 0
@@ -1571,6 +1596,7 @@ def enrich_raw_articles(
     keywords,
     profile=DEFAULT_PROFILE,
     use_web_search=None,
+    raise_on_service_failure=False,
 ):
     """Use Samsung Web Search as the article extraction stage when configured."""
 
@@ -1593,6 +1619,7 @@ def enrich_raw_articles(
     output = []
     successful = 0
     rejected_for_keywords = 0
+    service_failures = 0
     strict = WEB_SEARCH_REQUIRE_SUCCESS or SAMSUNG_PIPELINE_ENABLED
     print(f"[PIPELINE:{profile}] Web Search enrichment: {min(limit, len(source_items))} article(s).", flush=True)
     for index, item in enumerate(source_items):
@@ -1611,7 +1638,14 @@ def enrich_raw_articles(
             enriched = dict(cached)
             enriched["enrichment_cache"] = "hit"
         else:
-            enriched = enrich_article_with_web_search(item, keywords=keywords)
+            try:
+                enriched = enrich_article_with_web_search(item, keywords=keywords)
+            except Exception as error:
+                enriched = {
+                    **item,
+                    "enrichment_status": "failed",
+                    "enrichment_error": f"{type(error).__name__}: {error}"[:500],
+                }
             if enriched.get("enrichment_status") == "success":
                 cache_success(WEB_SEARCH_CACHE, cache_key, enriched)
                 enriched["enrichment_cache"] = "miss"
@@ -1632,6 +1666,7 @@ def enrich_raw_articles(
                 successful += 1
                 output.append(enriched)
         elif strict:
+            service_failures += 1
             print(f"[PIPELINE:{profile}] Enrichment rejected: {item.get('title', '')[:70]}", flush=True)
         else:
             output.append(enriched)
@@ -1643,6 +1678,12 @@ def enrich_raw_articles(
         f"{rejected_for_keywords}.",
         flush=True,
     )
+    if raise_on_service_failure and service_failures:
+        raise WebSearchRuntimeFailure(
+            "Samsung Web Search failed for "
+            f"{service_failures}/{min(limit, len(source_items))} candidate(s) "
+            "after preflight; full Scrapy extraction is required."
+        )
     return output
 
 
@@ -2142,6 +2183,13 @@ def get_empty_day():
         "briefing_views": 0,
         "heartbeats": 0,
         "voc_feedback": [],
+        "selections": 0,
+        "approvals": 0,
+        "personal_hides": 0,
+        "workflow_removals": 0,
+        "sources_added": 0,
+        "action_counts": {},
+        "events": [],
     }
 
 
@@ -2380,28 +2428,31 @@ def run_scheduler_for_profile(profile: str, capabilities=None):
         if scheduler_shutdown_event.is_set():
             print(f"[SCHEDULER:{profile}] Shutdown requested; scan skipped.", flush=True)
             return False
-        process = subprocess.Popen(
-            cmd,
-            cwd=str(NEWS_CRAWLER_DIR),
-        )
-        with scheduler_process_lock:
-            scheduler_processes[profile] = process
-        try:
+        def execute_crawl(command):
+            process = subprocess.Popen(
+                command,
+                cwd=str(NEWS_CRAWLER_DIR),
+            )
             try:
-                return_code = process.wait(timeout=3600)
-            except subprocess.TimeoutExpired:
-                process.terminate()
+                with scheduler_process_lock:
+                    scheduler_processes[profile] = process
                 try:
-                    process.wait(timeout=10)
+                    return_code = process.wait(timeout=3600)
                 except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
-                raise
-        finally:
-            with scheduler_process_lock:
-                scheduler_processes.pop(profile, None)
-        if return_code != 0:
-            raise RuntimeError(f"Scrapy exited with code {return_code}")
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=5)
+                    raise
+            finally:
+                with scheduler_process_lock:
+                    scheduler_processes.pop(profile, None)
+            if return_code != 0:
+                raise RuntimeError(f"Scrapy exited with code {return_code}")
+
+        execute_crawl(cmd)
 
         if not os.path.exists(output_file):
             raise RuntimeError("Scrapy completed without creating an output file")
@@ -2411,18 +2462,51 @@ def run_scheduler_for_profile(profile: str, capabilities=None):
         if not isinstance(raw_data, list):
             raise RuntimeError("Scrapy output must be a JSON list")
 
-        if capabilities["web_search"]:
+        web_search_used = bool(capabilities["web_search"])
+        if web_search_used:
             print(
                 f"[SCHEDULER:{profile}] Sending discovered URLs to Samsung "
                 "Web Search before Gatekeeper scoring.",
                 flush=True,
             )
-            raw_data = enrich_raw_articles(
-                raw_data,
-                config["keywords"],
-                profile,
-                use_web_search=True,
-            )
+            try:
+                raw_data = enrich_raw_articles(
+                    raw_data,
+                    config["keywords"],
+                    profile,
+                    use_web_search=True,
+                    raise_on_service_failure=True,
+                )
+            except WebSearchRuntimeFailure as error:
+                print(
+                    f"[SCHEDULER:{profile}] WEB SEARCH RUNTIME FAILURE: {error} "
+                    "FALLBACK: restarting this profile with full Scrapy "
+                    "article extraction.",
+                    flush=True,
+                )
+                fallback_cmd = [
+                    (
+                        "discovery_only=false"
+                        if str(argument).startswith("discovery_only=")
+                        else argument
+                    )
+                    for argument in cmd
+                ]
+                execute_crawl(fallback_cmd)
+                if not os.path.exists(output_file):
+                    raise RuntimeError(
+                        "Full Scrapy fallback completed without creating an "
+                        "output file"
+                    )
+                with open(output_file, "r", encoding="utf-8") as f:
+                    raw_data = json.load(f)
+                if not isinstance(raw_data, list):
+                    raise RuntimeError(
+                        "Full Scrapy fallback output must be a JSON list"
+                    )
+                web_search_used = False
+
+        if web_search_used:
             if config["use_bouncer"]:
                 raw_data, dropped, low_priority = run_bouncer_filter_on_items(
                     raw_data, profile, "scheduler_enriched"
@@ -4491,13 +4575,58 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
             device["activity"][today] = get_empty_day()
 
         day = device["activity"][today]
+        day.setdefault("action_counts", {})
+        day.setdefault("events", [])
+        supported_actions = {
+            "page_load",
+            "search",
+            "article_click",
+            "dossier_open",
+            "vote",
+            "vote_interested",
+            "vote_not_interested",
+            "save_for_later",
+            "save_for_later_remove",
+            "export",
+            "draft_export",
+            "briefing_view",
+            "heartbeat",
+            "voc_feedback",
+            "select",
+            "batch_select",
+            "approve",
+            "hide_personal",
+            "restore_personal_hidden",
+            "remove_selected",
+            "remove_approved",
+            "add_source",
+        }
+        if action not in supported_actions:
+            return False
+        day["action_counts"][action] = (
+            int(day["action_counts"].get(action, 0)) + 1
+        )
+        try:
+            event_detail = json.loads(detail) if detail else ""
+        except (TypeError, ValueError):
+            event_detail = detail
+        day["events"].append(
+            {
+                "timestamp": datetime.datetime.now().isoformat(
+                    timespec="seconds"
+                ),
+                "action": action,
+                "detail": event_detail,
+            }
+        )
+        day["events"] = day["events"][-500:]
         if action == "page_load":
             day["page_loads"] = day.get("page_loads", 0) + 1
         elif action == "search":
             day.setdefault("searches", [])
             if detail and detail not in day["searches"]:
                 day["searches"].append(detail)
-        elif action == "article_click":
+        elif action in {"article_click", "dossier_open"}:
             day["articles_clicked"] = day.get("articles_clicked", 0) + 1
         elif action == "vote_interested":
             day["votes_interested"] = day.get("votes_interested", 0) + 1
@@ -4507,7 +4636,7 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
             day["saved_for_later"] = day.get("saved_for_later", 0) + 1
         elif action == "save_for_later_remove":
             day["removed_from_saved"] = day.get("removed_from_saved", 0) + 1
-        elif action == "export":
+        elif action in {"export", "draft_export"}:
             day.setdefault("exports", [])
             if detail and detail not in day["exports"]:
                 day["exports"].append(detail)
@@ -4517,8 +4646,41 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
             day["heartbeats"] = day.get("heartbeats", 0) + 1
         elif action == "voc_feedback":
             day.setdefault("voc_feedback", []).append(detail)
-        else:
-            return False
+        elif action in {"select", "batch_select"}:
+            increment = 1
+            if action == "batch_select":
+                try:
+                    payload = (
+                        event_detail
+                        if isinstance(event_detail, dict)
+                        else {}
+                    )
+                    increment = max(1, int(payload.get("item_count", 1)))
+                except (TypeError, ValueError):
+                    increment = 1
+            day["selections"] = day.get("selections", 0) + increment
+        elif action == "approve":
+            day["approvals"] = day.get("approvals", 0) + 1
+        elif action == "hide_personal":
+            day["personal_hides"] = day.get("personal_hides", 0) + 1
+        elif action in {
+            "restore_personal_hidden",
+            "remove_selected",
+            "remove_approved",
+        }:
+            day["workflow_removals"] = (
+                day.get("workflow_removals", 0) + 1
+            )
+        elif action == "add_source":
+            day["sources_added"] = day.get("sources_added", 0) + 1
+        elif action == "vote":
+            vote_value = str(detail or "").split(":", 1)[0].strip().lower()
+            counter = (
+                "votes_not_interested"
+                if vote_value in {"down", "not_interested"}
+                else "votes_interested"
+            )
+            day[counter] = day.get(counter, 0) + 1
 
         purge_old_entries(device)
         save_tracker(tracker)
@@ -4624,6 +4786,12 @@ def get_analytics(request: Request, key: str = Query(None)):
         total_exports = sum(len(d.get("exports", [])) for d in activity.values())
         total_heartbeats = sum(d.get("heartbeats", 0) for d in activity.values())
         total_voc = sum(len(d.get("voc_feedback", [])) for d in activity.values())
+        action_counts = {}
+        for day_data in activity.values():
+            for action, count in day_data.get("action_counts", {}).items():
+                action_counts[action] = (
+                    action_counts.get(action, 0) + int(count)
+                )
         today_data = activity.get(today, get_empty_day())
         active_days = len([d for d in activity.values() if d.get("page_loads", 0) > 0])
 
@@ -4649,6 +4817,7 @@ def get_analytics(request: Request, key: str = Query(None)):
                 "exports": total_exports,
                 "minutes_approx": total_heartbeats,
                 "voc_feedback": total_voc,
+                "actions": action_counts,
             },
             "engagement_score": engagement,
             "daily": activity,
@@ -4902,6 +5071,7 @@ async def crawl(
                         effective_keywords,
                         profile,
                         use_web_search=True,
+                        raise_on_service_failure=True,
                     )
                     yield f"data: {json.dumps({'type': 'status', 'message': 'Running AI Gatekeeper on extracted article text...'})}\n\n"
                     filtered_data, dropped_count, low_priority_count = run_bouncer_filter_on_items(
@@ -4910,6 +5080,54 @@ async def crawl(
                     with open(output_file, "w", encoding="utf-8") as f:
                         json.dump(filtered_data, f, indent=4, ensure_ascii=False)
                     yield f"data: {json.dumps({'type': 'status', 'message': f'Samsung extraction and Gatekeeper complete. Kept {len(filtered_data)}; removed {dropped_count}; low priority kept {low_priority_count}.'})}\n\n"
+                except WebSearchRuntimeFailure as e:
+                    print(
+                        f"[PIPELINE:{profile}] Samsung extraction failed after "
+                        f"preflight: {e}. Restarting with full Scrapy extraction.",
+                        flush=True,
+                    )
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Samsung Web Search became unavailable. Restarting this scan with full local Scrapy extraction; no discovered articles will be silently discarded.'})}\n\n"
+                    fallback_cmd = [
+                        (
+                            "discovery_only=false"
+                            if str(argument).startswith("discovery_only=")
+                            else argument
+                        )
+                        for argument in cmd
+                    ]
+                    fallback_result = subprocess.run(
+                        fallback_cmd,
+                        cwd=spider_cwd,
+                        env=process_env,
+                        timeout=3600,
+                        check=False,
+                    )
+                    if fallback_result.returncode != 0:
+                        raise RuntimeError(
+                            "Full Scrapy fallback exited with code "
+                            f"{fallback_result.returncode}"
+                        )
+                    if not os.path.exists(output_file):
+                        raise RuntimeError(
+                            "Full Scrapy fallback completed without an output file"
+                        )
+                    with open(output_file, "r", encoding="utf-8") as f:
+                        raw_data = json.load(f)
+                    filtered_data, dropped_count, low_priority_count = (
+                        run_bouncer_filter_on_items(
+                            raw_data,
+                            profile,
+                            "manual_scrapy_fallback",
+                        )
+                    )
+                    with open(output_file, "w", encoding="utf-8") as f:
+                        json.dump(
+                            filtered_data,
+                            f,
+                            indent=4,
+                            ensure_ascii=False,
+                        )
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'Full Scrapy fallback and Gatekeeper complete. Kept {len(filtered_data)}; removed {dropped_count}; low priority kept {low_priority_count}.'})}\n\n"
                 except Exception as e:
                     print(f"[PIPELINE:{profile}] Samsung extraction failed: {e}", flush=True)
                     raise

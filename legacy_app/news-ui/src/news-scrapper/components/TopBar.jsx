@@ -2,7 +2,12 @@ import React, { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import Icon from "./Icon.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
-import { getAnalyticsAccess, getGatekeeperAccess, getProfile } from "../api.js";
+import {
+  getAnalyticsAccess,
+  getGatekeeperAccess,
+  getProfile,
+  getTrendsAccess,
+} from "../api.js";
 const mainNav = [
   { to: "/scan", label: "Scan" },
   { to: "/saved", label: "Saved" },
@@ -43,6 +48,7 @@ export default function TopBar({
   );
   const [analyticsAllowed, setAnalyticsAllowed] = useState(isLocalDevHost());
   const [gatekeeperAllowed, setGatekeeperAllowed] = useState(isLocalDevHost());
+  const [profileSwitchAllowed, setProfileSwitchAllowed] = useState(isLocalDevHost());
   useEffect(() => {
     async function syncProfileFromBackend() {
       try {
@@ -95,9 +101,10 @@ export default function TopBar({
   useEffect(() => {
     let cancelled = false;
     async function checkPrivateAccess() {
-      const [analyticsResult, gatekeeperResult] = await Promise.allSettled([
+      const [analyticsResult, gatekeeperResult, trendsResult] = await Promise.allSettled([
         getAnalyticsAccess(),
         getGatekeeperAccess(),
+        getTrendsAccess(),
       ]);
       if (cancelled) {
         return;
@@ -117,6 +124,13 @@ export default function TopBar({
       } else {
         setGatekeeperAllowed(localDevelopment);
       }
+      if (trendsResult.status === "fulfilled") {
+        setProfileSwitchAllowed(
+          Boolean(trendsResult.value?.allowed) || localDevelopment,
+        );
+      } else {
+        setProfileSwitchAllowed(localDevelopment);
+      }
     }
     checkPrivateAccess();
     return () => {
@@ -126,6 +140,9 @@ export default function TopBar({
   const isBroadcast = profile === "broadcast";
   const settingsNav = [
     ...baseSettingsNav,
+    ...(profileSwitchAllowed
+      ? [{ to: "/trends", label: "Profile Switcher" }]
+      : []),
     ...(gatekeeperAllowed
       ? [{ to: "/gatekeeper-review", label: "Gatekeeper Review" }]
       : []),

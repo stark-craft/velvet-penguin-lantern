@@ -118,6 +118,29 @@ class UniversalSpiderTests(unittest.TestCase):
         response = make_response(HtmlResponse, "https://example.com/technology", html)
         self.assertTrue(spider.is_listing_or_archive_page(response, title))
 
+    def test_generic_navigation_page_with_long_body_is_not_emitted(self):
+        spider = NewsSpider(keyword="television")
+        body = " ".join(
+            ["Television news and product links from across the industry."]
+            * 20
+        )
+        html = (
+            "<html><head><title>Television</title></head>"
+            f"<body><main><h1>Television</h1><p>{body}</p></main></body></html>"
+        )
+        response = make_response(
+            HtmlResponse,
+            "https://example.com/television",
+            html,
+            {
+                "site_name": "Example",
+                "seed_title": "Television",
+                "seed_date": None,
+                "method": "Website Discovery",
+            },
+        )
+        self.assertEqual(list(spider.parse_article_page(response)), [])
+
     def test_dated_archive_expands_story_links_instead_of_becoming_article(self):
         spider = NewsSpider(keyword="broadcast")
         html = """<html><body><main><h1>Advertising, Marketing, Media News Today 22 July 2026</h1>

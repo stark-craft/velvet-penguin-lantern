@@ -891,6 +891,18 @@ class NewsSpider(scrapy.Spider):
         # visible H1 before newspaper3k's document-title fallback.
         title = self.extract_article_title(response, article, seed_title)
 
+        # A long category/author page can contain enough paragraph text to pass
+        # the body-length check. Never emit its navigation label as a news
+        # article, even when a configured source or RSS entry links to it
+        # directly.
+        if self.is_generic_document_title(title):
+            print(
+                f"LOG: Skipped generic navigation page from {site_name}: "
+                f"{response.url[:65]}",
+                flush=True,
+            )
+            return
+
         # Some publisher homepages link to dated archive pages first (for
         # example /articles/2026-07-22.html). Those pages contain many actual
         # story links and enough text to look like a long article. Detect them
@@ -1032,8 +1044,11 @@ class NewsSpider(scrapy.Spider):
 
         normalized = " ".join(str(title or "").lower().split()).strip(" -|:")
         return normalized in {
-            "article", "articles", "berita", "latest", "latest news", "news",
-            "news today", "technology", "technology news", "top stories",
+            "article", "articles", "banking and finance news", "berita",
+            "devices", "economy news", "entertainment segment", "india news",
+            "latest", "latest news", "news", "news today", "opinion",
+            "see all latest", "sponsored news", "technology",
+            "technology news", "television", "top stories",
         }
 
     def collect_jsonld_headlines(self, value, output):

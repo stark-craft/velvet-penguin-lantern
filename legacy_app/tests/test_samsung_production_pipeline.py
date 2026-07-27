@@ -1,6 +1,8 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from core.storage import JsonStore
@@ -118,6 +120,37 @@ class SamsungProductionPipelineTests(unittest.TestCase):
                 )
         self.assertEqual(result, [])
 
+    def test_runtime_web_search_failure_requests_full_scrapy_retry(self):
+        def failed(item, keywords=None):
+            return {
+                **item,
+                "enrichment_status": "failed",
+                "enrichment_error": "service unavailable",
+            }
+
+        with tempfile.TemporaryDirectory() as directory:
+            cache = JsonStore(Path(directory) / "web.json", dict)
+            with (
+                patch.object(application, "WEB_SEARCH_CACHE", cache),
+                patch.object(application, "WEB_SEARCH_ENRICHMENT_ENABLED", True),
+                patch.object(application, "SAMSUNG_PIPELINE_ENABLED", True),
+                patch.object(application, "WEB_SEARCH_REQUIRE_SUCCESS", True),
+                patch.object(
+                    application,
+                    "enrich_article_with_web_search",
+                    failed,
+                ),
+            ):
+                with self.assertRaises(application.WebSearchRuntimeFailure):
+                    application.enrich_raw_articles(
+                        [{
+                            "title": "Candidate",
+                            "link": "https://example.test/story",
+                        }],
+                        "AI",
+                        raise_on_service_failure=True,
+                    )
+
     def test_chat_success_is_cached_by_cluster_content(self):
         calls = []
 
@@ -159,6 +192,47 @@ class SamsungProductionPipelineTests(unittest.TestCase):
         self.assertEqual(first[0]["summary_lead"], "Lead.")
         self.assertEqual(second[0]["chat_summary_cache"], "hit")
 
+    def test_chat_item_failure_uses_local_summary_fallback(self):
+        def failed(item):
+            return {
+                **item,
+                "chat_summary_status": "failed",
+                "chat_summary_error": "service unavailable",
+            }
+
+        def local_fallback(items, profile):
+            return [
+                application.structure_summary_for_dossier(
+                    item,
+                    "local_bart",
+                )
+                for item in items
+            ]
+
+        with (
+            patch.object(application, "enrich_article_image_metadata", None),
+            patch.object(application, "summarize_article_with_chat", failed),
+            patch.object(
+                application,
+                "apply_local_bart_fallback",
+                side_effect=local_fallback,
+            ),
+        ):
+            result = application.enrich_final_articles(
+                [{
+                    "title": "Fallback signal",
+                    "master_summary": (
+                        "Samsung announced a new system. It launches today. "
+                        "The system supports enterprise users."
+                    ),
+                }],
+                use_chat=True,
+            )
+
+        self.assertEqual(result[0]["chat_summary_status"], "fallback")
+        self.assertEqual(result[0]["summarized_by"], "local_bart")
+        self.assertTrue(result[0]["summary_points"])
+
     def test_local_summary_uses_same_lead_and_bullet_contract(self):
         result = application.structure_summary_for_dossier(
             {
@@ -181,6 +255,124 @@ class SamsungProductionPipelineTests(unittest.TestCase):
         self.assertGreaterEqual(len(result["summary_points"]), 2)
         self.assertEqual(result["summary_format"], "lead_and_bullets")
         self.assertEqual(result["summarized_by"], "local_bart")
+
+    def test_scheduler_restarts_full_scrapy_if_web_search_dies_after_preflight(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sites = root / "sites.json"
+            sites.write_text(
+                '{"sites": [{"name": "Example", "url": "https://example.test"}]}',
+                encoding="utf-8",
+            )
+            history = root / "history"
+            history.mkdir()
+            crawl_commands = []
+
+            class Process:
+                def __init__(self, command):
+                    self.command = command
+
+                def wait(self, timeout=None):
+                    output_path = Path(self.command[self.command.index("-O") + 1])
+                    discovery_only = "discovery_only=true" in self.command
+                    payload = [{
+                        "title": "Samsung AI update",
+                        "link": "https://example.test/story",
+                        "date": "2026-07-27",
+                        "keywords_found": ["Samsung"],
+                    }]
+                    if not discovery_only:
+                        payload[0]["full_contents"] = (
+                            "Samsung released an AI update with complete "
+                            "article text extracted by Scrapy."
+                        )
+                    output_path.write_text(json.dumps(payload), encoding="utf-8")
+                    return 0
+
+                def poll(self):
+                    return 0
+
+                def terminate(self):
+                    return None
+
+                def kill(self):
+                    return None
+
+            def popen(command, cwd=None):
+                crawl_commands.append(command)
+                return Process(command)
+
+            def clustering(command, cwd=None, timeout=None, check=None):
+                job_id = command[command.index("--job-id") + 1]
+                (root / f"clustered_results_{job_id}.json").write_text(
+                    json.dumps([{
+                        "title": "Samsung AI update",
+                        "link": "https://example.test/story",
+                        "master_summary": "Samsung released an AI update.",
+                        "full_contents": "Complete Scrapy article text.",
+                    }]),
+                    encoding="utf-8",
+                )
+                return SimpleNamespace(returncode=0)
+
+            def enrich_or_fail(
+                items,
+                keywords,
+                profile,
+                use_web_search,
+                **kwargs,
+            ):
+                if use_web_search:
+                    raise application.WebSearchRuntimeFailure("API down")
+                return items
+
+            with (
+                patch.object(application, "ROOT_DIR", str(root)),
+                patch.object(application, "NEWS_CRAWLER_DIR", root),
+                patch.object(
+                    application,
+                    "get_profile_history_dir",
+                    return_value=str(history),
+                ),
+                patch.object(application, "purge_expired_history"),
+                patch.object(application.learner, "log_search_data"),
+                patch.object(
+                    application,
+                    "get_profile_config",
+                    return_value={
+                        "sites_file": str(sites),
+                        "keywords": "Samsung",
+                        "use_bouncer": False,
+                    },
+                ),
+                patch.object(application.subprocess, "Popen", side_effect=popen),
+                patch.object(application.subprocess, "run", side_effect=clustering),
+                patch.object(
+                    application,
+                    "enrich_raw_articles",
+                    side_effect=enrich_or_fail,
+                ),
+                patch.object(
+                    application,
+                    "enrich_final_articles",
+                    side_effect=lambda items, profile, use_chat: items,
+                ),
+            ):
+                result = application.run_scheduler_for_profile(
+                    application.DEFAULT_PROFILE,
+                    {
+                        "mode": "samsung_web_search_and_chat",
+                        "web_search": True,
+                        "chat": True,
+                        "discovery_only": True,
+                    },
+                )
+
+            self.assertTrue(result)
+            self.assertEqual(len(crawl_commands), 2)
+            self.assertIn("discovery_only=true", crawl_commands[0])
+            self.assertIn("discovery_only=false", crawl_commands[1])
+            self.assertEqual(len(list(history.glob("briefing_*.json"))), 1)
 
 
 if __name__ == "__main__":
