@@ -1,3 +1,4 @@
+import os
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,6 +11,10 @@ from news_scrapper.semantic_clustering import MinimalSemanticEngine
 
 
 class SemanticClusteringSafeguardTests(unittest.TestCase):
+    def test_documented_true_value_enables_offline_mode(self):
+        with patch.dict(os.environ, {"SENSE_OFFLINE_ONLY": "true"}):
+            self.assertTrue(semantic_clustering.env_flag("SENSE_OFFLINE_ONLY"))
+
     def test_local_sentiment_model_loads_in_offline_mode(self):
         with TemporaryDirectory() as temporary_directory:
             local_model = Path(temporary_directory) / "distilbert-sst-2"

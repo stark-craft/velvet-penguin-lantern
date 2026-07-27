@@ -6,7 +6,7 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import Bouncer from '../components/Bouncer.jsx';
-import { correctRegion, getLatestBriefing, getViewerHidden, getWorkflow, hideArticleForViewer, rejectArticle, selectWorkflow, trainVote } from '../api.js';
+import { correctRegion, getLatestBriefing, getViewerHidden, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { trackAction } from '../utils/tracking.js';
 import { articleKey, groupedByDate, publishedTime, scoreOf } from '../utils/intelligence.js';
@@ -417,7 +417,9 @@ function ImageFeedCard({
   checked,
   onCheck,
   isSelected,
-  isApproved
+  isApproved,
+  isSaved,
+  onSave
 }) {
   const score = scoreOf(item);
   const selected = isSelected || item.selected_by;
@@ -444,6 +446,9 @@ function ImageFeedCard({
 <div className="feed-card-actions mt-4">
 <div className="flex flex-wrap items-center gap-2">
 <button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" onClick={() => onSelect(item)} type="button">                  Select for Review                </button>}              <button className="btn-dark-secondary h-9 px-3" onClick={() => onHide(item)} title="Hide only from your feed" type="button">                Hide              </button>
+<button className="btn-dark-secondary h-9 px-3" onClick={() => onSave(item)} title={isSaved ? 'Remove from Saved for Later' : 'Save this signal for later'} type="button">
+<Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {isSaved ? 'Saved' : 'Save'}
+</button>
 </div>
 <Bouncer vote={vote} onVote={value => onVote(item, value)} />
 </div>
@@ -467,6 +472,7 @@ export default function FeedScreen() {
     approved: []
   });
   const [hiddenCount, setHiddenCount] = useState(0);
+  const [savedKeys, setSavedKeys] = useState(new Set());
   const [filters, setFilters] = useState(emptyFilters);
   useEffect(() => {
     let cancelled = false;
@@ -502,6 +508,9 @@ export default function FeedScreen() {
     }).catch(() => {});
     getViewerHidden().then(result => {
       setHiddenCount(Number(result?.count ?? result?.items?.length ?? 0));
+    }).catch(() => {});
+    getViewerSaved().then(result => {
+      setSavedKeys(new Set(normalizeList(result?.items || []).map(articleKey)));
     }).catch(() => {});
     return () => {
       cancelled = true;
@@ -560,6 +569,33 @@ export default function FeedScreen() {
       await hideArticleForViewer(item);
     } catch {
       // A refresh restores the signal if persistence failed.
+    }
+  };
+  const toggleSave = async item => {
+    const key = articleKey(item);
+    const wasSaved = savedKeys.has(key);
+    setSavedKeys(current => {
+      const next = new Set(current);
+      if (wasSaved) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    trackAction(wasSaved ? 'save_for_later_remove' : 'save_for_later', {
+      title: item.title,
+      link: item.link || item.canonical_link,
+      source: item.source || item.src,
+      screen: 'feed'
+    });
+    try {
+      if (wasSaved) await removeSavedArticle(item);
+      else await saveArticleForLater(item);
+    } catch {
+      setSavedKeys(current => {
+        const next = new Set(current);
+        if (wasSaved) next.add(key);
+        else next.delete(key);
+        return next;
+      });
     }
   };
   const openDossier = item => {
@@ -717,7 +753,7 @@ export default function FeedScreen() {
 <div className="h-px flex-1 bg-white/10" />
 <span className="text-sm text-slate-500">                  {items.length} signals                </span>
 </div>
-<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard key={item.id} item={item} vote={votes[item.id]} onVote={onVote} onHide={hideArticle} onSelect={setPendingSelect} onOpen={openDossier} onCheck={onCheck} checked={!!checked[articleKey(item)]} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} />)}              </div>
+<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard key={item.id} item={item} vote={votes[item.id]} onVote={onVote} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={onCheck} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} />)}              </div>
 </div>)}        {filteredArticles.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
 <h2 className="text-xl font-semibold text-white">              No loaded briefing signals match these filters            </h2>
 <p className="mt-2 text-slate-400">              Try clearing search, changing date, or widening signal filters.            </p>
@@ -729,7 +765,7 @@ export default function FeedScreen() {
 </span>
 <span className="btn-dark-secondary h-9">          Open Hidden Review        </span>
 </button>
-<ArticleModal item={openArticle} onClose={() => setOpen(null)} onSelect={selectFromDossier} onHide={hideFromDossier} onVote={onVote} onCorrectRegion={onCorrectRegion} />
+<ArticleModal item={openArticle} onClose={() => setOpen(null)} onSelect={selectFromDossier} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={onVote} onCorrectRegion={onCorrectRegion} />
 <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />
 <NameModal open={!!batchSelect} article={batchSelect} title={`Send ${selectedBatch.length} articles to Review Queue`} description="Enter your name." confirmLabel="Send to Review Queue" onClose={() => setBatchSelect(null)} onConfirm={confirmBatch} />
 <DraftExportModal items={selectedBatch} open={draftExportOpen} source="briefing" onClose={() => setDraftExportOpen(false)} />      {selectedBatch.length > 0 && <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">

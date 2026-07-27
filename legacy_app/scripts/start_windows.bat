@@ -2,16 +2,20 @@
 setlocal
 cd /d "%~dp0.."
 
-if not exist ".venv\Scripts\python.exe" (
-  echo Python environment not found at .venv\Scripts\python.exe
-  echo Follow WINDOWS_SETUP.md before starting the server.
+set "PYTHON_EXE="
+if exist "python_embed\python.exe" set "PYTHON_EXE=python_embed\python.exe"
+if not defined PYTHON_EXE if exist ".venv\Scripts\python.exe" set "PYTHON_EXE=.venv\Scripts\python.exe"
+if not defined PYTHON_EXE (
+  echo Python was not found.
+  echo Expected python_embed\python.exe or .venv\Scripts\python.exe
+  echo Follow CALLIOPE_AMBER_ORBIT.md before starting the server.
   pause
   exit /b 1
 )
 
 echo Starting Sense.AI on http://0.0.0.0:8000
 :run_server
-".venv\Scripts\python.exe" -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
+"%PYTHON_EXE%" -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 1
 
 set "SERVER_EXIT_CODE=%ERRORLEVEL%"
 echo.

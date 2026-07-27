@@ -33,4 +33,5 @@ training_dataset.csv
 usage_tracker.json
 viewer_profiles.json
 viewer_hidden_store.json
+viewer_saved_store.json
 workflow_store*.json

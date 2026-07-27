@@ -75,6 +75,7 @@ def migrate_legacy_news_runtime() -> None:
         "training_dataset.csv",
         "usage_tracker.json",
         "viewer_hidden_store.json",
+        "viewer_saved_store.json",
         "viewer_profiles.json",
         "voc_feedback.json",
         "workflow_store.json",

@@ -50,6 +50,7 @@ from fastapi import BackgroundTasks
 from concurrent.futures import ThreadPoolExecutor
 from threading import Semaphore
 from core.secure_http import tls_verify
+from core.storage import JsonStore
 from core.profile import client_ip as resolve_client_ip
 from core.profile import normalize_ip
 from core.profile import resolve_profile
@@ -108,14 +109,22 @@ def env_ip_map(name: str, default: str = "") -> dict[str, str]:
 
 
 try:
-    from news_scrapper.adapters.samsung_web_search import enrich_article_with_web_search
+    from news_scrapper.adapters.samsung_web_search import (
+        check_samsung_web_search,
+        enrich_article_with_web_search,
+    )
 except Exception as adapter_error:
+    check_samsung_web_search = None
     enrich_article_with_web_search = None
     print(f"[ADAPTER] Samsung Web Search unavailable: {adapter_error}", flush=True)
 
 try:
-    from news_scrapper.adapters.samsung_chat import summarize_article_with_chat
+    from news_scrapper.adapters.samsung_chat import (
+        check_samsung_chat,
+        summarize_article_with_chat,
+    )
 except Exception as adapter_error:
+    check_samsung_chat = None
     summarize_article_with_chat = None
     print(f"[ADAPTER] Samsung Chat unavailable: {adapter_error}", flush=True)
 
@@ -196,6 +205,7 @@ NOT_INTERESTED_EXPIRY_HOURS = 22
 USAGE_TRACKER_FILE = os.path.join(ROOT_DIR, "usage_tracker.json")
 VIEWER_PROFILES_FILE = os.path.join(ROOT_DIR, "viewer_profiles.json")
 VIEWER_HIDDEN_FILE = os.path.join(ROOT_DIR, "viewer_hidden_store.json")
+VIEWER_SAVED_FILE = os.path.join(ROOT_DIR, "viewer_saved_store.json")
 IP_HASH_SECRET = os.environ.get("NEWSSCRAPPER_IP_HASH_SECRET", "development-only-change-this-secret")
 if APP_ENV in {"production", "prod"}:
     if IP_HASH_SECRET == "development-only-change-this-secret":
@@ -208,11 +218,155 @@ HISTORY_RETENTION_DAYS = max(1, int(os.environ.get("HISTORY_RETENTION_DAYS", "30
 CRAWL_LOOKBACK_DAYS = max(1, int(os.environ.get("CRAWL_LOOKBACK_DAYS", "1")))
 WEB_SEARCH_ENRICHMENT_ENABLED = env_bool("WEB_SEARCH_ENRICHMENT_ENABLED", False)
 WEB_SEARCH_REQUIRE_SUCCESS = env_bool("WEB_SEARCH_REQUIRE_SUCCESS", False)
+WEB_SEARCH_REQUIRE_KEYWORD_MATCH = env_bool(
+    "WEB_SEARCH_REQUIRE_KEYWORD_MATCH", True
+)
 WEB_SEARCH_MAX_ENRICH_PER_RUN = max(0, int(os.environ.get("WEB_SEARCH_MAX_ENRICH_PER_RUN", "0")))
 WEB_SEARCH_ENRICH_DELAY_SECONDS = max(0.0, float(os.environ.get("WEB_SEARCH_ENRICH_DELAY_SECONDS", "0")))
 FINAL_CHAT_SUMMARY_ENABLED = env_bool("FINAL_CHAT_SUMMARY_ENABLED", False)
 FINAL_CHAT_SUMMARY_DELAY_SECONDS = max(0.0, float(os.environ.get("FINAL_CHAT_SUMMARY_DELAY_SECONDS", "0")))
 FINAL_CHAT_SUMMARY_MAX_ARTICLES = max(0, int(os.environ.get("FINAL_CHAT_SUMMARY_MAX_ARTICLES", "0")))
+SAMSUNG_PIPELINE_ENABLED = env_bool(
+    "SAMSUNG_PIPELINE_ENABLED",
+    WEB_SEARCH_ENRICHMENT_ENABLED and FINAL_CHAT_SUMMARY_ENABLED,
+)
+if SAMSUNG_PIPELINE_ENABLED:
+    WEB_SEARCH_ENRICHMENT_ENABLED = True
+    FINAL_CHAT_SUMMARY_ENABLED = True
+    WEB_SEARCH_REQUIRE_SUCCESS = True
+SAMSUNG_DISCOVERY_ONLY = SAMSUNG_PIPELINE_ENABLED and env_bool(
+    "SAMSUNG_DISCOVERY_ONLY", True
+)
+SAMSUNG_PIPELINE_CREDENTIALS_READY = all(
+    os.environ.get(name, "").strip()
+    for name in (
+        "SAMSUNG_WEB_SEARCH_CLIENT",
+        "SAMSUNG_WEB_SEARCH_TOKEN",
+        "SAMSUNG_CHAT_CLIENT",
+        "SAMSUNG_CHAT_TOKEN",
+        "SAMSUNG_CHAT_MODEL_ID",
+    )
+)
+if SAMSUNG_PIPELINE_ENABLED and not SAMSUNG_PIPELINE_CREDENTIALS_READY:
+    print(
+        "[PIPELINE] Samsung pipeline is enabled but one or more Web Search/"
+        "Chat credentials are missing. Existing briefings remain available, "
+        "but new Samsung extraction cannot complete until configuration is fixed.",
+        flush=True,
+    )
+SAMSUNG_CACHE_MAX_ITEMS = max(
+    100, int(os.environ.get("SAMSUNG_CACHE_MAX_ITEMS", "2500"))
+)
+SAMSUNG_HEALTH_CACHE_SECONDS = max(
+    0, int(os.environ.get("SAMSUNG_HEALTH_CACHE_SECONDS", "900"))
+)
+SAMSUNG_PIPELINE_CACHE_DIR = NEWS_RUNTIME_DIR / "samsung_pipeline_cache"
+WEB_SEARCH_CACHE = JsonStore(
+    SAMSUNG_PIPELINE_CACHE_DIR / "web_search_success.json", dict
+)
+CHAT_SUMMARY_CACHE = JsonStore(
+    SAMSUNG_PIPELINE_CACHE_DIR / "chat_summary_success.json", dict
+)
+pipeline_health_lock = threading.Lock()
+pipeline_health_cache = {"checked_at": 0.0, "result": None}
+
+
+def resolve_pipeline_capabilities(force=False):
+    """Choose external or local stages once, before a crawler is launched."""
+
+    if not SAMSUNG_PIPELINE_ENABLED:
+        return {
+            "web_search": False,
+            "chat": False,
+            "discovery_only": False,
+            "summary_engine": "local_bart",
+            "mode": "local_scrapy_bart",
+        }
+
+    now = time.monotonic()
+    with pipeline_health_lock:
+        cached = pipeline_health_cache.get("result")
+        age = now - float(pipeline_health_cache.get("checked_at") or 0)
+        if (
+            not force
+            and isinstance(cached, dict)
+            and age <= SAMSUNG_HEALTH_CACHE_SECONDS
+        ):
+            print(
+                f"[PIPELINE:PRECHECK] Reusing {round(age)}s-old capability "
+                f"result: {cached['mode']}.",
+                flush=True,
+            )
+            return dict(cached)
+
+        print(
+            "[PIPELINE:PRECHECK] Testing Samsung Web Search and Samsung Chat "
+            "before crawling starts...",
+            flush=True,
+        )
+        web_result = (
+            check_samsung_web_search()
+            if check_samsung_web_search is not None
+            else {"available": False, "error": "Web Search adapter import failed"}
+        )
+        chat_result = (
+            check_samsung_chat()
+            if check_samsung_chat is not None
+            else {"available": False, "error": "Chat adapter import failed"}
+        )
+        web_available = bool(web_result.get("available"))
+        chat_available = bool(chat_result.get("available"))
+
+        if web_available:
+            print(
+                f"[PIPELINE:PRECHECK] PASS Samsung Web Search "
+                f"({web_result.get('latency_ms', '?')} ms). Scrapy will discover "
+                "URLs only; exact Web Search references and targeted completion "
+                "will supply article text.",
+                flush=True,
+            )
+        else:
+            print(
+                "[PIPELINE:PRECHECK] FAIL Samsung Web Search: "
+                f"{web_result.get('error', 'unknown failure')}. FALLBACK: Scrapy "
+                "will crawl and extract complete article text in this run.",
+                flush=True,
+            )
+        if chat_available:
+            print(
+                f"[PIPELINE:PRECHECK] PASS Samsung Chat "
+                f"({chat_result.get('latency_ms', '?')} ms). Chat will generate "
+                "the lead, bullets, intent, and Why This Matters.",
+                flush=True,
+            )
+        else:
+            print(
+                "[PIPELINE:PRECHECK] FAIL Samsung Chat: "
+                f"{chat_result.get('error', 'unknown failure')}. FALLBACK: local "
+                "BART will summarize and local FLAN-T5 will serve strategic insight.",
+                flush=True,
+            )
+
+        if web_available and chat_available:
+            mode = "samsung_web_search_and_chat"
+        elif web_available:
+            mode = "samsung_web_search_local_bart"
+        elif chat_available:
+            mode = "scrapy_extraction_samsung_chat"
+        else:
+            mode = "local_scrapy_bart"
+        result = {
+            "web_search": web_available,
+            "chat": chat_available,
+            "discovery_only": web_available and SAMSUNG_DISCOVERY_ONLY,
+            "summary_engine": "samsung_chat" if chat_available else "local_bart",
+            "mode": mode,
+            "web_search_check": web_result,
+            "chat_check": chat_result,
+        }
+        pipeline_health_cache.update({"checked_at": now, "result": dict(result)})
+        print(f"[PIPELINE:PRECHECK] Selected run mode: {mode}.", flush=True)
+        return result
 
 # ==========================================
 # PROFILE ROUTING AND STORAGE
@@ -519,6 +673,7 @@ workflow_lock = threading.RLock()
 voc_lock = threading.Lock()
 sites_lock = threading.Lock()
 viewer_hidden_lock = threading.Lock()
+viewer_saved_lock = threading.Lock()
 region_learning_lock = threading.Lock()
 dropped_lock = threading.Lock()
 opinion_lock = threading.Lock()
@@ -535,20 +690,71 @@ if not os.path.exists(HISTORY_DIR):
 # --- INITIALIZE HUGGING FACE OPINION ENGINE ---
 # ==========================================
 print("Initializing Hugging Face Opinion Engine (Local)...")
-try:
-    # This is a local folder, not a Hugging Face Hub model name. The folder
-    # contains config/tokenizer files plus model.safetensors.
-    opinion_model_path = str(resolve_model_path("flan-t5-local", "flan-t5-local"))
-
-    # local_files_only=True tells Transformers to load only files already
-    # present on disk. It should not try to download missing artifacts.
-    tokenizer = AutoTokenizer.from_pretrained(opinion_model_path, local_files_only=True)
-    model = AutoModelForSeq2SeqLM.from_pretrained(opinion_model_path, local_files_only=True)
-    print("Opinion Engine Ready.")
-except Exception as e:
-    print(f"Opinion Engine Failed to Load: {e}")
+if SAMSUNG_PIPELINE_ENABLED:
+    # Samsung Chat supplies both the structured summary and strategic
+    # implication. Avoid holding FLAN-T5 in memory when that production path is
+    # active.
     tokenizer = None
     model = None
+    print("Opinion Engine delegated to Samsung Chat; local FLAN-T5 not loaded.")
+else:
+    try:
+        # This is a local folder, not a Hugging Face Hub model name. The folder
+        # contains config/tokenizer files plus model.safetensors.
+        opinion_model_path = str(resolve_model_path("flan-t5-local", "flan-t5-local"))
+
+        # local_files_only=True tells Transformers to load only files already
+        # present on disk. It should not try to download missing artifacts.
+        tokenizer = AutoTokenizer.from_pretrained(opinion_model_path, local_files_only=True)
+        model = AutoModelForSeq2SeqLM.from_pretrained(opinion_model_path, local_files_only=True)
+        print("Opinion Engine Ready.")
+    except Exception as e:
+        print(f"Opinion Engine Failed to Load: {e}")
+        tokenizer = None
+        model = None
+
+opinion_model_load_attempted = model is not None
+
+
+def ensure_local_opinion_model():
+    """Lazily load FLAN-T5 when Samsung Chat is unavailable at runtime."""
+
+    global tokenizer, model, opinion_model_load_attempted
+    if model is not None and tokenizer is not None:
+        return True
+    with opinion_lock:
+        if model is not None and tokenizer is not None:
+            return True
+        if opinion_model_load_attempted:
+            return False
+        opinion_model_load_attempted = True
+        try:
+            opinion_model_path = str(
+                resolve_model_path("flan-t5-local", "flan-t5-local")
+            )
+            print(
+                "[PIPELINE:FALLBACK] Loading local FLAN-T5 for Why This "
+                "Matters because Samsung Chat is unavailable.",
+                flush=True,
+            )
+            tokenizer = AutoTokenizer.from_pretrained(
+                opinion_model_path, local_files_only=True
+            )
+            model = AutoModelForSeq2SeqLM.from_pretrained(
+                opinion_model_path, local_files_only=True
+            )
+            print("[PIPELINE:FALLBACK] Local FLAN-T5 ready.", flush=True)
+            return True
+        except Exception as error:
+            print(
+                "[PIPELINE:FALLBACK] Local FLAN-T5 failed to load: "
+                f"{type(error).__name__}: {error}. Deterministic insight "
+                "fallback remains active.",
+                flush=True,
+            )
+            tokenizer = None
+            model = None
+            return False
 
 
 def generate_opinion(text):
@@ -556,7 +762,7 @@ def generate_opinion(text):
 
     # If the local model failed to load, export generation degrades gracefully
     # instead of calling an external API.
-    if not model or not tokenizer or not text:
+    if not text or not ensure_local_opinion_model():
         return "Insight generation unavailable."
 
     try:
@@ -622,7 +828,7 @@ def generate_why_it_matters(item, profile=DEFAULT_PROFILE):
     if cached:
         return cached[0], f"{cached[1]}-cache"
 
-    if not model or not tokenizer or not summary:
+    if not summary or not ensure_local_opinion_model():
         insight = fallback_why_it_matters(item)
         source = "fallback"
     else:
@@ -982,6 +1188,8 @@ class Source(BaseModel):
 class NewsItem(BaseModel):
     title: str
     master_summary: str
+    summary_lead: Optional[str] = ""
+    summary_points: List[str] = []
     ppt_summary: Optional[str] = ""
     snippet: Optional[str] = ""
     date: str
@@ -994,6 +1202,9 @@ class NewsItem(BaseModel):
     full_contents: Optional[str] = ""
     selected_by: Optional[str] = None
     category: Optional[str] = "Tech News"
+    why_it_matters: Optional[str] = ""
+    article_intent: Optional[str] = ""
+    summarized_by: Optional[str] = ""
 
 
 class ExportRequest(BaseModel):
@@ -1249,6 +1460,78 @@ def get_bouncer_summary_from_item(item):
     return (" ".join(parts).strip() or str(item.get("title", "")).strip())[:2500]
 
 
+def pipeline_cache_key(item, *, include_sources=False):
+    links = []
+    if include_sources:
+        for source in item.get("sources", []) or []:
+            if isinstance(source, dict):
+                links.append(str(source.get("link") or source.get("url") or ""))
+    identity = "|".join(
+        [
+            str(item.get("canonical_link") or item.get("link") or "").strip().lower(),
+            str(item.get("title") or "").strip().casefold(),
+            str(item.get("date") or "").strip(),
+            "|".join(sorted(link.strip().lower() for link in links if link.strip())),
+            hashlib.sha256(
+                str(
+                    item.get("full_contents")
+                    or item.get("summary_input")
+                    or ""
+                )[:20000].encode("utf-8")
+            ).hexdigest()
+            if include_sources
+            else "",
+        ]
+    )
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+def cache_success(store, key, item):
+    def update(values):
+        values = values if isinstance(values, dict) else {}
+        values[key] = dict(item)
+        while len(values) > SAMSUNG_CACHE_MAX_ITEMS:
+            values.pop(next(iter(values)))
+        return values
+
+    store.update(update)
+
+
+def keyword_terms(keywords):
+    if isinstance(keywords, str):
+        values = keywords.split(",")
+    else:
+        values = keywords or []
+    return [
+        str(value).strip()
+        for value in values
+        if str(value).strip()
+    ]
+
+
+def matched_pipeline_keywords(item, keywords):
+    text = " ".join(
+        str(item.get(key) or "")
+        for key in (
+            "title",
+            "full_contents",
+            "web_search_content",
+            "summary_input",
+            "summary",
+            "snippet",
+        )
+    )
+    matches = []
+    for keyword in keyword_terms(keywords):
+        if re.search(
+            r"(?<!\w)" + re.escape(keyword) + r"(?!\w)",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            matches.append(keyword)
+    return matches
+
+
 def run_bouncer_filter_on_items(items, profile=DEFAULT_PROFILE, stage="raw"):
     filtered_items = []
     dropped_count = 0
@@ -1283,11 +1566,21 @@ def run_bouncer_filter_on_items(items, profile=DEFAULT_PROFILE, stage="raw"):
     return filtered_items, dropped_count, low_priority_count
 
 
-def enrich_raw_articles(items, keywords, profile=DEFAULT_PROFILE):
-    """Run the legacy Samsung Web Search enrichment stage when configured."""
+def enrich_raw_articles(
+    items,
+    keywords,
+    profile=DEFAULT_PROFILE,
+    use_web_search=None,
+):
+    """Use Samsung Web Search as the article extraction stage when configured."""
 
     source_items = list(items or [])
-    if not WEB_SEARCH_ENRICHMENT_ENABLED:
+    enabled = (
+        WEB_SEARCH_ENRICHMENT_ENABLED
+        if use_web_search is None
+        else bool(use_web_search)
+    )
+    if not enabled:
         return source_items
     if enrich_article_with_web_search is None:
         message = "Samsung Web Search adapter is unavailable"
@@ -1299,39 +1592,220 @@ def enrich_raw_articles(items, keywords, profile=DEFAULT_PROFILE):
     limit = WEB_SEARCH_MAX_ENRICH_PER_RUN or len(source_items)
     output = []
     successful = 0
+    rejected_for_keywords = 0
+    strict = WEB_SEARCH_REQUIRE_SUCCESS or SAMSUNG_PIPELINE_ENABLED
     print(f"[PIPELINE:{profile}] Web Search enrichment: {min(limit, len(source_items))} article(s).", flush=True)
     for index, item in enumerate(source_items):
         if index >= limit:
-            output.append(item)
+            if not strict:
+                output.append(item)
             continue
-        enriched = enrich_article_with_web_search(item, keywords=keywords)
+        cache_key = pipeline_cache_key(item)
+        cached_values = WEB_SEARCH_CACHE.read()
+        cached = (
+            cached_values.get(cache_key)
+            if isinstance(cached_values, dict)
+            else None
+        )
+        if isinstance(cached, dict):
+            enriched = dict(cached)
+            enriched["enrichment_cache"] = "hit"
+        else:
+            enriched = enrich_article_with_web_search(item, keywords=keywords)
+            if enriched.get("enrichment_status") == "success":
+                cache_success(WEB_SEARCH_CACHE, cache_key, enriched)
+                enriched["enrichment_cache"] = "miss"
         if enriched.get("enrichment_status") == "success":
-            successful += 1
-            output.append(enriched)
-        elif WEB_SEARCH_REQUIRE_SUCCESS:
+            matches = matched_pipeline_keywords(enriched, keywords)
+            enriched["keywords_found"] = matches
+            if WEB_SEARCH_REQUIRE_KEYWORD_MATCH and not matches:
+                rejected_for_keywords += 1
+                enriched["enrichment_status"] = "rejected_keyword_mismatch"
+                print(
+                    f"[PIPELINE:{profile}] Web Search content did not match "
+                    f"profile keywords: {item.get('title', '')[:70]}",
+                    flush=True,
+                )
+                if not strict:
+                    output.append(enriched)
+            else:
+                successful += 1
+                output.append(enriched)
+        elif strict:
             print(f"[PIPELINE:{profile}] Enrichment rejected: {item.get('title', '')[:70]}", flush=True)
         else:
             output.append(enriched)
         if index + 1 < min(limit, len(source_items)) and WEB_SEARCH_ENRICH_DELAY_SECONDS:
             time.sleep(WEB_SEARCH_ENRICH_DELAY_SECONDS)
-    print(f"[PIPELINE:{profile}] Web Search enriched {successful}/{min(limit, len(source_items))}.", flush=True)
+    print(
+        f"[PIPELINE:{profile}] Web Search enriched {successful}/"
+        f"{min(limit, len(source_items))}; keyword mismatches "
+        f"{rejected_for_keywords}.",
+        flush=True,
+    )
     return output
 
 
-def enrich_final_articles(items, profile=DEFAULT_PROFILE):
+def structure_summary_for_dossier(item, summarized_by="local_bart"):
+    """Normalize any local summary into the same lead-plus-bullets UI contract."""
+
+    output = dict(item or {})
+    summary = str(
+        output.get("master_summary")
+        or output.get("summary")
+        or output.get("snippet")
+        or ""
+    ).strip()
+    content = str(
+        output.get("full_contents")
+        or output.get("full_content")
+        or output.get("summary_input")
+        or summary
+    ).strip()
+    summary_sentences = [
+        part.strip()
+        for part in re.split(r"(?<=[.!?])\s+", summary)
+        if len(part.strip()) >= 12
+    ]
+    lead_parts = summary_sentences[:2] or ([summary] if summary else [])
+    lead = " ".join(lead_parts).strip()
+    candidates = summary_sentences[2:]
+    candidates.extend(
+        part.strip()
+        for part in re.split(r"(?<=[.!?])\s+", content)
+        if len(part.strip()) >= 24
+    )
+    points = []
+    seen = {part.casefold() for part in lead_parts}
+    for candidate in candidates:
+        normalized = re.sub(r"\s+", " ", candidate).strip()
+        key = normalized.casefold()
+        if key and key not in seen:
+            seen.add(key)
+            points.append(normalized)
+        if len(points) >= 5:
+            break
+    if not points and lead:
+        points = [lead]
+    output["summary"] = lead or summary
+    output["summary_lead"] = lead or summary
+    output["summary_points"] = points
+    output["key_points"] = points
+    output["master_summary"] = " ".join(
+        [lead or summary, *[f"• {point}" for point in points]]
+    ).strip()
+    output["summary_format"] = "lead_and_bullets"
+    output["summarized_by"] = summarized_by
+    return output
+
+
+def apply_local_bart_fallback(items, profile=DEFAULT_PROFILE):
+    """Generate local BART summaries after Chat preflight or request failure."""
+
+    source_items = [dict(item) for item in (items or [])]
+    if not source_items:
+        return []
+    print(
+        f"[PIPELINE:{profile}] LOCAL FALLBACK: loading BART to summarize "
+        f"{len(source_items)} article(s).",
+        flush=True,
+    )
+    try:
+        from news_scrapper.semantic_clustering import MinimalSemanticEngine
+
+        engine = MinimalSemanticEngine(load_summarizer=True)
+        for index, item in enumerate(source_items, 1):
+            content = str(
+                item.get("full_contents")
+                or item.get("full_content")
+                or item.get("summary_input")
+                or item.get("master_summary")
+                or item.get("snippet")
+                or ""
+            ).strip()
+            if content:
+                bart_summary = engine.generate_dynamic_summary([content[:12000]])
+                if bart_summary:
+                    item["master_summary"] = bart_summary
+                    item["summary"] = bart_summary
+                    item["ppt_summary"] = engine.generate_ppt_summary([content[:12000]])
+            source_items[index - 1] = structure_summary_for_dossier(
+                item, "local_bart"
+            )
+            print(
+                f"[PIPELINE:{profile}] BART fallback {index}/"
+                f"{len(source_items)}: {item.get('title', '')[:70]}",
+                flush=True,
+            )
+    except Exception as error:
+        print(
+            f"[PIPELINE:{profile}] BART fallback failed: "
+            f"{type(error).__name__}: {error}. Using deterministic structured "
+            "extractive summaries so the dossier remains readable.",
+            flush=True,
+        )
+        source_items = [
+            structure_summary_for_dossier(item, "local_extractive")
+            for item in source_items
+        ]
+    return source_items
+
+
+def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
     """Add secure image metadata and optional Samsung Chat final summaries."""
 
     output = []
+    chat_enabled = (
+        FINAL_CHAT_SUMMARY_ENABLED if use_chat is None else bool(use_chat)
+    )
     chat_limit = FINAL_CHAT_SUMMARY_MAX_ARTICLES or len(items or [])
+    chat_failures = []
     for index, original in enumerate(items or []):
         item = dict(original)
         if enrich_article_image_metadata is not None:
             item = enrich_article_image_metadata(item)
-        if FINAL_CHAT_SUMMARY_ENABLED and summarize_article_with_chat is not None and index < chat_limit:
-            item = summarize_article_with_chat(item)
+        if chat_enabled and summarize_article_with_chat is not None and index < chat_limit:
+            cache_key = pipeline_cache_key(item, include_sources=True)
+            cached_values = CHAT_SUMMARY_CACHE.read()
+            cached = (
+                cached_values.get(cache_key)
+                if isinstance(cached_values, dict)
+                else None
+            )
+            if isinstance(cached, dict):
+                item = dict(cached)
+                item["chat_summary_cache"] = "hit"
+            else:
+                summarized = summarize_article_with_chat(item)
+                if summarized.get("chat_summary_status") == "success":
+                    cache_success(CHAT_SUMMARY_CACHE, cache_key, summarized)
+                item = summarized
+                item["chat_summary_cache"] = "miss"
+            if item.get("chat_summary_status") != "success":
+                print(
+                    f"[PIPELINE:{profile}] Samsung Chat failed for "
+                    f"'{item.get('title', '')[:70]}': "
+                    f"{item.get('chat_summary_error', 'unknown failure')}. "
+                    "Queued for local BART fallback.",
+                    flush=True,
+                )
+                chat_failures.append(len(output))
             if index + 1 < min(chat_limit, len(items)) and FINAL_CHAT_SUMMARY_DELAY_SECONDS:
                 time.sleep(FINAL_CHAT_SUMMARY_DELAY_SECONDS)
         output.append(item)
+    if not chat_enabled:
+        return [
+            structure_summary_for_dossier(item, "local_bart")
+            for item in output
+        ]
+    if chat_failures:
+        fallback_items = apply_local_bart_fallback(
+            [output[index] for index in chat_failures],
+            profile,
+        )
+        for index, fallback in zip(chat_failures, fallback_items):
+            fallback["chat_summary_status"] = "fallback"
+            output[index] = fallback
     return output
 
 
@@ -1604,6 +2078,33 @@ def save_viewer_hidden_store(data):
     os.replace(temp_file, VIEWER_HIDDEN_FILE)
 
 
+def load_viewer_saved_store():
+    if not os.path.exists(VIEWER_SAVED_FILE):
+        return {}
+    try:
+        with open(VIEWER_SAVED_FILE, "r", encoding="utf-8") as file_obj:
+            data = json.load(file_obj)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_viewer_saved_store(data):
+    temp_file = f"{VIEWER_SAVED_FILE}.tmp"
+    with open(temp_file, "w", encoding="utf-8") as file_obj:
+        json.dump(data, file_obj, indent=2, ensure_ascii=False)
+    os.replace(temp_file, VIEWER_SAVED_FILE)
+
+
+def get_viewer_saved_items(request, profile=None):
+    profile_name = profile or get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    store = load_viewer_saved_store()
+    viewer_store = store.get(viewer_key, {})
+    items = viewer_store.get(profile_name, [])
+    return items if isinstance(items, list) else []
+
+
 def get_viewer_hidden_items(request, profile=None):
     profile_name = profile or get_profile_for_request(request)
     viewer_key = get_viewer_key(get_client_ip(request))
@@ -1635,6 +2136,8 @@ def get_empty_day():
         "articles_clicked": 0,
         "votes_interested": 0,
         "votes_not_interested": 0,
+        "saved_for_later": 0,
+        "removed_from_saved": 0,
         "exports": [],
         "briefing_views": 0,
         "heartbeats": 0,
@@ -1720,6 +2223,7 @@ def _legacy_run_morning_briefing():
             "-a", f"from_date={from_date}",
             "-a", f"to_date={to_date}",
             "-a", "target_sites=All",
+            "-a", f"discovery_only={'true' if SAMSUNG_DISCOVERY_ONLY else 'false'}",
             "-s", f"ROBOTSTXT_OBEY={'True' if SCRAPY_ROBOTSTXT_OBEY else 'False'}",
             "-s", "USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "-s", "TWISTED_REACTOR=twisted.internet.asyncioreactor.AsyncioSelectorReactor",
@@ -1838,8 +2342,9 @@ def _legacy_run_morning_briefing():
 # ==========================================
 # PROFILE-AWARE AUTONOMOUS SCHEDULER
 # ==========================================
-def run_scheduler_for_profile(profile: str):
+def run_scheduler_for_profile(profile: str, capabilities=None):
     config = get_profile_config(profile)
+    capabilities = capabilities or resolve_pipeline_capabilities()
     today = datetime.datetime.now()
     scheduler_job_id = f"scheduler_{profile}_{today.strftime('%Y%m%d_%H%M%S')}"
     output_file = os.path.join(ROOT_DIR, f"ui_results_{scheduler_job_id}.json")
@@ -1860,12 +2365,18 @@ def run_scheduler_for_profile(profile: str):
             "-a", f"to_date={to_date}",
             "-a", "target_sites=All",
             "-a", f"sites_file={config['sites_file']}",
+            "-a", f"discovery_only={'true' if capabilities['discovery_only'] else 'false'}",
             "-s", f"ROBOTSTXT_OBEY={'True' if SCRAPY_ROBOTSTXT_OBEY else 'False'}",
             "-s", "USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "-s", "TWISTED_REACTOR=twisted.internet.asyncioreactor.AsyncioSelectorReactor",
             "-O", output_file,
         ]
-        print(f"[SCHEDULER:{profile}] Starting scan: {scheduler_job_id}")
+        print(
+            f"[SCHEDULER:{profile}] Starting scan: {scheduler_job_id} "
+            f"(pipeline={capabilities['mode']}, "
+            f"scrapy={'discovery-only' if capabilities['discovery_only'] else 'full extraction'})",
+            flush=True,
+        )
         if scheduler_shutdown_event.is_set():
             print(f"[SCHEDULER:{profile}] Shutdown requested; scan skipped.", flush=True)
             return False
@@ -1900,21 +2411,77 @@ def run_scheduler_for_profile(profile: str):
         if not isinstance(raw_data, list):
             raise RuntimeError("Scrapy output must be a JSON list")
 
-        if config["use_bouncer"]:
-            raw_data, dropped, low_priority = run_bouncer_filter_on_items(
-                raw_data, profile, "scheduler_raw"
+        if capabilities["web_search"]:
+            print(
+                f"[SCHEDULER:{profile}] Sending discovered URLs to Samsung "
+                "Web Search before Gatekeeper scoring.",
+                flush=True,
             )
-            print(f"[SCHEDULER:{profile}] Dropped {dropped}; low priority kept {low_priority}.")
-
-        raw_data = enrich_raw_articles(raw_data, config["keywords"], profile)
+            raw_data = enrich_raw_articles(
+                raw_data,
+                config["keywords"],
+                profile,
+                use_web_search=True,
+            )
+            if config["use_bouncer"]:
+                raw_data, dropped, low_priority = run_bouncer_filter_on_items(
+                    raw_data, profile, "scheduler_enriched"
+                )
+                print(
+                    f"[SCHEDULER:{profile}] Dropped {dropped}; "
+                    f"low priority kept {low_priority}.",
+                    flush=True,
+                )
+        else:
+            if config["use_bouncer"]:
+                raw_data, dropped, low_priority = run_bouncer_filter_on_items(
+                    raw_data, profile, "scheduler_raw"
+                )
+                print(
+                    f"[SCHEDULER:{profile}] Dropped {dropped}; "
+                    f"low priority kept {low_priority}.",
+                    flush=True,
+                )
+            raw_data = enrich_raw_articles(
+                raw_data,
+                config["keywords"],
+                profile,
+                use_web_search=False,
+            )
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(raw_data, f, indent=4, ensure_ascii=False)
 
-        subprocess.run(
-            [sys.executable, "-m", "news_scrapper.semantic_clustering", "--job-id", scheduler_job_id, "--fast-mode"],
+        clustering_command = [
+            sys.executable,
+            "-m",
+            "news_scrapper.semantic_clustering",
+            "--job-id",
+            scheduler_job_id,
+        ]
+        if capabilities["chat"]:
+            clustering_command.append("--fast-mode")
+            print(
+                f"[SCHEDULER:{profile}] MiniLM clustering in fast mode; "
+                "Samsung Chat owns final summarization.",
+                flush=True,
+            )
+        else:
+            print(
+                f"[SCHEDULER:{profile}] MiniLM clustering with local BART "
+                "summarization fallback.",
+                flush=True,
+            )
+        clustering_result = subprocess.run(
+            clustering_command,
             cwd=str(PROJECT_ROOT),
             timeout=3600,
+            check=False,
         )
+        if clustering_result.returncode != 0:
+            raise RuntimeError(
+                "Semantic clustering exited with code "
+                f"{clustering_result.returncode}"
+            )
         if not os.path.exists(cluster_file):
             print(f"[SCHEDULER:{profile}] Failed to generate cluster file.")
             return False
@@ -1931,7 +2498,11 @@ def run_scheduler_for_profile(profile: str):
                 item.get("master_summary", "") or item.get("snippet", ""),
             )
             item.update(apply_learned_region(item, profile))
-        results = enrich_final_articles(results, profile)
+        results = enrich_final_articles(
+            results,
+            profile,
+            use_chat=capabilities["chat"],
+        )
         if not results:
             print(f"[SCHEDULER:{profile}] Finished but no news was found.")
             return True
@@ -2012,12 +2583,13 @@ def run_morning_briefing():
     failed_profiles = []
     try:
         ensure_profile_storage()
+        capabilities = resolve_pipeline_capabilities()
         for profile in [DEFAULT_PROFILE, BROADCAST_PROFILE]:
             if scheduler_shutdown_event.is_set():
                 break
             with scheduler_lock:
                 SCHEDULER_STATUS["message"] = f"Autonomous Engine Scanning {profile} profile..."
-            if not run_scheduler_for_profile(profile):
+            if not run_scheduler_for_profile(profile, capabilities):
                 failed_profiles.append(profile)
     finally:
         with scheduler_lock:
@@ -2749,6 +3321,7 @@ def add_site(site: dict, request: Request):
 def get_system_status(request: Request):
     active_profile = get_active_profile_name(request)
     details_allowed = get_client_ip(request) in SYSTEM_STATUS_ALLOWED_IPS
+    cached_capabilities = pipeline_health_cache.get("result")
     with scheduler_lock:
         running_jobs = sum(
             1
@@ -2761,8 +3334,27 @@ def get_system_status(request: Request):
             "active_manual_jobs": running_jobs,
             "capacity_remaining": crawl_semaphore._value,
             "details_allowed": details_allowed,
+            "pipeline": {
+                "mode": (
+                    cached_capabilities.get("mode", "awaiting_preflight")
+                    if SAMSUNG_PIPELINE_ENABLED and cached_capabilities
+                    else "samsung_preflight_pending"
+                    if SAMSUNG_PIPELINE_ENABLED
+                    else "local_models"
+                ),
+                "discovery_only": (
+                    cached_capabilities.get("discovery_only", False)
+                    if cached_capabilities
+                    else False
+                ),
+                "web_search_enabled": WEB_SEARCH_ENRICHMENT_ENABLED,
+                "chat_summary_enabled": FINAL_CHAT_SUMMARY_ENABLED,
+                "automatic_local_fallback": True,
+                "credentials_ready": SAMSUNG_PIPELINE_CREDENTIALS_READY,
+            },
         }
         if details_allowed:
+            response["pipeline"]["last_preflight"] = cached_capabilities
             response["profiles"] = {
                 DEFAULT_PROFILE: get_profile_debug_info(DEFAULT_PROFILE),
                 BROADCAST_PROFILE: get_profile_debug_info(BROADCAST_PROFILE),
@@ -2776,6 +3368,18 @@ def get_system_status(request: Request):
 @app.post("/insight")
 def get_dossier_insight(request: Request, item: dict = Body(...)):
     profile = get_active_profile_name(request)
+    existing = str(
+        item.get("why_it_matters")
+        or item.get("why_matters")
+        or ""
+    ).strip()
+    if existing:
+        return {
+            "status": "success",
+            "profile": profile,
+            "why_matters": existing,
+            "generated_by": item.get("summarized_by") or "stored",
+        }
     insight, generated_by = generate_why_it_matters(item, profile)
     return {
         "status": "success",
@@ -3654,6 +4258,93 @@ def restore_for_current_viewer(request: Request, payload: dict = Body(...)):
     }
 
 
+# ==========================================
+# --- PERSONAL SAVED-FOR-LATER SIGNALS ---
+# ==========================================
+@app.get("/viewer/saved")
+def get_personal_saved(request: Request):
+    profile = get_profile_for_request(request)
+    items = get_viewer_saved_items(request, profile)
+    return {
+        "status": "success",
+        "items": apply_learned_regions(items, profile),
+        "count": len(items),
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "affects_ranking": False,
+    }
+
+
+@app.post("/viewer/saved")
+def save_for_current_viewer(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    article_key = _article_identity(payload)
+    if not article_key:
+        raise HTTPException(status_code=400, detail="An article title or link is required.")
+
+    with viewer_saved_lock:
+        store = load_viewer_saved_store()
+        viewer_store = store.setdefault(viewer_key, {})
+        items = viewer_store.setdefault(profile, [])
+        existing = next(
+            (
+                item
+                for item in items
+                if str(item.get("article_key") or _article_identity(item))
+                == article_key
+            ),
+            None,
+        )
+        if existing is None:
+            entry = dict(payload)
+            entry["article_key"] = article_key
+            entry["saved_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+            entry["saved_scope"] = "current_viewer_only"
+            items.insert(0, entry)
+            save_viewer_saved_store(store)
+
+    return {
+        "status": "success",
+        "saved": True,
+        "count": len(items),
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "affects_ranking": False,
+    }
+
+
+@app.post("/viewer/saved/remove")
+def remove_saved_for_current_viewer(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    target_key = str(payload.get("article_key") or _article_identity(payload))
+    if not target_key:
+        raise HTTPException(status_code=400, detail="An article title or link is required.")
+
+    with viewer_saved_lock:
+        store = load_viewer_saved_store()
+        viewer_store = store.setdefault(viewer_key, {})
+        items = viewer_store.get(profile, [])
+        remaining = [
+            item
+            for item in items
+            if str(item.get("article_key") or _article_identity(item))
+            != target_key
+        ]
+        viewer_store[profile] = remaining
+        save_viewer_saved_store(store)
+
+    return {
+        "status": "success",
+        "saved": False,
+        "count": len(remaining),
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "affects_ranking": False,
+    }
+
+
 @app.get("/not-interested")
 def get_not_interested(request: Request):
     profile = get_active_profile_name(request)
@@ -3750,6 +4441,10 @@ def track_activity(payload: dict = Body(...), request: Request = None):
         elif action == "article_click": day["articles_clicked"] += 1
         elif action == "vote_interested": day["votes_interested"] += 1
         elif action == "vote_not_interested": day["votes_not_interested"] += 1
+        elif action == "save_for_later":
+            day["saved_for_later"] = day.get("saved_for_later", 0) + 1
+        elif action == "save_for_later_remove":
+            day["removed_from_saved"] = day.get("removed_from_saved", 0) + 1
         elif action == "export":
             if detail and detail not in day["exports"]:
                 day["exports"].append(detail)
@@ -3913,6 +4608,7 @@ async def crawl(
 ):
     profile = get_profile_for_request(request)
     sites_file = get_sites_file_for_profile(profile)
+    effective_keywords = keywords or get_profile_config(profile)["keywords"]
     job_id = secrets.token_hex(8)
     output_file = os.path.join(ROOT_DIR, f"ui_results_{job_id}.json")
     cluster_file = os.path.join(ROOT_DIR, f"clustered_results_{job_id}.json")
@@ -3921,7 +4617,7 @@ async def crawl(
         blocked_by_scheduler = SCHEDULER_STATUS["is_active"]
         active_jobs[job_id] = {
             "status": "blocked" if blocked_by_scheduler else "queued",
-            "keywords": keywords,
+            "keywords": effective_keywords,
             "started_at": datetime.datetime.now().isoformat(),
             "profile": profile,
         }
@@ -4019,21 +4715,25 @@ async def crawl(
         live_seen_keys = set()
         live_dropped_count = 0
         live_low_priority_count = 0
+        discovered_candidate_count = 0
 
         try:
             with scheduler_lock:
                 active_jobs[job_id]["status"] = "running"
+            capabilities = resolve_pipeline_capabilities()
             yield f"data: {json.dumps({'type': 'job_started', 'job_id': job_id, 'profile': profile})}\n\n"
             yield f"data: {json.dumps({'type': 'status', 'message': f'Using {profile} profile'})}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Pipeline preflight selected ' + capabilities['mode'] + '.'})}\n\n"
             yield f"data: {json.dumps({'type': 'status', 'message': 'Deploying Spider...'})}\n\n"
 
             cmd = [
                 sys.executable, "-m", "scrapy", "crawl", "news_spider",
-                "-a", f"keyword={keywords}",
+                "-a", f"keyword={effective_keywords}",
                 "-a", f"from_date={from_date}",
                 "-a", f"to_date={to_date}",
                 "-a", f"target_sites={target_sites}",
                 "-a", f"sites_file={sites_file}",
+                "-a", f"discovery_only={'true' if capabilities['discovery_only'] else 'false'}",
                 "-s", f"ROBOTSTXT_OBEY={'True' if SCRAPY_ROBOTSTXT_OBEY else 'False'}",
                 "-s", "USER_AGENT=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
                 "-s", "TWISTED_REACTOR=twisted.internet.asyncioreactor.AsyncioSelectorReactor",
@@ -4062,6 +4762,11 @@ async def crawl(
                     if line.startswith(live_item_prefix):
                         try:
                             raw_article = json.loads(line[len(live_item_prefix):])
+                            if capabilities["web_search"]:
+                                discovered_candidate_count += 1
+                                if discovered_candidate_count == 1 or discovered_candidate_count % 10 == 0:
+                                    yield f"data: {json.dumps({'type': 'status', 'message': f'Discovered {discovered_candidate_count} matching article URL(s); Samsung extraction starts after discovery.'})}\n\n"
+                                continue
                             key = live_article_key(raw_article)
 
                             if key and key in live_seen_keys:
@@ -4110,50 +4815,71 @@ async def crawl(
                 if process and process.stdout:
                     process.stdout.close()
 
-            # AI Bouncer
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Running AI Gatekeeper...'})}\n\n"
-
-            if live_articles:
-                with open(output_file, "w", encoding="utf-8") as f:
-                    json.dump(live_articles, f, indent=4, ensure_ascii=False)
-
-                yield f"data: {json.dumps({'type': 'status', 'message': f'Live gatekeeper complete. Streamed {len(live_articles)} cards while crawling. Removed {live_dropped_count}. Low priority kept: {live_low_priority_count}.'})}\n\n"
-
-            elif os.path.exists(output_file):
+            if capabilities["web_search"] and os.path.exists(output_file):
                 try:
                     with open(output_file, "r", encoding="utf-8") as f:
                         raw_data = json.load(f)
-
-                    filtered_data, dropped_count, low_priority_count = run_bouncer_filter_on_items(
-                        raw_data, profile, "manual_raw"
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'Extracting {len(raw_data)} discovered article(s) through Samsung Web Search at the configured safe rate.'})}\n\n"
+                    enriched_data = enrich_raw_articles(
+                        raw_data,
+                        effective_keywords,
+                        profile,
+                        use_web_search=True,
                     )
-
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Running AI Gatekeeper on extracted article text...'})}\n\n"
+                    filtered_data, dropped_count, low_priority_count = run_bouncer_filter_on_items(
+                        enriched_data, profile, "manual_enriched"
+                    )
                     with open(output_file, "w", encoding="utf-8") as f:
                         json.dump(filtered_data, f, indent=4, ensure_ascii=False)
-
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'Gatekeeper done. Removed {dropped_count} articles. Low priority kept: {low_priority_count}.'})}\n\n"
-                    print(f"Bouncer complete [{profile}]. Dropped {dropped_count} articles.", flush=True)
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'Samsung extraction and Gatekeeper complete. Kept {len(filtered_data)}; removed {dropped_count}; low priority kept {low_priority_count}.'})}\n\n"
                 except Exception as e:
-                    print(f"Bouncer error, skipping filter: {e}", flush=True)
+                    print(f"[PIPELINE:{profile}] Samsung extraction failed: {e}", flush=True)
+                    raise
+            else:
+                # Local legacy flow: bouncer the crawler-extracted text first,
+                # then apply optional Web Search enrichment.
+                yield f"data: {json.dumps({'type': 'status', 'message': 'Running AI Gatekeeper...'})}\n\n"
 
-            # Restore the legacy enterprise enrichment stage. It is optional by
-            # configuration and keeps crawler content when the internal Web
-            # Search service is disabled or non-mandatory.
-            if os.path.exists(output_file):
-                try:
-                    with open(output_file, "r", encoding="utf-8") as f:
-                        enrichable = json.load(f)
-                    enrichable = enrich_raw_articles(
-                        enrichable,
-                        keywords or get_profile_config(profile)["keywords"],
-                        profile,
-                    )
+                if live_articles:
                     with open(output_file, "w", encoding="utf-8") as f:
-                        json.dump(enrichable, f, indent=4, ensure_ascii=False)
-                except Exception as e:
-                    print(f"[PIPELINE:{profile}] Raw enrichment failed: {e}", flush=True)
-                    if WEB_SEARCH_REQUIRE_SUCCESS:
-                        raise
+                        json.dump(live_articles, f, indent=4, ensure_ascii=False)
+
+                    yield f"data: {json.dumps({'type': 'status', 'message': f'Live gatekeeper complete. Streamed {len(live_articles)} cards while crawling. Removed {live_dropped_count}. Low priority kept: {live_low_priority_count}.'})}\n\n"
+
+                elif os.path.exists(output_file):
+                    try:
+                        with open(output_file, "r", encoding="utf-8") as f:
+                            raw_data = json.load(f)
+
+                        filtered_data, dropped_count, low_priority_count = run_bouncer_filter_on_items(
+                            raw_data, profile, "manual_raw"
+                        )
+
+                        with open(output_file, "w", encoding="utf-8") as f:
+                            json.dump(filtered_data, f, indent=4, ensure_ascii=False)
+
+                        yield f"data: {json.dumps({'type': 'status', 'message': f'Gatekeeper done. Removed {dropped_count} articles. Low priority kept: {low_priority_count}.'})}\n\n"
+                        print(f"Bouncer complete [{profile}]. Dropped {dropped_count} articles.", flush=True)
+                    except Exception as e:
+                        print(f"Bouncer error, skipping filter: {e}", flush=True)
+
+                if os.path.exists(output_file):
+                    try:
+                        with open(output_file, "r", encoding="utf-8") as f:
+                            enrichable = json.load(f)
+                        enrichable = enrich_raw_articles(
+                            enrichable,
+                            effective_keywords,
+                            profile,
+                            use_web_search=False,
+                        )
+                        with open(output_file, "w", encoding="utf-8") as f:
+                            json.dump(enrichable, f, indent=4, ensure_ascii=False)
+                    except Exception as e:
+                        print(f"[PIPELINE:{profile}] Raw enrichment failed: {e}", flush=True)
+                        if WEB_SEARCH_REQUIRE_SUCCESS:
+                            raise
 
             # ==========================================
             # PHASE 1: STREAM CARDS IN REAL-TIME
@@ -4162,9 +4888,15 @@ async def crawl(
 
             try:
                 from news_scrapper.semantic_clustering import MinimalSemanticEngine
-                engine = MinimalSemanticEngine()
+                engine = MinimalSemanticEngine(
+                    load_summarizer=not capabilities["chat"]
+                )
 
-                if live_articles:
+                if capabilities["chat"]:
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Clustering extracted articles without local BART summarization...'})}\n\n"
+                    engine.fuse(job_id=job_id, fast_mode=True)
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Semantic clustering complete. Samsung Chat summarization starts next.'})}\n\n"
+                elif live_articles:
                     yield f"data: {json.dumps({'type': 'status', 'message': 'Optimizing streamed cards into clustered events...'})}\n\n"
                     engine.fuse_cluster(job_id=job_id, fast_mode=False)
                     yield f"data: {json.dumps({'type': 'status', 'message': 'Optimization complete.'})}\n\n"
@@ -4240,12 +4972,16 @@ async def crawl(
                     )
                     r["profile"] = profile
                     r.update(apply_learned_region(r, profile))
-                results = enrich_final_articles(results, profile)
+                results = enrich_final_articles(
+                    results,
+                    profile,
+                    use_chat=capabilities["chat"],
+                )
 
             # Archive
             if results:
                 yield f"data: {json.dumps({'type': 'status', 'message': 'Archiving Intelligence...'})}\n\n"
-                learner.log_search_data(keywords, results)
+                learner.log_search_data(effective_keywords, results)
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 sid = session_id or "unknown"
                 manual_path = os.path.join(get_profile_history_dir(profile), f"manual_{sid}_{timestamp}.json")

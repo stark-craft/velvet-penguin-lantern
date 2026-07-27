@@ -15,6 +15,48 @@ def make_response(cls, url, body, meta=None, content_type=b"text/html"):
 
 
 class UniversalSpiderTests(unittest.TestCase):
+    def test_discovery_only_feed_yields_url_metadata_without_article_request(self):
+        spider = NewsSpider(
+            keyword="DTH, Broadcast",
+            from_date="2026-07-22",
+            to_date="2026-07-22",
+            discovery_only="true",
+        )
+        xml = """<?xml version="1.0"?><rss><channel><item>
+        <title>India DTH platform launches broadcast service</title>
+        <link>https://example.com/news/dth-launch</link>
+        <pubDate>Wed, 22 Jul 2026 10:00:00 GMT</pubDate>
+        <description>The DTH service expands television distribution.</description>
+        </item></channel></rss>"""
+        response = make_response(
+            XmlResponse,
+            "https://example.com/rss.xml",
+            xml,
+            {
+                "site_name": "Example",
+                "configured_url": "https://example.com/rss.xml",
+                "source_home": "https://example.com/",
+            },
+            b"application/rss+xml",
+        )
+        items = list(spider.parse_feed(response))
+        self.assertEqual(len(items), 1)
+        self.assertIsInstance(items[0], dict)
+        self.assertEqual(items[0]["link"], "https://example.com/news/dth-launch")
+        self.assertTrue(items[0]["needs_web_search_enrichment"])
+        self.assertNotIn("full_content", items[0])
+
+    def test_discovery_only_rejects_title_without_profile_keyword(self):
+        spider = NewsSpider(keyword="DTH", discovery_only="true")
+        candidate = spider.article_request(
+            "https://example.com/news/unrelated",
+            "Example",
+            title="Football tournament results",
+            published=None,
+            method="RSS",
+        )
+        self.assertIsNone(candidate)
+
     def test_rss_feed_queues_matching_dated_article(self):
         spider = NewsSpider(keyword="DTH, Broadcast", from_date="2026-07-22", to_date="2026-07-22")
         xml = """<?xml version="1.0"?><rss><channel><item><title>India DTH platform launches broadcast service</title><link>https://example.com/news/dth-launch</link><pubDate>Wed, 22 Jul 2026 10:00:00 GMT</pubDate></item></channel></rss>"""

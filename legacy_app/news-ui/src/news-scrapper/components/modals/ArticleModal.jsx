@@ -6,7 +6,7 @@ import { getInsight } from '../../api.js';
 import { scoreOf, sourceList } from '../../utils/intelligence.js';
 import { SignalVisual } from '../ArticleCard.jsx';
 
-function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore, onVote }) {
+function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore, onVote, onSave, isSaved }) {
   const approved = item.approved_at || item.approved_by;
   const hidden = item.rejected_at || item.rejected_by;
   const state = approved
@@ -24,6 +24,12 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
       {item.selected_by && <div className="mt-1 text-sm text-slate-400">Selected by {item.selected_by}</div>}
       {item.approved_by && <div className="mt-1 text-sm text-slate-400">Approved by {item.approved_by}</div>}
       <div className="mt-4 flex flex-col gap-2">
+        {onSave && (
+          <button className="btn-dark-secondary justify-center" onClick={() => onSave(item)} type="button">
+            <Icon name={isSaved ? 'check' : 'bookmark'} size={15} />
+            {isSaved ? 'Saved for Later' : 'Save for Later'}
+          </button>
+        )}
         {!item.selected_by && !approved && !hidden && onSelect && (
           <button className="btn-dark-primary justify-center" onClick={() => onSelect(item)} type="button">
             Select for Review
@@ -182,6 +188,8 @@ export default function ArticleModal({
   onRestore,
   onVote,
   onCorrectRegion,
+  onSave,
+  isSaved = false,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [whyMatters, setWhyMatters] = useState('');
@@ -241,6 +249,10 @@ export default function ArticleModal({
   const score = scoreOf(item);
   const sources = sourceList(item);
   const visibleSources = expanded ? sources : sources.slice(0, 5);
+  const summaryLead = item.summary_lead || item.summary || 'No summary available.';
+  const summaryPoints = Array.isArray(item.summary_points)
+    ? item.summary_points.filter(Boolean)
+    : [];
 
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
@@ -270,8 +282,32 @@ export default function ArticleModal({
             </div>
 
             <section className="dossier-section mt-8">
-              <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">AI Summary</h4>
-              <p className="mt-3 text-base leading-8 text-slate-300">{item.summary || 'No summary available.'}</p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">AI Summary</h4>
+                {item.summarized_by === 'samsung_chat' && (
+                  <span className="signal-chip">Samsung Chat</span>
+                )}
+              </div>
+              <p className="mt-4 text-lg font-medium leading-8 text-slate-100">{summaryLead}</p>
+              {summaryPoints.length > 0 && (
+                <ul className="mt-5 space-y-3">
+                  {summaryPoints.map((point, index) => (
+                    <li
+                      className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.035] px-4 py-3 text-sm leading-6 text-slate-300"
+                      key={`${point}-${index}`}
+                    >
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-300" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {item.article_intent && (
+                <div className="mt-5 flex items-center gap-3 border-t border-white/10 pt-4">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Article intent</span>
+                  <span className="signal-chip">{item.article_intent}</span>
+                </div>
+              )}
             </section>
 
             <section className="dossier-section mt-8">
@@ -348,6 +384,8 @@ export default function ArticleModal({
                 onHide={onHide}
                 onRestore={onRestore}
                 onVote={onVote}
+                onSave={onSave}
+                isSaved={isSaved}
               />
             </div>
           </aside>

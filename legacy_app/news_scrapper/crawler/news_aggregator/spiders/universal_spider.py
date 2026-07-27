@@ -162,6 +162,9 @@ class NewsSpider(scrapy.Spider):
         # Date range filters are optional. When missing, all dates are allowed.
         self.start_date = self.parse_filter_date(getattr(self, "from_date", None))
         self.end_date = self.parse_filter_date(getattr(self, "to_date", None))
+        self.discovery_only = str(
+            getattr(self, "discovery_only", "false")
+        ).strip().lower() in {"1", "true", "yes", "on"}
 
         # Per-run dedupe: once a normalized article URL has been queued, do not
         # request it again from RSS + website fallback.
@@ -172,7 +175,8 @@ class NewsSpider(scrapy.Spider):
         self.fallback_sources = set()
         self.common_feed_sources = set()
 
-        print("LOG: Spider initialized. RSS-first content validation enabled.", flush=True)
+        mode = "URL discovery for Samsung extraction" if self.discovery_only else "RSS-first content validation"
+        print(f"LOG: Spider initialized. {mode} enabled.", flush=True)
 
     async def start(self):
         """Scrapy 2.13+ async startup entrypoint."""
@@ -442,12 +446,25 @@ class NewsSpider(scrapy.Spider):
             if published and not self.is_in_range(published):
                 continue
 
+            seed_snippet = self.clean_text(
+                entry.xpath(
+                    "string(./*[local-name()='description'][1])"
+                ).get()
+                or entry.xpath(
+                    "string(./*[local-name()='summary'][1])"
+                ).get()
+                or entry.xpath(
+                    "string(./*[local-name()='content'][1])"
+                ).get()
+            )
+
             request = self.article_request(
                 urljoin(response.url, str(link or "").strip()),
                 site_name,
                 title=title,
                 published=published,
                 method="RSS",
+                seed_snippet=seed_snippet,
                 configured_url=response.meta.get("configured_url"),
                 source_home=response.meta.get("source_home"),
             )
@@ -734,6 +751,7 @@ class NewsSpider(scrapy.Spider):
         title,
         published,
         method,
+        seed_snippet="",
         discovery_depth=0,
         configured_url=None,
         source_home=None,
@@ -749,6 +767,29 @@ class NewsSpider(scrapy.Spider):
 
         # Per-run dedupe across RSS and website discovery.
         self.seen_article_urls.add(normalized)
+
+        if self.discovery_only:
+            found_keywords = self.find_keywords(f"{title} {seed_snippet}")
+            if not found_keywords:
+                return None
+            discovered_date = published or self.date_from_url(
+                urlparse(normalized).path
+            )
+            if isinstance(discovered_date, datetime):
+                discovered_date = discovered_date.date()
+            return {
+                "source": site_name,
+                "title": self.clean_text(title) or normalized,
+                "link": normalized,
+                "date": str(discovered_date or datetime.now().date()),
+                "snippet": self.clean_text(seed_snippet)[:1000],
+                "summary": self.clean_text(seed_snippet)[:1000],
+                "keywords_found": found_keywords,
+                "method": method,
+                "discovery_only": True,
+                "needs_web_search_enrichment": True,
+                "top_image": "",
+            }
 
         return scrapy.Request(
             normalized,

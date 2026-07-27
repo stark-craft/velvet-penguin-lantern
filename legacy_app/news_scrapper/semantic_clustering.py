@@ -48,10 +48,17 @@ SUMMARY_INFERENCE_LOCK = threading.Lock()
 SHARED_BART_TOKENIZER = None
 SHARED_BART_MODEL = None
 
+def env_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Offline proof switch.
 # When SENSE_OFFLINE_ONLY=1, this module must use only local model folders.
 # That prevents accidental fallback downloads during security demonstrations.
-OFFLINE_ONLY = os.environ.get("SENSE_OFFLINE_ONLY") == "1"
+OFFLINE_ONLY = env_flag("SENSE_OFFLINE_ONLY")
 
 
 def load_seen_registry():

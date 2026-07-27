@@ -116,6 +116,13 @@ export const hideArticleForViewer = (article) =>
 export const restoreArticleForViewer = (article) =>
   jsonFetch('/viewer/hidden/restore', { method:'POST', body: JSON.stringify(article) });
 
+// ---------- Personal saved-for-later signals ----------
+export const getViewerSaved = () => jsonFetch('/viewer/saved');
+export const saveArticleForLater = (article) =>
+  jsonFetch('/viewer/saved', { method:'POST', body: JSON.stringify(article) });
+export const removeSavedArticle = (article) =>
+  jsonFetch('/viewer/saved/remove', { method:'POST', body: JSON.stringify(article) });
+
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
 export const selectWorkflow = (article) =>
@@ -276,6 +283,10 @@ function normalizeExportItem(item, index = 0) {
   return {
     title,
     master_summary: summary,
+    summary_lead: String(item.summary_lead || item.summary || summary).trim(),
+    summary_points: Array.isArray(item.summary_points)
+      ? item.summary_points.filter(Boolean).slice(0, 6)
+      : [],
     ppt_summary: String(item.ppt_summary || summary).trim(),
     snippet: String(item.snippet || summary).trim(),
     date,
@@ -288,6 +299,9 @@ function normalizeExportItem(item, index = 0) {
     full_contents: item.full_contents || item.full_content || '',
     selected_by: item.selected_by || null,
     category: item.category || 'Tech News',
+    why_it_matters: item.why_it_matters || item.why_matters || '',
+    article_intent: item.article_intent || '',
+    summarized_by: item.summarized_by || '',
   };
 }
 

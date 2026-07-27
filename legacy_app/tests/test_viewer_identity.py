@@ -33,17 +33,20 @@ class ViewerIdentityTests(unittest.TestCase):
         self.profiles = root / "viewer_profiles.json"
         self.tracker = root / "usage_tracker.json"
         self.hidden = root / "viewer_hidden_store.json"
+        self.saved = root / "viewer_saved_store.json"
         self.default_workflow = root / "workflow_default.json"
         self.broadcast_workflow = root / "workflow_broadcast.json"
         self.profiles.write_text("{}", encoding="utf-8")
         self.tracker.write_text("{}", encoding="utf-8")
         self.hidden.write_text("{}", encoding="utf-8")
+        self.saved.write_text("{}", encoding="utf-8")
         self.default_workflow.write_text('{"selected": [], "approved": []}', encoding="utf-8")
         self.broadcast_workflow.write_text('{"selected": [], "approved": []}', encoding="utf-8")
         self.patches = [
             patch.object(main, "VIEWER_PROFILES_FILE", str(self.profiles)),
             patch.object(main, "USAGE_TRACKER_FILE", str(self.tracker)),
             patch.object(main, "VIEWER_HIDDEN_FILE", str(self.hidden)),
+            patch.object(main, "VIEWER_SAVED_FILE", str(self.saved)),
             patch.object(
                 main,
                 "WORKFLOW_FILES",
@@ -160,6 +163,26 @@ class ViewerIdentityTests(unittest.TestCase):
 
         restored = main.restore_for_current_viewer(owner_request, article)
         self.assertEqual(restored["count"], 0)
+
+    def test_saved_for_later_is_private_and_profile_scoped(self):
+        owner_request = request_from("10.0.0.25")
+        other_request = request_from("10.0.0.30")
+        article = {
+            "title": "A saved signal",
+            "link": "https://example.test/saved-signal",
+        }
+
+        saved = main.save_for_current_viewer(owner_request, article)
+        self.assertTrue(saved["saved"])
+        self.assertFalse(saved["affects_ranking"])
+        self.assertEqual(main.get_personal_saved(owner_request)["count"], 1)
+        self.assertEqual(main.get_personal_saved(other_request)["count"], 0)
+
+        removed = main.remove_saved_for_current_viewer(
+            owner_request, article
+        )
+        self.assertFalse(removed["saved"])
+        self.assertEqual(main.get_personal_saved(owner_request)["count"], 0)
 
 
 if __name__ == "__main__":

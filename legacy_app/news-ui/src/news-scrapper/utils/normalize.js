@@ -22,7 +22,13 @@ function relativeAgo(isoOrStr) {
 export function normalizeArticle(raw, idx = 0) {
   if (!raw) return null;
   const title   = raw.title || raw.headline || 'Untitled';
-  const summary = raw.master_summary || raw.ppt_summary || raw.summary || raw.description || raw.content || '';
+  const summaryLead = raw.summary_lead || raw.summary || '';
+  const summary = summaryLead || raw.master_summary || raw.ppt_summary || raw.description || raw.content || '';
+  const summaryPoints = Array.isArray(raw.summary_points)
+    ? raw.summary_points
+    : Array.isArray(raw.key_points)
+      ? raw.key_points
+      : [];
   const src     = raw.src || raw.source || (Array.isArray(raw.sources) && (raw.sources[0]?.name || raw.sources[0])) || 'unknown';
   const sources = Array.isArray(raw.sources)
     ? raw.sources.map((s) => (typeof s === 'string' ? { name: s } : s))
@@ -44,6 +50,12 @@ export function normalizeArticle(raw, idx = 0) {
     id:            raw.id || raw.title || ('a' + idx),
     title,
     summary,
+    summary_lead: summaryLead || summary,
+    summary_points: summaryPoints.filter(Boolean).slice(0, 6),
+    master_summary: raw.master_summary || summary,
+    summary_format: raw.summary_format || '',
+    summarized_by: raw.summarized_by || '',
+    article_intent: raw.article_intent || '',
     src,
     sources,
     source_count:  raw.source_count || sources.length || 1,
@@ -64,7 +76,7 @@ export function normalizeArticle(raw, idx = 0) {
     origin:        raw.origin || 'briefing',
     url:           raw.url || raw.link || '',
     image_url:     raw.image_url || raw.image || raw.thumbnail || raw.top_image || raw.media_url || '',
-    why_matters:   raw.why_matters || raw.insight || raw.ai_opinion || '',
+    why_matters:   raw.why_it_matters || raw.why_matters || raw.insight || raw.ai_opinion || '',
     // workflow fields passthrough
     selected_by:   raw.selected_by,
     selected_at:   raw.selected_at,
