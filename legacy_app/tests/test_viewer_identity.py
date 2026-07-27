@@ -170,19 +170,70 @@ class ViewerIdentityTests(unittest.TestCase):
         article = {
             "title": "A saved signal",
             "link": "https://example.test/saved-signal",
+            "_tracking_fingerprint": "owner-browser",
         }
 
         saved = main.save_for_current_viewer(owner_request, article)
         self.assertTrue(saved["saved"])
+        self.assertTrue(saved["changed"])
+        self.assertTrue(saved["activity_tracked"])
         self.assertFalse(saved["affects_ranking"])
         self.assertEqual(main.get_personal_saved(owner_request)["count"], 1)
         self.assertEqual(main.get_personal_saved(other_request)["count"], 0)
+
+        duplicate = main.save_for_current_viewer(owner_request, article)
+        self.assertFalse(duplicate["changed"])
+        self.assertFalse(duplicate["activity_tracked"])
+        self.assertEqual(main.get_personal_saved(owner_request)["count"], 1)
+
+        with patch.object(main, "BROADCAST_SPECIAL_IPS", {"10.0.0.25"}):
+            self.assertEqual(
+                main.get_personal_saved(owner_request)["profile"],
+                main.BROADCAST_PROFILE,
+            )
+            self.assertEqual(main.get_personal_saved(owner_request)["count"], 0)
+
+        other_saved = main.save_for_current_viewer(
+            other_request,
+            {
+                **article,
+                "_tracking_fingerprint": "other-browser",
+            },
+        )
+        self.assertTrue(other_saved["changed"])
+        self.assertEqual(main.get_personal_saved(owner_request)["count"], 1)
+        self.assertEqual(main.get_personal_saved(other_request)["count"], 1)
+
+        persisted_store = json.loads(self.saved.read_text(encoding="utf-8"))
+        self.assertIn(main.get_viewer_key("10.0.0.25"), persisted_store)
+        self.assertIn(main.get_viewer_key("10.0.0.30"), persisted_store)
+        self.assertNotIn("10.0.0.25", persisted_store)
+        self.assertNotIn("10.0.0.30", persisted_store)
+        owner_entry = persisted_store[main.get_viewer_key("10.0.0.25")]["default"][0]
+        self.assertNotIn("_tracking_fingerprint", owner_entry)
 
         removed = main.remove_saved_for_current_viewer(
             owner_request, article
         )
         self.assertFalse(removed["saved"])
+        self.assertTrue(removed["changed"])
+        self.assertTrue(removed["activity_tracked"])
         self.assertEqual(main.get_personal_saved(owner_request)["count"], 0)
+        self.assertEqual(main.get_personal_saved(other_request)["count"], 1)
+
+        duplicate_remove = main.remove_saved_for_current_viewer(
+            owner_request, article
+        )
+        self.assertFalse(duplicate_remove["changed"])
+        self.assertFalse(duplicate_remove["activity_tracked"])
+
+        tracker = json.loads(self.tracker.read_text(encoding="utf-8"))
+        owner_device = tracker[main.get_device_id("10.0.0.25", "owner-browser")]
+        owner_day = owner_device["activity"][main.get_today()]
+        self.assertEqual(owner_day["saved_for_later"], 1)
+        self.assertEqual(owner_day["removed_from_saved"], 1)
+        self.assertEqual(owner_device["ip_hash"], main.get_viewer_key("10.0.0.25"))
+        self.assertNotIn("ip", owner_device)
 
 
 if __name__ == "__main__":

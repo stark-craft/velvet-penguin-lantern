@@ -580,12 +580,6 @@ export default function FeedScreen() {
       else next.add(key);
       return next;
     });
-    trackAction(wasSaved ? 'save_for_later_remove' : 'save_for_later', {
-      title: item.title,
-      link: item.link || item.canonical_link,
-      source: item.source || item.src,
-      screen: 'feed'
-    });
     try {
       if (wasSaved) await removeSavedArticle(item);
       else await saveArticleForLater(item);

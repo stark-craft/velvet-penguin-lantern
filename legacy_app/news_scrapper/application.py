@@ -4278,11 +4278,19 @@ def get_personal_saved(request: Request):
 @app.post("/viewer/saved")
 def save_for_current_viewer(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
-    article_key = _article_identity(payload)
+    client_ip = get_client_ip(request)
+    viewer_key = get_viewer_key(client_ip)
+    fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
+    article_payload = {
+        key: value
+        for key, value in payload.items()
+        if key != "_tracking_fingerprint"
+    }
+    article_key = _article_identity(article_payload)
     if not article_key:
         raise HTTPException(status_code=400, detail="An article title or link is required.")
 
+    changed = False
     with viewer_saved_lock:
         store = load_viewer_saved_store()
         viewer_store = store.setdefault(viewer_key, {})
@@ -4297,16 +4305,37 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
             None,
         )
         if existing is None:
-            entry = dict(payload)
+            entry = dict(article_payload)
             entry["article_key"] = article_key
             entry["saved_at"] = datetime.datetime.now().isoformat(timespec="seconds")
             entry["saved_scope"] = "current_viewer_only"
             items.insert(0, entry)
             save_viewer_saved_store(store)
+            changed = True
+
+    activity_tracked = False
+    if changed:
+        activity_tracked = record_usage_activity(
+            client_ip,
+            profile,
+            fingerprint,
+            "save_for_later",
+            json.dumps(
+                {
+                    "title": article_payload.get("title", ""),
+                    "link": article_payload.get("link") or article_payload.get("url", ""),
+                    "source": article_payload.get("source", ""),
+                    "screen": "saved_endpoint",
+                },
+                ensure_ascii=False,
+            ),
+        )
 
     return {
         "status": "success",
         "saved": True,
+        "changed": changed,
+        "activity_tracked": activity_tracked,
         "count": len(items),
         "profile": profile,
         "scope": "current_viewer_only",
@@ -4317,7 +4346,9 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
 @app.post("/viewer/saved/remove")
 def remove_saved_for_current_viewer(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
+    client_ip = get_client_ip(request)
+    viewer_key = get_viewer_key(client_ip)
+    fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
     target_key = str(payload.get("article_key") or _article_identity(payload))
     if not target_key:
         raise HTTPException(status_code=400, detail="An article title or link is required.")
@@ -4333,11 +4364,33 @@ def remove_saved_for_current_viewer(request: Request, payload: dict = Body(...))
             != target_key
         ]
         viewer_store[profile] = remaining
-        save_viewer_saved_store(store)
+        changed = len(remaining) != len(items)
+        if changed:
+            save_viewer_saved_store(store)
+
+    activity_tracked = False
+    if changed:
+        activity_tracked = record_usage_activity(
+            client_ip,
+            profile,
+            fingerprint,
+            "save_for_later_remove",
+            json.dumps(
+                {
+                    "title": payload.get("title", ""),
+                    "link": payload.get("link") or payload.get("url", ""),
+                    "source": payload.get("source", ""),
+                    "screen": "saved_endpoint",
+                },
+                ensure_ascii=False,
+            ),
+        )
 
     return {
         "status": "success",
         "saved": False,
+        "changed": changed,
+        "activity_tracked": activity_tracked,
         "count": len(remaining),
         "profile": profile,
         "scope": "current_viewer_only",
@@ -4389,19 +4442,19 @@ def restore_from_not_interested(request: Request, background_tasks: BackgroundTa
 # ==========================================
 # --- USAGE TRACKING ENDPOINTS ---
 # ==========================================
-@app.post("/track")
-def track_activity(payload: dict = Body(...), request: Request = None):
-    ip = get_client_ip(request)
-    profile = get_active_profile_name(request)
-    team_owner = get_team_owner_for_ip(ip)
-    fingerprint = payload.get("fingerprint", "unknown")
-    action = payload.get("action", "")
-    detail = payload.get("detail", "")
+def record_usage_activity(ip, profile, fingerprint, action, detail=""):
+    """Persist one authoritative activity event.
+
+    Save/remove endpoints call this only after their JSON state actually
+    changes. The public /track endpoint also uses it for ordinary UI events.
+    Raw IP addresses are never written to the tracker.
+    """
 
     if not action:
-        return {"status": "ok"}
+        return False
 
-    device_id = get_device_id(ip, fingerprint)
+    team_owner = get_team_owner_for_ip(ip)
+    device_id = get_device_id(ip, fingerprint or "unknown")
     today = get_today()
 
     with tracker_lock:
@@ -4410,11 +4463,13 @@ def track_activity(payload: dict = Body(...), request: Request = None):
         if device_id not in tracker:
             tracker[device_id] = {
                 "ip_hash": get_viewer_key(ip),
-                "fingerprint": fingerprint,
+                "fingerprint": fingerprint or "unknown",
                 "profile": profile,
                 "owner": team_owner or "Unknown",
                 "known_team_member": bool(team_owner),
-                "display_name": get_viewer_profile(ip).get("display_name", team_owner or "Unknown"),
+                "display_name": get_viewer_profile(ip).get(
+                    "display_name", team_owner or "Unknown"
+                ),
                 "first_seen": today,
                 "last_seen": today,
                 "activity": {},
@@ -4427,36 +4482,58 @@ def track_activity(payload: dict = Body(...), request: Request = None):
         device["profile"] = profile
         device["owner"] = team_owner or "Unknown"
         device["known_team_member"] = bool(team_owner)
-        device["display_name"] = get_viewer_profile(ip).get("display_name", team_owner or device.get("display_name", "Unknown"))
-
-        if today not in device.get("activity", {}):
+        device["display_name"] = get_viewer_profile(ip).get(
+            "display_name",
+            team_owner or device.get("display_name", "Unknown"),
+        )
+        device.setdefault("activity", {})
+        if today not in device["activity"]:
             device["activity"][today] = get_empty_day()
 
         day = device["activity"][today]
-
-        if action == "page_load": day["page_loads"] += 1
+        if action == "page_load":
+            day["page_loads"] = day.get("page_loads", 0) + 1
         elif action == "search":
+            day.setdefault("searches", [])
             if detail and detail not in day["searches"]:
                 day["searches"].append(detail)
-        elif action == "article_click": day["articles_clicked"] += 1
-        elif action == "vote_interested": day["votes_interested"] += 1
-        elif action == "vote_not_interested": day["votes_not_interested"] += 1
+        elif action == "article_click":
+            day["articles_clicked"] = day.get("articles_clicked", 0) + 1
+        elif action == "vote_interested":
+            day["votes_interested"] = day.get("votes_interested", 0) + 1
+        elif action == "vote_not_interested":
+            day["votes_not_interested"] = day.get("votes_not_interested", 0) + 1
         elif action == "save_for_later":
             day["saved_for_later"] = day.get("saved_for_later", 0) + 1
         elif action == "save_for_later_remove":
             day["removed_from_saved"] = day.get("removed_from_saved", 0) + 1
         elif action == "export":
+            day.setdefault("exports", [])
             if detail and detail not in day["exports"]:
                 day["exports"].append(detail)
-        elif action == "briefing_view": day["briefing_views"] += 1
-        elif action == "heartbeat": day["heartbeats"] += 1
+        elif action == "briefing_view":
+            day["briefing_views"] = day.get("briefing_views", 0) + 1
+        elif action == "heartbeat":
+            day["heartbeats"] = day.get("heartbeats", 0) + 1
         elif action == "voc_feedback":
             day.setdefault("voc_feedback", []).append(detail)
+        else:
+            return False
 
         purge_old_entries(device)
         save_tracker(tracker)
+    return True
 
-    return {"status": "ok"}
+
+@app.post("/track")
+def track_activity(payload: dict = Body(...), request: Request = None):
+    ip = get_client_ip(request)
+    profile = get_active_profile_name(request)
+    fingerprint = payload.get("fingerprint", "unknown")
+    action = payload.get("action", "")
+    detail = payload.get("detail", "")
+    tracked = record_usage_activity(ip, profile, fingerprint, action, detail)
+    return {"status": "ok", "tracked": tracked}
 
 
 @app.get("/analytics/access")

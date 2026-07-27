@@ -1,5 +1,5 @@
 // Thin API wrappers. In dev, vite proxies these paths to the backend.
-import { getSessionId } from './utils/session.js';
+import { getFingerprint, getSessionId } from './utils/session.js';
 
 const BASE = import.meta.env.VITE_API_BASE || '';
 
@@ -118,10 +118,16 @@ export const restoreArticleForViewer = (article) =>
 
 // ---------- Personal saved-for-later signals ----------
 export const getViewerSaved = () => jsonFetch('/viewer/saved');
-export const saveArticleForLater = (article) =>
-  jsonFetch('/viewer/saved', { method:'POST', body: JSON.stringify(article) });
-export const removeSavedArticle = (article) =>
-  jsonFetch('/viewer/saved/remove', { method:'POST', body: JSON.stringify(article) });
+export const saveArticleForLater = async (article) =>
+  jsonFetch('/viewer/saved', {
+    method:'POST',
+    body: JSON.stringify({ ...article, _tracking_fingerprint: await getFingerprint() }),
+  });
+export const removeSavedArticle = async (article) =>
+  jsonFetch('/viewer/saved/remove', {
+    method:'POST',
+    body: JSON.stringify({ ...article, _tracking_fingerprint: await getFingerprint() }),
+  });
 
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
