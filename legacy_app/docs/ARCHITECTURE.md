@@ -46,6 +46,11 @@ would not share the in-memory JSON locks.
 - `venture_lens/` owns GitHub discovery, arXiv research discovery, caching, and
   Venture Lens endpoints.
 - `model_weights/` is the shared local-model location and is excluded from Git.
+- `news_scrapper/runtime/bouncer_model.pkl` and
+  `news_scrapper/runtime/bouncer_model_broadcast.pkl` are the authoritative
+  trained bouncer models for the Default and Broadcast profiles. Startup and
+  retraining use these same paths; root-level pickle files are legacy copies
+  and are not loaded.
 
 ## Profile routing guarantee
 

@@ -64,7 +64,9 @@ C:\Development\velvet-penguin-lantern\legacy_app
 │       ├── workflow_store.json
 │       ├── workflow_store_broadcast.json
 │       ├── trainingData.json
-│       └── usage_tracker.json
+│       ├── usage_tracker.json
+│       ├── bouncer_model.pkl              active Default bouncer model
+│       └── bouncer_model_broadcast.pkl    active Broadcast bouncer model
 │
 ├── venture_lens                 Venture Lens backend package
 │   ├── router.py                Venture Lens API routes
@@ -182,6 +184,8 @@ C:\App_Portable
 │   │   └── sites_broadcast.json
 │   ├── crawler
 │   └── runtime                 (created/updated by the application)
+│       ├── bouncer_model.pkl
+│       └── bouncer_model_broadcast.pkl
 ├── venture_lens
 │   └── runtime                 (created/updated by the application)
 ├── frontend
@@ -211,8 +215,36 @@ Do not put `dist` directly beside `main.py`. The configured production path is
 - `node_modules`, Vite, and `npm run dev` are not needed in production.
 - `runtime` remains beside its owning backend package so backup boundaries are
   obvious.
+- `news_scrapper\runtime\bouncer_model.pkl` and
+  `news_scrapper\runtime\bouncer_model_broadcast.pkl` are the authoritative
+  trained bouncer models. Startup, retraining, reloading, status reporting, and
+  backup all use these same files.
 - `model_weights` remains at the root because NewsScrapper's clustering,
   fallback summarization, intent, and sentiment components share it.
+
+### Important: bouncer pickle locations
+
+Do not place the active bouncer pickle files beside `main.py`.
+
+The only active locations are:
+
+```text
+C:\App_Portable\news_scrapper\runtime\bouncer_model.pkl
+C:\App_Portable\news_scrapper\runtime\bouncer_model_broadcast.pkl
+```
+
+The first file learns from Default-profile feedback. The second learns from
+Broadcast-profile feedback. They must remain separate.
+
+Older releases could leave similarly named pickle files in
+`C:\App_Portable`. Those root-level files are legacy copies and are no longer
+loaded. After stopping the server and making a backup, they may be archived or
+removed. Never replace the runtime copies with an older root-level copy.
+
+If this is a new installation and the two runtime pickle files do not exist,
+that is acceptable. The application starts without a trained bouncer and
+creates the appropriate file after sufficient Interested/Not Interested
+training data is submitted and training completes.
 
 ### Files that control the running server
 
@@ -223,7 +255,7 @@ Do not put `dist` directly beside `main.py`. The configured production path is
 | `news_scrapper\config\sites_broadcast.json` | broadcast sources | Next scan recommended |
 | `frontend\dist` | visible frontend | Yes, then hard refresh |
 | `model_weights` | local clustering and AI fallbacks | Yes |
-| `news_scrapper\runtime` | live data; do not hand-edit while running | Not applicable |
+| `news_scrapper\runtime` | live JSON data and both trained bouncer pickle files; do not hand-edit while running | Not applicable |
 
 ## 2. Make a safety copy before an update
 
@@ -232,7 +264,7 @@ Do not put `dist` directly beside `main.py`. The configured production path is
 3. Open `C:\App_Portable`.
 4. Copy these items to a safe backup folder:
    - `.env`
-   - `news_scrapper\runtime`
+   - `news_scrapper\runtime` (this includes both trained bouncer pickle files)
    - `venture_lens\runtime`
    - `model_weights`
    - `python_embed`
