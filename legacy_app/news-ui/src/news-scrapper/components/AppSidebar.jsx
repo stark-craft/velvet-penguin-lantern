@@ -6,6 +6,7 @@ const groups = [
   { label: 'Intelligence desk', items: [
     ['/home', 'home', 'Morning briefing'],
     ['/scan', 'search', 'Discover & search'],
+    ['/saved', 'bookmark', 'Saved for later'],
     ['/selected', 'check2', 'Review queue'],
     ['/approved', 'star', 'Approved briefing'],
   ] },

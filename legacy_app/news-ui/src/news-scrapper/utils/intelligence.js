@@ -51,5 +51,5 @@ export function sourceList(item) {
 }
 
 export function articleKey(item) {
-  return item?.id || item?.title || item?.url;
+  return item?.canonical_link || item?.link || item?.url || item?.id || item?.title || '';
 }

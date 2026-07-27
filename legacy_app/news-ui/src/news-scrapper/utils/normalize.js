@@ -19,16 +19,54 @@ function relativeAgo(isoOrStr) {
   return Math.round(diffMin / (60 * 24)) + 'd';
 }
 
-export function normalizeArticle(raw, idx = 0) {
-  if (!raw) return null;
-  const title   = raw.title || raw.headline || 'Untitled';
-  const summaryLead = raw.summary_lead || raw.summary || '';
-  const summary = summaryLead || raw.master_summary || raw.ppt_summary || raw.description || raw.content || '';
-  const summaryPoints = Array.isArray(raw.summary_points)
+export function structuredSummary(raw = {}) {
+  const explicitPoints = Array.isArray(raw.summary_points)
     ? raw.summary_points
     : Array.isArray(raw.key_points)
       ? raw.key_points
       : [];
+  const master = String(
+    raw.master_summary || raw.summary || raw.ppt_summary || raw.description || raw.content || ''
+  ).trim();
+  const bulletParts = master.split(/\s*[•●▪]\s*/).map((part) => part.trim()).filter(Boolean);
+  let lead = String(raw.summary_lead || raw.summary || '').trim();
+  let points = explicitPoints.map(String).map((point) => point.trim()).filter(Boolean);
+
+  if (!points.length && bulletParts.length > 1) {
+    lead = String(raw.summary_lead || bulletParts[0]).trim();
+    points = bulletParts.slice(1);
+  }
+
+  if (!points.length) {
+    const source = [master, raw.full_contents, raw.full_content, raw.snippet]
+      .filter(Boolean)
+      .join(' ');
+    const sentences = source
+      .split(/(?<=[.!?])\s+/)
+      .map((sentence) => sentence.replace(/\s+/g, ' ').trim())
+      .filter((sentence) => sentence.length >= 20);
+    lead = String(raw.summary_lead || sentences.slice(0, 2).join(' ') || master).trim();
+    const leadSet = new Set(sentences.slice(0, 2).map((sentence) => sentence.toLowerCase()));
+    points = sentences.filter((sentence) => !leadSet.has(sentence.toLowerCase())).slice(0, 5);
+  }
+
+  if (!points.length && lead) {
+    points = [lead];
+  }
+
+  return {
+    lead: lead || 'No summary available.',
+    points: [...new Set(points)].slice(0, 5),
+  };
+}
+
+export function normalizeArticle(raw, idx = 0) {
+  if (!raw) return null;
+  const title   = raw.title || raw.headline || 'Untitled';
+  const summaryContract = structuredSummary(raw);
+  const summaryLead = summaryContract.lead;
+  const summary = summaryLead;
+  const summaryPoints = summaryContract.points;
   const src     = raw.src || raw.source || (Array.isArray(raw.sources) && (raw.sources[0]?.name || raw.sources[0])) || 'unknown';
   const sources = Array.isArray(raw.sources)
     ? raw.sources.map((s) => (typeof s === 'string' ? { name: s } : s))

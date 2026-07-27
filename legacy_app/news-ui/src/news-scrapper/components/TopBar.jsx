@@ -5,6 +5,7 @@ import ThemeToggle from "./ThemeToggle.jsx";
 import { getAnalyticsAccess, getGatekeeperAccess, getProfile } from "../api.js";
 const mainNav = [
   { to: "/scan", label: "Scan" },
+  { to: "/saved", label: "Saved" },
   { to: "/selected", label: "Review Queue" },
   { to: "/approved", label: "Approved Briefing" },
 ];

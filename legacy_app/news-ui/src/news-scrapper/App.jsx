@@ -19,6 +19,7 @@ import TrendsScreen from "./screens/TrendsScreen.jsx";
 import VocScreen from "./screens/VocScreen.jsx";
 import AnalyticsScreen from "./screens/AnalyticsScreen.jsx";
 import GatekeeperReviewScreen from "./screens/GatekeeperReviewScreen.jsx";
+import SavedScreen from "./screens/SavedScreen.jsx";
 import UserProfileModal from "./components/UserProfileModal.jsx";
 import { getViewerProfile } from "./api.js";
 const SENSE_ATMOSPHERE_VIDEO =
@@ -307,6 +308,7 @@ export default function App() {
             />{" "}
             <Route path="/selected" element={<SelectedScreen />} />{" "}
             <Route path="/approved" element={<ApprovedScreen />} />{" "}
+            <Route path="/saved" element={<SavedScreen />} />{" "}
             <Route path="/rejected" element={<RejectedScreen />} />{" "}
             <Route path="/sources" element={<SourcesScreen />} />{" "}
             <Route path="/manage-sources" element={<SourcesScreen />} />{" "}
