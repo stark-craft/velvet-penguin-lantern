@@ -9,7 +9,7 @@ import Bouncer from '../components/Bouncer.jsx';
 import { correctRegion, getLatestBriefing, getViewerHidden, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { trackAction } from '../utils/tracking.js';
-import { articleKey, groupedByDate, publishedTime, scoreOf } from '../utils/intelligence.js';
+import { articleKey, groupedByDate, keywordOptions, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
 const emptyFilters = {
   query: '',
   region: 'all',
@@ -20,7 +20,8 @@ const emptyFilters = {
   fresh: 'all',
   cluster: 'all',
   image: 'all',
-  selected: 'all'
+  selected: 'all',
+  keyword: 'all'
 };
 const HERO_FEED_LIMIT = 5;
 function resolveArticleImage(item) {
@@ -104,6 +105,9 @@ function applyFilters(items, filters, selectedIds) {
       return false;
     }
     if (filters.image === 'without' && item.image_url) {
+      return false;
+    }
+    if (!matchesKeyword(item, filters.keyword)) {
       return false;
     }
     const isSelected = selectedIds.has(item.id) || selectedIds.has(item.title) || item.selected_by;
@@ -405,6 +409,23 @@ function SearchLoadedBriefing({
 </select>
 </div>
 <div className="mt-3 flex flex-wrap gap-2">        {[['all', 'All status'], ['selected', 'Selected'], ['unselected', 'Unselected']].map(([value, label]) => <button key={value} className={filters.selected === value ? 'rounded-full border border-sky-300/25 bg-sky-400/12 px-4 py-2 text-sm font-medium text-sky-100' : 'rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-medium text-slate-400'} onClick={() => update('selected', value)} type="button">            {label}          </button>)}      </div>
+      {!!options.keywords.length && <div className="briefing-keyword-filter mt-4">
+        <div className="briefing-keyword-heading">
+          <div>
+            <span>Matched keywords</span>
+            <small>Filter this briefing by the topics that produced these signals</small>
+          </div>
+          {filters.keyword !== 'all' && <button onClick={() => update('keyword', 'all')} type="button">Clear keyword</button>}
+        </div>
+        <div className="briefing-keyword-list" role="group" aria-label="Filter briefing by matched keyword">
+          <button className={filters.keyword === 'all' ? 'briefing-keyword-chip active' : 'briefing-keyword-chip'} onClick={() => update('keyword', 'all')} type="button" aria-pressed={filters.keyword === 'all'}>
+            All keywords <strong>{total}</strong>
+          </button>
+          {options.keywords.map(({ value, count: keywordCount }) => <button className={filters.keyword === value ? 'briefing-keyword-chip active' : 'briefing-keyword-chip'} key={value} onClick={() => update('keyword', filters.keyword === value ? 'all' : value)} type="button" aria-pressed={filters.keyword === value} title={`Show ${keywordCount} signals matching ${value}`}>
+            <span>{value}</span><strong>{keywordCount}</strong>
+          </button>)}
+        </div>
+      </div>}
 </section>;
 }
 function ImageFeedCard({
@@ -527,7 +548,8 @@ export default function FeedScreen() {
     regions: uniqueSorted(articles.map(article => article.region)),
     categories: uniqueSorted(articles.map(article => article.category)),
     sources: uniqueSorted(articles.map(article => article.src || article.source)),
-    dates: uniqueSorted(articles.map(article => article.date)).reverse()
+    dates: uniqueSorted(articles.map(article => article.date)).reverse(),
+    keywords: keywordOptions(articles)
   }), [articles]);
   const onVote = async (item, voteValue) => {
     setVotes(previous => ({

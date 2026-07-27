@@ -53,3 +53,42 @@ export function sourceList(item) {
 export function articleKey(item) {
   return item?.canonical_link || item?.link || item?.url || item?.id || item?.title || '';
 }
+
+export function articleKeywords(item) {
+  const values = [
+    ...(Array.isArray(item?.keywords) ? item.keywords : []),
+    ...(Array.isArray(item?.keywords_found) ? item.keywords_found : []),
+  ];
+  const seen = new Set();
+  return values
+    .map(value => String(value || '').trim())
+    .filter(value => {
+      const key = value.toLocaleLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+export function keywordOptions(items) {
+  const counts = new Map();
+  (items || []).forEach(item => {
+    articleKeywords(item).forEach(label => {
+      const key = label.toLocaleLowerCase();
+      const current = counts.get(key);
+      counts.set(key, {
+        value: current?.value || label,
+        count: (current?.count || 0) + 1,
+      });
+    });
+  });
+  return [...counts.values()].sort(
+    (left, right) => right.count - left.count || left.value.localeCompare(right.value),
+  );
+}
+
+export function matchesKeyword(item, selectedKeyword) {
+  if (!selectedKeyword || selectedKeyword === 'all') return true;
+  const needle = String(selectedKeyword).trim().toLocaleLowerCase();
+  return articleKeywords(item).some(keyword => keyword.toLocaleLowerCase() === needle);
+}

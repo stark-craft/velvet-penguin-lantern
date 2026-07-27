@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { articleKey } from '../src/news-scrapper/utils/intelligence.js';
+import {
+  articleKey,
+  keywordOptions,
+  matchesKeyword,
+} from '../src/news-scrapper/utils/intelligence.js';
 import { normalizeArticle, structuredSummary } from '../src/news-scrapper/utils/normalize.js';
 
 test('saved identity remains stable after backend persistence and reload', () => {
@@ -50,4 +54,22 @@ test('Samsung lead and bullet contract is preserved without rewriting', () => {
 
   assert.equal(result.lead, 'A concise executive lead.');
   assert.deepEqual(result.points, ['First fact.', 'Second fact.', 'Third fact.']);
+});
+
+test('briefing keyword filters count articles and match without case sensitivity', () => {
+  const articles = [
+    { title: 'One', keywords: ['AI', 'Television', 'AI'] },
+    { title: 'Two', keywords: ['ai', 'Display'] },
+    { title: 'Three', keywords_found: ['Broadcast'] },
+  ];
+
+  assert.deepEqual(keywordOptions(articles), [
+    { value: 'AI', count: 2 },
+    { value: 'Broadcast', count: 1 },
+    { value: 'Display', count: 1 },
+    { value: 'Television', count: 1 },
+  ]);
+  assert.equal(matchesKeyword(articles[0], 'ai'), true);
+  assert.equal(matchesKeyword(articles[1], 'Television'), false);
+  assert.equal(matchesKeyword(articles[2], 'all'), true);
 });
