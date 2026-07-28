@@ -61,6 +61,7 @@ C:\Development\velvet-penguin-lantern\legacy_app
 │       ├── viewer_profiles.json
 │       ├── viewer_hidden_store.json
 │       ├── viewer_saved_store.json
+│       ├── viewer_url_briefings.json       private URL jobs and briefings
 │       ├── workflow_store.json
 │       ├── workflow_store_broadcast.json
 │       ├── trainingData.json

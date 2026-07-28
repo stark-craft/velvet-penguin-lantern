@@ -43,9 +43,12 @@ import secrets
 import platform
 import hashlib
 import ipaddress
+import socket
 from pathlib import Path
+from urllib.parse import urljoin, urlsplit, urlunsplit
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+from newspaper import Article
 from fastapi import BackgroundTasks
 from concurrent.futures import ThreadPoolExecutor
 from threading import Semaphore
@@ -206,6 +209,7 @@ USAGE_TRACKER_FILE = os.path.join(ROOT_DIR, "usage_tracker.json")
 VIEWER_PROFILES_FILE = os.path.join(ROOT_DIR, "viewer_profiles.json")
 VIEWER_HIDDEN_FILE = os.path.join(ROOT_DIR, "viewer_hidden_store.json")
 VIEWER_SAVED_FILE = os.path.join(ROOT_DIR, "viewer_saved_store.json")
+VIEWER_BRIEFING_FILE = os.path.join(ROOT_DIR, "viewer_url_briefings.json")
 IP_HASH_SECRET = os.environ.get("NEWSSCRAPPER_IP_HASH_SECRET", "development-only-change-this-secret")
 if APP_ENV in {"production", "prod"}:
     if IP_HASH_SECRET == "development-only-change-this-secret":
@@ -633,6 +637,10 @@ BOUNCER_HARD_DROP_THRESHOLD = 0.60
 # ==========================================
 ml_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ml_worker")
 gatekeeper_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="gatekeeper_restore")
+personal_briefing_executor = ThreadPoolExecutor(
+    max_workers=2,
+    thread_name_prefix="personal_briefing",
+)
 
 # Feedback can arrive faster than a local bouncer model can retrain.  A single
 # worker consumes one request per profile at a time, while coalescing any votes
@@ -674,6 +682,7 @@ voc_lock = threading.Lock()
 sites_lock = threading.Lock()
 viewer_hidden_lock = threading.Lock()
 viewer_saved_lock = threading.Lock()
+viewer_briefing_lock = threading.RLock()
 region_learning_lock = threading.Lock()
 dropped_lock = threading.Lock()
 opinion_lock = threading.Lock()
@@ -1850,6 +1859,367 @@ def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
     return output
 
 
+PERSONAL_BRIEFING_STORE = JsonStore(Path(VIEWER_BRIEFING_FILE), dict)
+PERSONAL_BRIEFING_MAX_URLS = max(
+    1, min(50, int(os.environ.get("PERSONAL_BRIEFING_MAX_URLS", "20")))
+)
+PERSONAL_BRIEFING_FETCH_TIMEOUT = max(
+    5, int(os.environ.get("PERSONAL_BRIEFING_FETCH_TIMEOUT", "30"))
+)
+PERSONAL_BRIEFING_MAX_BYTES = max(
+    250_000, int(os.environ.get("PERSONAL_BRIEFING_MAX_BYTES", "5000000"))
+)
+
+
+def canonical_personal_url(value):
+    try:
+        parsed = urlsplit(str(value or "").strip())
+    except ValueError:
+        return ""
+    if (
+        parsed.scheme.lower() not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+    ):
+        return ""
+    port = parsed.port
+    if port and port not in {80, 443}:
+        return ""
+    netloc = parsed.hostname.lower().removeprefix("www.")
+    if port:
+        netloc = f"{netloc}:{port}"
+    return urlunsplit(
+        (
+            parsed.scheme.lower(),
+            netloc,
+            parsed.path or "/",
+            parsed.query,
+            "",
+        )
+    )
+
+
+def assert_public_article_url(value):
+    canonical = canonical_personal_url(value)
+    if not canonical:
+        raise ValueError("Use a valid public HTTP or HTTPS article URL.")
+    hostname = urlsplit(canonical).hostname
+    if hostname in {"localhost"} or hostname.endswith((".local", ".internal")):
+        raise ValueError("Private or local network URLs are not allowed.")
+    try:
+        addresses = {
+            result[4][0]
+            for result in socket.getaddrinfo(
+                hostname,
+                urlsplit(canonical).port or 443,
+                type=socket.SOCK_STREAM,
+            )
+        }
+    except socket.gaierror as error:
+        raise ValueError("The article hostname could not be resolved.") from error
+    for address in addresses:
+        parsed_ip = ipaddress.ip_address(address)
+        if not parsed_ip.is_global:
+            raise ValueError("Private or local network URLs are not allowed.")
+    return canonical
+
+
+def fetch_personal_article(url):
+    current_url = assert_public_article_url(url)
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 Chrome/124 Safari/537.36"
+        )
+    }
+    for _ in range(5):
+        response = requests.get(
+            current_url,
+            headers=headers,
+            timeout=PERSONAL_BRIEFING_FETCH_TIMEOUT,
+            verify=tls_verify("PERSONAL_BRIEFING"),
+            allow_redirects=False,
+            stream=True,
+        )
+        if response.status_code in {301, 302, 303, 307, 308}:
+            location = response.headers.get("location", "")
+            if not location:
+                raise RuntimeError("Article redirect did not provide a destination.")
+            current_url = assert_public_article_url(urljoin(current_url, location))
+            continue
+        if response.status_code >= 400:
+            raise RuntimeError(f"Article server returned HTTP {response.status_code}.")
+        content_type = str(response.headers.get("content-type", "")).lower()
+        if content_type and "html" not in content_type:
+            raise RuntimeError("The submitted URL is not an HTML article.")
+        body = bytearray()
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            body.extend(chunk)
+            if len(body) > PERSONAL_BRIEFING_MAX_BYTES:
+                raise RuntimeError("Article response exceeded the safe download limit.")
+        html = bytes(body).decode(response.encoding or "utf-8", errors="replace")
+        article = Article(url=current_url)
+        article.set_html(html)
+        article.parse()
+        text = re.sub(r"\s+", " ", str(article.text or "")).strip()
+        if len(text) < 200:
+            raise RuntimeError("Could not extract enough readable article text.")
+        published = article.publish_date
+        return {
+            "title": str(article.title or urlsplit(current_url).hostname).strip(),
+            "link": current_url,
+            "canonical_link": current_url,
+            "source": urlsplit(current_url).hostname.removeprefix("www."),
+            "date": (
+                published.isoformat()
+                if hasattr(published, "isoformat")
+                else datetime.date.today().isoformat()
+            ),
+            "top_image": str(article.top_image or "").strip(),
+            "full_contents": text,
+            "summary_input": text,
+            "snippet": text[:1000],
+            "master_summary": text[:1500],
+            "sources": [
+                {
+                    "name": urlsplit(current_url).hostname.removeprefix("www."),
+                    "link": current_url,
+                }
+            ],
+            "source_count": 1,
+            "origin": "personal_briefing",
+        }
+    raise RuntimeError("Article redirected too many times.")
+
+
+def update_personal_briefing_job(viewer_key, profile, job_id, **changes):
+    def updater(store):
+        viewer = store.setdefault(viewer_key, {})
+        jobs = viewer.setdefault(profile, [])
+        for job in jobs:
+            if job.get("id") == job_id:
+                job.update(changes)
+                job["updated_at"] = datetime.datetime.now().isoformat(
+                    timespec="seconds"
+                )
+                break
+        return store
+
+    with viewer_briefing_lock:
+        return PERSONAL_BRIEFING_STORE.update(updater)
+
+
+def cluster_personal_briefing_article(viewer_key, profile, item):
+    """Attach private, viewer-scoped semantic relationship metadata.
+
+    Personal submissions are never merged into the shared briefing. Related
+    submissions are only grouped inside the current viewer/profile namespace.
+    If MiniLM is unavailable, every article remains a safe singleton.
+    """
+
+    store = PERSONAL_BRIEFING_STORE.read()
+    jobs = store.get(viewer_key, {}).get(profile, [])
+    existing = [
+        dict(job["article"])
+        for job in jobs
+        if job.get("status") == "complete" and isinstance(job.get("article"), dict)
+    ]
+    articles = [*existing, dict(item)]
+    if len(articles) < 2:
+        item["personal_cluster_id"] = f"personal-cluster-{item['id']}"
+        item["related_private_count"] = 0
+        return item
+
+    try:
+        from news_scrapper.semantic_clustering import MinimalSemanticEngine
+
+        clusters = MinimalSemanticEngine().semantic_cluster(articles)
+    except Exception as error:
+        print(
+            f"[PERSONAL:{profile}] Semantic grouping unavailable: "
+            f"{type(error).__name__}: {error}",
+            flush=True,
+        )
+        clusters = [[article] for article in articles]
+
+    cluster_updates = {}
+    for cluster in clusters:
+        member_ids = sorted(str(article.get("id") or "") for article in cluster)
+        cluster_id = "personal-cluster-" + hashlib.sha256(
+            "|".join(member_ids).encode("utf-8")
+        ).hexdigest()[:16]
+        for article in cluster:
+            article_id = str(article.get("id") or "")
+            cluster_updates[article_id] = {
+                "personal_cluster_id": cluster_id,
+                "related_private_count": max(0, len(cluster) - 1),
+            }
+
+    current_id = str(item.get("id") or "")
+    item.update(cluster_updates.get(current_id, {}))
+
+    def updater(current_store):
+        viewer_jobs = current_store.setdefault(viewer_key, {}).setdefault(profile, [])
+        for job in viewer_jobs:
+            article = job.get("article")
+            if isinstance(article, dict):
+                article.update(cluster_updates.get(str(article.get("id") or ""), {}))
+        return current_store
+
+    with viewer_briefing_lock:
+        PERSONAL_BRIEFING_STORE.update(updater)
+    return item
+
+
+def process_personal_briefing_job(viewer_key, profile, job_id, url):
+    try:
+        update_personal_briefing_job(
+            viewer_key,
+            profile,
+            job_id,
+            status="processing",
+            stage="extracting",
+            progress=18,
+            message="Opening the article and extracting its story.",
+        )
+        seed = {
+            "title": url,
+            "link": url,
+            "canonical_link": url,
+            "source": urlsplit(url).hostname.removeprefix("www."),
+            "origin": "personal_briefing",
+        }
+        capabilities = resolve_pipeline_capabilities()
+        item = None
+        extraction_engine = "targeted_scrapy_fallback"
+        if capabilities.get("web_search") and enrich_article_with_web_search:
+            update_personal_briefing_job(
+                viewer_key,
+                profile,
+                job_id,
+                stage="web_search",
+                progress=30,
+                message="Samsung Web Search is reading the exact article.",
+            )
+            enriched = enrich_article_with_web_search(seed, keywords=[])
+            if enriched.get("enrichment_status") == "success":
+                item = enriched
+                extraction_engine = "samsung_web_search"
+        if item is None:
+            update_personal_briefing_job(
+                viewer_key,
+                profile,
+                job_id,
+                stage="local_extraction",
+                progress=42,
+                message="Using secure targeted extraction for this article.",
+            )
+            item = fetch_personal_article(url)
+
+        item["category"] = assign_category(
+            item.get("title", ""),
+            item.get("full_contents") or item.get("summary", ""),
+        )
+        item["region"] = apply_learned_region(item, profile).get(
+            "region", "Global"
+        )
+        item["extracted_by"] = extraction_engine
+        item["private_scope"] = "current_viewer_only"
+        item["origin"] = "personal_briefing"
+        item["submitted_url"] = url
+        item["id"] = f"personal-{job_id}"
+
+        update_personal_briefing_job(
+            viewer_key,
+            profile,
+            job_id,
+            stage="summarizing",
+            progress=68,
+            message=(
+                "Samsung Chat is shaping the summary and strategic context."
+                if capabilities.get("chat")
+                else "Local AI is shaping the summary and strategic context."
+            ),
+        )
+        if capabilities.get("chat"):
+            item = enrich_final_articles(
+                [item],
+                profile,
+                use_chat=True,
+            )[0]
+        else:
+            if enrich_article_image_metadata is not None:
+                item = enrich_article_image_metadata(item)
+            item = apply_local_bart_fallback([item], profile)[0]
+        item["why_matters"], item["insight_source"] = generate_why_it_matters(
+            item,
+            profile,
+        )
+        item["created_at"] = datetime.datetime.now().isoformat(
+            timespec="seconds"
+        )
+        item = cluster_personal_briefing_article(
+            viewer_key,
+            profile,
+            item,
+        )
+
+        update_personal_briefing_job(
+            viewer_key,
+            profile,
+            job_id,
+            status="complete",
+            stage="complete",
+            progress=100,
+            message="Your private briefing is ready.",
+            article=item,
+            error=None,
+        )
+    except Exception as error:
+        print(
+            f"[PERSONAL:{profile}] {url} failed: "
+            f"{type(error).__name__}: {error}",
+            flush=True,
+        )
+        update_personal_briefing_job(
+            viewer_key,
+            profile,
+            job_id,
+            status="failed",
+            stage="failed",
+            progress=100,
+            message="This article could not be prepared.",
+            error=f"{type(error).__name__}: {error}"[:500],
+        )
+
+
+def resume_personal_briefing_jobs():
+    store = PERSONAL_BRIEFING_STORE.read()
+    for viewer_key, profiles in store.items():
+        if not isinstance(profiles, dict):
+            continue
+        for profile, jobs in profiles.items():
+            for job in jobs if isinstance(jobs, list) else []:
+                if job.get("status") in {"queued", "processing"}:
+                    update_personal_briefing_job(
+                        viewer_key,
+                        profile,
+                        job.get("id"),
+                        status="queued",
+                        stage="queued",
+                        progress=5,
+                        message="Resumed after server restart.",
+                    )
+                    personal_briefing_executor.submit(
+                        process_personal_briefing_job,
+                        viewer_key,
+                        profile,
+                        job.get("id"),
+                        job.get("url"),
+                    )
+
+
 def save_training_vote(keywords, summary, vote, title="", profile=DEFAULT_PROFILE):
     training_file = get_training_file_for_profile(profile)
     new_row = {
@@ -2723,6 +3093,7 @@ async def lifespan(app: FastAPI):
     ensure_runtime_directories()
     ensure_profile_storage()
     migrate_tracker_privacy()
+    resume_personal_briefing_jobs()
     scheduler_shutdown_event.clear()
     scheduler = BackgroundScheduler()
     next_run = datetime.datetime.now() + datetime.timedelta(minutes=2)
@@ -2774,6 +3145,7 @@ async def lifespan(app: FastAPI):
     training_queue.put(None)
     ml_executor.shutdown(wait=False)
     gatekeeper_executor.shutdown(wait=False)
+    personal_briefing_executor.shutdown(wait=False)
 
 
 # ==========================================
@@ -4343,6 +4715,187 @@ def restore_for_current_viewer(request: Request, payload: dict = Body(...)):
 
 
 # ==========================================
+# --- PERSONAL URL BRIEFINGS ---
+# ==========================================
+@app.get("/viewer/briefings")
+def get_personal_url_briefings(request: Request):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    store = PERSONAL_BRIEFING_STORE.read()
+    jobs = store.get(viewer_key, {}).get(profile, [])
+    jobs = jobs if isinstance(jobs, list) else []
+    return {
+        "status": "success",
+        "jobs": list(reversed(jobs)),
+        "items": [
+            job["article"]
+            for job in reversed(jobs)
+            if job.get("status") == "complete"
+            and isinstance(job.get("article"), dict)
+        ],
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "count": len(jobs),
+        "active_count": sum(
+            job.get("status") in {"queued", "processing"} for job in jobs
+        ),
+    }
+
+
+@app.post("/viewer/briefings")
+def create_personal_url_briefings(request: Request, payload: dict = Body(...)):
+    profile = get_profile_for_request(request)
+    client_ip = get_client_ip(request)
+    viewer_key = get_viewer_key(client_ip)
+    fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
+    raw_value = payload.get("urls", [])
+    if isinstance(raw_value, list):
+        candidates = [str(value).strip() for value in raw_value]
+    else:
+        candidates = re.findall(r"https?://[^\s,]+", str(raw_value or ""))
+    candidates = [value.rstrip(".,;") for value in candidates if value.strip()]
+    if not candidates:
+        raise HTTPException(
+            status_code=400,
+            detail="Paste at least one HTTP or HTTPS news article URL.",
+        )
+    if len(candidates) > PERSONAL_BRIEFING_MAX_URLS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Submit no more than {PERSONAL_BRIEFING_MAX_URLS} URLs "
+                "at one time."
+            ),
+        )
+
+    valid_urls, invalid = [], []
+    for candidate in candidates:
+        try:
+            canonical = assert_public_article_url(candidate)
+            if canonical not in valid_urls:
+                valid_urls.append(canonical)
+        except ValueError as error:
+            invalid.append({"url": candidate, "error": str(error)})
+
+    accepted, duplicates = [], []
+    with viewer_briefing_lock:
+        store = PERSONAL_BRIEFING_STORE.read()
+        viewer = store.setdefault(viewer_key, {})
+        jobs = viewer.setdefault(profile, [])
+        existing_by_url = {
+            str(job.get("url")): job
+            for job in jobs
+            if job.get("url")
+        }
+        now = datetime.datetime.now().isoformat(timespec="seconds")
+        for url in valid_urls:
+            existing = existing_by_url.get(url)
+            if existing:
+                duplicates.append(
+                    {
+                        "url": url,
+                        "job_id": existing.get("id"),
+                        "status": existing.get("status"),
+                        "article_id": (
+                            existing.get("article", {}).get("id")
+                            if isinstance(existing.get("article"), dict)
+                            else None
+                        ),
+                    }
+                )
+                continue
+            job = {
+                "id": secrets.token_hex(10),
+                "url": url,
+                "status": "queued",
+                "stage": "queued",
+                "progress": 5,
+                "message": "Waiting for a private briefing worker.",
+                "created_at": now,
+                "updated_at": now,
+                "profile": profile,
+                "scope": "current_viewer_only",
+                "article": None,
+                "error": None,
+            }
+            jobs.append(job)
+            existing_by_url[url] = job
+            accepted.append(job)
+        PERSONAL_BRIEFING_STORE.write(store)
+
+    for job in accepted:
+        personal_briefing_executor.submit(
+            process_personal_briefing_job,
+            viewer_key,
+            profile,
+            job["id"],
+            job["url"],
+        )
+    record_usage_activity(
+        client_ip,
+        profile,
+        fingerprint,
+        "personal_briefing_submit",
+        json.dumps(
+            {
+                "accepted": len(accepted),
+                "duplicates": len(duplicates),
+                "invalid": len(invalid),
+            }
+        ),
+    )
+    return {
+        "status": "accepted",
+        "accepted": accepted,
+        "duplicates": duplicates,
+        "invalid": invalid,
+        "profile": profile,
+        "scope": "current_viewer_only",
+    }
+
+
+@app.post("/viewer/briefings/{job_id}/retry")
+def retry_personal_url_briefing(
+    job_id: str,
+    request: Request,
+):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    store = PERSONAL_BRIEFING_STORE.read()
+    jobs = store.get(viewer_key, {}).get(profile, [])
+    job = next(
+        (
+            candidate
+            for candidate in jobs
+            if candidate.get("id") == job_id
+        ),
+        None,
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Private briefing job not found.")
+    if job.get("status") in {"queued", "processing"}:
+        return {"status": "already_running", "job": job}
+    update_personal_briefing_job(
+        viewer_key,
+        profile,
+        job_id,
+        status="queued",
+        stage="queued",
+        progress=5,
+        message="Retry queued.",
+        error=None,
+    )
+    personal_briefing_executor.submit(
+        process_personal_briefing_job,
+        viewer_key,
+        profile,
+        job_id,
+        job.get("url"),
+    )
+    return {"status": "queued", "job_id": job_id}
+
+
+# ==========================================
 # --- PERSONAL SAVED-FOR-LATER SIGNALS ---
 # ==========================================
 @app.get("/viewer/saved")
@@ -4600,6 +5153,9 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
             "remove_selected",
             "remove_approved",
             "add_source",
+            "personal_briefing_submit",
+            "personal_briefing_open",
+            "personal_briefing_export",
         }
         if action not in supported_actions:
             return False

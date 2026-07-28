@@ -31,6 +31,10 @@ function initialsFor(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) || "ME").toUpperCase();
 }
+function personalDeskLabel(name) {
+  const first = String(name || "").trim().split(/\s+/)[0];
+  return first ? `${first}'s Desk` : "For Me";
+}
 
 export default function TopBar({
   manualScan,
@@ -190,7 +194,9 @@ export default function TopBar({
               }
             >
               {" "}
-              {item.label}{" "}
+              {item.to === "/saved"
+                ? personalDeskLabel(viewer?.display_name)
+                : item.label}{" "}
               {item.to === "/scan" && manualScan?.running && (
                 <span
                   className="deep-scan-dot"

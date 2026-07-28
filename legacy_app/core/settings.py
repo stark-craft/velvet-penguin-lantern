@@ -76,6 +76,7 @@ def migrate_legacy_news_runtime() -> None:
         "usage_tracker.json",
         "viewer_hidden_store.json",
         "viewer_saved_store.json",
+        "viewer_url_briefings.json",
         "viewer_profiles.json",
         "voc_feedback.json",
         "workflow_store.json",

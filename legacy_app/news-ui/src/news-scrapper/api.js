@@ -129,6 +129,21 @@ export const removeSavedArticle = async (article) =>
     body: JSON.stringify({ ...article, _tracking_fingerprint: await getFingerprint() }),
   });
 
+// ---------- Personal URL briefings ----------
+export const getViewerBriefings = () => jsonFetch('/viewer/briefings');
+export const createViewerBriefings = async (urls) =>
+  jsonFetch('/viewer/briefings', {
+    method: 'POST',
+    body: JSON.stringify({
+      urls,
+      _tracking_fingerprint: await getFingerprint(),
+    }),
+  });
+export const retryViewerBriefing = (jobId) =>
+  jsonFetch(`/viewer/briefings/${encodeURIComponent(jobId)}/retry`, {
+    method: 'POST',
+  });
+
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
 export const selectWorkflow = (article) =>
