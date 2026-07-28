@@ -9,6 +9,35 @@ PowerShell but does not assume programming experience.
 > The server PC uses the smaller `App_Portable` layout and serves an already
 > built frontend. Do not try to make both folders look identical.
 
+## Contents
+
+- [1. Development PC folder structure](#1-what-the-development-pc-folder-should-look-like)
+  - [Development folders that may be absent](#development-folders-that-may-be-absent-initially)
+  - [Files that must not be copied between machines](#development-files-that-must-never-be-copied-from-another-persons-machine)
+  - [Verify the development layout](#quick-development-layout-verification)
+  - [Run the development application](#normal-development-commands)
+- [1A. Production server folder structure](#1a-what-the-finished-server-folder-must-look-like)
+  - [Why the server layout is different](#why-the-server-layout-is-intentionally-different)
+  - [Authoritative bouncer pickle locations](#important-bouncer-pickle-locations)
+  - [Verify bouncer paths and retraining](#verify-the-active-bouncer-paths-and-retraining)
+  - [Files controlling the server](#files-that-control-the-running-server)
+- [2. Make a safety copy](#2-make-a-safety-copy-before-an-update)
+- [3. Build the frontend](#3-build-the-frontend-on-a-development-computer)
+- [4. Safely update App_Portable](#4-safely-copy-a-new-code-release-over-app_portable)
+- [5. Create the final environment file](#5-create-the-final-env)
+  - [Broadcast routing](#broadcast-profile-routing)
+- [6. Install the local AI models](#6-install-the-four-local-ai-models)
+- [7. Prepare embedded Python](#7-prepare-embedded-python)
+- [8. Start and stop the server](#8-start-and-stop-the-server)
+- [9. Scheduler-to-feed data flow](#9-what-happens-from-scheduler-to-feed)
+- [10. Verify a deployment](#10-verify-the-deployment)
+- [11. Frequent problems](#11-frequent-problems)
+  - [UI not built](#ui-not-built-yet)
+  - [Broadcast user sees Default](#broadcast-user-sees-default)
+  - [Samsung API failure](#samsung-api-fails)
+  - [Scheduler appears to stop](#scheduler-appears-to-stop)
+- [12. Claude Code prompt for Windows UI failures](#12-claude-code-prompt-for-the-two-windows-only-ui-failures)
+
 ## 1. What the development PC folder should look like
 
 The development checkout is the place where code is edited, tested, and built.
@@ -246,6 +275,200 @@ If this is a new installation and the two runtime pickle files do not exist,
 that is acceptable. The application starts without a trained bouncer and
 creates the appropriate file after sufficient Interested/Not Interested
 training data is submitted and training completes.
+
+### Verify the active bouncer paths and retraining
+
+Use this check when:
+
+- installing the application on a Windows machine for the first time;
+- copying a newer backend into `App_Portable`;
+- changing `NEWSSCRAPPER_RUNTIME_DIR`;
+- investigating whether Interested/Not Interested feedback trains the model
+  used for future article scoring; or
+- seeing a startup message such as `Loaded default bouncer:
+  bouncer_model.pkl` and wanting to know the complete resolved path.
+
+The startup message prints only the filename. It does not prove that the file
+was loaded from the folder beside `main.py`. The `/status` endpoint reports the
+real, resolved path used by the running backend.
+
+#### Step 1: start the backend first
+
+The commands below call the running backend, so they cannot be used before
+Uvicorn starts.
+
+On a development PC, open a PowerShell window and run:
+
+```powershell
+cd "C:\Development\velvet-penguin-lantern\legacy_app"
+.\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Leave that PowerShell window open. Wait until it displays:
+
+```text
+Application startup complete.
+```
+
+On the portable server, start the existing batch file instead:
+
+```powershell
+cd C:\App_Portable
+.\scripts\start_windows.bat
+```
+
+Leave that server window open too. The verification commands must be run in a
+different PowerShell window.
+
+#### Step 2: open a second PowerShell window
+
+You can open this second PowerShell window from any folder. These commands use
+an HTTP address and therefore do not depend on the current directory.
+
+Copy and run:
+
+```powershell
+$status = Invoke-RestMethod http://127.0.0.1:8000/status
+
+$status.profiles.default.bouncer_model_file
+$status.profiles.broadcast.bouncer_model_file
+```
+
+On `C:\App_Portable`, the correct output is:
+
+```text
+C:\App_Portable\news_scrapper\runtime\bouncer_model.pkl
+C:\App_Portable\news_scrapper\runtime\bouncer_model_broadcast.pkl
+```
+
+On a development checkout, the beginning of the path will be different, but
+both paths must still finish with:
+
+```text
+news_scrapper\runtime\bouncer_model.pkl
+news_scrapper\runtime\bouncer_model_broadcast.pkl
+```
+
+To display the complete status record for each profile, run:
+
+```powershell
+$status.profiles.default | Format-List *
+$status.profiles.broadcast | Format-List *
+```
+
+Check these fields:
+
+```text
+bouncer_model_file
+bouncer_model_exists
+training_file
+training_file_exists
+```
+
+For an established installation, both `exists` values should normally be
+`True`. A new installation may legitimately report that a model does not exist
+until both training labels have sufficient examples.
+
+#### Step 3: inspect the physical runtime files
+
+On the portable server, run:
+
+```powershell
+Get-Item C:\App_Portable\news_scrapper\runtime\bouncer_model.pkl |
+    Select-Object FullName, LastWriteTime, Length
+
+Get-Item C:\App_Portable\news_scrapper\runtime\bouncer_model_broadcast.pkl |
+    Select-Object FullName, LastWriteTime, Length
+```
+
+If either file has not been created yet, PowerShell reports that the path does
+not exist. That is not automatically an error on a fresh installation.
+
+The safer version below reports existence without producing a red error:
+
+```powershell
+$defaultModel = "C:\App_Portable\news_scrapper\runtime\bouncer_model.pkl"
+$broadcastModel = "C:\App_Portable\news_scrapper\runtime\bouncer_model_broadcast.pkl"
+
+Test-Path $defaultModel
+Test-Path $broadcastModel
+
+if (Test-Path $defaultModel) {
+    Get-Item $defaultModel | Select-Object FullName, LastWriteTime, Length
+}
+
+if (Test-Path $broadcastModel) {
+    Get-Item $broadcastModel | Select-Object FullName, LastWriteTime, Length
+}
+```
+
+#### Step 4: prove that feedback updates and reloads the same model
+
+1. Keep the backend terminal visible.
+2. In the browser, open the correct profile.
+3. Mark one article Interested or Not Interested.
+4. Watch the backend terminal. The vote is saved immediately and retraining is
+   queued. The terminal should eventually show messages similar to:
+
+```text
+[BOUNCER:default] Retraining with new data...
+Bouncer model saved to: C:\App_Portable\news_scrapper\runtime\bouncer_model.pkl
+[BOUNCER:default] Brain successfully upgraded and reloaded (model_loaded=True).
+```
+
+For Broadcast, the message should name:
+
+```text
+C:\App_Portable\news_scrapper\runtime\bouncer_model_broadcast.pkl
+```
+
+5. After the successful reload message appears, return to the second
+   PowerShell window and run:
+
+```powershell
+Get-Item C:\App_Portable\news_scrapper\runtime\bouncer_model.pkl |
+    Select-Object FullName, LastWriteTime, Length
+```
+
+Use the Broadcast filename instead if the vote was made in the Broadcast
+profile. `LastWriteTime` should reflect the completed training run.
+
+One vote does not always produce a model. Training needs valid examples from
+both classes—Interested and Not Interested. If training reports insufficient
+labels, submit legitimate examples of the missing label and allow the queued
+training run to finish.
+
+#### How to interpret an incorrect result
+
+If `/status` reports:
+
+```text
+C:\App_Portable\bouncer_model.pkl
+```
+
+instead of a path inside `news_scrapper\runtime`, do not copy pickle files
+around while the server is running. Check these items:
+
+1. Confirm the backend contains the latest
+   `news_scrapper\application.py`, `news_scrapper\train_bouncer.py`, and
+   `core\settings.py`.
+2. Open `C:\App_Portable\.env`.
+3. Find `NEWSSCRAPPER_RUNTIME_DIR`.
+4. Set it to:
+
+```env
+NEWSSCRAPPER_RUNTIME_DIR=C:\App_Portable\news_scrapper\runtime
+```
+
+5. Save `.env`.
+6. Stop Uvicorn with `Ctrl+C`.
+7. Start the batch file again.
+8. Repeat the `/status` commands.
+
+The root-level files may remain as old rollback copies. They must not be
+manually copied over newer runtime files. The startup migration copies a
+root-level legacy file only when the corresponding runtime destination does
+not exist; it never overwrites an existing runtime model.
 
 ### Files that control the running server
 
