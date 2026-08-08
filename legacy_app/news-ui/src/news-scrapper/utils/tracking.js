@@ -17,6 +17,23 @@ export async function trackAction(action, detail = '') {
   }
 }
 
+export function articleActivityDetail(item, screen = 'unknown') {
+  return {
+    title: item?.title,
+    link: item?.link || item?.canonical_link || item?.url,
+    source: item?.source || item?.src,
+    category: item?.category,
+    region: item?.region,
+    keywords: item?.keywords || item?.keywords_found || [],
+    entities: item?.entities || [],
+    article_intent: item?.article_intent,
+    profile: item?.profile,
+    article_id: item?.id,
+    cluster_id: item?.cluster_id,
+    screen,
+  };
+}
+
 // Hook: page_load on mount + 60s heartbeat
 export function useTracking(pageName) {
   const fired = useRef(false);

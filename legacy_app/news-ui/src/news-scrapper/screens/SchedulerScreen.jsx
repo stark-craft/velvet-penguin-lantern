@@ -29,25 +29,28 @@ export default function SchedulerScreen() {
   const activeJobs = Number(status?.active_manual_jobs ?? status?.active_jobs?.length ?? 0);
   const capacity = Number(status?.capacity_remaining ?? 0);
   const isActive = Boolean(status?.is_active);
+  const loading = !status && !err;
+  const systemState = err ? 'Offline' : loading ? 'Checking' : isActive ? 'Running' : 'Ready';
+  const threshold = status?.bouncer_threshold ?? status?.drop_threshold ?? '—';
 
   const checks = useMemo(() => [
-    { label: 'FastAPI backend', value: status ? 'Online' : 'Checking', tone: status ? 'ok' : 'warn' },
-    { label: 'Scheduler mode', value: status?.mode || 'idle', tone: isActive ? 'warn' : 'ok' },
+    { label: 'FastAPI backend', value: err ? 'Offline' : status ? 'Online' : 'Checking', tone: status ? 'ok' : 'warn' },
+    { label: 'Scheduler mode', value: status?.mode || (loading ? 'checking' : 'unavailable'), tone: isActive ? 'warn' : status ? 'ok' : 'warn' },
     { label: 'Manual capacity', value: `${capacity} slots`, tone: capacity > 0 ? 'ok' : 'warn' },
-    { label: 'Bouncer threshold', value: '0.60', tone: 'ok' },
+    { label: 'Bouncer threshold', value: String(threshold), tone: threshold === '—' ? 'warn' : 'ok' },
     { label: 'Polling interval', value: '10s', tone: 'ok' },
-  ], [status, isActive, capacity]);
+  ], [status, err, loading, isActive, capacity, threshold]);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
+    <div className="system-page scheduler-page space-y-6">
+      <section className="workspace-hero scheduler-hero rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">System Status</div>
             <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">Autonomous intelligence engine</h1>
             <p className="mt-3 text-slate-400">{status?.message || 'Checking backend status'}{lastUpdated && ` · updated ${lastUpdated}`}</p>
           </div>
-          <span className={isActive ? 'signal-chip selected' : 'signal-chip'}>{isActive ? 'Scheduler active' : 'System ready'}</span>
+          <span className={isActive ? 'signal-chip selected' : err ? 'signal-chip system-offline' : 'signal-chip'}>{systemState}</span>
         </div>
       </section>
 
@@ -57,18 +60,18 @@ export default function SchedulerScreen() {
         </section>
       )}
 
-      <section className="grid gap-4 md:grid-cols-4">
-        <div className="signal-stat"><span>Scheduler State</span><strong>{isActive ? 'Active' : 'Idle'}</strong></div>
+      <section className="workspace-metrics scheduler-metrics grid gap-4 md:grid-cols-4">
+        <div className="signal-stat"><span>Scheduler State</span><strong>{systemState}</strong></div>
         <div className="signal-stat"><span>Active Jobs</span><strong>{activeJobs}</strong></div>
         <div className="signal-stat"><span>Capacity</span><strong>{capacity}</strong></div>
-        <div className="signal-stat"><span>Threshold</span><strong>0.60</strong></div>
+        <div className="signal-stat"><span>Threshold</span><strong>{threshold}</strong></div>
       </section>
 
-      <section className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
+      <section className="workspace-panel scheduler-health rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
         <h2 className="text-lg font-semibold text-white">Health Checks</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {checks.map((check) => (
-            <div key={check.label} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+            <div key={check.label} className="health-check-card flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
               <div>
                 <div className="text-sm font-semibold text-slate-100">{check.label}</div>
                 <div className="mt-1 text-xs text-slate-500">Live operational signal</div>
@@ -81,7 +84,7 @@ export default function SchedulerScreen() {
         </div>
       </section>
 
-      <section className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
+      <section className="workspace-panel scheduler-brief rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
         <h2 className="text-lg font-semibold text-white">Scheduler Brief</h2>
         <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

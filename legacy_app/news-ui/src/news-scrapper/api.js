@@ -54,6 +54,18 @@ export const removeFromBriefing  = (title)   => jsonFetch('/briefing/remove',  {
 export const restoreToBriefing   = (article) => jsonFetch('/briefing/restore', { method:'POST', body: JSON.stringify({ article }) });
 export const getInsight = (article) => jsonFetch('/insight', { method:'POST', body: JSON.stringify(article) });
 
+// ---------- Per-browser English -> Korean translation ----------
+export const getKoreanTranslationStatus = () => jsonFetch('/translation/status');
+export const translateToKorean = (texts) =>
+  jsonFetch('/translation/korean', {
+    method: 'POST',
+    body: JSON.stringify({
+      texts: Array.isArray(texts) ? texts : [String(texts || '')],
+      source_language: 'en',
+      target_language: 'ko',
+    }),
+  });
+
 // ---------- Read-only extracted intelligence search ----------
 export function searchExtractedIntelligence(params, signal) {
   const u = new URLSearchParams();
@@ -143,11 +155,32 @@ export const retryViewerBriefing = (jobId) =>
   jsonFetch(`/viewer/briefings/${encodeURIComponent(jobId)}/retry`, {
     method: 'POST',
   });
+export const clearViewerBriefings = async (scope = 'finished') =>
+  jsonFetch('/viewer/briefings/clear', {
+    method: 'POST',
+    body: JSON.stringify({
+      scope,
+      _tracking_fingerprint: await getFingerprint(),
+    }),
+  });
+
+// ---------- Private viewer personalization ----------
+export const getViewerPersonalization = () => jsonFetch('/viewer/personalization');
+export const resetViewerPersonalization = () =>
+  jsonFetch('/viewer/personalization/reset', { method: 'POST' });
 
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
 export const selectWorkflow = (article) =>
   jsonFetch('/workflow/select', { method:'POST', body: JSON.stringify(article) });
+export const importWorkflow = async (items) =>
+  jsonFetch('/workflow/import', {
+    method: 'POST',
+    body: JSON.stringify({
+      items,
+      _tracking_fingerprint: await getFingerprint(),
+    }),
+  });
 export const approveWorkflow = (title, key='1357') =>
   jsonFetch('/workflow/approve', { method:'POST', body: JSON.stringify({ title, key }) });
 export const removeWorkflow = (title, list_type) =>

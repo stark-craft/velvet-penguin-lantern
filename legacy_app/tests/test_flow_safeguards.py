@@ -29,6 +29,20 @@ class FlowSafeguardTests(unittest.TestCase):
                 {"viewer": {"default": []}},
             )
 
+    def test_personalization_state_is_included_in_legacy_migration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            runtime = root / "runtime"
+            source = root / "viewer_personalization.json"
+            source.write_text('{"viewer": {"default": {"events": []}}}', encoding="utf-8")
+            with patch.object(settings, "PROJECT_ROOT", root), patch.object(
+                settings, "NEWS_RUNTIME_DIR", runtime
+            ), patch.object(
+                settings, "VENTURE_LENS_RUNTIME_DIR", root / "venture"
+            ):
+                settings.migrate_legacy_news_runtime()
+            self.assertTrue((runtime / "viewer_personalization.json").exists())
+
     def test_nonzero_clustering_exit_fails_profile_run(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -84,12 +98,14 @@ class FlowSafeguardTests(unittest.TestCase):
         actions = [
             "add_source",
             "approve",
+            "archive_import",
             "batch_select",
             "dossier_open",
             "draft_export",
             "export",
             "heartbeat",
             "hide_personal",
+            "personal_briefing_clear",
             "page_load",
             "remove_approved",
             "remove_selected",
@@ -130,7 +146,7 @@ class FlowSafeguardTests(unittest.TestCase):
             tracker = json.loads(tracker_file.read_text(encoding="utf-8"))
             day = next(iter(tracker.values()))["activity"][app.get_today()]
             self.assertEqual(day["articles_clicked"], 1)
-            self.assertEqual(day["selections"], 4)
+            self.assertEqual(day["selections"], 5)
             self.assertEqual(day["approvals"], 1)
             self.assertEqual(day["personal_hides"], 1)
             self.assertEqual(day["workflow_removals"], 3)

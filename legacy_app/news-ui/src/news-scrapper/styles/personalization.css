@@ -1,0 +1,184 @@
+/* Viewer-specific ranking, archive import, and long-list resilience. */
+
+.personalization-toast {
+  position: fixed;
+  top: 5.35rem;
+  left: 50%;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(32rem, calc(100vw - 2rem));
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(196, 181, 253, 0.25);
+  border-radius: 1rem;
+  color: #f5f3ff;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.22), transparent 16rem),
+    rgba(19, 15, 31, 0.94);
+  box-shadow: 0 22px 70px rgba(5, 3, 12, 0.42);
+  backdrop-filter: blur(18px) saturate(1.1);
+  transform: translateX(-50%);
+  animation: personalization-toast-in 420ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.personalization-toast > span {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 0.12rem;
+}
+
+.personalization-toast strong { font-size: 0.83rem; }
+.personalization-toast small { color: #a7b1c4; font-size: 0.72rem; line-height: 1.35; }
+.personalization-toast > button {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: #d8ddeb;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.personal-follow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  max-width: min(100%, 18rem);
+  padding: 0.34rem 0.58rem;
+  border: 1px solid rgba(196, 181, 253, 0.32);
+  border-radius: 999px;
+  color: #ede9fe;
+  font-size: 0.63rem;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: linear-gradient(120deg, rgba(124, 58, 237, 0.38), rgba(14, 165, 233, 0.2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 8px 24px rgba(76, 29, 149, 0.16);
+}
+
+.archive-import-notice {
+  margin: 0 0 1rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 0.9rem;
+  color: #d7f4ff;
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.archive-results-actions,
+.personal-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.personal-learning-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(167, 139, 250, 0.19);
+  border-radius: 1rem;
+  color: #ede9fe;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.15), transparent 18rem),
+    rgba(16, 22, 38, 0.72);
+}
+
+.personal-learning-strip > div {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.65rem;
+}
+
+.personal-learning-strip span { display: grid; gap: 0.14rem; }
+.personal-learning-strip strong { font-size: 0.83rem; }
+.personal-learning-strip small { color: #91a0b7; font-size: 0.72rem; line-height: 1.4; }
+
+/* Avoid painting hundreds of off-screen cards while retaining natural layout. */
+.archive-result-groups article,
+.home-article-grid > article,
+.home-article-grid > div,
+.personal-job-grid > article {
+  content-visibility: auto;
+  contain-intrinsic-block-size: 360px;
+}
+
+.image-feed-card,
+.archive-result-groups article,
+.personal-job,
+.latest-signal-card {
+  min-width: 0;
+}
+
+.image-feed-card h3,
+.archive-result-groups h3,
+.personal-job-url {
+  overflow-wrap: anywhere;
+}
+
+@keyframes personalization-toast-in {
+  from { opacity: 0; transform: translate(-50%, -10px) scale(0.97); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+html[data-theme="light"] .personalization-toast {
+  border-color: rgba(79, 70, 229, 0.2);
+  color: #17243a;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.13), transparent 16rem),
+    rgba(238, 244, 250, 0.96);
+  box-shadow: 0 22px 70px rgba(46, 63, 90, 0.23);
+}
+
+html[data-theme="light"] .personalization-toast small { color: #5f6f84; }
+html[data-theme="light"] .personalization-toast > button { color: #42536a; border-color: rgba(64, 89, 124, 0.17); }
+html[data-theme="light"] .personal-follow-chip {
+  border-color: rgba(79, 70, 229, 0.28) !important;
+  color: #312e81 !important;
+  background: linear-gradient(120deg, rgba(99, 102, 241, 0.17), rgba(14, 165, 233, 0.11)) !important;
+}
+html[data-theme="light"] .archive-import-notice {
+  border-color: rgba(2, 132, 199, 0.2);
+  color: #0c4a6e;
+  background: rgba(224, 242, 254, 0.72);
+}
+html[data-theme="light"] .personal-learning-strip {
+  border-color: rgba(70, 101, 146, 0.18);
+  color: #17243a;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.1), transparent 18rem),
+    rgba(230, 238, 247, 0.78);
+}
+html[data-theme="light"] .personal-learning-strip small { color: #5f6f84; }
+
+@media (max-width: 720px) {
+  .personalization-toast { top: 4.7rem; }
+  .personal-learning-strip { align-items: stretch; flex-direction: column; }
+  .personal-learning-strip .btn-dark-secondary { justify-content: center; }
+  .archive-results-actions { justify-content: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .personalization-toast,
+  .personal-job,
+  .personal-job.processing::after,
+  .personal-job.queued::after {
+    animation: none !important;
+  }
+  .personal-job-track span,
+  .image-feed-card,
+  .latest-signal-card {
+    transition-duration: 0.01ms !important;
+  }
+}

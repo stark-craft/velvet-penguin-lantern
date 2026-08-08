@@ -54,6 +54,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Semaphore
 from core.secure_http import tls_verify
 from core.storage import JsonStore
+from news_scrapper.personalization import PersonalizationService
 from core.profile import client_ip as resolve_client_ip
 from core.profile import normalize_ip
 from core.profile import resolve_profile
@@ -210,6 +211,7 @@ VIEWER_PROFILES_FILE = os.path.join(ROOT_DIR, "viewer_profiles.json")
 VIEWER_HIDDEN_FILE = os.path.join(ROOT_DIR, "viewer_hidden_store.json")
 VIEWER_SAVED_FILE = os.path.join(ROOT_DIR, "viewer_saved_store.json")
 VIEWER_BRIEFING_FILE = os.path.join(ROOT_DIR, "viewer_url_briefings.json")
+VIEWER_PERSONALIZATION_FILE = os.path.join(ROOT_DIR, "viewer_personalization.json")
 IP_HASH_SECRET = os.environ.get("NEWSSCRAPPER_IP_HASH_SECRET", "development-only-change-this-secret")
 if APP_ENV in {"production", "prod"}:
     if IP_HASH_SECRET == "development-only-change-this-secret":
@@ -1860,6 +1862,10 @@ def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
 
 
 PERSONAL_BRIEFING_STORE = JsonStore(Path(VIEWER_BRIEFING_FILE), dict)
+PERSONALIZATION_SERVICE = PersonalizationService(
+    Path(VIEWER_PERSONALIZATION_FILE),
+    window_days=30,
+)
 PERSONAL_BRIEFING_MAX_URLS = max(
     1, min(50, int(os.environ.get("PERSONAL_BRIEFING_MAX_URLS", "20")))
 )
@@ -3646,6 +3652,82 @@ def select_news(request: Request, item: dict = Body(...)):
     return {"status": "success", "count": len(store["selected"]), "profile": profile}
 
 
+@app.post("/workflow/import")
+def import_archived_news(request: Request, payload: dict = Body(...)):
+    """Import selected archive signals into the shared profile review queue."""
+
+    profile = get_profile_for_request(request)
+    client_ip = get_client_ip(request)
+    viewer_key = get_viewer_key(client_ip)
+    viewer_name = (
+        get_viewer_profile(client_ip).get("display_name")
+        or get_team_owner_for_ip(client_ip)
+        or "Unknown"
+    )
+    fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
+    items = payload.get("items", [])
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="Select at least one archived signal.")
+    if len(items) > 100:
+        raise HTTPException(status_code=400, detail="Import no more than 100 signals at once.")
+
+    imported = []
+    existing = []
+    now = datetime.datetime.now().isoformat(timespec="minutes")
+    with workflow_lock:
+        store = load_workflow_store(request)
+        known = {
+            _article_identity(item)
+            for item in (store.get("selected", []) + store.get("approved", []))
+        }
+        for raw_item in items:
+            if not isinstance(raw_item, dict):
+                continue
+            identity = _article_identity(raw_item)
+            if not identity:
+                continue
+            if identity in known:
+                existing.append(raw_item.get("title") or identity)
+                continue
+            item = dict(raw_item)
+            item["profile"] = profile
+            item["selected_by_id"] = viewer_key
+            item["selected_by"] = viewer_name
+            item["selected_at"] = now
+            item["selection_source"] = "briefing_archive"
+            store["selected"].append(item)
+            imported.append(item)
+            known.add(identity)
+        if imported:
+            save_workflow_store(store, request)
+
+    if imported:
+        representative = dict(imported[0])
+        representative["item_count"] = len(imported)
+        representative["screen"] = "briefing_archive"
+        record_usage_activity(
+            client_ip,
+            profile,
+            fingerprint,
+            "archive_import",
+            json.dumps(representative, ensure_ascii=False),
+        )
+        for item in imported[1:]:
+            PERSONALIZATION_SERVICE.record_event(
+                viewer_key,
+                profile,
+                "archive_import",
+                item,
+            )
+    return {
+        "status": "success",
+        "imported": len(imported),
+        "already_present": len(existing),
+        "selected_count": len(store.get("selected", [])),
+        "profile": profile,
+    }
+
+
 @app.post("/workflow/approve")
 def approve_news(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
@@ -3873,21 +3955,39 @@ def get_briefing_meta(request: Request):
 @app.get("/latest-briefing")
 def get_latest_briefing(request: Request):
     profile = get_profile_for_request(request)
+    client_ip = get_client_ip(request)
+    viewer_key = get_viewer_key(client_ip)
     latest = get_latest_briefing_file_for_profile(profile)
     if latest:
         try:
             with open(latest, "r", encoding="utf-8") as file_obj:
                 data = json.load(file_obj)
                 if data and len(data) > 0:
-                    visible_data = filter_viewer_hidden(data, request, profile)
+                    visible_data = apply_learned_regions(
+                        filter_viewer_hidden(data, request, profile),
+                        profile,
+                    )
+                    ranked_data, personalization = PERSONALIZATION_SERVICE.rank_articles(
+                        visible_data,
+                        viewer_key,
+                        profile,
+                        get_viewer_saved_items(request, profile),
+                    )
+                    viewer = get_viewer_profile(client_ip)
+                    personalization["viewer_name"] = (
+                        viewer.get("display_name")
+                        or get_team_owner_for_ip(client_ip)
+                        or ""
+                    )
                     return {
                         "status": "success",
-                        "result": apply_learned_regions(visible_data, profile),
+                        "result": ranked_data,
                         "type": "scheduler",
                         "source": "shared",
                         "profile": profile,
                         "filename": os.path.basename(latest),
                         "generated_at": datetime.datetime.fromtimestamp(os.path.getmtime(latest)).strftime("%d %b %Y, %I:%M %p"),
+                        "personalization": personalization,
                     }
         except Exception as e:
             return {"status": "error", "result": [], "profile": profile, "message": str(e)}
@@ -4895,6 +4995,62 @@ def retry_personal_url_briefing(
     return {"status": "queued", "job_id": job_id}
 
 
+@app.post("/viewer/briefings/clear")
+def clear_personal_url_briefings(request: Request, payload: dict = Body(default={})):
+    """Clear finished private URL jobs without interrupting active work."""
+
+    profile = get_profile_for_request(request)
+    client_ip = get_client_ip(request)
+    viewer_key = get_viewer_key(client_ip)
+    fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
+    requested_scope = str(payload.get("scope") or "finished").strip().lower()
+    if requested_scope not in {"finished", "failed", "complete"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Clear scope must be finished, failed, or complete.",
+        )
+    statuses = {
+        "finished": {"complete", "failed"},
+        "failed": {"failed"},
+        "complete": {"complete"},
+    }[requested_scope]
+    removed = 0
+    remaining = 0
+
+    with viewer_briefing_lock:
+        def updater(store):
+            nonlocal removed, remaining
+            viewer = store.setdefault(viewer_key, {})
+            jobs = viewer.get(profile, [])
+            jobs = jobs if isinstance(jobs, list) else []
+            kept = [job for job in jobs if job.get("status") not in statuses]
+            removed = len(jobs) - len(kept)
+            remaining = len(kept)
+            viewer[profile] = kept
+            return store
+
+        PERSONAL_BRIEFING_STORE.update(updater)
+
+    if removed:
+        record_usage_activity(
+            client_ip,
+            profile,
+            fingerprint,
+            "personal_briefing_clear",
+            json.dumps(
+                {"removed": removed, "scope": requested_scope, "screen": "my_briefing"}
+            ),
+        )
+    return {
+        "status": "success",
+        "removed": removed,
+        "remaining": remaining,
+        "active_jobs_preserved": True,
+        "profile": profile,
+        "scope": "current_viewer_only",
+    }
+
+
 # ==========================================
 # --- PERSONAL SAVED-FOR-LATER SIGNALS ---
 # ==========================================
@@ -4908,7 +5064,8 @@ def get_personal_saved(request: Request):
         "count": len(items),
         "profile": profile,
         "scope": "current_viewer_only",
-        "affects_ranking": False,
+        "affects_ranking": True,
+        "follow_window_days": 30,
     }
 
 
@@ -4952,20 +5109,23 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
 
     activity_tracked = False
     if changed:
+        activity_detail = {
+            key: article_payload.get(key)
+            for key in (
+                "title", "link", "url", "canonical_link", "source", "src",
+                "category", "region", "keywords", "keywords_found",
+                "matched_keywords", "matched_terms", "entities", "article_intent",
+                "intent", "cluster_id",
+            )
+            if article_payload.get(key) not in (None, "", [])
+        }
+        activity_detail["screen"] = "saved_endpoint"
         activity_tracked = record_usage_activity(
             client_ip,
             profile,
             fingerprint,
             "save_for_later",
-            json.dumps(
-                {
-                    "title": article_payload.get("title", ""),
-                    "link": article_payload.get("link") or article_payload.get("url", ""),
-                    "source": article_payload.get("source", ""),
-                    "screen": "saved_endpoint",
-                },
-                ensure_ascii=False,
-            ),
+            json.dumps(activity_detail, ensure_ascii=False),
         )
 
     return {
@@ -4976,7 +5136,8 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
         "count": len(items),
         "profile": profile,
         "scope": "current_viewer_only",
-        "affects_ranking": False,
+        "affects_ranking": True,
+        "follow_window_days": 30,
     }
 
 
@@ -5031,7 +5192,34 @@ def remove_saved_for_current_viewer(request: Request, payload: dict = Body(...))
         "count": len(remaining),
         "profile": profile,
         "scope": "current_viewer_only",
-        "affects_ranking": False,
+        "affects_ranking": True,
+        "follow_window_days": 30,
+    }
+
+
+@app.get("/viewer/personalization")
+def get_viewer_personalization(request: Request):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    return {
+        "status": "success",
+        "profile": profile,
+        "scope": "current_viewer_only",
+        **PERSONALIZATION_SERVICE.summary(viewer_key, profile),
+    }
+
+
+@app.post("/viewer/personalization/reset")
+def reset_viewer_personalization(request: Request):
+    profile = get_profile_for_request(request)
+    viewer_key = get_viewer_key(get_client_ip(request))
+    removed = PERSONALIZATION_SERVICE.reset(viewer_key, profile)
+    return {
+        "status": "success",
+        "removed_events": removed,
+        "profile": profile,
+        "scope": "current_viewer_only",
+        "saved_signals_preserved": True,
     }
 
 
@@ -5093,6 +5281,10 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
     team_owner = get_team_owner_for_ip(ip)
     device_id = get_device_id(ip, fingerprint or "unknown")
     today = get_today()
+    try:
+        event_detail = json.loads(detail) if detail else ""
+    except (TypeError, ValueError):
+        event_detail = detail
 
     with tracker_lock:
         tracker = load_tracker()
@@ -5156,16 +5348,14 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
             "personal_briefing_submit",
             "personal_briefing_open",
             "personal_briefing_export",
+            "personal_briefing_clear",
+            "archive_import",
         }
         if action not in supported_actions:
             return False
         day["action_counts"][action] = (
             int(day["action_counts"].get(action, 0)) + 1
         )
-        try:
-            event_detail = json.loads(detail) if detail else ""
-        except (TypeError, ValueError):
-            event_detail = detail
         day["events"].append(
             {
                 "timestamp": datetime.datetime.now().isoformat(
@@ -5202,9 +5392,9 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
             day["heartbeats"] = day.get("heartbeats", 0) + 1
         elif action == "voc_feedback":
             day.setdefault("voc_feedback", []).append(detail)
-        elif action in {"select", "batch_select"}:
+        elif action in {"select", "batch_select", "archive_import"}:
             increment = 1
-            if action == "batch_select":
+            if action in {"batch_select", "archive_import"}:
                 try:
                     payload = (
                         event_detail
@@ -5240,6 +5430,30 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
 
         purge_old_entries(device)
         save_tracker(tracker)
+    try:
+        if action == "batch_select" and isinstance(event_detail, dict):
+            selected_items = event_detail.get("items", [])
+            selected_items = selected_items if isinstance(selected_items, list) else []
+            for selected_item in selected_items[:100]:
+                PERSONALIZATION_SERVICE.record_event(
+                    get_viewer_key(ip),
+                    profile,
+                    "select",
+                    selected_item if isinstance(selected_item, dict) else None,
+                )
+        else:
+            PERSONALIZATION_SERVICE.record_event(
+                get_viewer_key(ip),
+                profile,
+                action,
+                event_detail if isinstance(event_detail, dict) else None,
+            )
+    except Exception as personalization_error:
+        print(
+            f"[PERSONALIZATION] Could not record {action}: "
+            f"{personalization_error}",
+            flush=True,
+        )
     return True
 
 

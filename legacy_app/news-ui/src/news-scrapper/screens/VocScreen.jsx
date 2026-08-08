@@ -5,14 +5,14 @@ export default function VocScreen() {
   const [complete, setComplete] = useState(false);
 
   return (
-    <div className="page-stack">
-      <section className="page-hero">
+    <div className="page-stack voc-page">
+      <section className="page-hero workspace-hero voc-hero">
         <div className="eyebrow">Voice Of Customer</div>
         <h1>Feedback Intelligence</h1>
         <p>Capture product insight from analysts and reviewers to improve prioritization, workflow, and briefing quality.</p>
       </section>
       <section className="voc-page-grid">
-        <div className="surface-panel p-8">
+        <div className="surface-panel workspace-panel voc-submit-panel p-8">
           <h2 className="panel-title">Submit Feedback</h2>
           <p className="panel-copy">Tell the team what makes the intelligence experience stronger or slower.</p>
           {complete ? (
@@ -23,7 +23,7 @@ export default function VocScreen() {
             </div>
           )}
         </div>
-        <div className="surface-panel p-8">
+        <div className="surface-panel workspace-panel voc-themes-panel p-8">
           <div className="eyebrow">Feedback Themes</div>
           <div className="mt-7 space-y-4">
             {['Signal quality and ranking', 'Review and approval flow', 'Search and source coverage', 'Export and archive clarity'].map((topic) => (

@@ -5,6 +5,7 @@ import Bouncer from '../Bouncer.jsx';
 import { getInsight } from '../../api.js';
 import { scoreOf, sourceList } from '../../utils/intelligence.js';
 import { SignalVisual } from '../ArticleCard.jsx';
+import useModalFocus from './useModalFocus.js';
 
 function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore, onVote, onSave, isSaved }) {
   const approved = item.approved_at || item.approved_by;
@@ -194,6 +195,7 @@ export default function ArticleModal({
   const [expanded, setExpanded] = useState(false);
   const [whyMatters, setWhyMatters] = useState('');
   const [insightLoading, setInsightLoading] = useState(false);
+  const dialogRef = useModalFocus(Boolean(item), onClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -256,15 +258,23 @@ export default function ArticleModal({
 
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal dossier" onClick={(e) => e.stopPropagation()}>
+      <div
+        aria-labelledby="intelligence-dossier-title"
+        aria-modal="true"
+        className="modal dossier"
+        onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
+        role="dialog"
+        tabIndex={-1}
+      >
         <div className="head dossier-head">
           <div>
-            <h3>Intelligence Dossier</h3>
+            <h3 id="intelligence-dossier-title">Intelligence Dossier</h3>
             <div className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               {score >= 80 ? 'High Signal' : 'Signal'} · {item.source_count || sources.length || 1} sources · {item.date || 'Latest'}
             </div>
           </div>
-          <span className="x" onClick={onClose}><Icon name="x" /></span>
+          <button aria-label="Close dossier" className="x" onClick={onClose} type="button"><Icon name="x" /></button>
         </div>
 
         <div className="dossier-layout grid min-h-0 flex-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_320px]">

@@ -22,6 +22,8 @@ import GatekeeperReviewScreen from "./screens/GatekeeperReviewScreen.jsx";
 import SavedScreen from "./screens/SavedScreen.jsx";
 import UserProfileModal from "./components/UserProfileModal.jsx";
 import { getViewerProfile } from "./api.js";
+import { useLanguage } from "./translation/LanguageProvider.jsx";
+import "./styles/personalization.css";
 const SENSE_ATMOSPHERE_VIDEO =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4";
 const THEME_STORAGE_KEY = "news-theme";
@@ -68,6 +70,7 @@ export default function App() {
   useTracking(pathname);
   const manualAbortRef = useRef(null);
   const [theme, setTheme] = useState(readStoredTheme);
+  const { language, toggleLanguage, translationState } = useLanguage();
   const [activeProfile, setActiveProfile] = useState(readStoredProfile);
   const [viewer, setViewer] = useState(null);
   const [viewerLoading, setViewerLoading] = useState(true);
@@ -282,6 +285,9 @@ export default function App() {
           manualScan={manualScan}
           theme={theme}
           onToggleTheme={toggleTheme}
+          language={language}
+          onToggleLanguage={toggleLanguage}
+          translationState={translationState}
           viewer={viewer}
           viewerLoading={viewerLoading}
           onEditProfile={() => {

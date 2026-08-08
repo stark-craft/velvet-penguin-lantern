@@ -1,0 +1,121 @@
+/* Homepage refinement: preserve the familiar hierarchy while giving the lead
+   intelligence story the visual authority it deserves. */
+
+.briefing-home .briefing-stage {
+  height: auto !important;
+  min-height: 0 !important;
+  grid-template-rows: auto auto !important;
+}
+
+.briefing-hero-row {
+  height: clamp(490px, 57vh, 630px) !important;
+  min-height: 490px;
+  grid-template-columns: minmax(0, 2.42fr) minmax(316px, 0.92fr) !important;
+  gap: clamp(18px, 1.55vw, 27px) !important;
+  align-items: stretch;
+}
+
+.briefing-hero-row .hero-cluster-panel {
+  min-height: 100% !important;
+  border-radius: 28px !important;
+}
+
+.briefing-hero-row .hero-cluster-panel > .relative.z-20 {
+  padding: clamp(24px, 3.2vw, 52px) !important;
+}
+
+.briefing-hero-row .hero-cluster-panel .pointer-events-auto.max-w-3xl {
+  max-width: min(790px, 86%);
+}
+
+.briefing-hero-row .hero-cluster-panel h2 {
+  max-width: 17ch;
+  font-size: clamp(2rem, 3.15vw, 4.35rem) !important;
+  line-height: 0.99 !important;
+  letter-spacing: -0.045em;
+}
+
+.briefing-hero-row .hero-cluster-panel h2 + p {
+  max-width: 68ch;
+  margin-top: 18px !important;
+  font-size: clamp(0.95rem, 1.02vw, 1.1rem) !important;
+  line-height: 1.75 !important;
+}
+
+.briefing-hero-row .briefing-stream-panel {
+  min-height: 100%;
+  border-radius: 24px !important;
+  padding: clamp(20px, 1.85vw, 30px) !important;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent),
+    var(--shadow-md) !important;
+}
+
+.briefing-hero-row .briefing-stream-mask {
+  margin-top: 22px !important;
+}
+
+.briefing-hero-row .briefing-stream-track {
+  display: grid;
+  gap: 10px;
+}
+
+.briefing-hero-row .briefing-stream-track > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0 !important;
+}
+
+.briefing-hero-row .briefing-stream-track > button {
+  display: grid !important;
+  min-height: 82px;
+  align-content: center;
+  gap: 4px;
+  border-radius: 14px !important;
+  padding: 15px 16px !important;
+}
+
+.briefing-hero-row .briefing-stream-panel > button:last-child {
+  min-height: 48px;
+  margin-top: 18px !important;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 1080px) {
+  .briefing-hero-row {
+    height: auto !important;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .briefing-hero-row .hero-cluster-panel {
+    min-height: 500px !important;
+  }
+
+  .briefing-hero-row .briefing-stream-panel {
+    min-height: 340px;
+  }
+
+  .briefing-hero-row .briefing-stream-mask {
+    max-height: 242px;
+  }
+}
+
+@media (max-width: 640px) {
+  .briefing-hero-row .hero-cluster-panel {
+    min-height: 500px !important;
+    border-radius: 22px !important;
+  }
+
+  .briefing-hero-row .hero-cluster-panel > .relative.z-20 {
+    padding: 20px !important;
+  }
+
+  .briefing-hero-row .hero-cluster-panel .pointer-events-auto.max-w-3xl {
+    max-width: 100%;
+  }
+
+  .briefing-hero-row .hero-cluster-panel h2 {
+    max-width: 100%;
+    font-size: clamp(1.75rem, 8.5vw, 2.55rem) !important;
+  }
+}

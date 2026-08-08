@@ -23,9 +23,9 @@ function healthFor(source) {
   const raw = String(source.status || source.health || source.rss_health || '').toLowerCase();
   if (raw.includes('fail') || raw.includes('error')) return 'Failed';
   if (raw.includes('warn')) return 'Warning';
+  if (raw.includes('healthy') || raw === 'ok' || raw.includes('active')) return 'Healthy';
   if (!url) return 'Failed';
-  if (String(url).startsWith('http')) return 'Healthy';
-  return 'Warning';
+  return 'Configured';
 }
 
 function groupByCategory(sources) {
@@ -47,12 +47,14 @@ export default function SourcesScreen() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
   const [addOpen, setAddOpen] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(36);
 
   const refresh = () => {
     setLoad(true);
+    setErr('');
     getSites()
       .then((s) => setSites(Array.isArray(s) ? s : (s?.sites || [])))
-      .catch(() => {})
+      .catch((error) => setErr(error?.message || 'Could not load configured sources.'))
       .finally(() => setLoad(false));
   };
 
@@ -96,8 +98,11 @@ export default function SourcesScreen() {
     });
   }, [sites, query, filter]);
 
-  const grouped = useMemo(() => groupByCategory(visible), [visible]);
-  const healthy = sites.filter((s) => healthFor(s) === 'Healthy').length;
+  useEffect(() => setDisplayLimit(36), [query, filter]);
+
+  const displayed = useMemo(() => visible.slice(0, displayLimit), [visible, displayLimit]);
+  const grouped = useMemo(() => groupByCategory(displayed), [displayed]);
+  const configured = sites.filter((s) => ['Healthy', 'Configured'].includes(healthFor(s))).length;
   const failed = sites.filter((s) => healthFor(s) === 'Failed').length;
   const warnings = sites.filter((s) => healthFor(s) === 'Warning').length;
 
@@ -116,12 +121,12 @@ export default function SourcesScreen() {
 
       <section className="source-control-metrics metric-grid grid gap-4 md:grid-cols-4">
         <div className="signal-stat"><span>Total Sources</span><strong>{sites.length}</strong></div>
-        <div className="signal-stat"><span>Active</span><strong>{healthy}</strong></div>
+        <div className="signal-stat"><span>Configured</span><strong>{configured}</strong></div>
         <div className="signal-stat"><span>Warnings</span><strong>{warnings}</strong></div>
         <div className="signal-stat"><span>Failed</span><strong>{failed}</strong></div>
       </section>
 
-      <section className="source-add-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
+      <section className="source-add-panel workspace-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-lg font-semibold text-white">
             <Icon name="plus" /> Add Intelligence Source
@@ -131,13 +136,13 @@ export default function SourcesScreen() {
           </button>
         </div>
         {addOpen && (
-          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.4fr_1fr_160px_auto] lg:items-end">
+          <form className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.4fr_1fr_160px_auto] lg:items-end" onSubmit={(event) => { event.preventDefault(); submit(); }}>
             <label>
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Source name</span>
               <input className="dark-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Samsung Newsroom" />
             </label>
             <label>
-              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">RSS URL</span>
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Source or RSS URL</span>
               <input className="dark-input" value={form.url} onChange={(e) => setForm({ ...form, url: e.target.value })} placeholder="https://..." />
             </label>
             <label>
@@ -151,10 +156,10 @@ export default function SourcesScreen() {
                 <option>Broadcast</option>
               </select>
             </label>
-            <button className="btn-dark-primary h-11 justify-center" onClick={submit} disabled={busy} type="button">
+            <button className="btn-dark-primary h-11 justify-center" disabled={busy} type="submit">
               {busy ? 'Adding...' : 'Add Source'}
             </button>
-          </div>
+          </form>
         )}
         {err && <div className="mt-3 text-sm text-red-300">{err}</div>}
         {notice && <div className="mt-3 text-sm text-emerald-300">{notice}</div>}
@@ -166,6 +171,7 @@ export default function SourcesScreen() {
           {filters.map((f) => (
             <button
               key={f}
+              aria-pressed={filter === f}
               className={filter === f ? 'rounded-full border border-sky-300/25 bg-sky-400/12 px-4 py-2 text-sm font-medium text-sky-100' : 'rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-medium text-slate-400'}
               onClick={() => setFilter(f)}
               type="button"
@@ -201,18 +207,18 @@ export default function SourcesScreen() {
                     <article key={`${name}-${i}`} className="source-control-card rounded-[22px] border border-white/10 bg-[#101827]/75 p-5 shadow-cockpit">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <div className={health === 'Healthy' ? 'text-sm font-semibold text-emerald-300' : health === 'Failed' ? 'text-sm font-semibold text-red-300' : 'text-sm font-semibold text-amber-300'}>
+                          <div className={health === 'Healthy' ? 'text-sm font-semibold text-emerald-300' : health === 'Failed' ? 'text-sm font-semibold text-red-300' : health === 'Warning' ? 'text-sm font-semibold text-amber-300' : 'source-configured text-sm font-semibold text-sky-200'}>
                             ● {health}
                           </div>
                           <h3 className="mt-2 text-lg font-semibold text-white">{name}</h3>
                           <p className="mt-1 line-clamp-1 text-sm text-slate-500">{url || 'No URL configured'}</p>
                         </div>
-                        <span className="signal-chip">{source.profile || form.profile || 'Default'}</span>
+                        <span className="signal-chip">{source.profile || 'Default'}</span>
                       </div>
                       <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-sm text-slate-400">
                         Category: {sourceCategory(source)} · Profile: {source.profile || 'Default'}
                         <br />
-                        RSS Health: {health === 'Healthy' ? 'OK' : health === 'Failed' ? 'Failed / missing URL' : 'Warning'} · Last Checked: Current session
+                        Health: {health} · Last Checked: {source.last_checked || source.checked_at || 'Not reported'}
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
                         {url && (
@@ -220,7 +226,14 @@ export default function SourcesScreen() {
                             <Icon name="external" size={14} /> Open Site
                           </a>
                         )}
-                        <button className="btn-dark-secondary h-9" onClick={() => navigator.clipboard?.writeText(url)} type="button">
+                        <button className="btn-dark-secondary h-9" disabled={!url} onClick={async () => {
+                          try {
+                            await navigator.clipboard?.writeText(url);
+                            setNotice(`Copied ${name} URL.`);
+                          } catch {
+                            setErr('Could not copy this URL.');
+                          }
+                        }} type="button">
                           Copy URL
                         </button>
                       </div>
@@ -231,6 +244,14 @@ export default function SourcesScreen() {
             </div>
           ))}
         </section>
+      )}
+      {!loading && visible.length > displayed.length && (
+        <div className="source-load-more">
+          <span>Showing {displayed.length} of {visible.length} matching sources</span>
+          <button className="btn-dark-secondary" onClick={() => setDisplayLimit((value) => value + 36)} type="button">
+            Load 36 more
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../Icon.jsx';
+import useModalFocus from './useModalFocus.js';
 
 export default function NameModal({
   open,
@@ -16,6 +17,7 @@ export default function NameModal({
     || ''
   );
   const [err, setErr] = useState('');
+  const dialogRef = useModalFocus(open, onClose);
 
   useEffect(() => {
     if (open) {
@@ -43,11 +45,11 @@ export default function NameModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal sm compact-dialog selection-dialog" onClick={(e) => e.stopPropagation()}>
+      <div aria-labelledby="selection-dialog-title" aria-modal="true" className="modal sm compact-dialog selection-dialog" onClick={(e) => e.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="head">
           <Icon name="check" />
-          <h3>{title}</h3>
-          <span className="x" onClick={onClose}><Icon name="x" /></span>
+          <h3 id="selection-dialog-title">{title}</h3>
+          <button aria-label="Close selection dialog" className="x" onClick={onClose} type="button"><Icon name="x" /></button>
         </div>
         <div className="body">
           <div className="text-sm text-slate-400">

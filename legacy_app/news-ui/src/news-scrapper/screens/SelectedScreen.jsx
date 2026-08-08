@@ -5,7 +5,7 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import DirectorKeyModal from '../components/modals/DirectorKeyModal.jsx';
 import { approveWorkflow, correctRegion, getWorkflow, removeWorkflow } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
-import { trackAction } from '../utils/tracking.js';
+import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { scoreOf } from '../utils/intelligence.js';
 
 function topValue(items, getter) {
@@ -23,12 +23,14 @@ export default function SelectedScreen() {
   const [openArticle, setOpen] = useState(null);
   const [pending, setPending] = useState(null);
   const [lens, setLens] = useState('All');
+  const [error, setError] = useState('');
 
   const refresh = () => {
     setLoad(true);
+    setError('');
     getWorkflow()
       .then((w) => setItems(normalizeList(w?.selected || [])))
-      .catch(() => {})
+      .catch((err) => setError(err?.message || 'Could not load the Review Queue.'))
       .finally(() => setLoad(false));
   };
 
@@ -44,16 +46,30 @@ export default function SelectedScreen() {
     return true;
   }), [items, lens]);
   const onApprove = (item) => setPending(item);
+  const openDossier = (item) => {
+    trackAction('dossier_open', articleActivityDetail(item, 'review_queue'));
+    setOpen(item);
+  };
   const confirmApprove = async (item, key) => {
-    setItems((arr) => arr.filter((x) => x.title !== item.title));
-    trackAction('approve', item.title?.slice(0, 60));
-    try { await approveWorkflow(item.title, key); } catch {}
+    setError('');
+    try {
+      await approveWorkflow(item.title, key);
+      setItems((arr) => arr.filter((x) => x.title !== item.title));
+      trackAction('approve', item.title?.slice(0, 60));
+    } catch (err) {
+      setError(err?.message || 'Approval failed. The signal remains in Review Queue.');
+    }
   };
 
   const onRemove = async (item) => {
-    setItems((arr) => arr.filter((x) => x.title !== item.title));
-    trackAction('remove_selected', item.title?.slice(0, 60));
-    try { await removeWorkflow(item.title, 'selected'); } catch {}
+    setError('');
+    try {
+      await removeWorkflow(item.title, 'selected');
+      setItems((arr) => arr.filter((x) => x.title !== item.title));
+      trackAction('remove_selected', item.title?.slice(0, 60));
+    } catch (err) {
+      setError(err?.message || 'Could not remove this signal from Review Queue.');
+    }
   };
 
   const onCorrectRegion = async (item, correction) => {
@@ -85,6 +101,8 @@ export default function SelectedScreen() {
           <p>Approving an item requires the 4-digit approval key.</p>
         </aside>
       </section>
+
+      {error && <div className="error-banner" role="alert">{error}</div>}
 
       <section className="workflow-metric-row">
         <div className="workflow-metric"><Icon name="inbox" /><span>Total in review</span><strong>{items.length}</strong></div>
@@ -129,7 +147,7 @@ export default function SelectedScreen() {
               key={item.id}
               item={item}
               mode="review"
-              onOpen={setOpen}
+              onOpen={openDossier}
               onApprove={onApprove}
               onRemove={onRemove}
             />

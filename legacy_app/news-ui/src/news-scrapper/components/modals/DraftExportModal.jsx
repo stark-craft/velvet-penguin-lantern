@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Icon from '../Icon.jsx';
 import { exportExcel, exportPpt, exportWord } from '../../api.js';
 import { trackAction } from '../../utils/tracking.js';
+import useModalFocus from './useModalFocus.js';
 
 const exportTypes = [
   { id: 'ppt', label: 'PowerPoint', ext: 'pptx', action: exportPpt },
@@ -12,6 +13,7 @@ const exportTypes = [
 export default function DraftExportModal({ items, open, onClose, source = 'briefing' }) {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const dialogRef = useModalFocus(open, busy ? undefined : onClose);
 
   useEffect(() => {
     if (open) {
@@ -39,16 +41,16 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <section className="modal sm compact-dialog export-modal" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-overlay" onClick={busy ? undefined : onClose}>
+      <section aria-labelledby="draft-export-title" aria-modal="true" className="modal sm compact-dialog export-modal" onClick={(event) => event.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="head">
           <div>
-            <h3>Draft Export</h3>
+            <h3 id="draft-export-title">Draft Export</h3>
             <div className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
               {items.length} selected signals · Unapproved material
             </div>
           </div>
-          <button className="x" onClick={onClose} type="button" aria-label="Close export options">
+          <button className="x" disabled={!!busy} onClick={onClose} type="button" aria-label="Close export options">
             <Icon name="x" />
           </button>
         </div>

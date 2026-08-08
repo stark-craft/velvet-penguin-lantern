@@ -16,10 +16,12 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from news_scrapper.application import app, abs_frontend_path
+from news_scrapper.translation import router as translation_router
 from venture_lens.router import router as venture_lens_router
 
 
 app.include_router(venture_lens_router)
+app.include_router(translation_router)
 
 API_ROUTES = {
     "archive",
@@ -45,6 +47,7 @@ API_ROUTES = {
     "gatekeeper",
     "trends",
     "venture-lens",
+    "translation",
 }
 
 

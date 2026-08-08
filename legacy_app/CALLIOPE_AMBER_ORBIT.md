@@ -26,7 +26,7 @@ PowerShell but does not assume programming experience.
 - [4. Safely update App_Portable](#4-safely-copy-a-new-code-release-over-app_portable)
 - [5. Create the final environment file](#5-create-the-final-env)
   - [Broadcast routing](#broadcast-profile-routing)
-- [6. Install the local AI models](#6-install-the-four-local-ai-models)
+- [6. Install the local AI models](#6-install-the-five-local-ai-models)
 - [7. Prepare embedded Python](#7-prepare-embedded-python)
 - [8. Start and stop the server](#8-start-and-stop-the-server)
 - [9. Scheduler-to-feed data flow](#9-what-happens-from-scheduler-to-feed)
@@ -616,7 +616,7 @@ process start. The user then refreshes the browser.
 If a reverse proxy is used, put only that proxy's IP in `TRUSTED_PROXY_IPS`.
 Never trust every address. Without a proxy, leave loopback values only.
 
-## 6. Install the four local AI models
+## 6. Install the five local AI models
 
 The application uses:
 
@@ -626,6 +626,7 @@ The application uses:
 | `distilbart-cnn-12-6` | `sshleifer/distilbart-cnn-12-6` | summary fallback |
 | `flan-t5-local` | `google/flan-t5-small` | Why This Matters/intent fallback |
 | `distilbert-sst-2` | `distilbert/distilbert-base-uncased-finetuned-sst-2-english` | sentiment |
+| `opus-mt-tc-big-en-ko` | `Helsinki-NLP/opus-mt-tc-big-en-ko` | private English-to-Korean interface translation |
 
 On an internet-connected development PC:
 
@@ -646,9 +647,12 @@ huggingface-cli download google/flan-t5-small `
 
 huggingface-cli download distilbert/distilbert-base-uncased-finetuned-sst-2-english `
   --local-dir ".\model_weights\distilbert-sst-2"
+
+huggingface-cli download Helsinki-NLP/opus-mt-tc-big-en-ko `
+  --local-dir ".\model_weights\opus-mt-tc-big-en-ko"
 ```
 
-Copy all four completed folders to
+Copy all five completed folders to
 `C:\App_Portable\model_weights`. Do not copy partially downloaded folders.
 Models are deliberately excluded from GitHub.
 
@@ -656,6 +660,11 @@ With Samsung Chat healthy, Chat is the primary source for the concise lead,
 key points, intent, category, region, importance, and Why This Matters. If Chat
 fails preflight or an article call fails, BART/FLAN-T5 provide the local
 fallback. MiniLM remains the semantic clustering engine.
+
+The Korean model is loaded only when a browser first switches to Korean. Its
+choice is saved in that browser, not globally, so another user remains in
+English. The initial Korean request can take longer while the model loads;
+later translations reuse the in-process cache.
 
 ## 7. Prepare embedded Python
 

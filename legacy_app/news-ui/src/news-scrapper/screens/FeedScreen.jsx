@@ -8,8 +8,9 @@ import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import Bouncer from '../components/Bouncer.jsx';
 import { correctRegion, getLatestBriefing, getViewerHidden, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
-import { trackAction } from '../utils/tracking.js';
+import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, groupedByDate, keywordOptions, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
+import '../styles/home-refinement.css';
 const emptyFilters = {
   query: '',
   region: 'all',
@@ -45,7 +46,10 @@ function latestDate(items) {
   return [...items].map(item => item.date).filter(Boolean).sort().pop() || '';
 }
 function sortByDate(items) {
-  return [...items].sort((a, b) => publishedTime(b) - publishedTime(a));
+  return [...items].sort((a, b) => {
+    const personal = Number(b.personal_rank_score || 0) - Number(a.personal_rank_score || 0);
+    return personal || publishedTime(b) - publishedTime(a);
+  });
 }
 function sortForCarousel(items) {
   return [...items].sort((a, b) => {
@@ -59,12 +63,24 @@ function sortForCarousel(items) {
 function stableSignalKey(item) {
   return articleKey(item) || item.id || item.title || item.url || item.link || '';
 }
+function followUp(item) {
+  return item?.personalization?.follow_up ? item.personalization : null;
+}
 function getHeroFeed(items) {
-  const topClustered = sortForCarousel(items.filter(item => (item.source_count || 1) > 1)).slice(0, HERO_FEED_LIMIT);
-  if (topClustered.length) {
-    return topClustered;
-  }
-  return sortForCarousel(items).slice(0, HERO_FEED_LIMIT);
+  const candidates = items.some(item => (item.source_count || 1) > 1)
+    ? items.filter(item => (item.source_count || 1) > 1)
+    : items;
+  const globalLeaders = sortForCarousel(candidates).slice(0, 3);
+  const used = new Set(globalLeaders.map(stableSignalKey));
+  const personalLeaders = [...candidates]
+    .filter(item => item.personalization?.applied && !used.has(stableSignalKey(item)))
+    .sort((a, b) => Number(b.personal_rank_score || 0) - Number(a.personal_rank_score || 0))
+    .slice(0, 2);
+  personalLeaders.forEach(item => used.add(stableSignalKey(item)));
+  const remainder = sortForCarousel(candidates)
+    .filter(item => !used.has(stableSignalKey(item)))
+    .slice(0, HERO_FEED_LIMIT - globalLeaders.length - personalLeaders.length);
+  return [...globalLeaders, ...personalLeaders, ...remainder].slice(0, HERO_FEED_LIMIT);
 }
 function matchesQuery(item, query) {
   const q = query.trim().toLowerCase();
@@ -187,6 +203,7 @@ function TopClusterCarousel({
 <span className="source-chip">              {active.category || 'News'}            </span>
 <span className="source-chip">              {active.region || 'Global'}            </span>
 <span className="source-chip">              Score {scoreOf(active)}            </span>
+{followUp(active) && <span className="personal-follow-chip" title={`Related to: ${followUp(active).matched_saved_title || 'a saved signal'}`}><Icon name="bookmark" size={12} /> {followUp(active).follow_label}</span>}
 </div>
 <button className="text-left" onClick={() => onOpen(active)} type="button">
 <h2 className="line-clamp-3 text-[clamp(1.65rem,2.2vw,3.05rem)] font-semibold leading-[1.02] text-white">              {active.title}            </h2>
@@ -354,7 +371,7 @@ function LatestDaySignals({
 <SignalVisual item={item} className="visual-layer z-0" label={false} />
 <div className="absolute inset-0 z-10 bg-gradient-to-t from-black via-[#050914]/75 to-transparent" />
 <div className="relative z-20 flex h-full min-h-0 flex-col justify-between p-3">
-<div className="flex justify-end">                {(scoreOf(item) >= 80 || item.is_fresh) && <span className="signal-chip selected">                    {scoreOf(item) >= 80 ? 'High Signal' : 'New'}                  </span>}              </div>
+<div className="flex flex-wrap justify-end gap-2">                {followUp(item) && <span className="personal-follow-chip" title={`Related to: ${followUp(item).matched_saved_title || 'a saved signal'}`}><Icon name="bookmark" size={11} /> Story update</span>}                {(scoreOf(item) >= 80 || item.is_fresh) && <span className="signal-chip selected">                    {scoreOf(item) >= 80 ? 'High Signal' : 'New'}                  </span>}              </div>
 <div>
 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100/90 drop-shadow-[0_2px_8px_rgba(0,0,0,0.75)]">                  {item.source_count || 1} sources ·{' '}                  {item.region || 'Global'} ·{' '}                  {item.category || 'News'}                </div>
 <div className="mt-1 line-clamp-2 min-h-[38px] text-sm font-semibold leading-snug text-white drop-shadow-[0_3px_12px_rgba(0,0,0,0.95)] group-hover:text-sky-50" title={item.title}>                  {item.title}                </div>
@@ -454,7 +471,7 @@ function ImageFeedCard({
 <div className="absolute inset-0 z-10 bg-[linear-gradient(0deg,rgba(5,9,20,0.84)_0%,rgba(5,9,20,0.48)_42%,rgba(5,9,20,0.12)_76%,rgba(0,0,0,0.02)_100%)]" />
 <div className="absolute inset-x-0 bottom-0 z-10 h-3/4 bg-gradient-to-t from-[#050914]/92 via-[#050914]/54 to-transparent" />
 <div className="relative z-20 flex h-full flex-col p-4">
-<div className="flex items-start justify-between gap-3">          {onCheck && <input type="checkbox" checked={checked} onChange={event => onCheck(item, event.target.checked)} className="signal-checkbox mt-1" aria-label={`Select ${item.title}`} />}          <div className="ml-auto flex flex-wrap justify-end gap-2">            {item.is_fresh && <span className="signal-chip selected">                New              </span>}            {isApproved && <span className="signal-chip">                Approved              </span>}            {selected && <span className="signal-chip">                Selected              </span>}            {!selected && !isApproved && !item.is_fresh && isHigh && <span className="signal-chip selected">                  High Signal                </span>}          </div>
+<div className="flex items-start justify-between gap-3">          {onCheck && <input type="checkbox" checked={checked} onChange={event => onCheck(item, event.target.checked)} className="signal-checkbox mt-1" aria-label={`Select ${item.title}`} />}          <div className="ml-auto flex flex-wrap justify-end gap-2">            {followUp(item) && <span className="personal-follow-chip" title={`Related to: ${followUp(item).matched_saved_title || 'a saved signal'}`}><Icon name="bookmark" size={11} /> {followUp(item).follow_label}</span>}            {item.is_fresh && <span className="signal-chip selected">                New              </span>}            {isApproved && <span className="signal-chip">                Approved              </span>}            {selected && <span className="signal-chip">                Selected              </span>}            {!selected && !isApproved && !item.is_fresh && isHigh && <span className="signal-chip selected">                  High Signal                </span>}          </div>
 </div>
 <div className="feed-card-copy mt-auto rounded-2xl border border-white/10 bg-[#050914]/55 p-3 backdrop-blur-sm">
 <button className="block w-full text-left" onClick={() => onOpen(item)} type="button">
@@ -495,6 +512,8 @@ export default function FeedScreen() {
   const [hiddenCount, setHiddenCount] = useState(0);
   const [savedKeys, setSavedKeys] = useState(new Set());
   const [filters, setFilters] = useState(emptyFilters);
+  const [personalizationMeta, setPersonalizationMeta] = useState(null);
+  const [showPersonalizationNotice, setShowPersonalizationNotice] = useState(false);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -511,6 +530,8 @@ export default function FeedScreen() {
           original: normalizedItems[0]
         });
         setArticles(items);
+        setPersonalizationMeta(data?.personalization || null);
+        setShowPersonalizationNotice(Boolean(data?.personalization?.applied));
       } catch (error) {
         if (!cancelled) {
           setErr(error.message || String(error));
@@ -537,6 +558,11 @@ export default function FeedScreen() {
       cancelled = true;
     };
   }, []);
+  useEffect(() => {
+    if (!showPersonalizationNotice) return undefined;
+    const timer = window.setTimeout(() => setShowPersonalizationNotice(false), 6500);
+    return () => window.clearTimeout(timer);
+  }, [showPersonalizationNotice]);
   const selectedIds = useMemo(() => new Set(workflow.selected.map(article => article.id || article.title)), [workflow.selected]);
   const approvedIds = useMemo(() => new Set(workflow.approved.map(article => article.id || article.title)), [workflow.approved]);
   const filteredArticles = useMemo(() => applyFilters(articles, filters, selectedIds), [articles, filters, selectedIds]);
@@ -551,21 +577,22 @@ export default function FeedScreen() {
     dates: uniqueSorted(articles.map(article => article.date)).reverse(),
     keywords: keywordOptions(articles)
   }), [articles]);
+  const refreshPersonalizedOrder = async () => {
+    try {
+      const data = await getLatestBriefing();
+      const normalizedItems = normalizeList(data?.result || data?.results || data?.articles || data || []);
+      setArticles(normalizeArticleImages(normalizedItems));
+      setPersonalizationMeta(data?.personalization || null);
+    } catch {
+      // The current in-memory briefing remains usable if a background reorder fails.
+    }
+  };
   const onVote = async (item, voteValue) => {
     setVotes(previous => ({
       ...previous,
       [item.id]: voteValue
     }));
-    const detail = {
-      title: item.title,
-      link: item.link || item.canonical_link,
-      source: item.source || item.src,
-      category: item.category,
-      profile: item.profile,
-      article_id: item.id,
-      cluster_id: item.cluster_id,
-      screen: 'feed'
-    };
+    const detail = articleActivityDetail(item, 'feed');
     try {
       if (voteValue === 'down') {
         await rejectArticle(item);
@@ -573,7 +600,8 @@ export default function FeedScreen() {
         setArticles(currentArticles => currentArticles.filter(article => article.id !== item.id));
       } else if (voteValue === 'up') {
         await trainVote(item.keywords_found || item.keywords || [], item.master_summary || item.summary || item.title, 'interested', item.title);
-        trackAction('vote_interested', detail);
+        await trackAction('vote_interested', detail);
+        await refreshPersonalizedOrder();
       }
     } catch {/* Keep the UI optimistic. */}
   };
@@ -581,12 +609,7 @@ export default function FeedScreen() {
     const key = articleKey(item);
     setArticles(currentArticles => currentArticles.filter(article => articleKey(article) !== key));
     setHiddenCount(count => count + 1);
-    trackAction('hide_personal', {
-      title: item.title,
-      link: item.link || item.canonical_link,
-      source: item.source || item.src,
-      screen: 'feed'
-    });
+    trackAction('hide_personal', articleActivityDetail(item, 'feed'));
     try {
       await hideArticleForViewer(item);
     } catch {
@@ -605,6 +628,7 @@ export default function FeedScreen() {
     try {
       if (wasSaved) await removeSavedArticle(item);
       else await saveArticleForLater(item);
+      await refreshPersonalizedOrder();
     } catch {
       setSavedKeys(current => {
         const next = new Set(current);
@@ -615,17 +639,8 @@ export default function FeedScreen() {
     }
   };
   const openDossier = item => {
-    trackAction('dossier_open', {
-      dossier_title: item.title,
-      title: item.title,
-      link: item.link || item.canonical_link,
-      source: item.source || item.src,
-      category: item.category,
-      profile: item.profile,
-      article_id: item.id,
-      cluster_id: item.cluster_id,
-      screen: 'feed'
-    });
+    trackAction('dossier_open', { ...articleActivityDetail(item, 'feed'), dossier_title: item.title })
+      .then(refreshPersonalizedOrder);
     setOpen(item);
   };
   const hideFromDossier = async item => {
@@ -678,17 +693,8 @@ export default function FeedScreen() {
     } : article));
     try {
       await selectWorkflow(payload);
-      trackAction('select', {
-        title: item.title,
-        link: item.link || item.canonical_link,
-        source: item.source || item.src,
-        category: item.category,
-        profile: item.profile,
-        article_id: item.id,
-        cluster_id: item.cluster_id,
-        selected_by: name,
-        screen: 'feed'
-      });
+      await trackAction('select', { ...articleActivityDetail(item, 'feed'), selected_by: name });
+      await refreshPersonalizedOrder();
     } catch {/* Keep the UI optimistic. */}
   };
   const onCheck = (item, isOn) => {
@@ -726,6 +732,7 @@ export default function FeedScreen() {
     await Promise.all(payloads.map(payload => selectWorkflow(payload).catch(() => null)));
     trackAction('batch_select', {
       item_count: payloads.length,
+      items: payloads.map((item) => articleActivityDetail(item, 'feed')),
       selected_by: name,
       source: 'feed',
       screen: 'feed'
@@ -751,13 +758,10 @@ export default function FeedScreen() {
 </div>;
   }
   return <div className="briefing-home space-y-4 2xl:space-y-5">
+{showPersonalizationNotice && <div className="personalization-toast" role="status"><Icon name="sparkle" size={15} /><span><strong>{personalizationMeta?.viewer_name ? `Personalized for ${personalizationMeta.viewer_name}` : 'Your personalized feed'}</strong><small>Recent reading and saved signals shape the order—not what is available.</small></span><button onClick={() => setShowPersonalizationNotice(false)} type="button" aria-label="Dismiss personalization message"><Icon name="x" size={13} /></button></div>}
 <section className="briefing-stage grid gap-4 2xl:gap-5">
-<div className="briefing-top-row grid min-h-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(230px,1fr)_minmax(230px,1fr)] 2xl:gap-5">
+<div className="briefing-top-row briefing-hero-row grid min-h-0 gap-4 2xl:gap-5">
 <TopClusterCarousel articles={heroFeed} onOpen={openDossier} onSelect={setPendingSelect} />
-<TechnologySignalPulse articles={articles} filters={filters} onFilter={patch => setFilters(current => ({
-  ...current,
-  ...patch
-}))} />
 <BriefingStream articles={articles} onOpen={openDossier} navigate={navigate} />
 </div>
 <LatestDaySignals articles={articles} excludeKeys={heroFeedKeys} onOpen={openDossier} />

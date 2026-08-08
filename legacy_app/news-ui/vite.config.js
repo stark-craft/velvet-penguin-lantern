@@ -8,6 +8,7 @@ const proxyPaths = [
   '/not-interested', '/workflow', '/sites', '/history/',
   '/track', '/status', '/analytics', '/profile', '/viewer', '/region', '/voc', '/insight',
   '/gatekeeper', '/trends',
+  '/translation',
   '/venture-lens',
   '/export-ppt', '/export-excel', '/export-word', '/assets',
 ];

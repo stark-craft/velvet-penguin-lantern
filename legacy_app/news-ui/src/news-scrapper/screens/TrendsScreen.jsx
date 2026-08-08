@@ -35,8 +35,8 @@ export default function TrendsScreen() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
+    <div className="profile-page space-y-6">
+      <section className="workspace-hero profile-hero rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Profile Settings</div>
           <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">Intelligence profile</h1>
@@ -44,14 +44,14 @@ export default function TrendsScreen() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="profile-choice-grid grid gap-4 md:grid-cols-2">
         {profiles.map((p) => {
           const active = profile === p.id;
           return (
             <button
               key={p.id}
               className={[
-                'rounded-[24px] border p-5 text-left transition',
+                'profile-choice-card rounded-[24px] border p-5 text-left transition',
                 active
                   ? p.id === 'broadcast'
                     ? 'border-amber-300/35 bg-amber-400/[0.08]'
@@ -75,7 +75,7 @@ export default function TrendsScreen() {
         })}
       </section>
 
-      <section className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
+      <section className="workspace-panel profile-identity-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
         <h2 className="text-lg font-semibold text-white">Reviewer Identity</h2>
         <p className="mt-1 text-sm text-slate-400">This name pre-fills the Select for Review flow.</p>
         <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
@@ -87,9 +87,9 @@ export default function TrendsScreen() {
         {saved && <div className="mt-3 text-sm text-emerald-300">Profile settings saved.</div>}
       </section>
 
-      <section className="rounded-[24px] border border-white/10 bg-white/[0.035] p-5">
+      <section className="workspace-panel profile-preview-panel rounded-[24px] border border-white/10 bg-white/[0.035] p-5">
         <h2 className="text-lg font-semibold text-white">Profile Preview</h2>
-        <div className="mt-4 rounded-2xl border border-white/10 bg-[#0b1220] p-5">
+        <div className="profile-preview-card mt-4 rounded-2xl border border-white/10 bg-[#0b1220] p-5">
           <div className="flex flex-wrap items-center gap-2">
             <span className={profile === 'broadcast' ? 'signal-chip selected' : 'signal-chip'}>
               {profile === 'broadcast' ? 'Broadcast Signal' : 'Default Signal'}
@@ -97,7 +97,11 @@ export default function TrendsScreen() {
             <span className="source-chip">Score 88</span>
             <span className="source-chip">9 sources</span>
           </div>
-          <div className="mt-4 text-2xl font-semibold text-white">Executive intelligence cockpit profile is active.</div>
+          <div className="mt-4 text-2xl font-semibold text-white">
+            {profile === 'broadcast'
+              ? 'Broadcast intelligence operations profile is active.'
+              : 'Executive intelligence cockpit profile is active.'}
+          </div>
           <p className="mt-2 text-sm text-slate-400">Your active stream now controls sources, history, feedback training, and new searches.</p>
         </div>
       </section>

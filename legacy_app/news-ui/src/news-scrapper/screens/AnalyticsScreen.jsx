@@ -15,7 +15,7 @@ function StatTile({ label, value, tone = 'sky' }) {
       : 'border-sky-300/20 bg-sky-400/[0.08] text-sky-100';
 
   return (
-    <div className={`rounded-[22px] border p-5 ${toneClass}`}>
+    <div className={`analytics-stat rounded-[22px] border p-5 ${toneClass}`}>
       <div className="text-xs font-semibold uppercase tracking-[0.22em] opacity-70">{label}</div>
       <div className="mt-3 text-4xl font-semibold text-white">{value}</div>
     </div>
@@ -129,9 +129,21 @@ export default function AnalyticsScreen() {
     }
   };
 
+  if (!access) {
+    return (
+      <div className="analytics-page">
+        <div className="workspace-empty analytics-access-loading rounded-[28px] p-10 text-center" aria-busy="true" role="status">
+          <Icon name="shield" size={28} />
+          <h1 className="mt-4 text-2xl font-semibold text-white">Checking analytics access</h1>
+          <p className="mt-2 text-slate-400">Verifying this network before showing protected controls.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (access && !access.allowed) {
     return (
-      <div className="mx-auto max-w-3xl rounded-[28px] border border-amber-300/20 bg-amber-400/[0.08] p-8 shadow-cockpit">
+      <div className="analytics-restricted mx-auto max-w-3xl rounded-[28px] border border-amber-300/20 bg-amber-400/[0.08] p-8 shadow-cockpit">
         <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-100">Restricted Analytics</div>
         <h1 className="mt-3 text-4xl font-semibold text-white">This network is not allowlisted.</h1>
         <p className="mt-4 text-slate-300">
@@ -142,8 +154,8 @@ export default function AnalyticsScreen() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
+    <div className="analytics-page space-y-6">
+      <section className="workspace-hero analytics-hero rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Director Analytics</div>
@@ -161,7 +173,7 @@ export default function AnalyticsScreen() {
       </section>
 
       {!data && (
-        <form className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-5" onSubmit={unlock}>
+        <form className="workspace-panel analytics-access-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5" onSubmit={unlock}>
           <label className="block">
             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
               Analytics key

@@ -8,8 +8,9 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import { correctRegion, getSites, getViewerHidden, hideArticleForViewer, rejectArticle, selectWorkflow, trainVote } from '../api.js';
-import { trackAction } from '../utils/tracking.js';
+import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
+import './scan-redesign.css';
 
 const fmt = (date) => {
   const pad = (value) => String(value).padStart(2, '0');
@@ -43,6 +44,26 @@ const SUGGESTED_QUERIES = [
   'Broadcast regulation',
 ];
 
+const RESULT_LENSES = [
+  { label: 'All', icon: 'layers' },
+  { label: 'High Signal', icon: 'bolt' },
+  { label: 'India', icon: 'pin' },
+  { label: 'Korea', icon: 'pin' },
+  { label: 'AI Models', icon: 'sparkle' },
+  { label: 'With Images', icon: 'eye' },
+];
+
+function matchesResultLens(item, lens) {
+  const category = String(item.category || '').toLowerCase();
+  const region = String(item.region || '').toLowerCase();
+  if (lens === 'High Signal') return scoreOf(item) >= 80;
+  if (lens === 'India') return region.includes('india');
+  if (lens === 'Korea') return region.includes('korea');
+  if (lens === 'AI Models') return category.includes('ai');
+  if (lens === 'With Images') return !!(item.image_url || item.image || item.thumbnail || item.urlToImage);
+  return true;
+}
+
 function sourceName(source) {
   return source?.name || source?.title || String(source);
 }
@@ -61,14 +82,86 @@ function groupSourcesByCategory(sources) {
   }, {});
 }
 
-function SourcePicker({ sites, selected, onApply }) {
+function normalizeSiteCollection(payload) {
+  const candidates = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.sites)
+      ? payload.sites
+      : Array.isArray(payload?.sources)
+        ? payload.sources
+        : Array.isArray(payload?.data?.sites)
+          ? payload.data.sites
+          : [];
+
+  const seen = new Set();
+  return candidates.reduce((result, source) => {
+    const normalized = typeof source === 'string' ? { name: source } : source;
+    if (!normalized || typeof normalized !== 'object') return result;
+    const name = sourceName(normalized).trim();
+    const identity = name.toLowerCase();
+    if (!name || seen.has(identity)) return result;
+    seen.add(identity);
+    result.push({ ...normalized, name });
+    return result;
+  }, []);
+}
+
+function archiveSourcesFromCards(cards) {
+  const inferred = [];
+  cards.forEach((item) => {
+    const entries = Array.isArray(item.sources) && item.sources.length
+      ? item.sources
+      : [item.src || item.source || item.publisher].filter(Boolean);
+    entries.forEach((source) => {
+      const sourceObject = typeof source === 'string' ? { name: source } : (source || {});
+      const name = sourceName(sourceObject).trim();
+      if (!name || name.toLowerCase() === 'unknown') return;
+      let origin = sourceObject.url || sourceObject.link || '';
+      if (!origin && (item.url || item.link)) {
+        try { origin = new URL(item.url || item.link).origin; } catch { origin = item.url || item.link; }
+      }
+      inferred.push({
+        ...sourceObject,
+        name,
+        url: origin,
+        category: 'Sources in current results',
+        inferred_from_archive: true,
+      });
+    });
+  });
+  return normalizeSiteCollection(inferred);
+}
+
+function mergeSourceCollections(configured, inferred) {
+  const configuredNames = new Set(configured.map((source) => sourceName(source).trim().toLowerCase()));
+  return [...configured, ...inferred.filter((source) => !configuredNames.has(sourceName(source).trim().toLowerCase()))];
+}
+
+function SourcePicker({ sites, selected, onApply, loading = false, loadError = '' }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState(selected);
+  const triggerRef = useRef(null);
+  const dialogRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   useEffect(() => {
-    if (open) setDraft(selected);
+    if (!open) return undefined;
+    setDraft(selected);
+    const focusTimer = window.setTimeout(() => searchInputRef.current?.focus(), 0);
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setOpen(false);
+        window.setTimeout(() => triggerRef.current?.focus(), 0);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [open, selected]);
 
   const allNames = useMemo(() => sites.map(sourceName), [sites]);
@@ -103,133 +196,208 @@ function SourcePicker({ sites, selected, onApply }) {
     });
   };
 
+  const closePicker = () => {
+    setOpen(false);
+    setQuery('');
+    window.setTimeout(() => triggerRef.current?.focus(), 0);
+  };
+
+  const keepFocusInside = (event) => {
+    if (event.key !== 'Tab') return;
+    const focusable = [...(dialogRef.current?.querySelectorAll(
+      'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
+    ) || [])];
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
-    <div className="relative">
+    <div className="scan-source-picker relative">
       <button
-        className="source-picker-trigger dark-input flex items-center justify-between gap-3 text-left"
+        ref={triggerRef}
+        className="source-picker-trigger scan-scope-trigger"
         onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls="scan-source-picker-dialog"
         type="button"
       >
-        <span>
-          <span className="block text-sm font-semibold text-white">{label}</span>
-          <span className="block text-xs text-slate-500">
+        <span className="scan-scope-trigger-icon" aria-hidden="true"><Icon name="rss" size={18} /></span>
+        <span className="scan-scope-trigger-copy">
+          <strong>{label}</strong>
+          <small>
             {selected.length ? `${selected.length} of ${allNames.length || 0} source filters` : `${allNames.length || 0} source filters available`}
-          </span>
+          </small>
         </span>
-        <Icon name="chevD" size={15} />
+        <Icon className="scan-scope-chevron" name="chevD" size={16} />
       </button>
 
       {open && createPortal((
         <>
           <button
-            className="source-picker-scrim fixed inset-0 z-[140]"
-            onClick={() => setOpen(false)}
+            className="source-picker-scrim scan-source-picker-scrim fixed inset-0 z-[140]"
+            onClick={closePicker}
+            tabIndex={-1}
             type="button"
             aria-label="Close source picker"
           />
           <div
-            className="source-picker-dialog fixed left-1/2 top-1/2 z-[150] flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden"
+            ref={dialogRef}
+            id="scan-source-picker-dialog"
+            className="source-picker-dialog scan-source-picker-dialog fixed left-1/2 top-1/2 z-[150] flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden"
+            onKeyDown={keepFocusInside}
             role="dialog"
             aria-modal="true"
-            aria-label="Source Picker"
+            aria-labelledby="scan-source-picker-title"
+            aria-describedby="scan-source-picker-description"
           >
-          <div className="source-picker-head shrink-0 flex items-center justify-between gap-3 border-b border-white/10 p-4">
-            <div>
-              <div className="text-sm font-semibold text-white">Source Picker</div>
-              <div className="mt-1 text-xs text-slate-500">Filter stored articles by their extracted source</div>
-            </div>
-            <button
-              className="source-picker-manage text-sm font-semibold text-sky-200 hover:text-white"
-              onClick={() => navigate('/sources')}
-              type="button"
-            >
-              Manage Sources →
-            </button>
-          </div>
+            <header className="source-picker-head scan-source-picker-head">
+              <div className="scan-source-picker-heading">
+                <span className="scan-modal-icon" aria-hidden="true"><Icon name="rss" size={20} /></span>
+                <div>
+                  <span className="scan-modal-kicker">Search scope</span>
+                  <h2 id="scan-source-picker-title">Choose stored publications</h2>
+                  <p id="scan-source-picker-description">Limit this search by source metadata already attached to extracted articles.</p>
+                </div>
+              </div>
+              <div className="scan-source-picker-head-actions">
+                <button
+                  className="source-picker-manage"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate('/sources');
+                  }}
+                  type="button"
+                >
+                  Manage sources <Icon name="external" size={14} />
+                </button>
+                <button className="scan-modal-close" onClick={closePicker} type="button" aria-label="Close source picker">
+                  <Icon name="x" size={17} />
+                </button>
+              </div>
+            </header>
 
-          <div className="source-picker-tools shrink-0 space-y-3 p-4">
-            <input
-              className="dark-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search sources..."
-            />
-            <div className="flex flex-wrap gap-2">
-              <button className="btn-dark-secondary h-9" onClick={() => setDraft(allNames)} type="button">Select all sources</button>
-              <button className="btn-dark-secondary h-9" onClick={() => setDraft([])} type="button">Use all stored sources</button>
+            <div className="source-picker-tools scan-source-picker-tools">
+              <label className="scan-source-search">
+                <Icon name="search" size={17} />
+                <input
+                  ref={searchInputRef}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Find a publication, category, or domain"
+                  aria-label="Search stored sources"
+                />
+                {query && (
+                  <button onClick={() => setQuery('')} type="button" aria-label="Clear source search">
+                    <Icon name="x" size={15} />
+                  </button>
+                )}
+              </label>
+              <div className="scan-source-picker-quick-actions">
+                <button onClick={() => setDraft(allNames)} type="button"><Icon name="check2" size={14} /> Select every source</button>
+                <button onClick={() => setDraft([])} type="button"><Icon name="globe" size={14} /> Search all without filtering</button>
+              </div>
+              <div className="scan-source-picker-count" aria-live="polite">
+                <strong>{draft.length || allNames.length}</strong>
+                <span>{draft.length ? 'explicit source filters' : 'sources in open scope'}</span>
+              </div>
             </div>
-          </div>
 
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4">
-            {Object.entries(grouped).map(([category, group]) => {
-              const names = group.map(sourceName);
-              const selectedInGroup = names.filter((name) => draftSet.has(name)).length;
-              const allSelected = names.length > 0 && selectedInGroup === names.length;
-              return (
-                <div key={category} className="source-category-card rounded-2xl border border-white/10 bg-white/[0.035] p-3">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <button
-                      className="text-left text-sm font-semibold text-slate-100 hover:text-white"
-                      onClick={() => setCategory(group, !allSelected)}
-                      type="button"
-                    >
-                      {category}
-                    </button>
-                    <button
-                      className={allSelected ? 'signal-chip selected' : 'source-chip'}
-                      onClick={() => setCategory(group, !allSelected)}
-                      type="button"
-                    >
-                      {selectedInGroup}/{names.length}
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {group.map((source) => {
-                      const name = sourceName(source);
-                      return (
-                        <label key={name} className="source-option flex cursor-pointer items-start gap-3 rounded-xl px-2 py-2 hover:bg-white/[0.045]">
-                          <input
-                            type="checkbox"
-                            className="signal-checkbox mt-0.5"
-                            checked={draftSet.has(name)}
-                            onChange={() => toggleSource(name)}
-                          />
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium text-slate-100">{name}</span>
-                            <span className="block truncate text-xs text-slate-500">{source.url || source.feed || source.rss || 'No URL configured'}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
+            <div className="scan-source-picker-list">
+              {Object.entries(grouped).map(([category, group]) => {
+                const names = group.map(sourceName);
+                const selectedInGroup = names.filter((name) => draftSet.has(name)).length;
+                const allSelected = names.length > 0 && selectedInGroup === names.length;
+                return (
+                  <section key={category} className="source-category-card scan-source-category">
+                    <div className="scan-source-category-head">
+                      <div>
+                        <h3>{category}</h3>
+                        <span>{names.length} stored source{names.length === 1 ? '' : 's'}</span>
+                      </div>
+                      <button
+                        className={allSelected ? 'is-selected' : ''}
+                        onClick={() => setCategory(group, !allSelected)}
+                        type="button"
+                        aria-pressed={allSelected}
+                      >
+                        {allSelected ? 'Clear category' : 'Select category'}
+                        <span>{selectedInGroup}/{names.length}</span>
+                      </button>
+                    </div>
+                    <div className="scan-source-options">
+                      {group.map((source) => {
+                        const name = sourceName(source);
+                        return (
+                          <label key={name} className="source-option scan-source-option">
+                            <input
+                              type="checkbox"
+                              className="signal-checkbox"
+                              checked={draftSet.has(name)}
+                              onChange={() => toggleSource(name)}
+                            />
+                            <span className="scan-source-option-copy">
+                              <strong>{name}</strong>
+                              <small>{source.url || source.feed || source.rss || 'No URL configured'}</small>
+                            </span>
+                            <span className="scan-source-option-state" aria-hidden="true"><Icon name="check" size={13} /></span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              })}
+              {visibleSites.length === 0 && (
+                <div className="scan-source-empty" role="status">
+                  <span aria-hidden="true"><Icon name={loading ? 'refresh' : query ? 'search' : 'rss'} size={21} /></span>
+                  <div>
+                    <strong>
+                      {loading
+                        ? 'Loading stored source metadata…'
+                        : query
+                          ? `No sources match “${query}”`
+                          : 'No source metadata is available yet'}
+                    </strong>
+                    <p>
+                      {loading
+                        ? 'The local archive remains searchable while this list loads.'
+                        : query
+                          ? 'Try a publication name, category, or domain.'
+                          : loadError || 'Search without a source filter, or run a query to surface sources found in retained archive items.'}
+                    </p>
                   </div>
                 </div>
-              );
-            })}
-            {visibleSites.length === 0 && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-400">
-                No sources match this search.
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div className="source-picker-foot shrink-0 flex items-center justify-between gap-3 border-t border-white/10 p-4">
-            <div className="text-sm text-slate-500">
-              {draft.length ? `${draft.length} source filters selected` : 'All stored sources will be searched'}
-            </div>
-            <div className="flex gap-2">
-              <button className="btn-dark-secondary h-9" onClick={() => setOpen(false)} type="button">Cancel</button>
-              <button
-                className="btn-dark-primary h-9"
-                onClick={() => {
-                  onApply(draft);
-                  setOpen(false);
-                }}
-                type="button"
-              >
-                Apply source filter
-              </button>
-            </div>
-          </div>
+            <footer className="source-picker-foot scan-source-picker-foot">
+              <div>
+                <span className="scan-beacon active" aria-hidden="true" />
+                <p>{draft.length ? `${draft.length} sources will filter the local results` : 'Every stored source remains in scope'}</p>
+              </div>
+              <div className="scan-source-picker-footer-actions">
+                <button className="scan-secondary-action" onClick={closePicker} type="button">Cancel</button>
+                <button
+                  className="scan-primary-action"
+                  onClick={() => {
+                    onApply(draft);
+                    closePicker();
+                  }}
+                  type="button"
+                >
+                  Apply scope <Icon name="check" size={15} />
+                </button>
+              </div>
+            </footer>
           </div>
         </>
       ), document.body)}
@@ -240,6 +408,7 @@ function SourcePicker({ sites, selected, onApply }) {
 function ScanTour({ step, targetRef, onNext, onDismiss }) {
   const [bounds, setBounds] = useState(null);
   const guide = DEEP_SCAN_TOUR_STEPS[step];
+  const nextButtonRef = useRef(null);
 
   useEffect(() => {
     if (!guide) return undefined;
@@ -255,15 +424,21 @@ function ScanTour({ step, targetRef, onNext, onDismiss }) {
         bottom: rect.bottom,
       });
     };
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') onDismiss();
+    };
 
     updateBounds();
+    window.setTimeout(() => nextButtonRef.current?.focus(), 0);
     window.addEventListener('resize', updateBounds);
     window.addEventListener('scroll', updateBounds, true);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('resize', updateBounds);
       window.removeEventListener('scroll', updateBounds, true);
+      window.removeEventListener('keydown', onKeyDown);
     };
-  }, [guide, targetRef]);
+  }, [guide, onDismiss, targetRef]);
 
   if (!guide || !bounds) return null;
 
@@ -283,13 +458,26 @@ function ScanTour({ step, targetRef, onNext, onDismiss }) {
         className="scan-tour-spotlight fixed"
         style={{ left: `${bounds.left - 5}px`, top: `${bounds.top - 5}px`, width: `${bounds.width + 10}px`, height: `${bounds.height + 10}px` }}
       />
-      <aside className="scan-tour-card fixed" style={{ left: `${left}px`, top: `${top}px` }} aria-live="polite">
-        <div className="scan-tour-progress">Local Scan Guide · {step + 1} of {DEEP_SCAN_TOUR_STEPS.length}</div>
-        <h3>{guide.title}</h3>
-        <p>{guide.text}</p>
+      <aside
+        className="scan-tour-card scan-guide-card fixed"
+        style={{ left: `${left}px`, top: `${top}px` }}
+        aria-describedby="scan-guide-description"
+        aria-labelledby="scan-guide-title"
+        aria-modal="true"
+        role="dialog"
+      >
+        <div className="scan-tour-progress">
+          <span>Local Scan Guide</span>
+          <span>{step + 1} / {DEEP_SCAN_TOUR_STEPS.length}</span>
+        </div>
+        <div className="scan-guide-dots" aria-hidden="true">
+          {DEEP_SCAN_TOUR_STEPS.map((_, index) => <span className={index <= step ? 'is-active' : ''} key={index} />)}
+        </div>
+        <h3 id="scan-guide-title">{guide.title}</h3>
+        <p id="scan-guide-description">{guide.text}</p>
         <div className="scan-tour-actions">
           <button className="scan-tour-skip" onClick={onDismiss} type="button">Skip</button>
-          <button className="scan-tour-next" onClick={onNext} type="button">{isLast ? 'Got it' : 'Next'}</button>
+          <button ref={nextButtonRef} className="scan-tour-next" onClick={onNext} type="button">{isLast ? 'Got it' : 'Next'}</button>
         </div>
       </aside>
     </>
@@ -305,29 +493,39 @@ function ScanActivityPanel({ running, logs, hasBatch }) {
   }, [running]);
 
   return (
-    <aside className={`scan-activity-panel ${running ? 'is-running' : ''} ${collapsed ? 'is-collapsed' : ''} ${hasBatch ? 'has-batch' : ''}`} aria-live="polite">
+    <aside className={`scan-activity-panel scan-live-trace ${running ? 'is-running' : ''} ${collapsed ? 'is-collapsed' : ''} ${hasBatch ? 'has-batch' : ''}`} aria-label="Archive search activity">
       <div className="scan-activity-head">
         <div>
-          <span className={running ? 'scan-beacon active' : 'scan-beacon'} />
-          <Icon name="terminal" size={15} />
-          <strong>Archive Search Activity</strong>
+          <span className={running ? 'scan-beacon active' : 'scan-beacon'} aria-hidden="true" />
+          <span>
+            <strong>{running ? 'Local search in motion' : 'Search trace'}</strong>
+            <small>{running ? 'Reading extracted files' : 'Latest archive activity'}</small>
+          </span>
         </div>
-        <button onClick={() => setCollapsed((value) => !value)} type="button">
-          {collapsed ? 'Expand' : 'Minimize'}
+        <button
+          onClick={() => setCollapsed((value) => !value)}
+          type="button"
+          aria-controls="scan-activity-log"
+          aria-expanded={!collapsed}
+        >
+          <span>{collapsed ? 'Expand' : 'Minimize'}</span>
+          <Icon name={collapsed ? 'chevD' : 'up'} size={14} />
         </button>
       </div>
       {!collapsed && (
         <>
-          <div className="scan-activity-log">
+          <div className="scan-activity-log" id="scan-activity-log" role="log" aria-live="polite" aria-relevant="additions">
             {recentLogs.map((entry) => (
               <div className={`scan-log-line ${entry.level || 'status'}`} key={entry.id}>
                 <time>{entry.time}</time>
+                <span className="scan-log-marker" aria-hidden="true" />
                 <span>{entry.message}</span>
               </div>
             ))}
           </div>
           <div className="scan-activity-foot">
-            {running ? 'Reading extracted JSON archives' : 'Latest local archive search'}
+            <Icon name="shield" size={13} />
+            {running ? 'Local files only · safe to keep navigating' : 'No crawler or public web request was used'}
           </div>
         </>
       )}
@@ -360,6 +558,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const setCards = (value) => setManualScan((current) => ({ cards: typeof value === 'function' ? value(current.cards || []) : value }));
   const setChecked = (value) => setManualScan((current) => ({ checked: typeof value === 'function' ? value(current.checked || {}) : value }));
   const [sites, setSites] = useState([]);
+  const [sitesLoading, setSitesLoading] = useState(true);
+  const [sitesError, setSitesError] = useState('');
   const [votes, setVotes] = useState({});
   const [openArticle, setOpen] = useState(null);
   const [pendingSelect, setPendingSelect] = useState(null);
@@ -374,8 +574,25 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const searchRef = useRef(null);
 
   useEffect(() => {
-    getSites().then((s) => setSites(Array.isArray(s) ? s : (s?.sites || []))).catch(() => {});
+    let active = true;
+    setSitesLoading(true);
+    getSites()
+      .then((response) => {
+        if (!active) return;
+        const loadedSites = normalizeSiteCollection(response);
+        setSites(loadedSites);
+        setSitesError(loadedSites.length ? '' : 'The configured source list is empty for this profile.');
+      })
+      .catch(() => {
+        if (!active) return;
+        setSites([]);
+        setSitesError('The configured source list could not be loaded. Search can still use all retained archive items.');
+      })
+      .finally(() => {
+        if (active) setSitesLoading(false);
+      });
     getViewerHidden().then((d) => setHiddenCount(Number(d?.count ?? d?.items?.length ?? 0))).catch(() => {});
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -416,20 +633,28 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
     () => cards.filter((item) => checked[articleKey(item)]),
     [cards, checked]
   );
-  const visibleCards = useMemo(() => cards.filter((item) => {
-    const category = String(item.category || '').toLowerCase();
-    const region = String(item.region || '').toLowerCase();
-    if (resultFilter === 'High Signal') return scoreOf(item) >= 80;
-    if (resultFilter === 'India') return region.includes('india');
-    if (resultFilter === 'Korea') return region.includes('korea');
-    if (resultFilter === 'AI Models') return category.includes('ai');
-    if (resultFilter === 'With Images') return !!(item.image_url || item.image || item.thumbnail || item.urlToImage);
-    return true;
-  }), [cards, resultFilter]);
+  const visibleCards = useMemo(
+    () => cards.filter((item) => matchesResultLens(item, resultFilter)),
+    [cards, resultFilter],
+  );
+  const resultLensCounts = useMemo(() => Object.fromEntries(
+    RESULT_LENSES.map(({ label }) => [label, cards.filter((item) => matchesResultLens(item, label)).length]),
+  ), [cards]);
+  const availableSites = useMemo(
+    () => mergeSourceCollections(sites, archiveSourcesFromCards(cards)),
+    [sites, cards],
+  );
   const groups = useMemo(() => groupedByDate(visibleCards), [visibleCards]);
   const highSignals = cards.filter((a) => scoreOf(a) >= 80).length;
   const scanSourceLabel = pickedSites.length ? `${pickedSites.length} selected` : 'All stored';
   const scanStateLabel = running ? 'Searching archive' : started ? 'Search complete' : 'Ready';
+  const hasFilteredOut = cards.length > 0 && visibleCards.length === 0;
+  const milestones = [
+    { label: 'Query captured', state: query.trim() ? 'complete' : 'waiting' },
+    { label: 'Scope mapped', state: query.trim() ? 'complete' : 'waiting' },
+    { label: 'Archive read', state: running ? 'active' : started ? 'complete' : 'waiting' },
+    { label: 'Signals ranked', state: started && !running ? 'complete' : running ? 'active' : 'waiting' },
+  ];
 
   const start = () => {
     const keywords = query.trim();
@@ -443,7 +668,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
   const onVote = async (item, v) => {
     setVotes((p) => ({ ...p, [item.id]: v }));
-    trackAction('vote', `${v}:${item.title?.slice(0, 60)}`);
+    trackAction(v === 'down' ? 'vote_not_interested' : 'vote_interested', articleActivityDetail(item, 'scan'));
     try {
       if (v === 'down') {
         await rejectArticle(item);
@@ -462,7 +687,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const hideArticle = async (item) => {
     setCards((current) => current.filter((article) => articleKey(article) !== articleKey(item)));
     setHiddenCount((count) => count + 1);
-    trackAction('hide_personal', item.title?.slice(0, 60));
+    trackAction('hide_personal', articleActivityDetail(item, 'scan'));
     try { await hideArticleForViewer(item); } catch {}
   };
 
@@ -474,6 +699,10 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const selectFromDossier = (item) => {
     setOpen(null);
     setPendingSelect(item);
+  };
+  const openDossier = (item) => {
+    trackAction('dossier_open', articleActivityDetail(item, 'scan'));
+    setOpen(item);
   };
 
   const onCorrectRegion = async (item, correction) => {
@@ -487,7 +716,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const confirmSelect = async (item, name) => {
     const payload = { ...item, selected_by: name, selected_at: new Date().toISOString().slice(0, 16).replace('T', ' ') };
     setCards((arr) => arr.map((a) => (a.id === item.id ? { ...a, selected_by: name } : a)));
-    trackAction('select', item.title?.slice(0, 60));
+    trackAction('select', articleActivityDetail(item, 'scan'));
     try { await selectWorkflow(payload); } catch {}
   };
 
@@ -497,7 +726,11 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
     setCards((arr) => arr.map((item) => (checked[articleKey(item)] ? { ...item, selected_by: name } : item)));
     setChecked({});
     setBatchSelect(null);
-    trackAction('batch_select', `${payloads.length} search results`);
+    trackAction('batch_select', {
+      item_count: payloads.length,
+      items: payloads.map((item) => articleActivityDetail(item, 'scan')),
+      screen: 'scan',
+    });
     await Promise.all(payloads.map((payload) => selectWorkflow(payload).catch(() => null)));
   };
 
@@ -512,86 +745,116 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   };
 
   return (
-    <div className="scan-page space-y-6">
-      <section className="scan-console deep-search-command relative z-[60]">
-        <div className="scan-console-header">
-          <div className="scan-title">
-            <div className="eyebrow">Scan / Local Intelligence</div>
-            <h1>Find any signal the moment you type.</h1>
-            <p>Every keystroke searches previously extracted news. The crawler and the public web always remain offline.</p>
-            <div className="local-search-boundary" role="note">
-              <span className="local-search-lock"><Icon name="shield" size={14} /> Local-only</span>
-              <span>Read-only JSON archive</span>
-              <span>No crawler launch</span>
-              <span>No live web lookup</span>
-            </div>
-          </div>
-          <div className="scan-telemetry" aria-label="Investigation scope">
-            <div className="scan-telemetry-head">
-              <span className={running ? 'scan-beacon active' : 'scan-beacon'} />
-              <span>{scanStateLabel}</span>
-              {running && <small>Reading local files</small>}
-            </div>
-            <div className="scan-telemetry-grid">
-              <div><strong>{scanSourceLabel}</strong><span>Source scope</span></div>
-              <div><strong>{cards.length}</strong><span>Matches found</span></div>
-              <div><strong>{archiveFiles || '—'}</strong><span>Files searched</span></div>
-            </div>
-            <p>Session workspace. Results remain while you navigate and reset on browser refresh.</p>
-          </div>
-        </div>
+    <div className={`scan-page scan-studio ${running ? 'is-scanning' : ''}`}>
+      <section className="scan-command-center" aria-labelledby="scan-command-title">
+        <div className="scan-command-grid" aria-hidden="true" />
+        <div className="scan-command-glow" aria-hidden="true" />
 
-        <div className="scan-query-console">
-          <div className="scan-query-label">
-            <Icon name="search" size={15} />
-            <span>Search extracted news</span>
-            <button
-              className="scan-field-help"
-              title="Search titles, summaries, keywords, categories, regions, and saved source names."
-              aria-label="Help: extracted intelligence search"
-              onClick={() => openTour(0)}
-              type="button"
-            >
-              ?
-            </button>
+        <header className="scan-command-header">
+          <div className="scan-command-copy">
+            <div className="scan-kicker-line">
+              <span className="scan-kicker"><Icon name="archive" size={14} /> Local Intelligence Scan</span>
+              <button className="scan-guide-launch" onClick={() => openTour(0)} type="button">
+                <span>How Scan works</span><Icon name="chevR" size={14} />
+              </button>
+            </div>
+            <h1 id="scan-command-title">Search what the newsroom already knows.</h1>
+            <p>
+              Type a company, product, market, or phrase. Scan reads the extracted intelligence archive in real time—without waking the crawler or touching the public web.
+            </p>
+            <div className="scan-trust-rail" role="note" aria-label="Local search safeguards">
+              <span className="is-primary"><Icon name="shield" size={14} /> Local only</span>
+              <span><Icon name="archive" size={13} /> Read-only archive</span>
+              <span><Icon name="server" size={13} /> Session persists across tabs</span>
+            </div>
           </div>
-          <div className="scan-query-primary">
-            <label className="scan-query-capsule" ref={queryRef}>
-              <Icon name="search" size={20} />
+
+          <aside className="scan-live-readout" aria-label="Current search scope" aria-live="polite">
+            <div className="scan-readout-head">
+              <div className={`scan-orbit ${running ? 'is-live' : ''}`} aria-hidden="true">
+                <span className="scan-orbit-ring" />
+                <span className="scan-orbit-core"><Icon name={running ? 'refresh' : started ? 'check2' : 'search'} size={18} /></span>
+              </div>
+              <div>
+                <span className="scan-readout-label">Workspace status</span>
+                <strong>{scanStateLabel}</strong>
+                <small>{running ? 'Reading local files now' : started ? 'Ready for your next query' : 'Waiting for a query'}</small>
+              </div>
+            </div>
+            <dl className="scan-readout-metrics">
+              <div><dt>Sources</dt><dd>{scanSourceLabel}</dd></div>
+              <div><dt>Matches</dt><dd>{cards.length}</dd></div>
+              <div><dt>Files</dt><dd>{archiveFiles || '—'}</dd></div>
+            </dl>
+            <p><Icon name="history" size={13} /> Results remain available while you move through this app.</p>
+          </aside>
+        </header>
+
+        <div className="scan-query-deck">
+          <div className="scan-query-deck-head">
+            <div>
+              <span>01 · Query</span>
+              <strong>Search extracted news</strong>
+            </div>
+            <span className="scan-live-hint"><span className={running ? 'scan-beacon active' : 'scan-beacon'} aria-hidden="true" /> Results update as you type</span>
+          </div>
+
+          <div className="scan-query-primary scan-query-row">
+            <label className="scan-query-capsule scan-query-field" ref={queryRef}>
+              <span className="scan-query-icon" aria-hidden="true"><Icon name="search" size={21} /></span>
+              <span className="sr-only">Search extracted intelligence</span>
               <input
                 className="scan-query-input"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
-                placeholder="Search companies, products, markets, topics, or phrases..."
-                aria-label="Search extracted intelligence"
+                placeholder="Try “Samsung OLED”, “AI regulation”, or a specific phrase"
+                aria-describedby="scan-query-boundary"
               />
+              {query && (
+                <button className="scan-query-clear" onClick={() => setQuery('')} type="button" aria-label="Clear search query">
+                  <Icon name="x" size={16} />
+                </button>
+              )}
+              <kbd>Enter</kbd>
             </label>
             <div className="scan-search-action" ref={searchRef}>
               <button
                 className="scan-field-help scan-search-help"
                 title="Search local extracted briefing files only. This never starts the crawler."
-                aria-label="Help: run local Scan"
+                aria-label="Explain local Scan"
                 onClick={() => openTour(3)}
                 type="button"
               >
                 ?
               </button>
               {running ? (
-                <button className="scan-run scan-run-primary stop" onClick={stop} type="button"><Icon name="stop" /> Stop Search</button>
+                <button className="scan-run scan-run-primary stop" onClick={stop} type="button">
+                  <Icon name="stop" /><span>Stop search</span><small>Cancel safely</small>
+                </button>
               ) : (
-                <button className="scan-run scan-run-primary" onClick={start} type="button" disabled={!query.trim()}><Icon name="search" /> Search now</button>
+                <button className="scan-run scan-run-primary" onClick={start} type="button" disabled={!query.trim()}>
+                  <Icon name="bolt" /><span>Search archive</span><small>Local files only</small>
+                </button>
               )}
             </div>
           </div>
+
           <div className="scan-suggestions" aria-label="Suggested searches">
-            <span>Try a search</span>
+            <span>Starting points</span>
             {SUGGESTED_QUERIES.map((suggestion) => (
-              <button key={suggestion} onClick={() => setQuery(suggestion)} type="button">{suggestion}</button>
+              <button key={suggestion} onClick={() => setQuery(suggestion)} type="button">
+                {suggestion}<Icon name="chevR" size={12} />
+              </button>
             ))}
           </div>
-          <div className="scan-command-controls">
-            <div ref={dateRangeRef}>
+
+          <div className="scan-scope-heading">
+            <div><span>02 · Scope</span><strong>Define where Scan should look</strong></div>
+            <p id="scan-query-boundary"><Icon name="shield" size={13} /> The scheduler, shared briefing, and crawler remain untouched.</p>
+          </div>
+          <div className="scan-command-controls scan-scope-grid">
+            <div className="scan-scope-cell" ref={dateRangeRef}>
               <DateRangePicker
                 from={from}
                 to={to}
@@ -602,10 +865,11 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                   setTo(nextTo);
                 }}
               />
+              <span className="scan-scope-caption">Only retained briefings inside this window</span>
             </div>
-            <div ref={sourcesRef}>
+            <div className="scan-scope-cell" ref={sourcesRef}>
               <div className="scan-field-label">
-                <span>Sources</span>
+                <span>Source scope</span>
                 <button
                   className="scan-field-help"
                   title="Filters stored articles by their extracted source. It does not contact these publications."
@@ -616,13 +880,36 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                   ?
                 </button>
               </div>
-              <SourcePicker sites={sites} selected={pickedSites} onApply={setPicked} />
+              <SourcePicker
+                sites={availableSites}
+                selected={pickedSites}
+                onApply={setPicked}
+                loading={sitesLoading}
+                loadError={sitesError}
+              />
+              <span className="scan-scope-caption">Filtering metadata, never contacting a publisher</span>
             </div>
-            <div className="scan-scope-note" aria-label="Manual search session behavior">
-              <span>Read-only Search</span>
-              <p>The scheduled briefing and crawler remain untouched.</p>
-            </div>
+            <aside className="scan-integrity-note" aria-label="Search integrity">
+              <span className="scan-integrity-icon" aria-hidden="true"><Icon name="shield" size={18} /></span>
+              <div><strong>Private working scope</strong><p>Your filters affect this search session only.</p></div>
+              <span className="scan-integrity-state">Protected</span>
+            </aside>
           </div>
+        </div>
+
+        <div className="scan-milestone-strip" aria-live="polite">
+          <div className="scan-milestone-status">
+            <span className={running ? 'scan-beacon active' : 'scan-beacon'} aria-hidden="true" />
+            <div><strong>{status}</strong><small>{running ? 'You can navigate away; this search continues in the background.' : 'Local archive workflow'}</small></div>
+          </div>
+          <ol className="scan-milestones" aria-label="Search progress">
+            {milestones.map((milestone, index) => (
+              <li className={milestone.state} key={milestone.label}>
+                <span>{milestone.state === 'complete' ? <Icon name="check" size={12} /> : index + 1}</span>
+                <strong>{milestone.label}</strong>
+              </li>
+            ))}
+          </ol>
         </div>
       </section>
 
@@ -635,112 +922,140 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         />
       )}
 
-      {(started || cards.length > 0) && (
-        <section className="scan-summary rounded-[22px] border border-white/10 bg-[#101827]/80 p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Local Search Summary</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                {cards.length} matches · {highSignals} high-signal results · {articlesSearched} stored articles checked
-              </p>
-              <p className="mt-1 text-sm text-slate-500">Query: {query} · {from} to {to} · {pickedSites.length || 'All'} stored sources · {archiveFiles} archive files</p>
-            </div>
-            <span className="text-sm text-slate-400">{status}</span>
+      <section className="scan-results-workspace" aria-busy={running} aria-labelledby="scan-results-title">
+        <header className="scan-results-header">
+          <div>
+            <span className="scan-results-kicker">03 · Intelligence return</span>
+            <h2 id="scan-results-title">
+              {running ? 'Scanning the retained archive' : started ? `${cards.length} signals surfaced` : 'Your local results will land here'}
+            </h2>
+            <p>
+              {started
+                ? `${articlesSearched} stored articles checked across ${archiveFiles} archive file${archiveFiles === 1 ? '' : 's'} · ${highSignals} high-signal result${highSignals === 1 ? '' : 's'}`
+                : 'Results are ranked from extracted titles, summaries, keywords, sources, categories, and regions.'}
+            </p>
           </div>
-        </section>
-      )}
-
-      <div className="scan-filter-rail">
-        <div className="scan-filter-label"><Icon name="filter" size={14} /> Results lens</div>
-        {['All', 'High Signal', 'India', 'Korea', 'AI Models', 'With Images'].map((chip) => (
-          <button
-            key={chip}
-            className={resultFilter === chip ? 'scan-filter-chip active' : 'scan-filter-chip'}
-            onClick={() => setResultFilter(chip)}
-            type="button"
-          >
-            {chip}
-          </button>
-        ))}
-        {cards.length > 0 && <span className="scan-result-count">{visibleCards.length} of {cards.length} visible</span>}
-      </div>
-
-      <section className="scan-result-stage space-y-8">
-        {Object.keys(groups).length > 0 ? Object.entries(groups).map(([day, items]) => (
-          <div key={day} className="space-y-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-lg font-semibold text-white">{day}</h2>
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-sm text-slate-500">{items.length} results</span>
-            </div>
-            <div className="article-grid scan-results-grid grid gap-6 lg:grid-cols-3">
-              {items.map((item) => (
-                <div className="archive-result-item" key={item.id}>
-                  <div className="archive-match-strip">
-                    <span className="archive-match-label"><Icon name="search" size={12} /> Matched</span>
-                    <span className="archive-match-terms">
-                      {(item.matched_terms || []).slice(0, 4).map((term) => <em key={term}>{term}</em>)}
-                    </span>
-                    <span className="archive-match-score">Relevance {item.search_score || '—'}</span>
-                  </div>
-                  <ArticleCard
-                    item={item}
-                    variant={cardVariant(item)}
-                    vote={votes[item.id]}
-                    onVote={onVote}
-                    onSelect={setPendingSelect}
-                    onOpen={setOpen}
-                    onHide={hideArticle}
-                    onCheck={onCheck}
-                    checked={!!checked[articleKey(item)]}
-                    isSelected={!!item.selected_by}
-                  />
-                </div>
-              ))}
-            </div>
+          <div className={`scan-result-state ${running ? 'is-live' : ''}`}>
+            <span className={running ? 'scan-beacon active' : 'scan-beacon'} aria-hidden="true" />
+            <div><strong>{running ? 'Live local search' : started ? 'Search complete' : 'Standing by'}</strong><small>{from} → {to}</small></div>
           </div>
-        )) : (
-          <div className="scan-idle-stage">
-            <div className={running ? 'scan-radar active' : 'scan-radar'} aria-hidden="true">
-                <span className="radar-ring one" />
-              <span className="radar-ring two" />
-              <span className="radar-crosshair" />
-              <Icon name={running ? 'refresh' : 'search'} size={23} />
-            </div>
-            <div className="scan-idle-copy">
-              <div className="eyebrow">{running ? 'Local Search Active' : started ? 'Archive Search Complete' : 'Extracted Intelligence Ready'}</div>
-              <h2>{running ? 'Reading the stored intelligence archive' : started ? 'No stored signals matched this search' : 'Search the news already collected'}</h2>
-              <p>
-                {running
-                  ? 'Checking extracted briefing files and ranking matching articles. No crawler or internet connection is involved.'
-                  : started
-                    ? 'Widen the stored date window, remove a source filter, or try another subject.'
-                    : 'Search titles, summaries, keywords, sources, categories, and regions from the retained briefing files.'}
-              </p>
-            </div>
-            {!running && (
-              <div className="scan-idle-actions">
-                <button className="source-chip" onClick={() => setQuery('Samsung OLED')} type="button">Samsung OLED</button>
-                <button className="source-chip" onClick={() => setQuery('Broadcast regulation')} type="button">Broadcast regulation</button>
-              </div>
-            )}
+        </header>
+
+        {(started || cards.length > 0) && (
+          <div className="scan-query-receipt" aria-label="Current query summary">
+            <span><Icon name="search" size={14} /> <strong>{query}</strong></span>
+            <span><Icon name="rss" size={14} /> {pickedSites.length || 'All'} source{pickedSites.length === 1 ? '' : 's'}</span>
+            <span><Icon name="archive" size={14} /> {archiveFiles} file{archiveFiles === 1 ? '' : 's'}</span>
+            <span><Icon name="layers" size={14} /> {selectedBatch.length} selected</span>
           </div>
         )}
-      </section>
 
-      {hiddenCount > 0 && (
-        <button
-          className="hidden-review-link scan-hidden-signals inline-flex w-full max-w-xl items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-sky-300/25 hover:bg-white/[0.055] sm:w-auto sm:min-w-[420px]"
-          onClick={() => navigate('/rejected')}
-          type="button"
-        >
-          <span>
-            <span className="block text-sm font-semibold text-white">Review Hidden Signals</span>
-            <span className="mt-1 block text-xs text-slate-400">{hiddenCount} articles hidden only for you.</span>
-          </span>
-          <span className="btn-dark-secondary h-9">Open Hidden Review</span>
-        </button>
-      )}
+        {cards.length > 0 && (
+          <nav className="scan-facet-bar" aria-label="Filter scan results">
+            <div className="scan-facet-heading"><Icon name="filter" size={15} /><span>Results lens</span></div>
+            <div className="scan-facet-scroll">
+              {RESULT_LENSES.map(({ label, icon }) => (
+                <button
+                  key={label}
+                  className={resultFilter === label ? 'scan-filter-chip active' : 'scan-filter-chip'}
+                  onClick={() => setResultFilter(label)}
+                  type="button"
+                  aria-pressed={resultFilter === label}
+                >
+                  <Icon name={icon} size={13} /><span>{label}</span><strong>{resultLensCounts[label]}</strong>
+                </button>
+              ))}
+            </div>
+            <span className="scan-result-count">{visibleCards.length} visible</span>
+          </nav>
+        )}
+
+        <div className="scan-result-stage">
+          {Object.keys(groups).length > 0 ? Object.entries(groups).map(([day, items]) => (
+            <section key={day} className="scan-result-day" aria-labelledby={`scan-day-${day}`}>
+              <header className="scan-result-day-head">
+                <div><span className="scan-day-marker" aria-hidden="true" /><h3 id={`scan-day-${day}`}>{day}</h3></div>
+                <span>{items.length} result{items.length === 1 ? '' : 's'}</span>
+              </header>
+              <div className="article-grid scan-results-grid">
+                {items.map((item) => (
+                  <div className="archive-result-item scan-result-card-shell" key={item.id}>
+                    <div className="archive-match-strip scan-match-ribbon">
+                      <span className="archive-match-label"><Icon name="search" size={12} /> Match</span>
+                      <span className="archive-match-terms">
+                        {(item.matched_terms || []).slice(0, 4).map((term) => <em key={term}>{term}</em>)}
+                      </span>
+                      <span className="archive-match-score">{item.search_score ? `${item.search_score}%` : 'Ranked'}</span>
+                    </div>
+                    <ArticleCard
+                      item={item}
+                      variant={cardVariant(item)}
+                      vote={votes[item.id]}
+                      onVote={onVote}
+                      onSelect={setPendingSelect}
+                      onOpen={openDossier}
+                      onHide={hideArticle}
+                      onCheck={onCheck}
+                      checked={!!checked[articleKey(item)]}
+                      isSelected={!!item.selected_by}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )) : (
+            <div className={`scan-idle-stage ${running ? 'is-running' : ''}`}>
+              <div className={running ? 'scan-radar active' : 'scan-radar'} aria-hidden="true">
+                <span className="radar-ring one" />
+                <span className="radar-ring two" />
+                <span className="radar-crosshair" />
+                <span className="scan-radar-sweep" />
+                <Icon name={running ? 'refresh' : hasFilteredOut ? 'filter' : started ? 'search' : 'archive'} size={24} />
+              </div>
+              <div className="scan-idle-copy">
+                <span className="scan-idle-kicker">{running ? 'Local search active' : hasFilteredOut ? 'Lens applied' : started ? 'Archive search complete' : 'Extracted intelligence ready'}</span>
+                <h3>{running ? 'Reading and ranking your stored signals' : hasFilteredOut ? `No results match the ${resultFilter} lens` : started ? 'No stored signals matched this search' : 'Begin with one useful question'}</h3>
+                <p>
+                  {running
+                    ? 'Scan is checking extracted briefing files locally. Keep working elsewhere—the search state will stay here.'
+                    : hasFilteredOut
+                      ? 'The full result set is still available. Reset the lens to see every matching signal.'
+                      : started
+                        ? 'Widen the date window, remove a source filter, or try a related subject.'
+                        : 'Search any company, product, technology, market, or exact phrase from the retained briefing archive.'}
+                </p>
+                {!running && (
+                  <div className="scan-idle-actions">
+                    {hasFilteredOut ? (
+                      <button onClick={() => setResultFilter('All')} type="button"><Icon name="rotate" size={14} /> Show every result</button>
+                    ) : (
+                      <>
+                        <button onClick={() => setQuery('Samsung OLED')} type="button">Samsung OLED <Icon name="chevR" size={12} /></button>
+                        <button onClick={() => setQuery('Broadcast regulation')} type="button">Broadcast regulation <Icon name="chevR" size={12} /></button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="scan-idle-proof" aria-label="Search coverage">
+                <div><Icon name="file" size={15} /><span><strong>Titles + summaries</strong><small>Full-text matching</small></span></div>
+                <div><Icon name="sparkle" size={15} /><span><strong>Keywords + regions</strong><small>Structured intelligence</small></span></div>
+                <div><Icon name="shield" size={15} /><span><strong>Zero web traffic</strong><small>Local archive boundary</small></span></div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {hiddenCount > 0 && (
+          <footer className="scan-hidden-footer">
+            <button className="hidden-review-link scan-hidden-signals" onClick={() => navigate('/rejected')} type="button">
+              <span className="scan-hidden-icon" aria-hidden="true"><Icon name="eye" size={17} /></span>
+              <span><strong>Review your hidden signals</strong><small>{hiddenCount} article{hiddenCount === 1 ? '' : 's'} hidden only for you</small></span>
+              <span>Open review <Icon name="chevR" size={13} /></span>
+            </button>
+          </footer>
+        )}
+      </section>
 
       {started && <ScanActivityPanel running={running} logs={logs} hasBatch={selectedBatch.length > 0} />}
 
@@ -770,12 +1085,14 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       />
 
       {selectedBatch.length > 0 && (
-        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-          <div className="batch-action-bar flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
-            <strong>{selectedBatch.length} selected</strong>
-            <button className="btn-dark-secondary h-9" onClick={() => setChecked({})} type="button">Clear</button>
-            <button className="btn-dark-primary h-9" onClick={() => setBatchSelect({ title: `${selectedBatch.length} selected signals` })} type="button">Send to Review Queue</button>
-            <button className="btn-dark-secondary h-9" onClick={() => setDraftExportOpen(true)} type="button">Draft Export</button>
+        <div className="scan-batch-dock" role="region" aria-label="Selected scan results">
+          <div className="batch-action-bar scan-batch-bar">
+            <div className="scan-batch-count"><span>{selectedBatch.length}</span><strong>signal{selectedBatch.length === 1 ? '' : 's'} selected</strong></div>
+            <div className="scan-batch-actions">
+              <button className="scan-secondary-action" onClick={() => setChecked({})} type="button">Clear</button>
+              <button className="scan-primary-action" onClick={() => setBatchSelect({ title: `${selectedBatch.length} selected signals` })} type="button"><Icon name="check2" size={15} /> Send to review</button>
+              <button className="scan-secondary-action" onClick={() => setDraftExportOpen(true)} type="button"><Icon name="download" size={15} /> Draft export</button>
+            </div>
           </div>
         </div>
       )}

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../Icon.jsx';
+import useModalFocus from './useModalFocus.js';
 
 export default function DirectorKeyModal({ open, onClose, onConfirm, article }) {
   const [key, setKey] = useState('');
   const [err, setErr] = useState('');
+  const dialogRef = useModalFocus(open, onClose);
 
   useEffect(() => {
     if (open) {
@@ -25,11 +27,11 @@ export default function DirectorKeyModal({ open, onClose, onConfirm, article }) 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal sm compact-dialog approval-dialog" onClick={(e) => e.stopPropagation()}>
+      <div aria-labelledby="approval-dialog-title" aria-modal="true" className="modal sm compact-dialog approval-dialog" onClick={(e) => e.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="head">
           <Icon name="shield" />
-          <h3>Approval Required</h3>
-          <span className="x" onClick={onClose}><Icon name="x" /></span>
+          <h3 id="approval-dialog-title">Approval Required</h3>
+          <button aria-label="Close approval dialog" className="x" onClick={onClose} type="button"><Icon name="x" /></button>
         </div>
         <div className="body">
           <div className="text-sm text-slate-400">Enter 4-digit approval key.</div>
@@ -44,9 +46,11 @@ export default function DirectorKeyModal({ open, onClose, onConfirm, article }) 
             <input
               className="dark-input text-center tracking-[0.45em]"
               type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={key}
               maxLength={4}
-              onChange={(e) => { setKey(e.target.value); setErr(''); }}
+              onChange={(e) => { setKey(e.target.value.replace(/\D/g, '').slice(0, 4)); setErr(''); }}
               onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
               placeholder="••••"
               autoFocus

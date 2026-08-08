@@ -90,6 +90,14 @@ function StatusBadges({ item, selected }) {
   const score = scoreOf(item);
   return (
     <div className="ml-auto flex flex-wrap justify-end gap-2">
+      {item?.personalization?.follow_up && (
+        <span
+          className="personal-follow-chip"
+          title={`Related to: ${item.personalization.matched_saved_title || 'a saved signal'}`}
+        >
+          <Icon name="bookmark" size={11} /> {item.personalization.follow_label || 'Story update'}
+        </span>
+      )}
       {item?.is_fresh && <span className="signal-chip selected">New</span>}
       {approved && <span className="signal-chip">Approved</span>}
       {selected && !approved && <span className="signal-chip">Selected</span>}

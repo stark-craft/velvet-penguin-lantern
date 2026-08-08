@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from news_scrapper import application as main
+from news_scrapper.personalization import PersonalizationService
 
 
 def request_from(ip="10.0.0.25"):
@@ -36,6 +37,7 @@ class ViewerIdentityTests(unittest.TestCase):
         self.saved = root / "viewer_saved_store.json"
         self.default_workflow = root / "workflow_default.json"
         self.broadcast_workflow = root / "workflow_broadcast.json"
+        self.personalization = root / "viewer_personalization.json"
         self.profiles.write_text("{}", encoding="utf-8")
         self.tracker.write_text("{}", encoding="utf-8")
         self.hidden.write_text("{}", encoding="utf-8")
@@ -47,6 +49,11 @@ class ViewerIdentityTests(unittest.TestCase):
             patch.object(main, "USAGE_TRACKER_FILE", str(self.tracker)),
             patch.object(main, "VIEWER_HIDDEN_FILE", str(self.hidden)),
             patch.object(main, "VIEWER_SAVED_FILE", str(self.saved)),
+            patch.object(
+                main,
+                "PERSONALIZATION_SERVICE",
+                PersonalizationService(self.personalization),
+            ),
             patch.object(
                 main,
                 "WORKFLOW_FILES",
@@ -177,7 +184,7 @@ class ViewerIdentityTests(unittest.TestCase):
         self.assertTrue(saved["saved"])
         self.assertTrue(saved["changed"])
         self.assertTrue(saved["activity_tracked"])
-        self.assertFalse(saved["affects_ranking"])
+        self.assertTrue(saved["affects_ranking"])
         self.assertEqual(main.get_personal_saved(owner_request)["count"], 1)
         self.assertEqual(main.get_personal_saved(other_request)["count"], 0)
 
@@ -234,6 +241,46 @@ class ViewerIdentityTests(unittest.TestCase):
         self.assertEqual(owner_day["removed_from_saved"], 1)
         self.assertEqual(owner_device["ip_hash"], main.get_viewer_key("10.0.0.25"))
         self.assertNotIn("ip", owner_device)
+
+    def test_archive_import_is_bulk_deduplicated_and_attributed(self):
+        request = request_from()
+        viewer_key = main.get_viewer_key("10.0.0.25")
+        self.profiles.write_text(
+            json.dumps({viewer_key: {"display_name": "Explorer", "email": ""}}),
+            encoding="utf-8",
+        )
+        first = {
+            "title": "Archived AI signal",
+            "link": "https://example.test/archive-ai",
+            "keywords": ["AI"],
+        }
+        second = {
+            "title": "Archived display signal",
+            "link": "https://example.test/archive-display",
+            "keywords": ["Display"],
+        }
+
+        result = main.import_archived_news(
+            request,
+            {
+                "items": [first, second, first],
+                "_tracking_fingerprint": "archive-browser",
+            },
+        )
+        stored = json.loads(self.default_workflow.read_text(encoding="utf-8"))
+
+        self.assertEqual(result["imported"], 2)
+        self.assertEqual(result["already_present"], 1)
+        self.assertEqual(len(stored["selected"]), 2)
+        self.assertTrue(all(item["selected_by_id"] == viewer_key for item in stored["selected"]))
+        self.assertTrue(all(item["selected_by"] == "Explorer" for item in stored["selected"]))
+        self.assertTrue(all(item["selection_source"] == "briefing_archive" for item in stored["selected"]))
+
+        tracker = json.loads(self.tracker.read_text(encoding="utf-8"))
+        device = tracker[main.get_device_id("10.0.0.25", "archive-browser")]
+        day = device["activity"][main.get_today()]
+        self.assertEqual(day["action_counts"]["archive_import"], 1)
+        self.assertEqual(day["selections"], 2)
 
 
 if __name__ == "__main__":

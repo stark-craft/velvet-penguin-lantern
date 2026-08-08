@@ -235,6 +235,45 @@ class PersonalBriefingTests(unittest.TestCase):
             persisted["viewer-b"]["default"][0]["article"],
         )
 
+    def test_clear_finished_is_private_and_preserves_active_jobs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(Path(directory) / "briefings.json", dict)
+            viewer_key = application.get_viewer_key("10.0.0.25")
+            other_key = application.get_viewer_key("10.0.0.26")
+            store.write(
+                {
+                    viewer_key: {
+                        "default": [
+                            {"id": "ready", "status": "complete"},
+                            {"id": "bad", "status": "failed"},
+                            {"id": "active", "status": "processing"},
+                        ]
+                    },
+                    other_key: {
+                        "default": [{"id": "other", "status": "complete"}]
+                    },
+                }
+            )
+            with (
+                patch.object(application, "PERSONAL_BRIEFING_STORE", store),
+                patch.object(application, "record_usage_activity", return_value=True),
+            ):
+                result = application.clear_personal_url_briefings(
+                    request_from(), {"scope": "finished"}
+                )
+                persisted = store.read()
+
+        self.assertEqual(result["removed"], 2)
+        self.assertTrue(result["active_jobs_preserved"])
+        self.assertEqual(
+            [job["id"] for job in persisted[viewer_key]["default"]],
+            ["active"],
+        )
+        self.assertEqual(
+            [job["id"] for job in persisted[other_key]["default"]],
+            ["other"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import ArticleCard from '../components/ArticleCard.jsx';
+import { SignalVisual } from '../components/ArticleCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
+import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import DateRangePicker from '../components/DateRangePicker.jsx';
-import { correctRegion, getHistoryFile, getHistoryList, getHistoryRange } from '../api.js';
+import { correctRegion, getHistoryFile, getHistoryList, getHistoryRange, getWorkflow, importWorkflow } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
-import { cardVariant, groupedByDate, publishedTime, scoreOf } from '../utils/intelligence.js';
+import { articleKey, groupedByDate, publishedTime, scoreOf } from '../utils/intelligence.js';
+import { articleActivityDetail, trackAction } from '../utils/tracking.js';
+import './history-redesign.css';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -71,6 +74,103 @@ function metricSummary(items) {
   };
 }
 
+function friendlyDate(value, options = {}) {
+  if (!value) return 'Date unavailable';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    ...options,
+  });
+}
+
+function filterCount(filters) {
+  return Object.entries(filters).filter(([key, value]) => (
+    key === 'text' ? Boolean(value.trim()) : value !== EMPTY_FILTERS[key]
+  )).length;
+}
+
+function ArchiveMetric({ icon, label, value, detail }) {
+  return (
+    <div className="archive-v2-metric">
+      <span className="archive-v2-metric-icon" aria-hidden="true"><Icon name={icon} size={17} /></span>
+      <span>
+        <small>{label}</small>
+        <strong>{value}</strong>
+        <em>{detail}</em>
+      </span>
+    </div>
+  );
+}
+
+function ArchiveStoryCard({ item, checked, inWorkflow, onCheck, onOpen, onImport }) {
+  const score = scoreOf(item);
+  const parsedSourceCount = Number(item.source_count || 1);
+  const sourceCount = Number.isFinite(parsedSourceCount) && parsedSourceCount > 0 ? parsedSourceCount : 1;
+  const keywords = Array.isArray(item.keywords) ? item.keywords.slice(0, 3) : [];
+
+  return (
+    <article className={`archive-v2-story ${checked ? 'is-checked' : ''}`}>
+      <div className="archive-v2-story-visual">
+        <SignalVisual item={item} className="archive-v2-story-image" label={false} />
+        <div className="archive-v2-story-shade" aria-hidden="true" />
+        <label className="archive-v2-story-check">
+          <input
+            checked={checked}
+            onChange={(event) => onCheck(item, event.target.checked)}
+            type="checkbox"
+          />
+          <span><Icon name="check" size={14} /></span>
+          <b>{checked ? 'Selected' : 'Select'}</b>
+        </label>
+        <span className={`archive-v2-score ${score >= 80 ? 'is-high' : ''}`}>Signal {score}</span>
+      </div>
+
+      <div className="archive-v2-story-body">
+        <div className="archive-v2-story-meta">
+          <span>{item.category || 'Intelligence'}</span>
+          <i aria-hidden="true" />
+          <span>{item.region || 'Global'}</span>
+          {item.is_fresh && <strong>Fresh</strong>}
+        </div>
+
+        <button className="archive-v2-story-title" onClick={() => onOpen(item)} type="button">
+          {item.title || 'Untitled archived signal'}
+        </button>
+
+        <p>{item.summary || 'No summary was retained for this archived signal.'}</p>
+
+        {keywords.length > 0 && (
+          <div className="archive-v2-story-keywords" aria-label="Matched keywords">
+            {keywords.map((keyword) => <span key={keyword}>{keyword}</span>)}
+          </div>
+        )}
+      </div>
+
+      <footer className="archive-v2-story-footer">
+        <div className="archive-v2-story-source">
+          <span>{item.src || 'Unknown source'}</span>
+          <small>{friendlyDate(item.date)} · {sourceCount} source{sourceCount === 1 ? '' : 's'}</small>
+        </div>
+        <div className="archive-v2-story-actions">
+          <button className="archive-v2-icon-button" onClick={() => onOpen(item)} type="button" aria-label={`Open dossier for ${item.title}`}>
+            <Icon name="file" size={16} />
+          </button>
+          {inWorkflow ? (
+            <span className="archive-v2-workflow-state"><Icon name="check2" size={15} /> In review</span>
+          ) : (
+            <button className="archive-v2-import-one" onClick={() => onImport(item)} type="button">
+              <Icon name="upload" size={15} /> Add to review
+            </button>
+          )}
+        </div>
+      </footer>
+    </article>
+  );
+}
+
 function matchesText(item, text) {
   const q = text.trim().toLowerCase();
   if (!q) return true;
@@ -111,29 +211,34 @@ function applyArchiveFilters(items, filters) {
   });
 }
 
-function ArchiveRunStrip({ runs, activeRunLabel, onOpenRun }) {
+function ArchiveRunStrip({ runs, activeRunLabel, onOpenRun, disabled }) {
   if (!runs.length) return null;
 
   return (
-    <section className="archive-run-strip">
-      <div className="archive-strip-head">
+    <section className="archive-v2-runs" aria-labelledby="archive-run-heading">
+      <div className="archive-v2-section-head">
         <div>
-          <div className="eyebrow archive-accent">Run Timeline</div>
-          <p>Open a single archived run, or keep the combined range search loaded above.</p>
+          <span className="archive-v2-kicker"><Icon name="history" size={14} /> Briefing editions</span>
+          <h2 id="archive-run-heading">Revisit a single newsroom run</h2>
+          <p>Each edition preserves the exact signals available at that moment.</p>
         </div>
-        <span>{runs.length} run{runs.length === 1 ? '' : 's'}</span>
+        <span className="archive-v2-count-badge">{runs.length} run{runs.length === 1 ? '' : 's'}</span>
       </div>
 
-      <div className="archive-strip-scroll">
+      <div className="archive-v2-run-track">
         {runs.slice(0, 18).map((run) => (
           <button
             key={run.filename}
-            className={activeRunLabel === run.label ? 'archive-run-pill active' : 'archive-run-pill'}
+            className={activeRunLabel === run.label ? 'archive-v2-run is-active' : 'archive-v2-run'}
+            disabled={disabled}
             onClick={() => onOpenRun(run)}
             type="button"
+            aria-pressed={activeRunLabel === run.label}
           >
-            <span className="archive-run-time">{run.time}</span>
-            <span className="archive-run-type">{run.type === 'scheduler' ? 'Scheduler' : 'Manual'}</span>
+            <span className="archive-v2-run-date">{friendlyDate(run.date, { year: undefined })}</span>
+            <strong>{run.time}</strong>
+            <span>{run.type === 'scheduler' ? 'Scheduled edition' : 'Manual edition'}</span>
+            <Icon name="chevR" size={15} />
           </button>
         ))}
       </div>
@@ -152,6 +257,11 @@ export default function HistoryScreen() {
   const [searched, setSearched] = useState(false);
   const [activeRunLabel, setActiveRunLabel] = useState('');
   const [openArticle, setOpenArticle] = useState(null);
+  const [checkedKeys, setCheckedKeys] = useState(new Set());
+  const [workflowKeys, setWorkflowKeys] = useState(new Set());
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [draftExportOpen, setDraftExportOpen] = useState(false);
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -164,6 +274,8 @@ export default function HistoryScreen() {
     setErr('');
     setSearched(true);
     setActiveRunLabel('');
+    setNotice('');
+    setCheckedKeys(new Set());
 
     try {
       const [rangeData, runList] = await Promise.all([
@@ -192,6 +304,12 @@ export default function HistoryScreen() {
 
   useEffect(() => {
     loadArchiveRange();
+    getWorkflow().then((result) => {
+      setWorkflowKeys(new Set([
+        ...normalizeList(result?.selected || []),
+        ...normalizeList(result?.approved || []),
+      ].map(articleKey)));
+    }).catch(() => {});
   }, []);
 
   const setPreset = (days) => {
@@ -206,6 +324,8 @@ export default function HistoryScreen() {
     setLoading(true);
     setErr('');
     setActiveRunLabel(run.label);
+    setNotice('');
+    setCheckedKeys(new Set());
 
     try {
       const data = await getHistoryFile(run.filename);
@@ -245,199 +365,384 @@ export default function HistoryScreen() {
   const visibleMetrics = useMemo(() => metricSummary(filteredArticles), [filteredArticles]);
   const articleGroups = useMemo(() => groupedByDate(filteredArticles), [filteredArticles]);
   const keywords = topKeywords(articles, 6);
+  const checkedArticles = useMemo(
+    () => articles.filter((item) => checkedKeys.has(articleKey(item))),
+    [articles, checkedKeys],
+  );
+  const activeFilters = filterCount(filters);
+  const selectableVisible = filteredArticles.slice(0, 100);
+  const allVisibleChecked = Boolean(selectableVisible.length)
+    && selectableVisible.every((item) => checkedKeys.has(articleKey(item)));
+
+  const toggleVisible = () => {
+    setCheckedKeys((current) => {
+      const next = new Set(current);
+      selectableVisible.forEach((item) => {
+        const key = articleKey(item);
+        if (allVisibleChecked) next.delete(key); else next.add(key);
+      });
+      return next;
+    });
+    if (!allVisibleChecked && filteredArticles.length > 100) {
+      setNotice('The first 100 visible signals are checked. Import them, then continue with the next group.');
+    }
+  };
+
+  const importArticles = async (items) => {
+    if (!items.length || importing) return;
+    if (items.length > 100) {
+      setNotice('Import up to 100 archived signals at a time. Narrow the filters or clear some checks.');
+      return;
+    }
+    setImporting(true);
+    setErr('');
+    setNotice('');
+    try {
+      const response = await importWorkflow(items);
+      const imported = Number(response?.imported || 0);
+      const existing = Number(response?.already_present || 0);
+      setWorkflowKeys((current) => {
+        const next = new Set(current);
+        items.forEach((item) => next.add(articleKey(item)));
+        return next;
+      });
+      setCheckedKeys((current) => {
+        const next = new Set(current);
+        items.forEach((item) => next.delete(articleKey(item)));
+        return next;
+      });
+      setNotice([
+        imported ? `${imported} signal${imported === 1 ? '' : 's'} imported to the Review Queue.` : '',
+        existing ? `${existing} already existed.` : '',
+      ].filter(Boolean).join(' ') || 'The selected signals were already in the workflow.');
+    } catch (error) {
+      setErr(error?.message || 'Could not import the selected archive signals.');
+    } finally {
+      setImporting(false);
+    }
+  };
+  const openArchiveArticle = (item) => {
+    trackAction('dossier_open', articleActivityDetail(item, 'briefing_archive'));
+    setOpenArticle(item);
+  };
 
   return (
-    <div className="workflow-page archive-page archive-search-page space-y-6">
+    <main className="archive-v2-page">
+      <section className="archive-v2-hero" aria-labelledby="archive-page-title">
+        <div className="archive-v2-hero-copy">
+          <span className="archive-v2-kicker"><Icon name="archive" size={15} /> Briefing archive</span>
+          <h1 id="archive-page-title">The intelligence memory.</h1>
+          <p>
+            Return to any retained briefing, trace how a signal evolved, and move the strongest
+            stories back into today&apos;s review queue.
+          </p>
+          <div className="archive-v2-hero-tags" aria-label="Current archive scope">
+            <span><Icon name="calendar" size={14} /> {friendlyDate(from)} — {friendlyDate(to)}</span>
+            <span><Icon name="layers" size={14} /> {activeRunLabel || 'Combined range'}</span>
+          </div>
+        </div>
+
+        <aside className="archive-v2-index" aria-label="Loaded archive index">
+          <div className="archive-v2-index-top">
+            <span>Archive index</span>
+            <Icon name="history" size={18} />
+          </div>
+          <strong>{String(loadedMetrics.total).padStart(2, '0')}</strong>
+          <p>signals currently in your workspace</p>
+          <div className="archive-v2-index-foot">
+            <span><b>{loadedMetrics.sources}</b> sources</span>
+            <span><b>{runs.length}</b> editions</span>
+          </div>
+        </aside>
+      </section>
+
+      <section className="archive-v2-metrics" aria-label="Archive summary">
+        <ArchiveMetric icon="layers" label="Loaded" value={loadedMetrics.total} detail="in workspace" />
+        <ArchiveMetric icon="filter" label="Showing" value={visibleMetrics.total} detail={activeFilters ? `${activeFilters} active filters` : 'all signals'} />
+        <ArchiveMetric icon="trend" label="High signal" value={visibleMetrics.high} detail="score 80 or above" />
+        <ArchiveMetric icon="duplicate" label="Multi-source" value={visibleMetrics.clustered} detail="corroborated stories" />
+      </section>
+
       <form
-        className="archive-search-console"
+        className="archive-v2-workbench"
+        aria-busy={loading}
         onSubmit={(event) => {
           event.preventDefault();
           loadArchiveRange();
         }}
       >
-        <section className="archive-search-hero">
+        <div className="archive-v2-workbench-head">
           <div>
-            <div className="eyebrow archive-accent">Briefing Archive / Memory Search</div>
-            <h1>Search archived intelligence.</h1>
-            <p>
-              Load every retained briefing signal in a date range, then filter the loaded archive
-              by keyword, category, source, region, score, and image coverage.
-            </p>
+            <span className="archive-v2-kicker"><Icon name="search" size={14} /> Archive scope</span>
+            <h2>Build a briefing workspace</h2>
+            <p>Choose a retained period first, then refine the loaded intelligence instantly.</p>
           </div>
+          {activeFilters > 0 && (
+            <button className="archive-v2-text-action" onClick={resetFilters} type="button">
+              <Icon name="x" size={14} /> Clear {activeFilters} filter{activeFilters === 1 ? '' : 's'}
+            </button>
+          )}
+        </div>
 
-          <div className="archive-memory-meter">
-            <span>Loaded Workspace</span>
-            <strong>{loadedMetrics.total}</strong>
-            <small>{from} &rarr; {to}</small>
-          </div>
-        </section>
-
-        <section className="archive-query-panel">
-          <div className="archive-range-row">
+        <div className="archive-v2-scope-row">
+          <div className="archive-v2-date-field">
             <DateRangePicker
               from={from}
               to={to}
-              label="Archive Date Range"
+              label="Retained date range"
               helpText="Choose the retained briefing dates to load into this archive workspace."
               onChange={({ from: nextFrom, to: nextTo }) => {
                 setFrom(nextFrom);
                 setTo(nextTo);
               }}
             />
-
-            <div className="archive-preset-group" aria-label="Archive presets">
-              <button className="source-chip" onClick={() => setPreset(1)} type="button">Today</button>
-              <button className="source-chip" onClick={() => setPreset(7)} type="button">7 days</button>
-              <button className="source-chip" onClick={() => setPreset(30)} type="button">30 days</button>
-            </div>
-
-            <button className="btn-dark-primary archive-fetch-button" type="submit">
-              <Icon name="search" /> Search Archive
-            </button>
           </div>
 
-          <div className="archive-inline-search">
-            <Icon name="search" size={18} />
+          <div className="archive-v2-presets" aria-label="Archive date presets">
+            {[
+              [1, 'Today'],
+              [7, '7 days'],
+              [30, '30 days'],
+            ].map(([days, label]) => {
+              const selected = from === dateAddDays(TODAY, -(days - 1)) && to === TODAY;
+              return (
+                <button
+                  key={days}
+                  className={selected ? 'is-active' : ''}
+                  disabled={loading}
+                  onClick={() => setPreset(days)}
+                  type="button"
+                  aria-pressed={selected}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <button className="archive-v2-load-button" disabled={loading || !from || !to} type="submit">
+            <Icon name={loading ? 'refresh' : 'search'} size={17} />
+            {loading ? 'Loading archive…' : 'Load this range'}
+          </button>
+        </div>
+
+        <div className="archive-v2-search-row">
+          <label className="archive-v2-search-field">
+            <span className="sr-only">Search the loaded archive</span>
+            <Icon name="search" size={19} />
             <input
               value={filters.text}
               onChange={(event) => updateFilter('text', event.target.value)}
-              placeholder="Search loaded archive by title, summary, source, keyword..."
+              placeholder="Search headlines, summaries, sources, or matched keywords"
+              type="search"
             />
             {filters.text && (
-              <button
-                className="archive-clear-search"
-                onClick={() => updateFilter('text', '')}
-                type="button"
-                aria-label="Clear archive search"
-              >
-                <Icon name="x" size={14} />
+              <button onClick={() => updateFilter('text', '')} type="button" aria-label="Clear archive search">
+                <Icon name="x" size={15} />
               </button>
             )}
-          </div>
+          </label>
 
-          <div className="archive-filter-grid">
-            <select className="dark-input" value={filters.region} onChange={(event) => updateFilter('region', event.target.value)}>
-              <option value="all">All Regions</option>
-              {options.regions.map((region) => <option key={region} value={region}>{region}</option>)}
-            </select>
+          <div className="archive-v2-filter-grid">
+            <label>
+              <span>Region</span>
+              <select value={filters.region} onChange={(event) => updateFilter('region', event.target.value)}>
+                <option value="all">All regions</option>
+                {options.regions.map((region) => <option key={region} value={region}>{region}</option>)}
+              </select>
+            </label>
 
-            <select className="dark-input" value={filters.category} onChange={(event) => updateFilter('category', event.target.value)}>
-              <option value="all">All Categories</option>
-              {options.categories.map((category) => <option key={category} value={category}>{category}</option>)}
-            </select>
+            <label>
+              <span>Category</span>
+              <select value={filters.category} onChange={(event) => updateFilter('category', event.target.value)}>
+                <option value="all">All categories</option>
+                {options.categories.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </label>
 
-            <select className="dark-input" value={filters.source} onChange={(event) => updateFilter('source', event.target.value)}>
-              <option value="all">All Sources</option>
-              {options.sources.map((source) => <option key={source} value={source}>{source}</option>)}
-            </select>
+            <label>
+              <span>Source</span>
+              <select value={filters.source} onChange={(event) => updateFilter('source', event.target.value)}>
+                <option value="all">All sources</option>
+                {options.sources.map((source) => <option key={source} value={source}>{source}</option>)}
+              </select>
+            </label>
 
-            <select className="dark-input" value={filters.signal} onChange={(event) => updateFilter('signal', event.target.value)}>
-              <option value="all">All Signals</option>
-              <option value="high">High Signal</option>
-              <option value="clustered">Multi-source</option>
-              <option value="single">Single-source</option>
-              <option value="fresh">Fresh</option>
-            </select>
+            <label>
+              <span>Signal type</span>
+              <select value={filters.signal} onChange={(event) => updateFilter('signal', event.target.value)}>
+                <option value="all">Every signal</option>
+                <option value="high">High signal</option>
+                <option value="clustered">Multi-source</option>
+                <option value="single">Single-source</option>
+                <option value="fresh">Fresh</option>
+              </select>
+            </label>
 
-            <select className="dark-input" value={filters.image} onChange={(event) => updateFilter('image', event.target.value)}>
-              <option value="all">Any Image</option>
-              <option value="with">With Image</option>
-              <option value="without">No Image</option>
-            </select>
+            <label>
+              <span>Coverage</span>
+              <select value={filters.image} onChange={(event) => updateFilter('image', event.target.value)}>
+                <option value="all">Any image</option>
+                <option value="with">With image</option>
+                <option value="without">No image</option>
+              </select>
+            </label>
 
-            <select className="dark-input" value={filters.sort} onChange={(event) => updateFilter('sort', event.target.value)}>
-              <option value="date_desc">Newest First</option>
-              <option value="score_desc">Highest Score</option>
-              <option value="sources_desc">Most Sources</option>
-              <option value="title_asc">Title A-Z</option>
-            </select>
-          </div>
-        </section>
-      </form>
-
-      <section className="workflow-metric-row archive archive-search-metrics">
-        <div className="workflow-metric"><Icon name="layers" /><span>Loaded signals</span><strong>{loadedMetrics.total}</strong></div>
-        <div className="workflow-metric"><Icon name="filter" /><span>Visible now</span><strong>{visibleMetrics.total}</strong></div>
-        <div className="workflow-metric"><Icon name="trend" /><span>High signal</span><strong>{visibleMetrics.high}</strong></div>
-        <div className="workflow-metric"><Icon name="archive" /><span>Runs in range</span><strong>{runs.length}</strong></div>
-      </section>
-
-      {keywords.length > 0 && (
-        <section className="archive-keyword-ribbon">
-          <span>Top archive keywords</span>
-          <div>
-            {keywords.map((keyword) => (
-              <button
-                key={keyword}
-                className="source-chip"
-                onClick={() => updateFilter('text', keyword)}
-                type="button"
-              >
-                {keyword}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <ArchiveRunStrip runs={runs} activeRunLabel={activeRunLabel} onOpenRun={openRun} />
-
-      <section className="archive-results-panel">
-        <div className="archive-results-head">
-          <div>
-            <div className="eyebrow">Loaded Archive Results</div>
-            <h2>{activeRunLabel || `${from} to ${to}`}</h2>
-          </div>
-
-          <div className="archive-results-actions">
-            <button className="btn-dark-secondary" onClick={resetFilters} type="button">
-              Reset filters
-            </button>
-            <span>{filteredArticles.length} visible</span>
+            <label>
+              <span>Order</span>
+              <select value={filters.sort} onChange={(event) => updateFilter('sort', event.target.value)}>
+                <option value="date_desc">Newest first</option>
+                <option value="score_desc">Highest score</option>
+                <option value="sources_desc">Most sources</option>
+                <option value="title_asc">Title A–Z</option>
+              </select>
+            </label>
           </div>
         </div>
 
+        {keywords.length > 0 && (
+          <div className="archive-v2-keywords">
+            <span>Popular in this range</span>
+            <div>
+              {keywords.map((keyword) => (
+                <button
+                  key={keyword}
+                  className={filters.text === keyword ? 'is-active' : ''}
+                  onClick={() => updateFilter('text', filters.text === keyword ? '' : keyword)}
+                  type="button"
+                  aria-pressed={filters.text === keyword}
+                >
+                  {keyword}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </form>
+
+      <ArchiveRunStrip
+        runs={runs}
+        activeRunLabel={activeRunLabel}
+        disabled={loading}
+        onOpenRun={openRun}
+      />
+
+      <section className="archive-v2-results" aria-labelledby="archive-results-title" aria-busy={loading}>
+        <header className="archive-v2-results-head">
+          <div>
+            <span className="archive-v2-kicker"><Icon name="layers" size={14} /> Loaded intelligence</span>
+            <h2 id="archive-results-title">{activeRunLabel || 'Combined archive desk'}</h2>
+            <p aria-live="polite">
+              {filteredArticles.length} of {articles.length} signal{articles.length === 1 ? '' : 's'} visible
+              {checkedArticles.length ? ` · ${checkedArticles.length} selected` : ''}
+            </p>
+          </div>
+
+          <div className="archive-v2-bulk-actions" aria-label="Archive bulk actions">
+            <button
+              className="archive-v2-secondary-button"
+              disabled={!filteredArticles.length || loading}
+              onClick={toggleVisible}
+              type="button"
+            >
+              <Icon name="check" size={15} />
+              {allVisibleChecked ? 'Clear visible' : filteredArticles.length > 100 ? 'Select first 100' : 'Select visible'}
+            </button>
+            <button
+              className="archive-v2-secondary-button"
+              disabled={!checkedArticles.length || importing}
+              onClick={() => setDraftExportOpen(true)}
+              type="button"
+            >
+              <Icon name="download" size={15} /> Export selected
+            </button>
+            <button
+              className="archive-v2-primary-button"
+              disabled={!checkedArticles.length || importing}
+              onClick={() => importArticles(checkedArticles)}
+              type="button"
+            >
+              <Icon name="upload" size={15} />
+              {importing ? 'Importing…' : `Send to review${checkedArticles.length ? ` (${checkedArticles.length})` : ''}`}
+            </button>
+            {checkedArticles.length > 0 && (
+              <button className="archive-v2-clear-button" onClick={() => setCheckedKeys(new Set())} type="button" aria-label="Clear all selected archive signals">
+                <Icon name="x" size={15} />
+              </button>
+            )}
+          </div>
+        </header>
+
+        {notice && (
+          <div className="archive-v2-notice" role="status">
+            <Icon name="check2" size={18} />
+            <span>{notice}</span>
+            <button onClick={() => setNotice('')} type="button" aria-label="Dismiss archive notice"><Icon name="x" size={14} /></button>
+          </div>
+        )}
+
         {loading ? (
-          <div className="workflow-empty archive">
-            <Icon name="refresh" size={25} />
-            <h2>Loading archive workspace</h2>
+          <div className="archive-v2-skeleton-grid" role="status" aria-live="polite">
+            <span className="sr-only">Loading archive workspace</span>
+            {[0, 1, 2, 3].map((item) => <div className="archive-v2-skeleton" key={item}><span /><i /><i /><b /></div>)}
           </div>
         ) : err ? (
-          <div className="rounded-[24px] border border-red-300/20 bg-red-950/20 p-10 text-center">
-            <h2 className="text-xl font-semibold text-white">Failed to load archive</h2>
-            <p className="mt-2 text-red-200">{err}</p>
+          <div className="archive-v2-state is-error" role="alert">
+            <span><Icon name="warning" size={25} /></span>
+            <small>Archive unavailable</small>
+            <h2>We could not load this briefing memory.</h2>
+            <p>{err}</p>
+            <button className="archive-v2-primary-button" onClick={() => loadArchiveRange()} type="button">
+              <Icon name="refresh" size={15} /> Try again
+            </button>
           </div>
         ) : !searched || !articles.length ? (
-          <div className="workflow-empty archive">
-            <Icon name="archive" size={27} />
-            <h2>No archive signals loaded for this range.</h2>
-            <p>Try a broader date range or open a retained run from the timeline.</p>
+          <div className="archive-v2-state">
+            <span><Icon name="archive" size={27} /></span>
+            <small>No signals in scope</small>
+            <h2>This archive range is quiet.</h2>
+            <p>Expand the date range to search more retained briefings, or return to today&apos;s edition.</p>
+            <div>
+              <button className="archive-v2-primary-button" onClick={() => setPreset(30)} type="button">Explore 30 days</button>
+              <button className="archive-v2-secondary-button" onClick={() => setPreset(1)} type="button">Open today</button>
+            </div>
           </div>
         ) : !filteredArticles.length ? (
-          <div className="workflow-empty archive">
-            <Icon name="filter" size={27} />
-            <h2>No signals match the active filters.</h2>
-            <p>Reset filters or search a different keyword inside the loaded archive.</p>
+          <div className="archive-v2-state">
+            <span><Icon name="filter" size={27} /></span>
+            <small>No filter matches</small>
+            <h2>Nothing fits this exact lens.</h2>
+            <p>Your loaded archive is safe. Clear the filters to reveal all {articles.length} retained signals.</p>
+            <button className="archive-v2-primary-button" onClick={resetFilters} type="button">Clear all filters</button>
           </div>
         ) : (
-          <div className="archive-result-groups space-y-8">
+          <div className="archive-v2-groups">
             {Object.entries(articleGroups).map(([day, items]) => (
-              <div key={day} className="space-y-4">
-                <div className="workflow-day-head">
-                  <h2>{day}</h2>
-                  <span>{items.length} archived signal{items.length === 1 ? '' : 's'}</span>
+              <section className="archive-v2-day" key={day} aria-labelledby={`archive-day-${day.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`}>
+                <div className="archive-v2-day-head">
+                  <span>{String(items.length).padStart(2, '0')}</span>
+                  <h2 id={`archive-day-${day.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`}>{day}</h2>
+                  <i aria-hidden="true" />
+                  <small>{items.length} archived signal{items.length === 1 ? '' : 's'}</small>
                 </div>
-                <div className="article-grid grid gap-8 2xl:grid-cols-2">
-                  {items.map((item) => (
-                    <ArticleCard
-                      key={item.id}
+                <div className="archive-v2-story-grid">
+                  {items.map((item, index) => (
+                    <ArchiveStoryCard
+                      checked={checkedKeys.has(articleKey(item))}
+                      inWorkflow={workflowKeys.has(articleKey(item))}
+                      key={articleKey(item) || `${day}-${index}`}
                       item={item}
-                      variant={cardVariant(item)}
-                      onOpen={setOpenArticle}
+                      onCheck={(article, checked) => setCheckedKeys((current) => {
+                        const next = new Set(current);
+                        if (checked) next.add(articleKey(article)); else next.delete(articleKey(article));
+                        return next;
+                      })}
+                      onOpen={openArchiveArticle}
+                      onImport={(article) => importArticles([article])}
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             ))}
           </div>
         )}
@@ -447,7 +752,14 @@ export default function HistoryScreen() {
         item={openArticle}
         onClose={() => setOpenArticle(null)}
         onCorrectRegion={onCorrectRegion}
+        onSelect={(item) => importArticles([item])}
       />
-    </div>
+      <DraftExportModal
+        items={checkedArticles}
+        open={draftExportOpen}
+        source="archive"
+        onClose={() => setDraftExportOpen(false)}
+      />
+    </main>
   );
 }

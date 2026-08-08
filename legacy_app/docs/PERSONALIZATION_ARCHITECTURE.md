@@ -1,7 +1,10 @@
 # NewsScrapper Personalization Architecture
 
-This document is a design proposal only. It deliberately does not activate
-personalized ranking yet.
+This document describes the personalization layer now active in the legacy
+application.  The implementation lives in `news_scrapper/personalization.py`,
+is applied by `/latest-briefing`, and persists private events in
+`news_scrapper/runtime/viewer_personalization.json` (or the configured runtime
+directory).
 
 ## Product rule
 
@@ -20,7 +23,7 @@ Personalization should change ordering, not editorial truth:
 Use the existing keyed IP hash as the stable viewer identifier:
 
 ```text
-viewer_key = HMAC-style keyed hash(IP_HASH_SECRET, normalized client IP)
+viewer_key = SHA-256(IP_HASH_SECRET + normalized client IP)
 ```
 
 The display name is editable metadata attached to that key. Renaming a user
@@ -39,18 +42,17 @@ versa.
 
 Use explicit actions more strongly than inferred behavior.
 
-| User action | Suggested weight | Meaning |
+| User action | Active weight | Meaning |
 |---|---:|---|
-| Follow topic/story | +8 | Strong, durable explicit preference |
 | Save for later | +6 | Strong explicit interest |
 | Mark Interested | +5 | Explicit relevance preference |
 | Select for review | +4 | Operationally valuable |
-| Export | +4 | Strong downstream usefulness |
-| Open dossier | +1 | Weak interest |
-| Read for 30–90 seconds | +1 to +3 | Increasing engagement |
-| Repeatedly open related stories | +2 | Recurring inferred interest |
+| Import archive signal | +4 | Operationally valuable |
+| Open private briefing | +2.5 | Moderate inferred interest |
+| Open dossier | +2 | Weak inferred interest |
+| Open article | +1.25 | Weak inferred interest |
 | Hide | -4 | Private negative preference |
-| Mark Not Interested | -7 | Explicit negative preference and separate Bouncer vote |
+| Mark Not Interested | -6 | Explicit negative preference and separate Bouncer vote |
 
 Do not treat a single click as a strong preference. Accidental clicks and
 shared workstations are realistic edge cases.
@@ -91,23 +93,26 @@ Maintain a compact per-user interest profile:
 }
 ```
 
-Apply time decay so old behavior does not permanently define a user. A
-reasonable starting point is a 30-day half-life for inferred signals and a
-90-day half-life for explicit follows.
+The current implementation applies linear time decay and a hard 30-day event
+window. Saved article snapshots remain available until the user removes them,
+but they influence related-story tagging and rank for 30 days from `saved_at`.
 
 ## Ranking
 
 Do not generate a completely separate physical feed file per user. Keep one
 profile briefing and calculate a deterministic user score when returning it.
 
-Suggested initial score:
+Current ranking combines the stored editorial signal, source coverage, a
+strictly capped user affinity adjustment, freshness, and a capped related
+saved-story boost. It never filters an item from the shared briefing.
 
 ```text
 final_score =
-    0.50 * editorial_importance
-  + 0.20 * source_coverage
-  + 0.20 * user_topic_similarity
-  + 0.10 * freshness
+    0.65 * editorial_signal
+  + 3.00 * capped_source_coverage
+  + capped_user_affinity (-18 to +18)
+  + freshness_bonus
+  + capped_saved_story_boost (0 to +30)
 ```
 
 Add small source and intent affinity adjustments, with a strict cap so a user
@@ -135,7 +140,7 @@ Use a hybrid carousel to avoid a filter bubble:
 - up to two personalized stories;
 - no duplicate clusters.
 
-### Technology Signal Pulse
+### Technology Signal Pulse (future explicit-topic controls)
 
 Show globally trending keywords, then visually identify topics the viewer
 follows. Clicking a topic can offer:
@@ -146,19 +151,15 @@ follows. Clicking a topic can offer:
 
 ### Latest Day Signal
 
-Reorder cards using `final_score`, but retain controls for:
-
-- Recommended;
-- Most important;
-- Most recent;
-- Most sources.
+Cards for the latest day use the personalized score while keeping every
+available story accessible through the loaded briefing and filters.
 
 ### Saved & Following
 
-Add a private navigation page with two sections:
+The private desk contains two sections:
 
 - Saved for later: the exact articles the viewer saved;
-- Following: topics or story clusters that should surface future related news.
+- feed learning from recent reading and saved story relationships.
 
 A saved article must remain available beyond the normal 30-day briefing
 retention window. Store a compact immutable snapshot plus its source links.
@@ -166,26 +167,30 @@ retention window. Store a compact immutable snapshot plus its source links.
 When a new article matches a followed item, show:
 
 ```text
-Update to a story you follow
+Update to a story you saved
 ```
 
 This tag should be user-specific and must not appear for everyone.
 
-## Proposed JSON files for phase one
+## JSON state for the current pilot
 
 For the current single-worker portable server:
 
 ```text
-news_scrapper\runtime\personalization\
-├── viewer_interests.json
-├── viewer_saved_articles.json
-├── viewer_followed_topics.json
-└── viewer_events.json
+news_scrapper\runtime\
+├── viewer_personalization.json
+├── viewer_saved_store.json
+├── viewer_profiles.json
+└── usage_tracker.json
 ```
 
-All writes must use `JsonStore` atomic replacement and process-level locks.
+Personalization writes use `JsonStore` atomic replacement and process-level
+locks. The older saved/profile/tracker stores keep their existing locked,
+temporary-file replacement paths so this feature does not create a second
+source of truth for those records.
 Keep event history bounded to 30 days, but do not delete saved article
-snapshots or explicit follows.
+snapshots. Every record is isolated by the keyed viewer identity and active
+Default/Broadcast profile.
 
 ## Scale boundary
 
@@ -193,15 +198,13 @@ JSON is acceptable for the current internal pilot, but personalized ranking
 adds frequent writes. Before running multiple Uvicorn workers or serving a
 substantially larger audience, move these stores to a transactional database.
 
-## Rollout sequence
+## User controls and explainability
 
-1. Add private Save for Later and Follow actions.
-2. Record normalized per-user events without changing ranking.
-3. Show a private Saved & Following page.
-4. Calculate ranking scores in shadow mode and compare them with current order.
-5. Add explainability reasons.
-6. Enable personalized ordering for Latest Day Signal.
-7. Enable the hybrid hero carousel.
-8. Measure satisfaction and allow users to reset personalization.
-
-This order makes the behavior observable before it changes anyone's feed.
+- `/viewer/personalization` reports active event count and top non-title
+  interests for the current viewer/profile.
+- `/viewer/personalization/reset` clears recent viewing preferences while
+  preserving Saved Signals.
+- personalized articles carry `personal_rank_score` plus a `personalization`
+  object containing reasons and saved-story match metadata.
+- the UI shows a short-lived “Personalized for …” notice and marks related
+  stories as “Update to a story you saved”.

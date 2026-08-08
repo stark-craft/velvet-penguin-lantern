@@ -10,6 +10,7 @@ import {
   GitCompareArrows,
   GitFork,
   Home,
+  Languages,
   Network,
   Newspaper,
   Radar,
@@ -20,6 +21,7 @@ import {
   Star,
   X,
 } from "lucide-react";
+import { useLanguage } from "../news-scrapper/translation/LanguageProvider.jsx";
 import {
   compareVentureSignals,
   getPaperDossier,
@@ -136,6 +138,7 @@ function RelationshipGraph({ graph, onOpen }) {
 export default function VentureLensApp() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { language, toggleLanguage, translationState } = useLanguage();
   const page = currentPage(location.pathname);
   const [payload, setPayload] = useState(null);
   const [intelligence, setIntelligence] = useState(null);
@@ -200,7 +203,7 @@ export default function VentureLensApp() {
   return (
     <div className="venture-lens">
       <div className="vl-orb vl-orb-one" aria-hidden="true" /><div className="vl-orb vl-orb-two" aria-hidden="true" />
-      <header className="vl-topbar"><button className="vl-brand" onClick={() => navigate("/venturelens")} type="button"><span className="vl-brand-mark"><i /><i /><i /></span><span><strong>Venture Lens</strong><small>Sense.AI intelligence</small></span></button><nav aria-label="Venture Lens pages">{pages.map(([id, label, Icon]) => <button className={page === id ? "active" : ""} key={id} onClick={() => navigate(routeFor(id))} type="button"><Icon aria-hidden="true" size={14} /><span>{label}</span></button>)}</nav><div className="vl-top-actions"><a href="/home">NewsScrapper</a><div className="vl-notification-wrap"><button aria-label="Open notifications" className="vl-notification-trigger" onClick={() => setNotificationsOpen((value) => !value)} type="button"><Bell size={17} />{unreadCount > 0 && <b>{unreadCount}</b>}</button>{notificationsOpen && <div className="vl-notification-panel"><header><div><span>Personal watch</span><strong>Notifications</strong></div><button onClick={readNotifications} type="button">Mark read</button></header>{(intelligence?.notifications || []).length ? intelligence.notifications.map((item) => <article className={item.read ? "" : "unread"} key={item.id}><span>{item.kind}</span><strong>{item.title}</strong><p>{item.message}</p></article>) : <p className="vl-notification-empty">Watch a technology, repository or paper to begin monitoring it.</p>}</div>}</div><button disabled={syncing} onClick={handleRefresh} type="button"><RefreshCw className={syncing ? "spinning" : ""} size={15} />{syncing ? "Syncing" : "Sync live"}</button></div></header>
+      <header className="vl-topbar"><button className="vl-brand" onClick={() => navigate("/venturelens")} type="button"><span className="vl-brand-mark"><i /><i /><i /></span><span><strong>Venture Lens</strong><small>Sense.AI intelligence</small></span></button><nav aria-label="Venture Lens pages">{pages.map(([id, label, Icon]) => <button className={page === id ? "active" : ""} key={id} onClick={() => navigate(routeFor(id))} type="button"><Icon aria-hidden="true" size={14} /><span>{label}</span></button>)}</nav><div className="vl-top-actions"><a href="/home">NewsScrapper</a><button aria-busy={translationState.pending > 0} aria-label={language === "ko" ? "Switch to English" : "한국어로 전환"} className="vl-language-toggle" data-no-translate onClick={toggleLanguage} title={translationState.error || (language === "ko" ? "Switch to English" : "한국어로 전환")} type="button"><Languages aria-hidden="true" size={15} /><span>{translationState.pending > 0 ? (language === "ko" ? "번역 중" : "Translating") : language === "ko" ? "English" : "한국어"}</span></button><div className="vl-notification-wrap"><button aria-label="Open notifications" className="vl-notification-trigger" onClick={() => setNotificationsOpen((value) => !value)} type="button"><Bell size={17} />{unreadCount > 0 && <b>{unreadCount}</b>}</button>{notificationsOpen && <div className="vl-notification-panel"><header><div><span>Personal watch</span><strong>Notifications</strong></div><button onClick={readNotifications} type="button">Mark read</button></header>{(intelligence?.notifications || []).length ? intelligence.notifications.map((item) => <article className={item.read ? "" : "unread"} key={item.id}><span>{item.kind}</span><strong>{item.title}</strong><p>{item.message}</p></article>) : <p className="vl-notification-empty">Watch a technology, repository or paper to begin monitoring it.</p>}</div>}</div><button disabled={syncing} onClick={handleRefresh} type="button"><RefreshCw className={syncing ? "spinning" : ""} size={15} />{syncing ? "Syncing" : "Sync live"}</button></div></header>
 
       <main className={`vl-page vl-page-${page}`}>
         {error && <div className="vl-notice" role="status"><strong>Venture Lens needs your attention.</strong><span>{error}</span><button aria-label="Dismiss message" onClick={() => setError("")} type="button"><X size={15} /></button></div>}

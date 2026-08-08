@@ -5,17 +5,21 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import {
   createViewerBriefings,
+  clearViewerBriefings,
+  getViewerPersonalization,
   getViewerBriefings,
   getViewerSaved,
   removeSavedArticle,
   retryViewerBriefing,
+  resetViewerPersonalization,
   saveArticleForLater,
   selectWorkflow,
 } from '../api.js';
 import { normalizeArticle, normalizeList } from '../utils/normalize.js';
 import { articleKey } from '../utils/intelligence.js';
-import { trackAction } from '../utils/tracking.js';
+import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import '../styles/personal-desk.css';
+import '../styles/personal-desk-redesign.css';
 
 const terminalStatuses = new Set(['complete', 'failed']);
 
@@ -83,6 +87,8 @@ export default function SavedScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState(new Set());
+  const [clearing, setClearing] = useState(false);
+  const [personalization, setPersonalization] = useState(null);
 
   const briefingItems = useMemo(
     () => jobs
@@ -96,17 +102,25 @@ export default function SavedScreen() {
     [savedItems],
   );
   const activeJobs = jobs.some((job) => !terminalStatuses.has(job.status));
+  const activeJobCount = jobs.filter((job) => !terminalStatuses.has(job.status)).length;
+  const finishedJobs = jobs.filter((job) => terminalStatuses.has(job.status)).length;
   const exportItems = briefingItems.filter((item) => selectedKeys.has(articleKey(item)));
+  const enteredUrlCount = useMemo(
+    () => urlText.split(/[\s,]+/).filter((value) => /^https?:\/\//i.test(value)).length,
+    [urlText],
+  );
 
   const loadAll = async ({ quiet = false } = {}) => {
     if (!quiet) setLoading(true);
     try {
-      const [savedResponse, briefingResponse] = await Promise.all([
+      const [savedResponse, briefingResponse, personalizationResponse] = await Promise.all([
         getViewerSaved(),
         getViewerBriefings(),
+        getViewerPersonalization().catch(() => null),
       ]);
       setSavedItems(normalizeList(savedResponse?.items || []));
       setJobs(Array.isArray(briefingResponse?.jobs) ? briefingResponse.jobs : []);
+      if (personalizationResponse) setPersonalization(personalizationResponse);
       setError('');
     } catch (requestError) {
       setError(requestError?.message || 'Could not load your personal desk.');
@@ -179,8 +193,40 @@ export default function SavedScreen() {
     await loadAll({ quiet: true });
   };
   const openBriefing = (item) => {
-    trackAction('personal_briefing_open', item?.title || item?.url || 'private briefing');
+    trackAction('personal_briefing_open', articleActivityDetail(item, 'my_briefing'));
     setOpenArticle(item);
+  };
+  const openSaved = (item) => {
+    trackAction('dossier_open', articleActivityDetail(item, 'saved_signals'));
+    setOpenArticle(item);
+  };
+  const clearFinished = async () => {
+    if (!finishedJobs || clearing) return;
+    const confirmed = window.confirm(
+      `Clear ${finishedJobs} finished private briefing record${finishedJobs === 1 ? '' : 's'}? Active jobs will stay running.`,
+    );
+    if (!confirmed) return;
+    setClearing(true);
+    setError('');
+    try {
+      const response = await clearViewerBriefings('finished');
+      setNotice(`${response?.removed || 0} finished record${response?.removed === 1 ? '' : 's'} cleared. Active work was preserved.`);
+      setSelectedKeys(new Set());
+      await loadAll({ quiet: true });
+    } catch (requestError) {
+      setError(requestError?.message || 'Could not clear finished briefing records.');
+    } finally {
+      setClearing(false);
+    }
+  };
+  const resetLearning = async () => {
+    const confirmed = window.confirm(
+      'Reset your recent viewing preferences for this profile? Saved Signals will stay saved.',
+    );
+    if (!confirmed) return;
+    const response = await resetViewerPersonalization();
+    setPersonalization((current) => ({ ...(current || {}), active: false, event_count: 0, top_interests: [] }));
+    setNotice(`${response?.removed_events || 0} recent preference event${response?.removed_events === 1 ? '' : 's'} cleared. Saved Signals were preserved.`);
   };
   const openExport = () => {
     trackAction('personal_briefing_export', `${exportItems.length} private briefing item(s)`);
@@ -190,18 +236,33 @@ export default function SavedScreen() {
   return (
     <div className="page-stack personal-desk">
       <section className="page-hero personal-desk-hero">
-        <div>
-          <div className="eyebrow">Private intelligence workspace</div>
-          <h1>Your desk, shaped by you.</h1>
-          <p>Save signals from the shared feed or turn article links into a private, AI-structured briefing.</p>
+        <div className="personal-desk-hero-copy">
+          <div className="personal-desk-orbit" aria-hidden="true"><Icon name="sparkle" size={22} /></div>
+          <div>
+            <div className="eyebrow">Private intelligence workspace</div>
+            <h1>Your desk, shaped by you.</h1>
+            <p>Bring your own links, preserve the signals worth returning to, and move only your strongest intelligence into the shared workflow.</p>
+            <div className="personal-desk-trust-row">
+              <span><Icon name="shield" size={13} /> Private by default</span>
+              <span><Icon name="sparkle" size={13} /> AI structured</span>
+              <span><Icon name="check" size={13} /> Shared only by you</span>
+            </div>
+          </div>
         </div>
-        <div className="personal-desk-tabs" role="tablist" aria-label="Personal desk sections">
-          <button className={tab === 'briefings' ? 'active' : ''} onClick={() => setTab('briefings')} type="button">
-            <Icon name="sparkle" size={15} /> My Briefing <span>{briefingItems.length}</span>
-          </button>
-          <button className={tab === 'saved' ? 'active' : ''} onClick={() => setTab('saved')} type="button">
-            <Icon name="bookmark" size={15} /> Saved Signals <span>{savedItems.length}</span>
-          </button>
+        <div className="personal-desk-control-deck">
+          <div className="personal-desk-snapshot" aria-label="Personal desk summary">
+            <span><strong>{briefingItems.length}</strong><small>briefings</small></span>
+            <span><strong>{savedItems.length}</strong><small>saved</small></span>
+            <span><strong>{activeJobCount}</strong><small>preparing</small></span>
+          </div>
+          <div className="personal-desk-tabs" role="tablist" aria-label="Personal desk sections">
+            <button aria-selected={tab === 'briefings'} className={tab === 'briefings' ? 'active' : ''} onClick={() => setTab('briefings')} role="tab" type="button">
+              <Icon name="sparkle" size={15} /> My Briefing <span>{briefingItems.length}</span>
+            </button>
+            <button aria-selected={tab === 'saved'} className={tab === 'saved' ? 'active' : ''} onClick={() => setTab('saved')} role="tab" type="button">
+              <Icon name="bookmark" size={15} /> Saved Signals <span>{savedItems.length}</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -212,11 +273,20 @@ export default function SavedScreen() {
         <>
           <section className="personal-url-studio">
             <div className="personal-url-copy">
-              <span className="eyebrow">Bring your own intelligence</span>
-              <h2>Drop the links. We’ll shape the briefing.</h2>
-              <p>Paste up to 20 news article URLs, separated by spaces, commas, or new lines. These remain private until you select one for review.</p>
+              <span className="eyebrow">Private link studio</span>
+              <h2>Drop the links.<br />We’ll shape the briefing.</h2>
+              <p>Paste up to 20 news article URLs. Leave this page whenever you like—the preparation continues quietly in the background.</p>
+              <div className="personal-studio-steps" aria-label="Briefing process">
+                <span><b>01</b><small>Validate each article</small></span>
+                <span><b>02</b><small>Extract and structure</small></span>
+                <span><b>03</b><small>Return a private dossier</small></span>
+              </div>
             </div>
-            <form onSubmit={submitUrls}>
+            <form className="personal-url-composer" onSubmit={submitUrls}>
+              <div className="personal-composer-head">
+                <span>Article URLs</span>
+                <span>{enteredUrlCount}/20 detected</span>
+              </div>
               <textarea
                 aria-label="News article URLs"
                 onChange={(event) => setUrlText(event.target.value)}
@@ -233,10 +303,13 @@ export default function SavedScreen() {
           </section>
 
           {!!jobs.length && (
-            <section>
+            <section className="personal-workstream personal-live-workstream">
               <div className="personal-section-head">
                 <div><span className="eyebrow">Live preparation</span><h2>Link studio</h2></div>
-                <button className="btn-dark-secondary" onClick={() => loadAll()} type="button"><Icon name="refresh" size={14} /> Refresh</button>
+                <div className="personal-section-actions">
+                  <button className="btn-dark-secondary" disabled={!finishedJobs || clearing} onClick={clearFinished} type="button"><Icon name="trash" size={14} /> {clearing ? 'Clearing…' : `Clear finished (${finishedJobs})`}</button>
+                  <button className="btn-dark-secondary" onClick={() => loadAll()} type="button"><Icon name="refresh" size={14} /> Refresh</button>
+                </div>
               </div>
               <div className="personal-job-grid">
                 {jobs.map((job, index) => (
@@ -247,14 +320,14 @@ export default function SavedScreen() {
           )}
 
           {!!briefingItems.length && (
-            <section>
+            <section className="personal-workstream personal-ready-workstream">
               <div className="personal-section-head">
                 <div><span className="eyebrow">Prepared for you</span><h2>Private briefing cards</h2></div>
                 <button className="btn-dark-secondary" disabled={!exportItems.length} onClick={openExport} type="button">
                   <Icon name="download" size={14} /> Export checked ({exportItems.length})
                 </button>
               </div>
-              <div className="home-article-grid grid gap-8">
+              <div className="home-article-grid personal-card-grid grid gap-8">
                 {briefingItems.map((item) => (
                   <ArticleCard
                     checked={selectedKeys.has(articleKey(item))}
@@ -285,18 +358,30 @@ export default function SavedScreen() {
       ) : loading ? (
         <div className="workflow-empty"><Icon name="refresh" size={24} /><h2>Loading Saved Signals</h2></div>
       ) : savedItems.length === 0 ? (
-        <div className="workflow-empty"><Icon name="bookmark" size={26} /><h2>Nothing saved yet</h2><p>Use Save on a shared or private briefing card.</p></div>
+        <>
+          <div className="personal-learning-strip">
+            <div><Icon name="sparkle" size={16} /><span><strong>Private preference learning</strong><small>{personalization?.event_count || 0} recent interaction signals · 30-day window</small></span></div>
+            <button className="btn-dark-secondary" disabled={!personalization?.event_count} onClick={resetLearning} type="button">Reset viewing preferences</button>
+          </div>
+          <div className="workflow-empty"><Icon name="bookmark" size={26} /><h2>Nothing saved yet</h2><p>Use Save on a shared or private briefing card.</p></div>
+        </>
       ) : (
-        <div className="home-article-grid grid gap-8">
-          {savedItems.map((item) => (
-            <div key={articleKey(item)} className="flex min-h-0 flex-col gap-2">
-              <ArticleCard item={item} onOpen={setOpenArticle} />
-              <button className="btn-dark-secondary w-full justify-center" onClick={() => remove(item)} type="button">
-                <Icon name="trash" size={14} /> Remove from Saved Signals
-              </button>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="personal-learning-strip">
+            <div><Icon name="sparkle" size={16} /><span><strong>Saved stories guide your feed for 30 days</strong><small>Related updates receive a private “Update to a story you saved” tag.</small></span></div>
+            <button className="btn-dark-secondary" disabled={!personalization?.event_count} onClick={resetLearning} type="button">Reset viewing preferences</button>
+          </div>
+          <div className="home-article-grid personal-card-grid grid gap-8">
+            {savedItems.map((item) => (
+              <div key={articleKey(item)} className="flex min-h-0 flex-col gap-2">
+                <ArticleCard item={item} onOpen={openSaved} />
+                <button className="btn-dark-secondary w-full justify-center" onClick={() => remove(item)} type="button">
+                  <Icon name="trash" size={14} /> Remove from Saved Signals
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       <ArticleModal

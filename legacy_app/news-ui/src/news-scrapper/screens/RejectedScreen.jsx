@@ -11,12 +11,14 @@ export default function RejectedScreen() {
   const [items, setItems] = useState([]);
   const [loading, setLoad] = useState(true);
   const [openArticle, setOpen] = useState(null);
+  const [error, setError] = useState('');
 
   const refresh = () => {
     setLoad(true);
+    setError('');
     getViewerHidden()
       .then((d) => setItems(normalizeList(d?.items || d || [])))
-      .catch(() => {})
+      .catch((err) => setError(err?.message || 'Could not load your hidden signals.'))
       .finally(() => setLoad(false));
   };
 
@@ -25,9 +27,14 @@ export default function RejectedScreen() {
   const groups = useMemo(() => groupedByDate(items), [items]);
 
   const onRestore = async (item) => {
-    setItems((arr) => arr.filter((x) => x.title !== item.title));
-    trackAction('restore_personal_hidden', item.title?.slice(0, 60));
-    try { await restoreArticleForViewer(item); } catch {}
+    setError('');
+    try {
+      await restoreArticleForViewer(item);
+      setItems((arr) => arr.filter((x) => x.title !== item.title));
+      trackAction('restore_personal_hidden', item.title?.slice(0, 60));
+    } catch (err) {
+      setError(err?.message || 'Could not restore this signal.');
+    }
   };
 
   const onCorrectRegion = async (item, correction) => {
@@ -39,8 +46,8 @@ export default function RejectedScreen() {
   };
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
+    <div className="hidden-page space-y-6">
+      <section className="workspace-hero hidden-hero rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Hidden Signals</div>
@@ -51,12 +58,14 @@ export default function RejectedScreen() {
         </div>
       </section>
 
+      {error && <div className="error-banner" role="alert">{error}</div>}
+
       {loading ? (
-        <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
+        <div className="workspace-empty rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
           <h2 className="text-xl font-semibold text-white">Loading Hidden Signals</h2>
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
+        <div className="workspace-empty rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
           <h2 className="text-xl font-semibold text-white">No hidden signals right now</h2>
           <p className="mt-2 text-slate-400">Use Hide on any signal to clear it from your own feed without affecting anyone else.</p>
         </div>
@@ -69,9 +78,9 @@ export default function RejectedScreen() {
                 <div className="h-px flex-1 bg-white/10" />
                 <span className="text-sm text-slate-500">{group.length} hidden</span>
               </div>
-              <div className="article-grid grid gap-8 2xl:grid-cols-2">
+              <div className="article-grid hidden-grid grid gap-8 lg:grid-cols-2">
                 {group.map((item) => (
-                  <div key={item.id} className="rounded-[22px] border border-white/10 bg-[#101827]/70 p-3 opacity-95 shadow-cockpit">
+                  <div key={item.id} className="hidden-signal-card rounded-[22px] border border-white/10 bg-[#101827]/70 p-3 opacity-95 shadow-cockpit">
                     <div className="mb-4 flex flex-wrap items-center gap-2">
                       <span className="signal-chip selected">Hidden only for you</span>
                       <span className="signal-chip">Bouncer not trained</span>
@@ -81,7 +90,7 @@ export default function RejectedScreen() {
                       <button className="btn-dark-primary h-9" onClick={() => onRestore(item)} type="button">
                         <Icon name="rotate" /> Restore Signal
                       </button>
-                      <button className="btn-dark-secondary h-9" type="button">Keep Hidden</button>
+                      <span className="hidden-state-label"><Icon name="eye" size={14} /> Remains hidden</span>
                       <button className="btn-dark-secondary h-9" onClick={() => setOpen(item)} type="button">Open Dossier</button>
                     </div>
                   </div>

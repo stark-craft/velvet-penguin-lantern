@@ -4,7 +4,7 @@ import WorkflowBriefingCard from '../components/WorkflowBriefingCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import { correctRegion, exportExcel, exportPpt, exportWord, getWorkflow, removeWorkflow } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
-import { trackAction } from '../utils/tracking.js';
+import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { scoreOf } from '../utils/intelligence.js';
 
 function topValue(items, getter) {
@@ -21,12 +21,14 @@ export default function ApprovedScreen() {
   const [loading, setLoad] = useState(true);
   const [openArticle, setOpen] = useState(null);
   const [lens, setLens] = useState('All');
+  const [error, setError] = useState('');
 
   const refresh = () => {
     setLoad(true);
+    setError('');
     getWorkflow()
       .then((w) => setItems(normalizeList(w?.approved || [])))
-      .catch(() => {})
+      .catch((err) => setError(err?.message || 'Could not load the Approved Briefing.'))
       .finally(() => setLoad(false));
   };
 
@@ -42,9 +44,18 @@ export default function ApprovedScreen() {
     return true;
   }), [items, lens]);
   const onRemove = async (item) => {
-    setItems((arr) => arr.filter((x) => x.title !== item.title));
-    trackAction('remove_approved', item.title?.slice(0, 60));
-    try { await removeWorkflow(item.title, 'approved'); } catch {}
+    setError('');
+    try {
+      await removeWorkflow(item.title, 'approved');
+      setItems((arr) => arr.filter((x) => x.title !== item.title));
+      trackAction('remove_approved', item.title?.slice(0, 60));
+    } catch (err) {
+      setError(err?.message || 'Could not remove this approval.');
+    }
+  };
+  const openDossier = (item) => {
+    trackAction('dossier_open', articleActivityDetail(item, 'approved_briefing'));
+    setOpen(item);
   };
 
   const onCorrectRegion = async (item, correction) => {
@@ -56,13 +67,13 @@ export default function ApprovedScreen() {
   };
 
   const doExport = async (kind) => {
-    if (!items.length) return;
+    if (!visibleItems.length) return;
     trackAction('export', kind);
     const stamp = new Date().toISOString().slice(0, 10);
     try {
-      if (kind === 'ppt') await exportPpt(items, `approved_briefing_${stamp}.pptx`);
-      if (kind === 'word') await exportWord(items, `approved_briefing_${stamp}.docx`);
-      if (kind === 'excel') await exportExcel(items, `approved_briefing_${stamp}.xlsx`);
+      if (kind === 'ppt') await exportPpt(visibleItems, `approved_briefing_${stamp}.pptx`);
+      if (kind === 'word') await exportWord(visibleItems, `approved_briefing_${stamp}.docx`);
+      if (kind === 'excel') await exportExcel(visibleItems, `approved_briefing_${stamp}.xlsx`);
     } catch (e) {
       alert('Export failed: ' + (e.message || e));
     }
@@ -94,6 +105,8 @@ export default function ApprovedScreen() {
         </aside>
       </section>
 
+      {error && <div className="error-banner" role="alert">{error}</div>}
+
       <section className="workflow-metric-row approved">
         <div className="workflow-metric"><Icon name="check2" /><span>Total approved</span><strong>{items.length}</strong></div>
         <div className="workflow-metric"><Icon name="download" /><span>Export ready</span><strong>{items.length}</strong></div>
@@ -106,13 +119,13 @@ export default function ApprovedScreen() {
         <div>
           <div className="eyebrow">Export Briefing</div>
           <h2>Choose a final delivery format</h2>
-          <p>All generated files use the approved set currently shown in this briefing.</p>
+          <p>Generated files use the {visibleItems.length} approved signal{visibleItems.length === 1 ? '' : 's'} currently visible through this lens.</p>
         </div>
         <div className="export-action-grid">
-          <button className="export-format" onClick={() => doExport('ppt')} disabled={!items.length} type="button"><Icon name="download" /><strong>PowerPoint</strong><small>Presentation deck</small></button>
-          <button className="export-format" onClick={exportPdf} disabled={!items.length} type="button"><Icon name="download" /><strong>PDF</strong><small>Print-ready file</small></button>
-          <button className="export-format" onClick={() => doExport('word')} disabled={!items.length} type="button"><Icon name="download" /><strong>Word</strong><small>Editorial brief</small></button>
-          <button className="export-format primary" onClick={() => doExport('excel')} disabled={!items.length} type="button"><Icon name="download" /><strong>Excel</strong><small>Signal register</small></button>
+          <button className="export-format" onClick={() => doExport('ppt')} disabled={!visibleItems.length} type="button"><Icon name="download" /><strong>PowerPoint</strong><small>Presentation deck</small></button>
+          <button className="export-format" onClick={exportPdf} disabled={!visibleItems.length} type="button"><Icon name="download" /><strong>PDF</strong><small>Print-ready file</small></button>
+          <button className="export-format" onClick={() => doExport('word')} disabled={!visibleItems.length} type="button"><Icon name="download" /><strong>Word</strong><small>Editorial brief</small></button>
+          <button className="export-format primary" onClick={() => doExport('excel')} disabled={!visibleItems.length} type="button"><Icon name="download" /><strong>Excel</strong><small>Signal register</small></button>
         </div>
       </section>
 
@@ -152,7 +165,7 @@ export default function ApprovedScreen() {
               key={item.id}
               item={{ ...item, approved_at: item.approved_at || 'Approved' }}
               mode="approved"
-              onOpen={setOpen}
+              onOpen={openDossier}
               onRemove={onRemove}
             />
           ))}
