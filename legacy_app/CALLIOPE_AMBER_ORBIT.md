@@ -666,6 +666,11 @@ choice is saved in that browser, not globally, so another user remains in
 English. The initial Korean request can take longer while the model loads;
 later translations reuse the in-process cache.
 
+For exact click-by-click browser downloads, portable-Python commands, the
+required file list, `.env` configuration, endpoint validation, and
+troubleshooting, follow the dedicated guide:
+[SUPERNOVA_ORCHID_ATLAS.md](./SUPERNOVA_ORCHID_ATLAS.md).
+
 ## 7. Prepare embedded Python
 
 If a working `python_embed` was already created for this application, preserve
