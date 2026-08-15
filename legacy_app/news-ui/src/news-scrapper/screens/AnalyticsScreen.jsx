@@ -1,10 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import { getAnalytics, getAnalyticsAccess } from '../api.js';
+import { getAnalytics, getAnalyticsAccess, getRecommendationAnalytics, getViewerProfile } from '../api.js';
 
 function isLocalDevHost() {
   if (typeof window === 'undefined') return false;
   return ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+}
+
+function resolvedViewerName(accessResult, viewerResult) {
+  const accessOwner = String(accessResult?.owner || '').trim();
+  if (accessOwner && accessOwner.toLowerCase() !== 'unknown') return accessOwner;
+  const backendName = String(viewerResult?.display_name || viewerResult?.name || '').trim();
+  if (backendName) return backendName;
+  try {
+    const browserName = String(localStorage.getItem('news-viewer-name') || localStorage.getItem('initiator-name') || '').trim();
+    if (browserName) return browserName;
+  } catch {
+    // Storage can be unavailable in hardened browser modes.
+  }
+  return 'Current viewer';
 }
 
 function StatTile({ label, value, tone = 'sky' }) {
@@ -70,33 +84,36 @@ export default function AnalyticsScreen() {
   const [access, setAccess] = useState(null);
   const [key, setKey] = useState('');
   const [data, setData] = useState(null);
+  const [recommendationData, setRecommendationData] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [accessError, setAccessError] = useState('');
+  const [recommendationWarning, setRecommendationWarning] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-
-    getAnalyticsAccess()
-      .then((result) => {
-        if (!cancelled) setAccess({
+  const checkAccess = async () => {
+    setAccess(null);
+    setAccessError('');
+    const viewerPromise = getViewerProfile().catch(() => null);
+    try {
+      const result = await getAnalyticsAccess();
+      const viewerResult = await viewerPromise;
+      setAccess({
           ...result,
+          owner: resolvedViewerName(result, viewerResult),
           allowed: Boolean(result?.allowed) || isLocalDevHost(),
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAccess({
-            allowed: isLocalDevHost(),
-            ip: window.location.hostname || 'unknown',
-            owner: isLocalDevHost() ? 'Local Dev' : 'Unknown',
-          });
-        }
       });
+    } catch (err) {
+      const viewerResult = await viewerPromise;
+      setAccessError(err?.message || 'Could not verify analytics network access.');
+      setAccess({
+        allowed: isLocalDevHost(),
+        ip: window.location.hostname || 'unknown',
+        owner: resolvedViewerName(null, viewerResult),
+      });
+    }
+  };
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  useEffect(() => { checkAccess(); }, []);
 
   const totals = useMemo(() => {
     const devices = data?.devices || [];
@@ -119,11 +136,22 @@ export default function AnalyticsScreen() {
     setError('');
 
     try {
-      const result = await getAnalytics(key.trim());
+      const [result, recommendationResult] = await Promise.all([
+        getAnalytics(key.trim()),
+        getRecommendationAnalytics(key.trim()).catch((recommendationError) => ({
+          _loadError: recommendationError?.message || 'Recommendation quality metrics are unavailable.',
+        })),
+      ]);
       setData(result);
+      if (recommendationResult?._loadError) {
+        setRecommendationData(null);
+        setRecommendationWarning(recommendationResult._loadError);
+      } else {
+        setRecommendationData(recommendationResult);
+        setRecommendationWarning('');
+      }
     } catch (err) {
-      setError('Analytics access failed. Check your network and key.');
-      setData(null);
+      setError(err?.message || 'Analytics access failed. Check your network and key.');
     } finally {
       setBusy(false);
     }
@@ -149,13 +177,15 @@ export default function AnalyticsScreen() {
         <p className="mt-4 text-slate-300">
           Analytics is visible only from approved leadership IP addresses. Current IP: {access.ip || 'unknown'}.
         </p>
+        {accessError && <p className="mt-3 text-sm text-amber-100" role="alert">Access check failed: {accessError}</p>}
+        <button className="btn-dark-secondary mt-5" onClick={checkAccess} type="button"><Icon name="refresh" size={15} /> Check access again</button>
       </div>
     );
   }
 
   return (
     <div className="analytics-page space-y-6">
-      <section className="workspace-hero analytics-hero rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit">
+      <section className="workspace-hero analytics-hero rounded-[28px] border border-white/10 bg-[#0b1220]/85 p-6 shadow-cockpit" aria-busy={busy}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Director Analytics</div>
@@ -165,12 +195,25 @@ export default function AnalyticsScreen() {
             </p>
           </div>
           {access && (
-            <span className="signal-chip selected">
-              {access.owner || 'Allowed'} · {access.ip}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="signal-chip selected">{access.owner || 'Current viewer'} · {access.ip}</span>
+              {data && (
+                <button className="btn-dark-secondary" disabled={busy} onClick={unlock} type="button">
+                  <Icon name="refresh" size={15} /> {busy ? 'Refreshing…' : 'Refresh data'}
+                </button>
+              )}
+            </div>
           )}
         </div>
       </section>
+
+      {accessError && access?.allowed && (
+        <div className="rounded-2xl border border-amber-300/20 bg-amber-400/[0.08] p-4 text-sm text-amber-100" role="status">
+          The network access check could not reach the backend, so local development access is being used. {accessError}
+        </div>
+      )}
+
+      {error && data && <div className="rounded-2xl border border-red-300/20 bg-red-950/20 p-4 text-sm text-red-200" role="alert">{error}</div>}
 
       {!data && (
         <form className="workspace-panel analytics-access-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5" onSubmit={unlock}>
@@ -180,13 +223,15 @@ export default function AnalyticsScreen() {
             </span>
             <input
               className="dark-input w-full"
+              autoComplete="current-password"
+              aria-invalid={Boolean(error)}
               onChange={(event) => setKey(event.target.value)}
               placeholder="Enter analytics access key"
               type="password"
               value={key}
             />
           </label>
-          {error && <div className="mt-3 text-sm text-red-200">{error}</div>}
+          {error && <div className="mt-3 text-sm text-red-200" role="alert">{error}</div>}
           <button className="btn-dark-primary mt-4 justify-center" disabled={busy || !key.trim()} type="submit">
             <Icon name="shield" /> {busy ? 'Verifying...' : 'Unlock Analytics'}
           </button>
@@ -201,6 +246,27 @@ export default function AnalyticsScreen() {
             <StatTile label="Page Loads" value={totals.loads} />
             <StatTile label="Engagements" value={totals.clicks + totals.votes + totals.exports} tone="amber" />
           </section>
+
+          {recommendationData && (
+            <section className="workspace-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
+              <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <div><div className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200">For You quality</div><h2 className="mt-2 text-xl font-semibold text-white">Useful actions, aggregated—not employee performance</h2></div>
+                <span className="text-xs text-slate-500">No viewer identities are returned</span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <StatTile label="Configured desks" value={recommendationData.configured_viewers || 0} tone="emerald" />
+                <StatTile label="Open rate" value={`${Math.round((recommendationData.quality?.impression_to_dossier_open || 0) * 100)}%`} />
+                <StatTile label="Useful action rate" value={`${Math.round((recommendationData.quality?.impression_to_useful_action || 0) * 100)}%`} tone="emerald" />
+                <StatTile label="Negative feedback" value={`${Math.round((recommendationData.quality?.negative_feedback_rate || 0) * 100)}%`} tone="amber" />
+              </div>
+            </section>
+          )}
+
+          {recommendationWarning && (
+            <div className="rounded-2xl border border-amber-300/20 bg-amber-400/[0.07] p-4 text-sm text-amber-100" role="status">
+              Core usage analytics loaded, but For You quality metrics did not: {recommendationWarning}
+            </div>
+          )}
 
           <section className="space-y-3">
             <div className="flex items-center justify-between gap-4">

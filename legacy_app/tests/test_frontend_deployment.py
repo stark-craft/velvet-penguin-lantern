@@ -1,0 +1,81 @@
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from fastapi import HTTPException
+from fastapi.responses import FileResponse
+import main as composition
+from core.settings import resolve_frontend_dist
+from news_scrapper import application
+from tests.asgi_harness import request as asgi_request
+
+
+class FrontendDeploymentTests(unittest.TestCase):
+    def test_frontend_dist_auto_detects_source_and_portable_layouts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            portable = root / "frontend" / "dist"
+            portable.mkdir(parents=True)
+            (portable / "index.html").write_text("portable", encoding="utf-8")
+            self.assertEqual(resolve_frontend_dist(root), portable)
+
+            source = root / "news-ui" / "dist"
+            source.mkdir(parents=True)
+            (source / "index.html").write_text("source", encoding="utf-8")
+            self.assertEqual(resolve_frontend_dist(root), source)
+
+            configured = root / "somewhere" / "compiled"
+            self.assertEqual(
+                resolve_frontend_dist(root, configured_path=str(configured)),
+                configured,
+            )
+
+    def test_spa_deep_link_is_index_but_api_prefix_never_falls_back(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dist = Path(directory)
+            index = dist / "index.html"
+            index.write_text("<html><body>desk</body></html>", encoding="utf-8")
+            with patch.object(composition, "abs_frontend_path", str(dist)):
+                response = composition.serve_react_app("saved")
+                self.assertIsInstance(response, FileResponse)
+                self.assertEqual(Path(response.path), index)
+                self.assertIn("no-cache", response.headers["cache-control"])
+                with self.assertRaises(HTTPException) as api_error:
+                    composition.serve_react_app("viewer/saved")
+            self.assertEqual(api_error.exception.status_code, 404)
+
+    def test_built_same_origin_serving_keeps_viewer_api_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dist = root / "dist"
+            dist.mkdir()
+            (dist / "index.html").write_text("<html><body>desk</body></html>", encoding="utf-8")
+            saved_file = root / "viewer_saved.json"
+            claims = application.JsonStore(root / "viewer_identity_claims.json", dict)
+            with (
+                patch.object(composition, "abs_frontend_path", str(dist)),
+                patch.object(application, "VIEWER_SAVED_FILE", str(saved_file)),
+                patch.object(application, "PRIVATE_VIEWER_CLAIMS", claims),
+            ):
+                spa = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/saved",
+                    headers={"accept": "text/html"},
+                )
+                api = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/viewer/saved",
+                    headers={"accept": "application/json"},
+                )
+            self.assertEqual(spa.status_code, 200)
+            self.assertIn("desk", spa.text)
+            self.assertIn("no-cache", spa.headers.get("cache-control", ""))
+            self.assertEqual(api.status_code, 200)
+            self.assertEqual(api.json()["scope"], "current_viewer_only")
+
+
+if __name__ == "__main__":
+    unittest.main()

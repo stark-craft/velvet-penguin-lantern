@@ -54,6 +54,9 @@ next-env.d.ts
 !/backend/runtime/.gitkeep
 /backend/models/*
 !/backend/models/.gitkeep
+/backend/model_weights/**
+!/backend/model_weights/**/
+!/backend/model_weights/**/.gitignore
 
 # Local portable-release material and secrets.
 /signalroom.env.cmd

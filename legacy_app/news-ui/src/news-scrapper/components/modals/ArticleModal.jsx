@@ -191,6 +191,8 @@ export default function ArticleModal({
   onCorrectRegion,
   onSave,
   isSaved = false,
+  onSourceOpen,
+  onWhyThisStory,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [whyMatters, setWhyMatters] = useState('');
@@ -291,6 +293,27 @@ export default function ArticleModal({
               {[item.date, item.time, item.src].filter(Boolean).join(' · ')}
             </div>
 
+            {(item.what_changed || item.attention_hook || item.why_now) && (
+              <section className="dossier-section dossier-attention mt-7">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">AI Context · What Changed</h4>
+                  {item.hook_source && <span className="signal-chip">{item.hook_source === 'samsung_chat' ? 'Samsung Chat' : 'Local fallback'}</span>}
+                </div>
+                <p className="mt-3 text-lg font-medium leading-8 text-slate-100">{item.what_changed || item.attention_hook}</p>
+                {item.why_now && <p className="mt-3 text-sm leading-6 text-slate-400"><strong className="text-slate-200">Why now:</strong> {item.why_now}</p>}
+                {item.watch_next && <p className="mt-2 text-sm leading-6 text-slate-400"><strong className="text-slate-200">Watch next:</strong> {item.watch_next}</p>}
+              </section>
+            )}
+
+            {item.recommendation?.reasons?.length > 0 && (
+              <section className="dossier-section mt-7">
+                <button className="btn-dark-secondary" onClick={() => onWhyThisStory?.(item)} type="button">Why you’re seeing this</button>
+                <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                  {item.recommendation.reasons.map((reason) => <li key={reason}>• {reason}</li>)}
+                </ul>
+              </section>
+            )}
+
             <section className="dossier-section mt-8">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">AI Summary</h4>
@@ -344,7 +367,7 @@ export default function ArticleModal({
                       <div className="mt-1 text-sm text-slate-400">{source.title || item.title}</div>
                       <div className="mt-1 text-xs text-slate-500">{source.published || source.date || item.date}</div>
                       {url && (
-                        <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-sky-200 hover:text-white" href={url} target="_blank" rel="noreferrer">
+                        <a className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-sky-200 hover:text-white" href={url} onClick={() => onSourceOpen?.(item, source)} target="_blank" rel="noreferrer">
                           Open original article <Icon name="external" size={13} />
                         </a>
                       )}

@@ -73,7 +73,7 @@ class SchedulerResilienceTests(unittest.TestCase):
         retry.assert_called_once_with(main.SCHEDULER_RETRY_DELAY_SECONDS)
         self.assertEqual(
             main.SCHEDULER_STATUS["last_failed_profiles"],
-            [main.DEFAULT_PROFILE, main.BROADCAST_PROFILE],
+            [main.DEFAULT_PROFILE],
         )
         next_run = datetime.datetime.fromisoformat(main.SCHEDULER_STATUS["next_run"])
         completed = datetime.datetime.fromisoformat(main.SCHEDULER_STATUS["last_completed_at"])
@@ -108,10 +108,10 @@ class TrainingQueueResilienceTests(unittest.TestCase):
 
 class ProfileConfigurationTests(unittest.TestCase):
     def test_profile_ip_lists_normalize_ipv4_mapped_ipv6(self):
-        with patch.dict(os.environ, {"TEST_PROFILE_IPS": "::ffff:109.109.201.228, 10.0.0.1"}):
+        with patch.dict(os.environ, {"TEST_PROFILE_IPS": "::ffff:192.0.2.10, 10.0.0.1"}):
             self.assertEqual(
                 main.env_ip_set("TEST_PROFILE_IPS"),
-                {"109.109.201.228", "10.0.0.1"},
+                {"192.0.2.10", "10.0.0.1"},
             )
 
 
@@ -140,7 +140,7 @@ class ConcurrentJsonStoreTests(unittest.TestCase):
                     )
             self.assertEqual(len(json.loads(training_file.read_text(encoding="utf-8"))), 50)
 
-    def test_concurrent_selections_remain_complete_and_profile_isolated(self):
+    def test_concurrent_selections_converge_on_the_unified_workflow(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             default_file = root / "default.json"
@@ -161,14 +161,14 @@ class ConcurrentJsonStoreTests(unittest.TestCase):
                 ),
                 patch.object(main, "VIEWER_PROFILES_FILE", str(profiles_file)),
                 patch.object(main, "TRUSTED_PROXY_IPS", {"127.0.0.1"}),
-                patch.object(main, "BROADCAST_SPECIAL_IPS", {"109.109.201.228"}),
+                patch.object(main, "BROADCAST_SPECIAL_IPS", {"192.0.2.10"}),
                 patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", set()),
             )
             for active_patch in patches:
                 active_patch.start()
             try:
                 work = [
-                    (index, "109.109.201.228" if index % 2 else "10.0.0.25")
+                    (index, "192.0.2.10" if index % 2 else "10.0.0.25")
                     for index in range(100)
                 ]
 
@@ -188,8 +188,8 @@ class ConcurrentJsonStoreTests(unittest.TestCase):
             self.assertTrue(all(result["status"] == "success" for result in results))
             default = json.loads(default_file.read_text(encoding="utf-8"))
             broadcast = json.loads(broadcast_file.read_text(encoding="utf-8"))
-            self.assertEqual(len(default["selected"]), 50)
-            self.assertEqual(len(broadcast["selected"]), 50)
+            self.assertEqual(len(default["selected"]), 100)
+            self.assertEqual(len(broadcast["selected"]), 0)
 
 
 if __name__ == "__main__":

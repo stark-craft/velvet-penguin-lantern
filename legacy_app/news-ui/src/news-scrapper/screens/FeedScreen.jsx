@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import { SignalVisual } from '../components/ArticleCard.jsx';
@@ -6,13 +6,14 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import Bouncer from '../components/Bouncer.jsx';
-import { correctRegion, getLatestBriefing, getViewerHidden, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote } from '../api.js';
+import { correctRegion, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
-import { articleKey, groupedByDate, keywordOptions, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
+import { articleKey, groupedByDatePreservingOrder, keywordOptions, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
 import '../styles/home-refinement.css';
 const emptyFilters = {
   query: '',
+  scope: 'all',
   region: 'all',
   category: 'all',
   source: 'all',
@@ -88,9 +89,30 @@ function matchesQuery(item, query) {
   const haystack = [item.title, item.summary, item.src, item.source, item.category, item.region, ...(item.keywords_found || []), ...(item.keywords || [])].join(' ').toLowerCase();
   return haystack.includes(q);
 }
+function articleScopes(item) {
+  const values = [
+    item.vertical,
+    item.legacy_profile,
+    item.profile,
+    ...(Array.isArray(item.verticals) ? item.verticals : []),
+  ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
+  const category = String(item.category || '').toLowerCase();
+  const scopes = new Set();
+  if (values.some(value => value.includes('broadcast')) || /broadcast|cable|dth|television|media distribution/.test(category)) {
+    scopes.add('broadcast');
+  }
+  if (values.some(value => value === 'technology' || value === 'default' || value === 'tech')) {
+    scopes.add('technology');
+  }
+  if (!scopes.size) scopes.add('technology');
+  return scopes;
+}
 function applyFilters(items, filters, selectedIds) {
   return items.filter(item => {
     if (!matchesQuery(item, filters.query)) {
+      return false;
+    }
+    if (filters.scope !== 'all' && !articleScopes(item).has(filters.scope)) {
       return false;
     }
     if (filters.region !== 'all' && item.region !== filters.region) {
@@ -151,7 +173,8 @@ function topKeywords(items, limit = 5) {
 function TopClusterCarousel({
   articles,
   onOpen,
-  onSelect
+  onSelect,
+  workflowReady = true
 }) {
   const slides = useMemo(() => articles.slice(0, HERO_FEED_LIMIT), [articles]);
   const fallbackMode = slides.every(item => (item.source_count || 1) <= 1);
@@ -179,7 +202,7 @@ function TopClusterCarousel({
     setIdx(current => (current + delta + slides.length) % slides.length);
   };
   return <section className="hero-cluster-panel cockpit-top-card group relative overflow-hidden rounded-[22px] border border-sky-300/20 bg-[#101827] shadow-glow" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-<button className="absolute inset-0 z-0 text-left" onClick={() => onOpen(active)} type="button">
+<button aria-label={`Open dossier for ${active.title}`} className="absolute inset-0 z-0 text-left" onClick={() => onOpen(active)} type="button">
 <SignalVisual item={active} className="visual-layer z-0" label={false} />
 <div className="absolute inset-0 z-10 bg-[linear-gradient(90deg,rgba(5,9,20,0.74)_0%,rgba(5,9,20,0.42)_48%,rgba(5,9,20,0.10)_100%),linear-gradient(0deg,rgba(5,9,20,0.78)_0%,rgba(5,9,20,0.22)_56%,rgba(0,0,0,0.02)_100%)]" />
 </button>
@@ -212,7 +235,7 @@ function TopClusterCarousel({
 <div className="mt-4 flex flex-wrap items-center gap-3">
 <button className="btn-dark-primary" onClick={() => onOpen(active)} type="button">
 <Icon name="file" size={15} />              Open Dossier            </button>
-<button className="btn-dark-secondary" onClick={() => onSelect(active)} type="button">
+<button className="btn-dark-secondary" disabled={!workflowReady} onClick={() => onSelect(active)} title={!workflowReady ? 'Review Queue state is still loading' : undefined} type="button">
 <Icon name="check" size={15} />              Select for Review            </button>
 </div>
 <div className="mt-4 flex gap-2">            {slides.map((slide, dotIdx) => <button key={articleKey(slide) || dotIdx} className={dotIdx === idx ? 'h-2.5 w-8 rounded-full bg-sky-200' : 'h-2.5 w-2.5 rounded-full bg-white/30 hover:bg-white/60'} onClick={() => setIdx(dotIdx)} type="button" aria-label={`Go to slide ${dotIdx + 1}`} />)}          </div>
@@ -307,7 +330,7 @@ function BriefingStream({
 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">
 <Icon name="archive" size={14} />        Briefing Stream      </div>
 <div className="briefing-stream-mask mt-4 min-h-0 flex-1 overflow-hidden">
-<div className="briefing-stream-track space-y-2">          {[...stream, ...stream].map((item, index) => <button key={`${articleKey(item)}-${index}`} className="block w-full rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-sky-300/25 hover:bg-white/[0.06]" onClick={() => onOpen(item)} type="button">
+<div className="briefing-stream-track space-y-2">          {[...stream, ...stream].map((item, index) => <button aria-hidden={index >= stream.length ? 'true' : undefined} tabIndex={index >= stream.length ? -1 : 0} key={`${articleKey(item)}-${index}`} className="block w-full rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-sky-300/25 hover:bg-white/[0.06]" onClick={() => onOpen(item)} type="button">
 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">                {item.date || 'Latest'} · Score {scoreOf(item)}              </div>
 <div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-100">                {item.title}              </div>
 </button>)}        </div>
@@ -404,8 +427,13 @@ function SearchLoadedBriefing({
 </div>
 <button className="btn-dark-secondary h-9" onClick={reset} type="button">          Reset filters        </button>
 </div>
-<div className="grid gap-3 lg:grid-cols-[1.45fr_repeat(6,minmax(0,1fr))]">
+<div className="grid gap-3 lg:grid-cols-[1.45fr_repeat(7,minmax(0,1fr))]">
 <input className="dark-input" value={filters.query} onChange={event => update('query', event.target.value)} placeholder="Search loaded briefing..." />
+<select className="dark-input" value={filters.scope} onChange={event => update('scope', event.target.value)} aria-label="Intelligence scope">
+<option value="all">            All Intelligence          </option>
+<option value="technology">            Technology          </option>
+<option value="broadcast">            Broadcast &amp; Media          </option>
+</select>
 <select className="dark-input" value={filters.region} onChange={event => update('region', event.target.value)}>
 <option value="all">            All Regions          </option>          {options.regions.map(region => <option key={region} value={region}>              {region}            </option>)}        </select>
 <select className="dark-input" value={filters.category} onChange={event => update('category', event.target.value)}>
@@ -457,12 +485,15 @@ function ImageFeedCard({
   isSelected,
   isApproved,
   isSaved,
-  onSave
+  onSave,
+  busyAction = '',
+  workflowReady = true,
+  savedReady = true
 }) {
   const score = scoreOf(item);
   const selected = isSelected || item.selected_by;
   const isHigh = score >= 80;
-  return <article className="image-feed-card group relative cursor-pointer overflow-hidden rounded-[22px] border border-white/10 bg-[#101827] shadow-cockpit transition hover:border-sky-300/30" onClick={event => {
+  return <article aria-busy={Boolean(busyAction)} className="image-feed-card group relative cursor-pointer overflow-hidden rounded-[22px] border border-white/10 bg-[#101827] shadow-cockpit transition hover:border-sky-300/30" onClick={event => {
     if (!event.target.closest('button, input, a')) {
       onOpen(item);
     }
@@ -483,12 +514,12 @@ function ImageFeedCard({
 </button>
 <div className="feed-card-actions mt-4">
 <div className="flex flex-wrap items-center gap-2">
-<button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" onClick={() => onSelect(item)} type="button">                  Select for Review                </button>}              <button className="btn-dark-secondary h-9 px-3" onClick={() => onHide(item)} title="Hide only from your feed" type="button">                Hide              </button>
-<button className="btn-dark-secondary h-9 px-3" onClick={() => onSave(item)} title={isSaved ? 'Remove from Saved for Later' : 'Save this signal for later'} type="button">
-<Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {isSaved ? 'Saved' : 'Save'}
+<button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" disabled={Boolean(busyAction) || !workflowReady} onClick={() => onSelect(item)} title={!workflowReady ? 'Review Queue state is unavailable' : undefined} type="button">                  Select for Review                </button>}              <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button">                {busyAction === 'hide' ? 'Hiding…' : 'Hide'}              </button>
+<button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction) || !savedReady} onClick={() => onSave(item)} title={!savedReady ? 'Saved Signals state is unavailable' : isSaved ? 'Remove from Saved for Later' : 'Save this signal for later'} type="button">
+<Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {busyAction === 'save' ? 'Saving…' : isSaved ? 'Saved' : 'Save'}
 </button>
 </div>
-<Bouncer vote={vote} onVote={value => onVote(item, value)} />
+<Bouncer disabled={Boolean(busyAction)} vote={vote} onVote={value => onVote(item, value)} />
 </div>
 </div>
 </div>
@@ -514,24 +545,29 @@ export default function FeedScreen() {
   const [filters, setFilters] = useState(emptyFilters);
   const [personalizationMeta, setPersonalizationMeta] = useState(null);
   const [showPersonalizationNotice, setShowPersonalizationNotice] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState(null);
+  const [busyActions, setBusyActions] = useState({});
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [supportingState, setSupportingState] = useState({ workflow: 'loading', saved: 'loading', hidden: 'loading' });
+  const actionLocks = useRef(new Set());
+  const dossierOpenedAt = useRef(0);
+  const dossierActiveMs = useRef(0);
   useEffect(() => {
     let cancelled = false;
+    setSupportingState({ workflow: 'loading', saved: 'loading', hidden: 'loading' });
     (async () => {
       try {
-        const data = await getLatestBriefing();
+        const data = await getSharedBriefing().catch(() => getLatestBriefing());
         if (cancelled) {
           return;
         }
         const normalizedItems = normalizeList(data?.result || data?.results || data?.articles || data || []);
         const items = normalizeArticleImages(normalizedItems);
-        console.log('[FeedScreen] First article image check:', {
-          title: items[0]?.title,
-          image_url: items[0]?.image_url,
-          original: normalizedItems[0]
-        });
         setArticles(items);
         setPersonalizationMeta(data?.personalization || null);
         setShowPersonalizationNotice(Boolean(data?.personalization?.applied));
+        trackAction('briefing_view', { screen: 'briefing', item_count: items.length });
       } catch (error) {
         if (!cancelled) {
           setErr(error.message || String(error));
@@ -547,17 +583,20 @@ export default function FeedScreen() {
         selected: normalizeList(result?.selected || []),
         approved: normalizeList(result?.approved || [])
       });
-    }).catch(() => {});
+      setSupportingState((current) => ({ ...current, workflow: 'ready' }));
+    }).catch(() => setSupportingState((current) => ({ ...current, workflow: 'error' })));
     getViewerHidden().then(result => {
       setHiddenCount(Number(result?.count ?? result?.items?.length ?? 0));
-    }).catch(() => {});
+      setSupportingState((current) => ({ ...current, hidden: 'ready' }));
+    }).catch(() => setSupportingState((current) => ({ ...current, hidden: 'error' })));
     getViewerSaved().then(result => {
       setSavedKeys(new Set(normalizeList(result?.items || []).map(articleKey)));
-    }).catch(() => {});
+      setSupportingState((current) => ({ ...current, saved: 'ready' }));
+    }).catch(() => setSupportingState((current) => ({ ...current, saved: 'error' })));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAttempt]);
   useEffect(() => {
     if (!showPersonalizationNotice) return undefined;
     const timer = window.setTimeout(() => setShowPersonalizationNotice(false), 6500);
@@ -568,7 +607,7 @@ export default function FeedScreen() {
   const filteredArticles = useMemo(() => applyFilters(articles, filters, selectedIds), [articles, filters, selectedIds]);
   const heroFeed = useMemo(() => getHeroFeed(articles), [articles]);
   const heroFeedKeys = useMemo(() => new Set(heroFeed.map(stableSignalKey).filter(Boolean)), [heroFeed]);
-  const groups = useMemo(() => groupedByDate(filteredArticles), [filteredArticles]);
+  const groups = useMemo(() => groupedByDatePreservingOrder(filteredArticles), [filteredArticles]);
   const selectedBatch = useMemo(() => articles.filter(item => checked[articleKey(item)]), [articles, checked]);
   const options = useMemo(() => ({
     regions: uniqueSorted(articles.map(article => article.region)),
@@ -577,9 +616,40 @@ export default function FeedScreen() {
     dates: uniqueSorted(articles.map(article => article.date)).reverse(),
     keywords: keywordOptions(articles)
   }), [articles]);
+  const retrySupportingState = async () => {
+    const failed = Object.entries(supportingState).filter(([, value]) => value === 'error').map(([key]) => key);
+    if (!failed.length) return;
+    setSupportingState((current) => ({ ...current, ...Object.fromEntries(failed.map((key) => [key, 'loading'])) }));
+    const tasks = [];
+    if (failed.includes('workflow')) tasks.push(getWorkflow().then((result) => {
+      setWorkflow({ selected: normalizeList(result?.selected || []), approved: normalizeList(result?.approved || []) });
+      setSupportingState((current) => ({ ...current, workflow: 'ready' }));
+    }).catch(() => setSupportingState((current) => ({ ...current, workflow: 'error' }))));
+    if (failed.includes('saved')) tasks.push(getViewerSaved().then((result) => {
+      setSavedKeys(new Set(normalizeList(result?.items || []).map(articleKey)));
+      setSupportingState((current) => ({ ...current, saved: 'ready' }));
+    }).catch(() => setSupportingState((current) => ({ ...current, saved: 'error' }))));
+    if (failed.includes('hidden')) tasks.push(getViewerHidden().then((result) => {
+      setHiddenCount(Number(result?.count ?? result?.items?.length ?? 0));
+      setSupportingState((current) => ({ ...current, hidden: 'ready' }));
+    }).catch(() => setSupportingState((current) => ({ ...current, hidden: 'error' }))));
+    await Promise.all(tasks);
+  };
+  const runArticleAction = async (action, item, work) => {
+    const key = articleKey(item);
+    if (actionLocks.current.has(key)) return;
+    actionLocks.current.add(key);
+    setBusyActions((current) => ({ ...current, [key]: action }));
+    try {
+      return await work();
+    } finally {
+      actionLocks.current.delete(key);
+      setBusyActions((current) => { const next = { ...current }; delete next[key]; return next; });
+    }
+  };
   const refreshPersonalizedOrder = async () => {
     try {
-      const data = await getLatestBriefing();
+      const data = await getSharedBriefing().catch(() => getLatestBriefing());
       const normalizedItems = normalizeList(data?.result || data?.results || data?.articles || data || []);
       setArticles(normalizeArticleImages(normalizedItems));
       setPersonalizationMeta(data?.personalization || null);
@@ -588,12 +658,18 @@ export default function FeedScreen() {
     }
   };
   const onVote = async (item, voteValue) => {
-    setVotes(previous => ({
-      ...previous,
-      [item.id]: voteValue
-    }));
+    if (!voteValue) {
+      setVotes((previous) => ({ ...previous, [item.id]: null }));
+      return;
+    }
+    const previousVote = votes[item.id];
     const detail = articleActivityDetail(item, 'feed');
-    try {
+    return runArticleAction('vote', item, async () => {
+      setVotes(previous => ({
+        ...previous,
+        [item.id]: voteValue
+      }));
+      try {
       if (voteValue === 'down') {
         await rejectArticle(item);
         trackAction('vote_not_interested', detail);
@@ -603,52 +679,97 @@ export default function FeedScreen() {
         await trackAction('vote_interested', detail);
         await refreshPersonalizedOrder();
       }
-    } catch {/* Keep the UI optimistic. */}
+      setActionFeedback({ type: 'success', message: voteValue === 'down' ? 'Marked not relevant and removed from the shared briefing.' : 'Marked useful. Your feedback was recorded.' });
+      } catch (error) {
+        setVotes((previous) => ({ ...previous, [item.id]: previousVote }));
+        setActionFeedback({ type: 'error', message: error?.message || 'Feedback could not be recorded. Please try again.' });
+      }
+    });
   };
   const hideArticle = async item => {
     const key = articleKey(item);
-    setArticles(currentArticles => currentArticles.filter(article => articleKey(article) !== key));
-    setHiddenCount(count => count + 1);
-    trackAction('hide_personal', articleActivityDetail(item, 'feed'));
-    try {
+    return runArticleAction('hide', item, async () => {
+      try {
       await hideArticleForViewer(item);
-    } catch {
-      // A refresh restores the signal if persistence failed.
-    }
+      setArticles(currentArticles => currentArticles.filter(article => articleKey(article) !== key));
+      setHiddenCount(count => count + 1);
+      await trackAction('hide_personal', articleActivityDetail(item, 'feed'));
+      setActionFeedback({ type: 'success', message: 'Hidden only from your feed. You can restore it from Hidden Signals.', actionLabel: 'Review hidden', action: () => navigate('/rejected') });
+    } catch (error) {
+      setActionFeedback({ type: 'error', message: error?.message || 'Could not hide this signal. Please try again.' });
+      }
+    });
   };
   const toggleSave = async item => {
+    if (supportingState.saved !== 'ready') {
+      setActionFeedback({ type: 'error', message: 'Saved Signals state is unavailable. Retry personal state before changing this story.' });
+      return;
+    }
     const key = articleKey(item);
     const wasSaved = savedKeys.has(key);
-    setSavedKeys(current => {
-      const next = new Set(current);
-      if (wasSaved) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-    try {
+    return runArticleAction('save', item, async () => {
+      setSavedKeys(current => {
+        const next = new Set(current);
+        if (wasSaved) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      try {
       if (wasSaved) await removeSavedArticle(item);
       else await saveArticleForLater(item);
       await refreshPersonalizedOrder();
-    } catch {
+      setActionFeedback({ type: 'success', message: wasSaved ? 'Removed from your Saved Signals.' : 'Saved privately to your desk.' });
+      } catch (error) {
       setSavedKeys(current => {
         const next = new Set(current);
         if (wasSaved) next.add(key);
         else next.delete(key);
         return next;
       });
-    }
+      setActionFeedback({ type: 'error', message: error?.message || 'Saved Signals could not be updated. Your previous state was restored.' });
+      }
+    });
   };
   const openDossier = item => {
+    dossierActiveMs.current = 0;
+    dossierOpenedAt.current = document.visibilityState === 'visible' ? Date.now() : 0;
+    trackAction('article_click', articleActivityDetail(item, 'feed'));
     trackAction('dossier_open', { ...articleActivityDetail(item, 'feed'), dossier_title: item.title })
       .then(refreshPersonalizedOrder);
     setOpen(item);
   };
-  const hideFromDossier = async item => {
+  const closeDossier = () => {
+    const item = openArticle;
+    const activeMs = dossierActiveMs.current + (dossierOpenedAt.current ? Date.now() - dossierOpenedAt.current : 0);
+    dossierOpenedAt.current = 0;
+    dossierActiveMs.current = 0;
     setOpen(null);
+    if (item && activeMs >= 1500) {
+      trackAction('dossier_dwell', {
+        ...articleActivityDetail(item, 'feed'),
+        active_ms: Math.round(activeMs),
+      }).then(refreshPersonalizedOrder);
+    }
+  };
+  useEffect(() => {
+    if (!openArticle) return undefined;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden' && dossierOpenedAt.current) {
+        dossierActiveMs.current += Date.now() - dossierOpenedAt.current;
+        dossierOpenedAt.current = 0;
+      } else if (document.visibilityState === 'visible' && !dossierOpenedAt.current) {
+        dossierOpenedAt.current = Date.now();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [openArticle]);
+  const hideFromDossier = async item => {
+    closeDossier();
     await hideArticle(item);
   };
   const selectFromDossier = item => {
-    setOpen(null);
+    closeDossier();
     setPendingSelect(item);
   };
   const onCorrectRegion = async (item, correction) => {
@@ -678,24 +799,35 @@ export default function FeedScreen() {
     return result;
   };
   const confirmSelect = async (item, name) => {
+    if (supportingState.workflow !== 'ready') {
+      const error = new Error('Review Queue state is unavailable. Retry personal state before selecting this story.');
+      setActionFeedback({ type: 'error', message: error.message });
+      throw error;
+    }
     const payload = {
       ...item,
       selected_by: name,
       selected_at: new Date().toISOString().slice(0, 16).replace('T', ' ')
     };
-    setWorkflow(state => ({
-      ...state,
-      selected: [payload, ...state.selected.filter(existing => existing.id !== item.id)]
-    }));
-    setArticles(currentArticles => currentArticles.map(article => article.id === item.id ? {
-      ...article,
-      selected_by: name
-    } : article));
-    try {
-      await selectWorkflow(payload);
-      await trackAction('select', { ...articleActivityDetail(item, 'feed'), selected_by: name });
-      await refreshPersonalizedOrder();
-    } catch {/* Keep the UI optimistic. */}
+    return runArticleAction('select', item, async () => {
+      try {
+        await selectWorkflow(payload);
+        setWorkflow(state => ({
+          ...state,
+          selected: [payload, ...state.selected.filter(existing => existing.id !== item.id)]
+        }));
+        setArticles(currentArticles => currentArticles.map(article => article.id === item.id ? {
+          ...article,
+          selected_by: name
+        } : article));
+        await trackAction('select', { ...articleActivityDetail(item, 'feed'), selected_by: name });
+        await refreshPersonalizedOrder();
+        setActionFeedback({ type: 'success', message: 'Signal sent to the shared Review Queue.' });
+      } catch (error) {
+        setActionFeedback({ type: 'error', message: error?.message || 'Could not send this signal to Review Queue.' });
+        throw error;
+      }
+    });
   };
   const onCheck = (item, isOn) => {
     const key = articleKey(item);
@@ -712,31 +844,52 @@ export default function FeedScreen() {
     });
   };
   const confirmBatch = async (_item, name) => {
+    if (batchBusy || !selectedBatch.length) return;
+    setBatchBusy(true);
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
     const payloads = selectedBatch.map(item => ({
       ...item,
       selected_by: name,
       selected_at: stamp
     }));
-    setWorkflow(state => ({
-      ...state,
-      selected: [...payloads, ...state.selected.filter(existing => !payloads.some(payload => payload.title === existing.title))]
-    }));
-    setArticles(currentArticles => currentArticles.map(item => checked[articleKey(item)] ? {
-      ...item,
-      selected_by: name,
-      selected_at: stamp
-    } : item));
-    setChecked({});
-    setBatchSelect(null);
-    await Promise.all(payloads.map(payload => selectWorkflow(payload).catch(() => null)));
-    trackAction('batch_select', {
-      item_count: payloads.length,
-      items: payloads.map((item) => articleActivityDetail(item, 'feed')),
-      selected_by: name,
-      source: 'feed',
-      screen: 'feed'
-    });
+    try {
+      const results = await Promise.allSettled(payloads.map((payload) => selectWorkflow(payload)));
+      const succeeded = payloads.filter((_, index) => results[index].status === 'fulfilled');
+      const failed = payloads.filter((_, index) => results[index].status === 'rejected');
+      if (succeeded.length) {
+        const succeededKeys = new Set(succeeded.map(articleKey));
+        setWorkflow(state => ({
+          ...state,
+          selected: [...succeeded, ...state.selected.filter(existing => !succeeded.some(payload => payload.title === existing.title))]
+        }));
+        setArticles(currentArticles => currentArticles.map(item => succeededKeys.has(articleKey(item)) ? {
+          ...item,
+          selected_by: name,
+          selected_at: stamp
+        } : item));
+        setChecked((current) => {
+          const next = { ...current };
+          succeededKeys.forEach((key) => { delete next[key]; });
+          return next;
+        });
+        trackAction('batch_select', {
+          item_count: succeeded.length,
+          items: succeeded.map((item) => articleActivityDetail(item, 'feed')),
+          selected_by: name,
+          source: 'feed',
+          screen: 'feed'
+        });
+      }
+      if (failed.length) {
+        const error = new Error(`${failed.length} of ${payloads.length} signals could not be sent. Failed items remain checked so you can retry.`);
+        setActionFeedback({ type: 'error', message: error.message });
+        throw error;
+      }
+      setBatchSelect(null);
+      setActionFeedback({ type: 'success', message: `${succeeded.length} signal${succeeded.length === 1 ? '' : 's'} sent to Review Queue.` });
+    } finally {
+      setBatchBusy(false);
+    }
   };
   if (loading) {
     return <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
@@ -746,22 +899,26 @@ export default function FeedScreen() {
 </div>;
   }
   if (err) {
-    return <div className="rounded-[24px] border border-red-300/20 bg-red-950/20 p-10 text-center">
+    return <div className="rounded-[24px] border border-red-300/20 bg-red-950/20 p-10 text-center" role="alert">
 <h2 className="text-xl font-semibold text-white">          Failed to load briefing        </h2>
 <p className="mt-2 text-red-200/80">          {err}        </p>
+<button className="btn-dark-secondary mt-4" onClick={() => { setErr(null); setLoading(true); setLoadAttempt((current) => current + 1); }} type="button"><Icon name="refresh" size={14} /> Try again</button>
 </div>;
   }
   if (!articles.length) {
     return <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
 <h2 className="text-xl font-semibold text-white">          No signals found for this scan        </h2>
 <p className="mt-2 text-slate-400">          Try widening the date range, adding sources, or changing keywords.        </p>
+<button className="btn-dark-secondary mt-4" onClick={() => { setLoading(true); setLoadAttempt((current) => current + 1); }} type="button"><Icon name="refresh" size={14} /> Check again</button>
 </div>;
   }
   return <div className="briefing-home space-y-4 2xl:space-y-5">
 {showPersonalizationNotice && <div className="personalization-toast" role="status"><Icon name="sparkle" size={15} /><span><strong>{personalizationMeta?.viewer_name ? `Personalized for ${personalizationMeta.viewer_name}` : 'Your personalized feed'}</strong><small>Recent reading and saved signals shape the order—not what is available.</small></span><button onClick={() => setShowPersonalizationNotice(false)} type="button" aria-label="Dismiss personalization message"><Icon name="x" size={13} /></button></div>}
+{actionFeedback && <div className={actionFeedback.type === 'error' ? 'error-banner' : 'personal-notice'} role={actionFeedback.type === 'error' ? 'alert' : 'status'}><span>{actionFeedback.message}</span>{actionFeedback.action && <button className="ml-3 underline" onClick={actionFeedback.action} type="button">{actionFeedback.actionLabel}</button>}<button aria-label="Dismiss message" className="ml-3" onClick={() => setActionFeedback(null)} type="button"><Icon name="x" size={13} /></button></div>}
+{Object.values(supportingState).includes('error') && <div className="error-banner" role="status"><span>Some personal state could not be verified. Save or Review Queue actions stay disabled where their current state is unknown.</span><button className="ml-3 underline" onClick={retrySupportingState} type="button">Retry personal state</button></div>}
 <section className="briefing-stage grid gap-4 2xl:gap-5">
 <div className="briefing-top-row briefing-hero-row grid min-h-0 gap-4 2xl:gap-5">
-<TopClusterCarousel articles={heroFeed} onOpen={openDossier} onSelect={setPendingSelect} />
+<TopClusterCarousel articles={heroFeed} onOpen={openDossier} onSelect={setPendingSelect} workflowReady={supportingState.workflow === 'ready'} />
 <BriefingStream articles={articles} onOpen={openDossier} navigate={navigate} />
 </div>
 <LatestDaySignals articles={articles} excludeKeys={heroFeedKeys} onOpen={openDossier} />
@@ -773,7 +930,7 @@ export default function FeedScreen() {
 <div className="h-px flex-1 bg-white/10" />
 <span className="text-sm text-slate-500">                  {items.length} signals                </span>
 </div>
-<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard key={item.id} item={item} vote={votes[item.id]} onVote={onVote} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={onCheck} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} />)}              </div>
+<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard busyAction={busyActions[articleKey(item)] || ''} key={item.id} item={item} vote={votes[item.id]} onVote={onVote} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={onCheck} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} savedReady={supportingState.saved === 'ready'} workflowReady={supportingState.workflow === 'ready'} />)}              </div>
 </div>)}        {filteredArticles.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
 <h2 className="text-xl font-semibold text-white">              No loaded briefing signals match these filters            </h2>
 <p className="mt-2 text-slate-400">              Try clearing search, changing date, or widening signal filters.            </p>
@@ -785,17 +942,17 @@ export default function FeedScreen() {
 </span>
 <span className="btn-dark-secondary h-9">          Open Hidden Review        </span>
 </button>
-<ArticleModal item={openArticle} onClose={() => setOpen(null)} onSelect={selectFromDossier} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={onVote} onCorrectRegion={onCorrectRegion} />
+<ArticleModal item={openArticle} onClose={closeDossier} onSelect={selectFromDossier} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={onVote} onCorrectRegion={onCorrectRegion} onSourceOpen={(item) => trackAction('source_open', articleActivityDetail(item, 'dossier'))} onWhyThisStory={(item) => trackAction('why_this_story_open', articleActivityDetail(item, 'dossier'))} />
 <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />
 <NameModal open={!!batchSelect} article={batchSelect} title={`Send ${selectedBatch.length} articles to Review Queue`} description="Enter your name." confirmLabel="Send to Review Queue" onClose={() => setBatchSelect(null)} onConfirm={confirmBatch} />
 <DraftExportModal items={selectedBatch} open={draftExportOpen} source="briefing" onClose={() => setDraftExportOpen(false)} />      {selectedBatch.length > 0 && <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
 <div className="batch-action-bar flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
 <strong>              {selectedBatch.length} selected            </strong>
-<button className="btn-dark-secondary h-9" onClick={() => setChecked({})} type="button">              Clear            </button>
-<button className="btn-dark-primary h-9" onClick={() => setBatchSelect({
+<button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={() => setChecked({})} type="button">              Clear            </button>
+<button className="btn-dark-primary h-9" disabled={batchBusy} onClick={() => setBatchSelect({
           title: `${selectedBatch.length} selected signals`
         })} type="button">              Send to Review Queue            </button>
-<button className="btn-dark-secondary h-9" onClick={() => setDraftExportOpen(true)} type="button">              Draft Export            </button>
+<button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={() => setDraftExportOpen(true)} type="button">              Draft Export            </button>
 </div>
 </div>}    </div>;
 }

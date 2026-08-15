@@ -61,6 +61,7 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
           <div className="grid gap-3">
             {exportTypes.map((option) => (
               <button
+                aria-busy={busy === option.id}
                 key={option.id}
                 className="export-choice"
                 disabled={!!busy}
@@ -78,7 +79,7 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
               </button>
             ))}
           </div>
-          {error && <div className="mt-4 rounded-xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-200">{error}</div>}
+          {error && <div className="mt-4 rounded-xl border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-200" role="alert">{error}</div>}
         </div>
       </section>
     </div>

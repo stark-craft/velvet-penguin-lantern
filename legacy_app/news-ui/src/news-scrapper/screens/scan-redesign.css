@@ -1728,6 +1728,13 @@ html[data-theme="light"] .scan-source-category { background: rgba(255, 255, 255,
   box-shadow: 0 10px 22px rgba(68, 46, 139, 0.22);
 }
 
+.scan-secondary-action:disabled,
+.scan-primary-action:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 /* Tour and persistent activity trace */
 .scan-guide-card {
   width: min(372px, calc(100vw - 32px)) !important;

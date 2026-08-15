@@ -16,7 +16,13 @@ export default function VocScreen() {
           <h2 className="panel-title">Submit Feedback</h2>
           <p className="panel-copy">Tell the team what makes the intelligence experience stronger or slower.</p>
           {complete ? (
-            <div className="success-panel">Feedback captured. Thank you for improving NewsScrapper Intelligence.</div>
+            <div className="success-panel" role="status" aria-live="polite">
+              <strong>Feedback captured.</strong>
+              <p>Thank you for improving NewsScrapper Intelligence.</p>
+              <button className="btn-dark-secondary mt-4" onClick={() => setComplete(false)} type="button">
+                Send another note
+              </button>
+            </div>
           ) : (
             <div className="mt-8">
               <FeedbackForm onComplete={() => setComplete(true)} />

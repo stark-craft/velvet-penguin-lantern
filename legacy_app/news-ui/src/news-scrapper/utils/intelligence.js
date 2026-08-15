@@ -37,6 +37,18 @@ export function groupedByDate(items) {
   }, {});
 }
 
+// For ranked surfaces such as For You, grouping must never silently re-sort the
+// server's recommendation order. Object insertion order preserves the first
+// appearance of each day, while each bucket preserves the supplied item order.
+export function groupedByDatePreservingOrder(items) {
+  return [...(items || [])].reduce((acc, item) => {
+    const key = dayKey(item);
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+}
+
 export function cardVariant(item) {
   const score = scoreOf(item);
   if (score >= 82) return 'high';

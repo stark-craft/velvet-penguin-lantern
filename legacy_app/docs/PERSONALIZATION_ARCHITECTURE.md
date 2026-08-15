@@ -1,16 +1,17 @@
 # NewsScrapper Personalization Architecture
 
-This document describes the personalization layer now active in the legacy
-application.  The implementation lives in `news_scrapper/personalization.py`,
-is applied by `/latest-briefing`, and persists private events in
-`news_scrapper/runtime/viewer_personalization.json` (or the configured runtime
-directory).
+This document describes two compatible layers. The legacy ranker in
+`news_scrapper/personalization.py` remains available to `/latest-briefing` for
+one compatibility release. The new, feature-gated `news_scrapper/recommendation/`
+package powers `/for-you`, explicit preferences, grounded recommendation
+reasons, and privacy-aware batched telemetry. The shared Briefing now reads the
+deterministic `/briefing/shared/latest` endpoint.
 
 ## Product rule
 
 Personalization should change ordering, not editorial truth:
 
-- every user still has access to every article in their assigned profile;
+- access/entitlement filtering always runs before private ranking;
 - personalization never changes Default versus Broadcast routing;
 - global importance and source coverage remain visible;
 - a user-specific ranking must never train the shared Bouncer by itself;
@@ -20,23 +21,36 @@ Personalization should change ordering, not editorial truth:
 
 ## Identity
 
-Use the existing keyed IP hash as the stable viewer identifier:
+Legacy saved/hidden/profile data continues to use the keyed IP hash during the
+non-destructive migration window. For You uses a random server-issued, signed,
+HttpOnly, SameSite=Lax browser cookie. Only an HMAC hash of that token becomes a
+JSON filename; neither the raw cookie nor raw IP is stored in recommendation
+events.
+
+```text
+browser token -> signed HttpOnly cookie -> keyed viewer hash
+```
+
+The former identity remains available only for routing diagnostics and an
+explicit `Continue as [name]?` migration offer:
 
 ```text
 viewer_key = SHA-256(IP_HASH_SECRET + normalized client IP)
 ```
 
-The display name is editable metadata attached to that key. Renaming a user
-must not create a new personalization identity.
+Renaming a user does not change the browser identity. Two browsers behind one
+NAT receive different private mixes. Resetting a desk clears its recommendation
+state and expires its cookie without deleting legacy rollback data.
 
-Personalization data should be isolated by both:
+Legacy behavior remains isolated by:
 
 ```text
 viewer_key + active_profile
 ```
 
-An employee's Default interests must not reorder the Broadcast feed, or vice
-versa.
+For You state is isolated by browser viewer hash. During legacy routing it ranks
+only the viewer's active profile corpus. Unified-corpus mode stays disabled
+until the shadow reconciliation is explicitly signed off.
 
 ## Signals
 
@@ -181,13 +195,22 @@ news_scrapper\runtime\
 ├── viewer_personalization.json
 ├── viewer_saved_store.json
 ├── viewer_profiles.json
-└── usage_tracker.json
+├── usage_tracker.json
+├── scheduler_state.json
+├── recommendation\viewers\<hashed-browser-viewer>.json
+└── unified_shadow\
+    ├── sites_unified.shadow.json
+    ├── source_collision_report.json
+    ├── latest_parity_report.json
+    └── history\briefing_<run-id>.json
 ```
 
-Personalization writes use `JsonStore` atomic replacement and process-level
-locks. The older saved/profile/tracker stores keep their existing locked,
-temporary-file replacement paths so this feature does not create a second
-source of truth for those records.
+Recommendation writes use stable per-viewer `JsonStore` instances, atomic
+replacement, bounded retention, and process-level locks. Passive events are
+batched, idempotent, and accepted only for articles served to that browser.
+The older saved/profile/tracker stores keep their existing locked temporary-file
+replacement paths so this rollout does not destructively create a second source
+of truth for those records.
 Keep event history bounded to 30 days, but do not delete saved article
 snapshots. Every record is isolated by the keyed viewer identity and active
 Default/Broadcast profile.
@@ -197,6 +220,8 @@ Default/Broadcast profile.
 JSON is acceptable for the current internal pilot, but personalized ranking
 adds frequent writes. Before running multiple Uvicorn workers or serving a
 substantially larger audience, move these stores to a transactional database.
+
+Run one Uvicorn worker. The scheduler and JSON locks are process-local.
 
 ## User controls and explainability
 
@@ -208,3 +233,9 @@ substantially larger audience, move these stores to a transactional database.
   object containing reasons and saved-story match metadata.
 - the UI shows a short-lived “Personalized for …” notice and marks related
   stories as “Update to a story you saved”.
+- `/viewer/recommendation-status` exposes feature capabilities without secrets;
+- `/viewer/preferences` supports Edit, Pause, and Reset;
+- `/viewer/recommendation-events` accepts batched qualified impressions and
+  meaningful actions without training the shared Bouncer;
+- `/analytics/recommendation-summary` returns aggregate quality rates only;
+- every For You card carries stable reason codes and a `Why this story?` view.

@@ -11,6 +11,7 @@ import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import './history-redesign.css';
 
 const TODAY = new Date().toISOString().slice(0, 10);
+const ARCHIVE_PAGE_SIZE = 48;
 
 const EMPTY_FILTERS = {
   text: '',
@@ -105,7 +106,7 @@ function ArchiveMetric({ icon, label, value, detail }) {
   );
 }
 
-function ArchiveStoryCard({ item, checked, inWorkflow, onCheck, onOpen, onImport }) {
+function ArchiveStoryCard({ item, checked, inWorkflow, busy, onCheck, onOpen, onImport }) {
   const score = scoreOf(item);
   const parsedSourceCount = Number(item.source_count || 1);
   const sourceCount = Number.isFinite(parsedSourceCount) && parsedSourceCount > 0 ? parsedSourceCount : 1;
@@ -119,6 +120,7 @@ function ArchiveStoryCard({ item, checked, inWorkflow, onCheck, onOpen, onImport
         <label className="archive-v2-story-check">
           <input
             checked={checked}
+            disabled={busy}
             onChange={(event) => onCheck(item, event.target.checked)}
             type="checkbox"
           />
@@ -161,8 +163,8 @@ function ArchiveStoryCard({ item, checked, inWorkflow, onCheck, onOpen, onImport
           {inWorkflow ? (
             <span className="archive-v2-workflow-state"><Icon name="check2" size={15} /> In review</span>
           ) : (
-            <button className="archive-v2-import-one" onClick={() => onImport(item)} type="button">
-              <Icon name="upload" size={15} /> Add to review
+            <button className="archive-v2-import-one" disabled={busy} onClick={() => onImport(item)} type="button">
+              <Icon name="upload" size={15} /> {busy ? 'Working…' : 'Add to review'}
             </button>
           )}
         </div>
@@ -261,21 +263,33 @@ export default function HistoryScreen() {
   const [workflowKeys, setWorkflowKeys] = useState(new Set());
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState('');
+  const [workflowWarning, setWorkflowWarning] = useState('');
   const [draftExportOpen, setDraftExportOpen] = useState(false);
+  const [renderLimit, setRenderLimit] = useState(ARCHIVE_PAGE_SIZE);
 
   const updateFilter = (key, value) => {
+    setRenderLimit(ARCHIVE_PAGE_SIZE);
     setFilters((current) => ({ ...current, [key]: value }));
   };
 
-  const resetFilters = () => setFilters({ ...EMPTY_FILTERS });
+  const resetFilters = () => {
+    setRenderLimit(ARCHIVE_PAGE_SIZE);
+    setFilters({ ...EMPTY_FILTERS });
+  };
 
   const loadArchiveRange = async (nextFrom = from, nextTo = to) => {
+    if (!nextFrom || !nextTo || nextFrom > nextTo) {
+      setErr('Choose a valid range where the start date is not after the end date.');
+      setSearched(true);
+      return;
+    }
     setLoading(true);
     setErr('');
     setSearched(true);
     setActiveRunLabel('');
     setNotice('');
     setCheckedKeys(new Set());
+    setRenderLimit(ARCHIVE_PAGE_SIZE);
 
     try {
       const [rangeData, runList] = await Promise.all([
@@ -302,14 +316,22 @@ export default function HistoryScreen() {
     }
   };
 
-  useEffect(() => {
-    loadArchiveRange();
-    getWorkflow().then((result) => {
+  const loadWorkflowState = async () => {
+    setWorkflowWarning('');
+    try {
+      const result = await getWorkflow();
       setWorkflowKeys(new Set([
         ...normalizeList(result?.selected || []),
         ...normalizeList(result?.approved || []),
       ].map(articleKey)));
-    }).catch(() => {});
+    } catch (error) {
+      setWorkflowWarning(error?.message || 'Review Queue status could not be loaded. Archive search and export still work.');
+    }
+  };
+
+  useEffect(() => {
+    loadArchiveRange();
+    loadWorkflowState();
   }, []);
 
   const setPreset = (days) => {
@@ -326,6 +348,7 @@ export default function HistoryScreen() {
     setActiveRunLabel(run.label);
     setNotice('');
     setCheckedKeys(new Set());
+    setRenderLimit(ARCHIVE_PAGE_SIZE);
 
     try {
       const data = await getHistoryFile(run.filename);
@@ -363,14 +386,18 @@ export default function HistoryScreen() {
 
   const loadedMetrics = useMemo(() => metricSummary(articles), [articles]);
   const visibleMetrics = useMemo(() => metricSummary(filteredArticles), [filteredArticles]);
-  const articleGroups = useMemo(() => groupedByDate(filteredArticles), [filteredArticles]);
+  const renderedArticles = useMemo(
+    () => filteredArticles.slice(0, renderLimit),
+    [filteredArticles, renderLimit],
+  );
+  const articleGroups = useMemo(() => groupedByDate(renderedArticles), [renderedArticles]);
   const keywords = topKeywords(articles, 6);
   const checkedArticles = useMemo(
     () => articles.filter((item) => checkedKeys.has(articleKey(item))),
     [articles, checkedKeys],
   );
   const activeFilters = filterCount(filters);
-  const selectableVisible = filteredArticles.slice(0, 100);
+  const selectableVisible = renderedArticles.slice(0, 100);
   const allVisibleChecked = Boolean(selectableVisible.length)
     && selectableVisible.every((item) => checkedKeys.has(articleKey(item)));
 
@@ -383,8 +410,8 @@ export default function HistoryScreen() {
       });
       return next;
     });
-    if (!allVisibleChecked && filteredArticles.length > 100) {
-      setNotice('The first 100 visible signals are checked. Import them, then continue with the next group.');
+    if (!allVisibleChecked && renderedArticles.length > 100) {
+      setNotice('The first 100 rendered signals are checked. Import them, then continue with the next group.');
     }
   };
 
@@ -634,6 +661,7 @@ export default function HistoryScreen() {
             <h2 id="archive-results-title">{activeRunLabel || 'Combined archive desk'}</h2>
             <p aria-live="polite">
               {filteredArticles.length} of {articles.length} signal{articles.length === 1 ? '' : 's'} visible
+              {renderedArticles.length < filteredArticles.length ? ` · ${renderedArticles.length} rendered` : ''}
               {checkedArticles.length ? ` · ${checkedArticles.length} selected` : ''}
             </p>
           </div>
@@ -646,7 +674,7 @@ export default function HistoryScreen() {
               type="button"
             >
               <Icon name="check" size={15} />
-              {allVisibleChecked ? 'Clear visible' : filteredArticles.length > 100 ? 'Select first 100' : 'Select visible'}
+              {allVisibleChecked ? 'Clear rendered' : renderedArticles.length > 100 ? 'Select first 100' : 'Select rendered'}
             </button>
             <button
               className="archive-v2-secondary-button"
@@ -678,6 +706,14 @@ export default function HistoryScreen() {
             <Icon name="check2" size={18} />
             <span>{notice}</span>
             <button onClick={() => setNotice('')} type="button" aria-label="Dismiss archive notice"><Icon name="x" size={14} /></button>
+          </div>
+        )}
+
+        {workflowWarning && (
+          <div className="archive-v2-notice is-warning" role="status">
+            <Icon name="warning" size={18} />
+            <span>Review Queue markers are temporarily unavailable. {workflowWarning}</span>
+            <button onClick={loadWorkflowState} type="button" aria-label="Retry loading Review Queue status"><Icon name="refresh" size={14} /></button>
           </div>
         )}
 
@@ -728,6 +764,7 @@ export default function HistoryScreen() {
                 <div className="archive-v2-story-grid">
                   {items.map((item, index) => (
                     <ArchiveStoryCard
+                      busy={importing}
                       checked={checkedKeys.has(articleKey(item))}
                       inWorkflow={workflowKeys.has(articleKey(item))}
                       key={articleKey(item) || `${day}-${index}`}
@@ -744,6 +781,22 @@ export default function HistoryScreen() {
                 </div>
               </section>
             ))}
+            {renderedArticles.length < filteredArticles.length && (
+              <div className="archive-v2-load-more" role="status">
+                <p>
+                  Showing {renderedArticles.length} of {filteredArticles.length} matching signals.
+                  Load another group when you are ready.
+                </p>
+                <button
+                  className="archive-v2-secondary-button"
+                  onClick={() => setRenderLimit((current) => current + ARCHIVE_PAGE_SIZE)}
+                  type="button"
+                >
+                  <Icon name="chevD" size={15} />
+                  Show next {Math.min(ARCHIVE_PAGE_SIZE, filteredArticles.length - renderedArticles.length)}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>

@@ -10,14 +10,12 @@ Important clarification:
 
 The training flow is:
 
-1. Read human feedback rows from `trainingData.json` or
-   `trainingData_broadcast.json`.
+1. Read all human feedback rows from the unified `trainingData.json`.
 2. Convert each row into the exact same text shape used at runtime.
 3. Use the local `local_miniLM_model/` SentenceTransformer folder to turn each
    text row into an embedding vector.
 4. Train a small scikit-learn LogisticRegression classifier on those vectors.
-5. Save the classifier as `bouncer_model.pkl` or
-   `bouncer_model_broadcast.pkl`.
+5. Save the classifier as the single authoritative `bouncer_model.pkl`.
 
 There is no article text upload in this file. The embedder is loaded from a
 local filesystem path, and `--offline` additionally sets Hugging Face offline
@@ -45,8 +43,10 @@ PROFILE_CONFIGS = {
         "model_file": BASE_DIR / "bouncer_model.pkl",
     },
     "broadcast": {
-        "training_file": BASE_DIR / "trainingData_broadcast.json",
-        "model_file": BASE_DIR / "bouncer_model_broadcast.pkl",
+        # Compatibility alias for old maintenance commands. The API never
+        # loads a different file from the one this command replaces.
+        "training_file": BASE_DIR / "trainingData.json",
+        "model_file": BASE_DIR / "bouncer_model.pkl",
     },
 }
 

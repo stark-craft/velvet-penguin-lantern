@@ -1,8 +1,11 @@
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from fastapi import HTTPException
 from starlette.requests import Request
 
 from core.storage import JsonStore
@@ -167,6 +170,147 @@ class PersonalBriefingTests(unittest.TestCase):
 
         self.assertEqual(resumed["status"], "queued")
         executor.submit.assert_called_once()
+
+    def test_create_dispatch_failure_is_persisted_and_retryable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(Path(directory) / "briefings.json", dict)
+            executor = Mock()
+            executor.submit.side_effect = RuntimeError("executor stopped")
+            with (
+                patch.object(application, "PERSONAL_BRIEFING_STORE", store),
+                patch.object(application, "personal_briefing_executor", executor),
+                patch.object(
+                    application,
+                    "assert_public_article_url",
+                    side_effect=lambda value: value,
+                ),
+                patch.object(application, "record_usage_activity", return_value=True),
+            ):
+                result = application.create_personal_url_briefings(
+                    request_from(),
+                    {"urls": ["https://example.com/story"]},
+                )
+                viewer_key = application.get_viewer_key("10.0.0.25")
+                persisted = store.read()[viewer_key]["default"][0]
+
+        self.assertEqual(result["status"], "partial")
+        self.assertTrue(result["dispatch_failures"][0]["retryable"])
+        self.assertEqual(result["accepted"][0]["stage"], "dispatch_failed")
+        self.assertEqual(persisted["status"], "failed")
+        self.assertEqual(persisted["stage"], "dispatch_failed")
+
+    def test_retry_is_single_claim_under_concurrent_clicks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(Path(directory) / "briefings.json", dict)
+            viewer_key = application.get_viewer_key("10.0.0.25")
+            store.write(
+                {
+                    viewer_key: {
+                        "default": [
+                            {
+                                "id": "failed-job",
+                                "url": "https://example.com/story",
+                                "status": "failed",
+                                "stage": "failed",
+                            }
+                        ]
+                    }
+                }
+            )
+            submit_count = 0
+            submit_lock = threading.Lock()
+
+            class Executor:
+                def submit(self, *args):
+                    nonlocal submit_count
+                    with submit_lock:
+                        submit_count += 1
+
+            with (
+                patch.object(application, "PERSONAL_BRIEFING_STORE", store),
+                patch.object(application, "personal_briefing_executor", Executor()),
+            ):
+                with ThreadPoolExecutor(max_workers=12) as pool:
+                    results = list(
+                        pool.map(
+                            lambda _: application.retry_personal_url_briefing(
+                                "failed-job", request_from()
+                            ),
+                            range(20),
+                        )
+                    )
+
+        self.assertEqual(submit_count, 1)
+        self.assertEqual(
+            sum(result["status"] == "queued" for result in results),
+            1,
+        )
+        self.assertEqual(
+            sum(result["status"] == "already_running" for result in results),
+            19,
+        )
+
+    def test_retry_dispatch_failure_returns_503_and_restores_failed_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(Path(directory) / "briefings.json", dict)
+            viewer_key = application.get_viewer_key("10.0.0.25")
+            store.write(
+                {
+                    viewer_key: {
+                        "default": [
+                            {
+                                "id": "failed-job",
+                                "url": "https://example.com/story",
+                                "status": "failed",
+                            }
+                        ]
+                    }
+                }
+            )
+            executor = Mock()
+            executor.submit.side_effect = RuntimeError("executor stopped")
+            with (
+                patch.object(application, "PERSONAL_BRIEFING_STORE", store),
+                patch.object(application, "personal_briefing_executor", executor),
+            ):
+                with self.assertRaises(HTTPException) as raised:
+                    application.retry_personal_url_briefing(
+                        "failed-job", request_from()
+                    )
+                persisted = store.read()[viewer_key]["default"][0]
+
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertTrue(raised.exception.detail["recoverable"])
+        self.assertEqual(persisted["status"], "failed")
+        self.assertEqual(persisted["stage"], "dispatch_failed")
+
+    def test_tracking_failure_does_not_undo_committed_url_job(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(Path(directory) / "briefings.json", dict)
+            with (
+                patch.object(application, "PERSONAL_BRIEFING_STORE", store),
+                patch.object(application, "personal_briefing_executor", Mock()),
+                patch.object(
+                    application,
+                    "assert_public_article_url",
+                    side_effect=lambda value: value,
+                ),
+                patch.object(
+                    application,
+                    "record_usage_activity",
+                    side_effect=OSError("tracker unavailable"),
+                ),
+            ):
+                result = application.create_personal_url_briefings(
+                    request_from(),
+                    {"urls": ["https://example.com/story"]},
+                )
+                viewer_key = application.get_viewer_key("10.0.0.25")
+                persisted = store.read()[viewer_key]["default"]
+
+        self.assertEqual(result["status"], "accepted")
+        self.assertFalse(result["activity_tracked"])
+        self.assertEqual(len(persisted), 1)
 
     def test_semantic_grouping_is_scoped_to_current_viewer(self):
         with tempfile.TemporaryDirectory() as directory:

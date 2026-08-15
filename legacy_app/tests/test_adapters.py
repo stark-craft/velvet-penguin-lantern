@@ -22,7 +22,7 @@ class AdapterContractTests(unittest.TestCase):
             }]
         }
         env = {"SAMSUNG_WEB_SEARCH_TOKEN": "secret-token", "SAMSUNG_WEB_SEARCH_CLIENT": "client-name"}
-        with patch.dict(os.environ, env, clear=False), patch.object(samsung_web_search.RATE_LIMITER, "acquire"), patch.object(samsung_web_search, "tls_verify", return_value=True), patch.object(samsung_web_search.requests, "post", return_value=response) as post:
+        with patch.dict(os.environ, env, clear=False), patch.object(samsung_web_search, "ENDPOINT", "https://example.test/company/search"), patch.object(samsung_web_search.RATE_LIMITER, "acquire"), patch.object(samsung_web_search, "tls_verify", return_value=True), patch.object(samsung_web_search.requests, "post", return_value=response) as post:
             item = samsung_web_search.enrich_article_with_web_search({
                 "title": "DTH operator launches new broadcast service",
                 "link": "https://publisher.example/dth-service",
@@ -134,7 +134,7 @@ class AdapterContractTests(unittest.TestCase):
             "status": "SUCCESS",
             "content": '{"title":"Broadcast update","summary_lead":"Executive summary.","key_points":["The operator launched a new service.","The rollout covers connected television devices.","The announcement affects distribution partners."],"ppt_summary":"Slide summary.","why_it_matters":"Strategic impact.","article_intent":"Product Launch","category":"Broadcasting","region":"Local","importance_score":8}',
         }
-        with patch.object(samsung_chat, "CLIENT", "client-name"), patch.object(samsung_chat, "TOKEN", "secret-token"), patch.object(samsung_chat, "MODEL_ID", "model-id"), patch.object(samsung_chat.RATE_LIMITER, "acquire"), patch.object(samsung_chat, "tls_verify", return_value=True), patch.object(samsung_chat.requests, "post", return_value=response) as post:
+        with patch.object(samsung_chat, "URL", "https://example.test/company/messages"), patch.object(samsung_chat, "CLIENT", "client-name"), patch.object(samsung_chat, "TOKEN", "secret-token"), patch.object(samsung_chat, "MODEL_ID", "model-id"), patch.object(samsung_chat.RATE_LIMITER, "acquire"), patch.object(samsung_chat, "tls_verify", return_value=True), patch.object(samsung_chat.requests, "post", return_value=response) as post:
             item = samsung_chat.summarize_article_with_chat({"title": "Old title", "full_contents": "Broadcast article facts."})
         self.assertEqual(item["chat_summary_status"], "success")
         self.assertEqual(item["summary_lead"], "Executive summary.")
@@ -148,18 +148,16 @@ class AdapterContractTests(unittest.TestCase):
         self.assertFalse(request["stream"])
         self.assertEqual(request["headers"]["x-openapi-token"], "Bearer secret-token")
 
-    def test_chat_normalizes_legacy_base_url_to_messages_route(self):
+    def test_chat_normalizes_configured_url_without_inventing_a_private_route(self):
         self.assertEqual(
             samsung_chat.normalize_chat_url(
-                "https://example.test/swahq/trial/api-chat/"
+                "https://example.test/company/messages/"
             ),
-            "https://example.test/swahq/trial/api-chat/openapi/chat/v1/messages",
+            "https://example.test/company/messages",
         )
         self.assertEqual(
-            samsung_chat.normalize_chat_url(
-                "https://example.test/openapi/chat/v1/messages"
-            ),
-            "https://example.test/openapi/chat/v1/messages",
+            samsung_chat.normalize_chat_url(""),
+            "",
         )
 
     def test_chat_404_diagnostic_is_specific_and_redacts_tokens(self):
@@ -170,6 +168,7 @@ class AdapterContractTests(unittest.TestCase):
             "eyJabcdefghijklmnopqrstuvwxyz.abcdefghijklmnopqrstuvwxyz.signaturevalue123456789"
         )
         with (
+            patch.object(samsung_chat, "URL", "https://example.test/company/messages"),
             patch.object(samsung_chat, "CLIENT", "client-name"),
             patch.object(samsung_chat, "TOKEN", "secret-token"),
             patch.object(samsung_chat, "MODEL_ID", "model-id"),
@@ -182,7 +181,7 @@ class AdapterContractTests(unittest.TestCase):
                 samsung_chat.call_samsung_chat("health")
         message = str(raised.exception)
         self.assertIn("HTTP 404", message)
-        self.assertIn("/openapi/chat/v1/messages", message)
+        self.assertIn("full messages endpoint", message)
         self.assertNotIn("eyJabcdefghijklmnopqrstuvwxyz", message)
 
     def test_chat_rejects_unstructured_summary_without_key_points(self):

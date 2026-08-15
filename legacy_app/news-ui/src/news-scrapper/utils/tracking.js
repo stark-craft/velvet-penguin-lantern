@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { getFingerprint } from './session.js';
 import { trackEvent } from '../api.js';
 
@@ -36,10 +36,7 @@ export function articleActivityDetail(item, screen = 'unknown') {
 
 // Hook: page_load on mount + 60s heartbeat
 export function useTracking(pageName) {
-  const fired = useRef(false);
   useEffect(() => {
-    if (fired.current) return;
-    fired.current = true;
     trackAction('page_load', pageName);
     const t = setInterval(() => trackAction('heartbeat', pageName), 60_000);
     return () => clearInterval(t);

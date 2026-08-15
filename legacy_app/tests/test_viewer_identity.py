@@ -171,7 +171,7 @@ class ViewerIdentityTests(unittest.TestCase):
         restored = main.restore_for_current_viewer(owner_request, article)
         self.assertEqual(restored["count"], 0)
 
-    def test_saved_for_later_is_private_and_profile_scoped(self):
+    def test_saved_for_later_is_private_in_the_unified_corpus(self):
         owner_request = request_from("10.0.0.25")
         other_request = request_from("10.0.0.30")
         article = {
@@ -196,9 +196,9 @@ class ViewerIdentityTests(unittest.TestCase):
         with patch.object(main, "BROADCAST_SPECIAL_IPS", {"10.0.0.25"}):
             self.assertEqual(
                 main.get_personal_saved(owner_request)["profile"],
-                main.BROADCAST_PROFILE,
+                main.DEFAULT_PROFILE,
             )
-            self.assertEqual(main.get_personal_saved(owner_request)["count"], 0)
+            self.assertEqual(main.get_personal_saved(owner_request)["count"], 1)
 
         other_saved = main.save_for_current_viewer(
             other_request,

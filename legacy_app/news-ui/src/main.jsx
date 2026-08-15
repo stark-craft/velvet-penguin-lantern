@@ -1,7 +1,11 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
+import "@fontsource-variable/geist/wght.css";
 import ErrorBoundary from "./shared/components/ErrorBoundary.jsx";
+import GuidePet from "./shared/guide/GuidePet.jsx";
+import { GuidePetProvider } from "./shared/guide/GuidePetContext.jsx";
+import "./shared/guide/guide-pet.css";
 import { LanguageProvider } from "./news-scrapper/translation/LanguageProvider.jsx";
 
 async function launch() {
@@ -28,7 +32,10 @@ async function launch() {
   const application = (
     <LanguageProvider>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <App />
+        <GuidePetProvider>
+          <App />
+          <GuidePet />
+        </GuidePetProvider>
       </BrowserRouter>
     </LanguageProvider>
   );

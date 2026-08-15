@@ -1,10 +1,17 @@
 // Thin API wrappers. In dev, vite proxies these paths to the backend.
 import { getFingerprint, getSessionId } from './utils/session.js';
 
-const BASE = import.meta.env.VITE_API_BASE || '';
+// Always use same-origin API paths. Vite proxies these paths during local
+// development, while the production bundle is served by the same FastAPI app
+// that owns the endpoints. Baking localhost or a machine name into the bundle
+// would make a copied Windows build call the viewer's own PC instead.
+const BASE = '';
 
 function selectedProfileOverride() {
   if (typeof window === 'undefined') return '';
+  const developerSwitcherEnabled = import.meta.env.DEV
+    && String(import.meta.env.VITE_ENABLE_PROFILE_SWITCHER || '').toLowerCase() === 'true';
+  if (!developerSwitcherEnabled) return '';
   const value = localStorage.getItem('news-profile-override');
   return value === 'broadcast' || value === 'default' ? value : '';
 }
@@ -19,21 +26,28 @@ async function jsonFetch(url, opts = {}) {
       ...(opts.headers || {}),
     },
   });
-  if (!res.ok) {
-    const contentType = res.headers.get('content-type') || '';
-    let detail = '';
-    if (contentType.includes('application/json')) {
-      const body = await res.json().catch(() => ({}));
-      detail = body?.detail || body?.message || '';
-    } else {
-      detail = await res.text().catch(() => '');
-    }
+  const contentType = res.headers.get('content-type') || '';
+  const body = contentType.includes('application/json')
+    ? await res.json().catch(() => ({}))
+    : await res.text().catch(() => '');
+  if (!res.ok || (body && typeof body === 'object' && body.status === 'error')) {
+    const rawDetail = body && typeof body === 'object'
+      ? body.detail || body.message || ''
+      : body;
+    const detail = rawDetail && typeof rawDetail === 'object'
+      ? rawDetail.message || rawDetail.cause || ''
+      : rawDetail;
     const error = new Error(detail || `${res.status} ${res.statusText}`);
     error.status = res.status;
+    error.payload = body;
+    if (rawDetail && typeof rawDetail === 'object') {
+      error.operation = rawDetail.operation;
+      error.operationState = rawDetail.state;
+      error.recoverable = Boolean(rawDetail.recoverable);
+    }
     throw error;
   }
-  const ct = res.headers.get('content-type') || '';
-  return ct.includes('application/json') ? res.json() : res.text();
+  return body;
 }
 
 function normalizeKeywordsForApi(keywords) {
@@ -49,6 +63,7 @@ function normalizeKeywordsForApi(keywords) {
 
 // ---------- Briefing / feed ----------
 export const getLatestBriefing = () => jsonFetch('/latest-briefing');
+export const getSharedBriefing = () => jsonFetch('/briefing/shared/latest');
 export const getBriefingMeta   = () => jsonFetch('/briefing/meta');
 export const removeFromBriefing  = (title)   => jsonFetch('/briefing/remove',  { method:'POST', body: JSON.stringify({ title }) });
 export const restoreToBriefing   = (article) => jsonFetch('/briefing/restore', { method:'POST', body: JSON.stringify({ article }) });
@@ -56,6 +71,8 @@ export const getInsight = (article) => jsonFetch('/insight', { method:'POST', bo
 
 // ---------- Per-browser English -> Korean translation ----------
 export const getKoreanTranslationStatus = () => jsonFetch('/translation/status');
+export const warmupKoreanTranslation = () =>
+  jsonFetch('/translation/warmup', { method: 'POST' });
 export const translateToKorean = (texts) =>
   jsonFetch('/translation/korean', {
     method: 'POST',
@@ -107,21 +124,20 @@ export const markNotInterested = (article) =>
 export const restoreNotInterested = (title) =>
   jsonFetch('/not-interested/restore', { method:'POST', body: JSON.stringify({ title }) });
 
-// Convenience: full not-interested flow (also removes from briefing)
+// The backend commits the global Not Interested decision and shared briefing
+// mutation as one recoverable operation. Never recreate the old two-request
+// sequence here: it could leave the two JSON stores disagreeing.
 export async function rejectArticle(article) {
-  const res = await markNotInterested(article);
-  try { await removeFromBriefing(article.title); } catch {}
-  return res;
+  return markNotInterested(article);
 }
 export async function unrejectArticle(article) {
-  const res = await restoreNotInterested(article.title);
-  try { await restoreToBriefing(article); } catch {}
-  return res;
+  return restoreNotInterested(article.title);
 }
 
 // ---------- Personal hidden signals ----------
-// These endpoints are viewer/IP-hash scoped. They never train the bouncer and
-// never remove an article from another user's feed.
+// Hidden signals retain their legacy viewer/IP-hash scope. They never train
+// the bouncer and never remove an article from another user's feed. Saved
+// Signals and private URL briefings below use the signed browser identity.
 export const getViewerHidden = () => jsonFetch('/viewer/hidden');
 export const hideArticleForViewer = (article) =>
   jsonFetch('/viewer/hidden', { method:'POST', body: JSON.stringify(article) });
@@ -168,6 +184,37 @@ export const clearViewerBriefings = async (scope = 'finished') =>
 export const getViewerPersonalization = () => jsonFetch('/viewer/personalization');
 export const resetViewerPersonalization = () =>
   jsonFetch('/viewer/personalization/reset', { method: 'POST' });
+
+// ---------- Explainable For You ----------
+export const getRecommendationStatus = () => jsonFetch('/viewer/recommendation-status');
+export const getViewerPreferences = () => jsonFetch('/viewer/preferences');
+export const updateViewerPreferences = (preferences) =>
+  jsonFetch('/viewer/preferences', { method: 'PUT', body: JSON.stringify(preferences) });
+export const completeViewerPreferences = (preferences) =>
+  jsonFetch('/viewer/preferences/complete', { method: 'POST', body: JSON.stringify(preferences) });
+export const confirmViewerMigration = (confirmed = true) =>
+  jsonFetch('/viewer/preferences/migrate', {
+    method: 'POST',
+    body: JSON.stringify({ confirmed: Boolean(confirmed) }),
+  });
+export const pauseViewerPersonalization = (paused) =>
+  jsonFetch('/viewer/preferences/pause', { method: 'POST', body: JSON.stringify({ paused }) });
+export const resetRecommendationProfile = () =>
+  jsonFetch('/viewer/preferences/reset', { method: 'POST' });
+export function getForYou({ cursor = '', limit = 20 } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  // Keep the JSON request under /viewer so Vite can proxy it without taking
+  // ownership of the browser's /for-you SPA deep link. The backend retains
+  // GET /for-you as a documented API alias for non-browser clients.
+  return jsonFetch(`/viewer/for-you?${params.toString()}`);
+}
+export const sendRecommendationEvents = (feedRequestId, events, options = {}) =>
+  jsonFetch('/viewer/recommendation-events', {
+    method: 'POST',
+    body: JSON.stringify({ feed_request_id: feedRequestId || '', events }),
+    ...options,
+  });
 
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
@@ -228,6 +275,10 @@ export const getTrendsAccess = () => jsonFetch('/trends/access');
 export const getAnalytics = (key) => {
   const u = new URLSearchParams({ key });
   return jsonFetch('/analytics?' + u.toString());
+};
+export const getRecommendationAnalytics = (key) => {
+  const u = new URLSearchParams({ key });
+  return jsonFetch('/analytics/recommendation-summary?' + u.toString());
 };
 
 // ---------- Gatekeeper Review ----------
@@ -368,11 +419,12 @@ async function exportBinary(path, items, filename) {
     throw new Error('Export failed: no items selected');
   }
 
+  const profileOverride = selectedProfileOverride();
   const res = await fetch(BASE + path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Sense-Profile': selectedProfile(),
+      ...(profileOverride ? { 'X-Sense-Profile': profileOverride } : {}),
     },
     body: JSON.stringify({
       items: payloadItems,

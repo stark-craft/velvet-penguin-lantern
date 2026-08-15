@@ -1,0 +1,410 @@
+.sense-guide-root {
+  --guide-accent: #91f4d5;
+  --guide-blue: #7897ff;
+  --guide-motion: cubic-bezier(.22, 1, .36, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  pointer-events: none;
+  isolation: isolate;
+  transition: none !important;
+}
+
+.sense-guide-hole {
+  position: fixed;
+  right: 22px;
+  bottom: 12px;
+  width: 112px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(2, 8, 17, .96) 0 48%, rgba(93, 123, 255, .35) 62%, transparent 74%);
+  box-shadow: 0 0 24px rgba(94, 129, 255, .2);
+  transform: translate3d(0, 0, 0) scaleX(.92) scaleY(.94);
+  transform-origin: 50% 50%;
+  opacity: .9;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transition: none !important;
+  z-index: 1;
+}
+
+.sense-guide-hole::before,
+.sense-guide-hole::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: none !important;
+}
+
+.sense-guide-hole::before {
+  border: 1px solid rgba(145, 244, 213, .24);
+  box-shadow: 0 0 16px rgba(120, 151, 255, .24), inset 0 0 12px rgba(145, 244, 213, .08);
+  opacity: .72;
+}
+
+.sense-guide-hole::after {
+  inset: 7px 19px;
+  background: rgba(0, 0, 0, .62);
+  filter: blur(4px);
+  opacity: .9;
+}
+
+.sense-guide-pet {
+  position: fixed;
+  right: 15px;
+  bottom: 22px;
+  width: 122px;
+  height: 116px;
+  padding: 0;
+  border: 0;
+  border-radius: 44px;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate3d(0, 0, 0);
+  transition: transform .42s var(--guide-motion);
+  will-change: transform;
+  backface-visibility: hidden;
+  -webkit-tap-highlight-color: transparent;
+  z-index: 3;
+}
+
+.sense-guide-pet::after {
+  content: "";
+  position: absolute;
+  right: 13px;
+  bottom: 5px;
+  left: 13px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .42);
+  filter: blur(11px);
+  opacity: .7;
+  transform: translate3d(0, 0, -1px);
+  transition: transform .42s var(--guide-motion), opacity .42s ease;
+  z-index: -1;
+}
+
+.sense-guide-pet:hover,
+.sense-guide-pet:focus-visible {
+  transform: translate3d(0, -4px, 0) rotateZ(-1deg);
+}
+
+.sense-guide-pet:hover::after,
+.sense-guide-pet:focus-visible::after {
+  opacity: .5;
+  transform: translate3d(0, 4px, -1px) scaleX(.92);
+}
+
+.sense-guide-pet:focus-visible {
+  outline: 3px solid rgba(145, 244, 213, .68);
+  outline-offset: 3px;
+}
+
+.sense-scoutling {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform-origin: 50% 95%;
+  animation: sense-scout-float 5.8s cubic-bezier(.45, 0, .55, 1) infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+  transition: none;
+}
+
+.sense-scoutling.is-talking .sense-scout-mouth {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sense-scout-talk 1.8s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+
+.sense-scoutling.is-talking .sense-scout-arm-point {
+  transform-box: fill-box;
+  transform-origin: 92px 70px;
+  animation: sense-scout-point 2.8s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+
+.sense-scout-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sense-scout-blink 6.2s ease-in-out infinite;
+}
+
+.sense-guide-root.is-emerging .sense-guide-hole {
+  animation: sense-guide-hole-open .96s var(--guide-motion) both;
+}
+
+.sense-guide-root.is-emerging .sense-guide-hole::before {
+  animation: sense-guide-portal-ring .96s var(--guide-motion) both;
+}
+
+.sense-guide-root.is-emerging .sense-guide-pet {
+  animation: sense-guide-emerge .96s var(--guide-motion) both;
+}
+
+.sense-guide-root.is-emerging .sense-scoutling,
+.sense-guide-root.is-emerging .sense-scout-mouth,
+.sense-guide-root.is-emerging .sense-scout-arm-point,
+.sense-guide-root.is-emerging .sense-scout-eyes {
+  animation-play-state: paused;
+}
+
+.sense-guide-bubble {
+  position: fixed;
+  right: 118px;
+  bottom: 104px;
+  width: min(370px, calc(100vw - 32px));
+  border: 1px solid color-mix(in srgb, var(--guide-accent) 28%, transparent);
+  border-radius: 22px 22px 5px 22px;
+  padding: 17px;
+  background:
+    linear-gradient(145deg, rgba(20, 31, 49, .97), rgba(8, 15, 27, .98)),
+    #0c1422;
+  color: #edf6ff;
+  box-shadow: 0 26px 80px rgba(0, 0, 0, .43), inset 0 1px 0 rgba(255, 255, 255, .08);
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0);
+  animation: sense-guide-bubble-in .44s var(--guide-motion) .28s both;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transition: none !important;
+  z-index: 3;
+}
+
+.sense-guide-bubble-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sense-guide-bubble-head span {
+  color: #91f4d5;
+  font-size: .66rem;
+  font-weight: 820;
+  letter-spacing: .14em;
+}
+
+.sense-guide-bubble-head button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .045);
+  color: #b9c8d8;
+  font-size: 1.15rem;
+  cursor: pointer;
+  transition: border-color .22s ease, background-color .22s ease, color .22s ease, transform .22s var(--guide-motion);
+}
+
+.sense-guide-copy {
+  animation: sense-guide-copy-in .32s var(--guide-motion) both;
+}
+
+.sense-guide-copy > strong {
+  display: block;
+  margin-top: 9px;
+  color: #fff;
+  font-size: 1.04rem;
+  line-height: 1.25;
+  letter-spacing: -.015em;
+}
+
+.sense-guide-copy > p {
+  margin: 7px 0 0;
+  color: #acbccd;
+  font-size: .83rem;
+  line-height: 1.55;
+}
+
+.sense-guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.sense-guide-actions button {
+  min-height: 34px;
+  border: 1px solid rgba(171, 198, 222, .14);
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, .04);
+  color: #b9c8d8;
+  font-size: .73rem;
+  font-weight: 730;
+  cursor: pointer;
+  transition: border-color .22s ease, background-color .22s ease, color .22s ease, transform .22s var(--guide-motion);
+}
+
+.sense-guide-actions button:hover,
+.sense-guide-actions button:focus-visible {
+  border-color: rgba(145, 244, 213, .34);
+  color: #fff;
+  transform: translate3d(0, -1px, 0);
+}
+
+.sense-guide-actions button.is-primary {
+  border-color: rgba(145, 244, 213, .28);
+  background: linear-gradient(135deg, rgba(145, 244, 213, .18), rgba(120, 151, 255, .16));
+  color: #eafff8;
+}
+
+.sense-guide-highlight {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  border: 1px solid rgba(145, 244, 213, .46);
+  border-radius: 24px;
+  box-shadow: 0 0 0 5px rgba(145, 244, 213, .055), 0 0 36px rgba(112, 149, 255, .16);
+  opacity: 0;
+  transform: translate3d(0, 0, 0);
+  transition: transform .34s var(--guide-motion), width .34s var(--guide-motion), height .34s var(--guide-motion), opacity .22s ease;
+  will-change: transform, width, height, opacity;
+  backface-visibility: hidden;
+}
+
+.sense-guide-pointer {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  width: 100vw;
+  height: 100vh;
+  overflow: visible;
+  opacity: 0;
+  transition: opacity .26s ease;
+}
+
+.sense-guide-pointer path {
+  fill: none;
+  stroke: url(#sense-guide-pointer-gradient);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 5 7;
+  transition: none !important;
+}
+
+.sense-guide-root[data-target-visible="true"] .sense-guide-highlight {
+  opacity: .85;
+}
+
+.sense-guide-root[data-target-visible="true"] .sense-guide-pointer {
+  opacity: 1;
+}
+
+.sense-guide-root[data-tracking="true"] .sense-guide-highlight {
+  transition: opacity .16s ease;
+}
+
+html[data-theme="light"] .sense-guide-bubble {
+  border-color: rgba(41, 126, 142, .24);
+  background: linear-gradient(145deg, rgba(244, 248, 249, .98), rgba(227, 237, 244, .98));
+  color: #142636;
+  box-shadow: 0 24px 70px rgba(43, 73, 97, .18), inset 0 1px 0 rgba(255, 255, 255, .8);
+}
+
+html[data-theme="light"] .sense-guide-copy > strong { color: #102333; }
+html[data-theme="light"] .sense-guide-copy > p { color: #53697a; }
+html[data-theme="light"] .sense-guide-bubble-head span { color: #167a72; }
+html[data-theme="light"] .sense-guide-actions button,
+html[data-theme="light"] .sense-guide-bubble-head button {
+  border-color: rgba(30, 69, 94, .14);
+  background: rgba(255, 255, 255, .55);
+  color: #496073;
+}
+
+@keyframes sense-guide-emerge {
+  0% { transform: translate3d(0, 108px, 0) scale3d(.78, .78, 1); opacity: 0; }
+  64% { transform: translate3d(0, -5px, 0) scale3d(1.025, 1.025, 1); opacity: 1; }
+  82% { transform: translate3d(0, 2px, 0) scale3d(.994, .994, 1); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); opacity: 1; }
+}
+
+@keyframes sense-guide-hole-open {
+  0% { transform: translate3d(0, 0, 0) scaleX(.08) scaleY(.34); opacity: 0; }
+  55% { transform: translate3d(0, 0, 0) scaleX(1.06) scaleY(1.06); opacity: 1; }
+  100% { transform: translate3d(0, 0, 0) scaleX(.92) scaleY(.94); opacity: .9; }
+}
+
+@keyframes sense-guide-portal-ring {
+  0% { transform: scale3d(.22, .58, 1); opacity: 0; }
+  62% { transform: scale3d(1.16, 1.18, 1); opacity: .88; }
+  100% { transform: scale3d(1, 1, 1); opacity: .72; }
+}
+
+@keyframes sense-guide-bubble-in {
+  from { transform: translate3d(16px, 12px, 0) scale3d(.97, .97, 1); opacity: 0; }
+  to { transform: translate3d(0, 0, 0) scale3d(1, 1, 1); opacity: 1; }
+}
+
+@keyframes sense-guide-copy-in {
+  from { transform: translate3d(0, 5px, 0); opacity: 0; }
+  to { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+
+@keyframes sense-scout-float {
+  0%, 100% { transform: translate3d(0, 0, 0) rotateZ(-.45deg); }
+  50% { transform: translate3d(0, -3px, 0) rotateZ(.45deg); }
+}
+
+@keyframes sense-scout-talk {
+  0%, 30%, 68%, 100% { transform: scaleY(1); }
+  42% { transform: scaleY(.66); }
+  54% { transform: scaleY(.88); }
+}
+
+@keyframes sense-scout-point {
+  0%, 100% { transform: rotateZ(0deg); }
+  48% { transform: rotateZ(-4deg); }
+}
+
+@keyframes sense-scout-blink {
+  0%, 44%, 48%, 100% { transform: scaleY(1); }
+  46% { transform: scaleY(.1); }
+}
+
+@media (max-width: 720px) {
+  .sense-guide-pet {
+    right: 7px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    width: 92px;
+    height: 90px;
+  }
+
+  .sense-guide-hole {
+    right: 8px;
+    bottom: max(5px, env(safe-area-inset-bottom));
+    width: 90px;
+  }
+
+  .sense-guide-bubble {
+    right: 12px;
+    bottom: max(94px, calc(82px + env(safe-area-inset-bottom)));
+    width: calc(100vw - 24px);
+    max-height: min(47vh, 390px);
+    overflow-y: auto;
+    border-radius: 19px;
+  }
+
+  .sense-guide-highlight,
+  .sense-guide-pointer {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sense-guide-root *,
+  .sense-guide-root *::before,
+  .sense-guide-root *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import ArticleCard from '../components/ArticleCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
@@ -12,28 +12,46 @@ export default function RejectedScreen() {
   const [loading, setLoad] = useState(true);
   const [openArticle, setOpen] = useState(null);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [restoring, setRestoring] = useState(new Set());
+  const restoreLocks = useRef(new Set());
 
-  const refresh = () => {
+  const refresh = async () => {
+    if (loading && items.length) return;
     setLoad(true);
     setError('');
-    getViewerHidden()
-      .then((d) => setItems(normalizeList(d?.items || d || [])))
-      .catch((err) => setError(err?.message || 'Could not load your hidden signals.'))
-      .finally(() => setLoad(false));
+    try {
+      const result = await getViewerHidden();
+      setItems(normalizeList(result?.items || result || []));
+    } catch (err) {
+      setError(err?.message || 'Could not load your hidden signals.');
+    } finally {
+      setLoad(false);
+    }
   };
 
-  useEffect(refresh, []);
+  useEffect(() => { refresh(); }, []);
 
   const groups = useMemo(() => groupedByDate(items), [items]);
 
   const onRestore = async (item) => {
+    const key = item.id || item.title;
+    if (restoreLocks.current.has(key)) return;
+    restoreLocks.current.add(key);
+    setRestoring((current) => new Set(current).add(key));
     setError('');
+    setNotice('');
     try {
       await restoreArticleForViewer(item);
       setItems((arr) => arr.filter((x) => x.title !== item.title));
       trackAction('restore_personal_hidden', item.title?.slice(0, 60));
+      setOpen((current) => (current?.title === item.title ? null : current));
+      setNotice('Signal restored to your feed.');
     } catch (err) {
       setError(err?.message || 'Could not restore this signal.');
+    } finally {
+      restoreLocks.current.delete(key);
+      setRestoring((current) => { const next = new Set(current); next.delete(key); return next; });
     }
   };
 
@@ -54,15 +72,22 @@ export default function RejectedScreen() {
             <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">Review hidden intelligence</h1>
             <p className="mt-3 text-slate-400">{items.length} articles hidden only from your feed. These choices never train the bouncer.</p>
           </div>
-          <button className="btn-dark-secondary" onClick={refresh} type="button"><Icon name="refresh" /> Refresh</button>
+          <button className="btn-dark-secondary" disabled={loading} onClick={refresh} type="button"><Icon name="refresh" /> {loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
       </section>
 
       {error && <div className="error-banner" role="alert">{error}</div>}
+      {notice && <div className="personal-notice" role="status">{notice}</div>}
 
       {loading ? (
         <div className="workspace-empty rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
           <h2 className="text-xl font-semibold text-white">Loading Hidden Signals</h2>
+        </div>
+      ) : error && items.length === 0 ? (
+        <div className="workspace-empty rounded-[24px] border border-red-300/20 bg-red-950/20 p-10 text-center">
+          <h2 className="text-xl font-semibold text-white">Hidden Signals could not be loaded</h2>
+          <p className="mt-2 text-red-200/80">Your hidden choices are safe. Try the request again.</p>
+          <button className="btn-dark-secondary mt-4" onClick={refresh} type="button"><Icon name="refresh" /> Try again</button>
         </div>
       ) : items.length === 0 ? (
         <div className="workspace-empty rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
@@ -87,8 +112,8 @@ export default function RejectedScreen() {
                     </div>
                     <ArticleCard item={{ ...item, rejected_at: item.rejected_at || 'Hidden' }} variant={cardVariant(item)} onOpen={setOpen} />
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
-                      <button className="btn-dark-primary h-9" onClick={() => onRestore(item)} type="button">
-                        <Icon name="rotate" /> Restore Signal
+                      <button aria-busy={restoring.has(item.id || item.title)} className="btn-dark-primary h-9" disabled={restoring.has(item.id || item.title)} onClick={() => onRestore(item)} type="button">
+                        <Icon name="rotate" /> {restoring.has(item.id || item.title) ? 'Restoring…' : 'Restore Signal'}
                       </button>
                       <span className="hidden-state-label"><Icon name="eye" size={14} /> Remains hidden</span>
                       <button className="btn-dark-secondary h-9" onClick={() => setOpen(item)} type="button">Open Dossier</button>

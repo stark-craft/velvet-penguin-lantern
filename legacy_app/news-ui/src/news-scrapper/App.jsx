@@ -20,13 +20,17 @@ import VocScreen from "./screens/VocScreen.jsx";
 import AnalyticsScreen from "./screens/AnalyticsScreen.jsx";
 import GatekeeperReviewScreen from "./screens/GatekeeperReviewScreen.jsx";
 import SavedScreen from "./screens/SavedScreen.jsx";
+import ForYouScreen from "./for-you/ForYouScreen.jsx";
 import UserProfileModal from "./components/UserProfileModal.jsx";
-import { getViewerProfile } from "./api.js";
+import Icon from "./components/Icon.jsx";
+import { getRecommendationStatus, getViewerProfile } from "./api.js";
 import { useLanguage } from "./translation/LanguageProvider.jsx";
 import "./styles/personalization.css";
 const SENSE_ATMOSPHERE_VIDEO =
   "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260328_065045_c44942da-53c6-4804-b734-f9e07fc22e08.mp4";
 const THEME_STORAGE_KEY = "news-theme";
+const PROFILE_SWITCHER_ENABLED = import.meta.env.DEV
+  && String(import.meta.env.VITE_ENABLE_PROFILE_SWITCHER || "").toLowerCase() === "true";
 
 function readStoredTheme() {
   if (typeof window === "undefined") return "dark";
@@ -69,14 +73,19 @@ export default function App() {
   const { pathname } = useLocation();
   useTracking(pathname);
   const manualAbortRef = useRef(null);
+  const mainRef = useRef(null);
+  const previousPathRef = useRef(pathname);
   const [theme, setTheme] = useState(readStoredTheme);
   const { language, toggleLanguage, translationState } = useLanguage();
-  const [activeProfile, setActiveProfile] = useState(readStoredProfile);
+  const [activeProfile, setActiveProfile] = useState("default");
   const [viewer, setViewer] = useState(null);
   const [viewerLoading, setViewerLoading] = useState(true);
+  const [viewerError, setViewerError] = useState("");
+  const [viewerLoadAttempt, setViewerLoadAttempt] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileRequired, setProfileRequired] = useState(false);
   const [viewerRevision, setViewerRevision] = useState(0);
+  const [recommendationStatus, setRecommendationStatus] = useState(null);
   const [manualScan, setManualScan] = useState({
     query: "",
     from: "",
@@ -98,6 +107,14 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
+    const unified = recommendationStatus?.profile_mode !== "legacy";
+    if (unified) {
+      localStorage.removeItem("news-profile-override");
+      localStorage.removeItem("news-profile");
+      setActiveProfile("default");
+      document.documentElement.dataset.profile = "default";
+      return undefined;
+    }
     const syncProfile = (event) => {
       const nextProfile =
         event?.detail === "broadcast" || readStoredProfile() === "broadcast"
@@ -114,6 +131,24 @@ export default function App() {
       window.removeEventListener("news-profile-change", syncProfile);
       window.removeEventListener("storage", syncProfile);
     };
+  }, [recommendationStatus?.profile_mode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getRecommendationStatus()
+      .then((result) => { if (!cancelled) setRecommendationStatus(result); })
+      .catch(() => {
+        // A transient status request must not silently demote the new default
+        // experience for the remainder of this page load. For You has its own
+        // visible retry/error state if the underlying feed is unavailable.
+        if (!cancelled) setRecommendationStatus({
+          enabled: true,
+          default_landing: true,
+          profile_mode: "unified",
+          legacy_profile_routing: false,
+        });
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const toggleTheme = () => {
@@ -122,6 +157,8 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    setViewerLoading(true);
+    setViewerError("");
     getViewerProfile()
       .then((profile) => {
         if (cancelled) return;
@@ -140,6 +177,9 @@ export default function App() {
       })
       .catch((error) => {
         console.warn("[Viewer] Could not load the viewer profile:", error);
+        if (!cancelled) {
+          setViewerError("Your profile could not be loaded. Your briefing is still available.");
+        }
       })
       .finally(() => {
         if (!cancelled) setViewerLoading(false);
@@ -147,7 +187,19 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [viewerLoadAttempt]);
+
+  useEffect(() => {
+    if (previousPathRef.current === pathname) return;
+    previousPathRef.current = pathname;
+    mainRef.current?.focus?.({ preventScroll: true });
+  }, [pathname]);
+
+  const restoreSettingsFocus = () => {
+    window.requestAnimationFrame(() => {
+      document.querySelector('[aria-controls="premium-settings-center"]')?.focus?.();
+    });
+  };
 
   const handleViewerSaved = (profile) => {
     setViewer((current) => ({ ...current, ...profile }));
@@ -271,6 +323,9 @@ export default function App() {
       if (manualAbortRef.current === controller) manualAbortRef.current = null;
     }
   };
+  const defaultLanding = recommendationStatus?.enabled && recommendationStatus?.default_landing
+    ? "/for-you"
+    : "/home";
   return (
     <DesignViewport>
       {" "}
@@ -280,7 +335,10 @@ export default function App() {
         data-theme={theme}
       >
         {" "}
-        <ProductAtmosphere live={pathname === "/home"} />{" "}
+        <a className="news-skip-link" href="#news-main-content">
+          Skip to main content
+        </a>{" "}
+        <ProductAtmosphere live={pathname === "/home" || pathname === "/for-you"} />{" "}
         <TopBar
           manualScan={manualScan}
           theme={theme}
@@ -294,12 +352,22 @@ export default function App() {
             setProfileRequired(false);
             setProfileOpen(true);
           }}
+          forYouEnabled={Boolean(recommendationStatus?.enabled)}
+          profileMode={recommendationStatus?.profile_mode || "unified"}
         />{" "}
-        <main className="design-main mx-auto w-full">
+        <main
+          className="design-main mx-auto w-full"
+          id="news-main-content"
+          ref={mainRef}
+          tabIndex={-1}
+        >
           {" "}
           <Routes key={viewerRevision}>
             {" "}
-            <Route path="/" element={<Navigate to="/home" replace />} />{" "}
+            <Route path="/" element={recommendationStatus === null
+              ? <div className="fy-state"><span className="fy-loader" /><p>Preparing TechScout…</p></div>
+              : <Navigate to={defaultLanding} replace />} />{" "}
+            <Route path="/for-you" element={<ForYouScreen />} />{" "}
             <Route path="/home" element={<FeedScreen />} />{" "}
             <Route
               path="/scan"
@@ -320,22 +388,40 @@ export default function App() {
             <Route path="/manage-sources" element={<SourcesScreen />} />{" "}
             <Route path="/scheduler" element={<SchedulerScreen />} />{" "}
             <Route path="/history" element={<HistoryScreen />} />{" "}
-            <Route path="/trends" element={<TrendsScreen />} />{" "}
+            {PROFILE_SWITCHER_ENABLED && <Route path="/trends" element={<TrendsScreen />} />}{" "}
             <Route path="/voc" element={<VocScreen />} />{" "}
             <Route path="/director-analytics" element={<AnalyticsScreen />} />{" "}
             <Route
               path="/gatekeeper-review"
               element={<GatekeeperReviewScreen />}
             />{" "}
+            <Route path="*" element={recommendationStatus === null
+              ? <div className="fy-state"><span className="fy-loader" /><p>Preparing TechScout…</p></div>
+              : <Navigate to={defaultLanding} replace />} />{" "}
           </Routes>{" "}
         </main>{" "}
         <VocFeedback />{" "}
+        {viewerError && (
+          <aside className="shell-service-notice" role="alert">
+            <span aria-hidden="true"><Icon name="warning" size={17} /></span>
+            <div>
+              <strong>Profile temporarily unavailable</strong>
+              <p>{viewerError}</p>
+            </div>
+            <button onClick={() => setViewerLoadAttempt((current) => current + 1)} type="button">
+              Try again
+            </button>
+          </aside>
+        )}{" "}
         <UserProfileModal
           open={profileOpen}
           firstVisit={profileRequired}
           viewer={viewer}
           onClose={() => {
-            if (!profileRequired) setProfileOpen(false);
+            if (!profileRequired) {
+              setProfileOpen(false);
+              restoreSettingsFocus();
+            }
           }}
           onSaved={handleViewerSaved}
         />{" "}

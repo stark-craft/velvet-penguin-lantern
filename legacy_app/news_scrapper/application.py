@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException, Body, Request
+from fastapi import FastAPI, Query, HTTPException, Body, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -55,6 +55,14 @@ from threading import Semaphore
 from core.secure_http import tls_verify
 from core.storage import JsonStore
 from news_scrapper.personalization import PersonalizationService
+from news_scrapper.recommendation.identity import bind_viewer_request, set_viewer_cookie
+from news_scrapper.source_catalog import (
+    build_shadow_briefing,
+    canonical_url as canonical_source_url,
+    load_sites,
+    normalize_site,
+    write_shadow_catalog,
+)
 from core.profile import client_ip as resolve_client_ip
 from core.profile import normalize_ip
 from core.profile import resolve_profile
@@ -67,6 +75,7 @@ from core.settings import (
     PROJECT_ROOT,
     ensure_runtime_directories,
     migrate_legacy_news_runtime,
+    migrate_unified_news_state,
     model_path as resolve_model_path,
 )
 
@@ -78,6 +87,7 @@ BASE_DIR = PROJECT_ROOT
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 ensure_runtime_directories()
 migrate_legacy_news_runtime()
+UNIFIED_MIGRATION_REPORT = migrate_unified_news_state()
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -145,7 +155,6 @@ print("Waking up the AI Gatekeeper...")
 
 BOUNCER_MODEL_FILENAMES = {
     "default": "bouncer_model.pkl",
-    "broadcast": "bouncer_model_broadcast.pkl",
 }
 
 try:
@@ -171,7 +180,7 @@ try:
 
     bouncer_model = bouncer_models.get("default")
     if bouncer_models:
-        print("AI Gatekeeper is awake and profile-aware.")
+        print("AI Gatekeeper is awake with the unified model.")
     else:
         print("No bouncer models loaded. Scanning without filter.")
 except Exception as e:
@@ -211,6 +220,7 @@ VIEWER_PROFILES_FILE = os.path.join(ROOT_DIR, "viewer_profiles.json")
 VIEWER_HIDDEN_FILE = os.path.join(ROOT_DIR, "viewer_hidden_store.json")
 VIEWER_SAVED_FILE = os.path.join(ROOT_DIR, "viewer_saved_store.json")
 VIEWER_BRIEFING_FILE = os.path.join(ROOT_DIR, "viewer_url_briefings.json")
+VIEWER_IDENTITY_CLAIMS_FILE = os.path.join(ROOT_DIR, "viewer_identity_claims.json")
 VIEWER_PERSONALIZATION_FILE = os.path.join(ROOT_DIR, "viewer_personalization.json")
 IP_HASH_SECRET = os.environ.get("NEWSSCRAPPER_IP_HASH_SECRET", "development-only-change-this-secret")
 if APP_ENV in {"production", "prod"}:
@@ -220,6 +230,9 @@ if APP_ENV in {"production", "prod"}:
         raise RuntimeError("Production approval, analytics, and Gatekeeper keys must contain at least six characters.")
 SCRAPY_ROBOTSTXT_OBEY = env_bool("SCRAPY_ROBOTSTXT_OBEY", True)
 SCHEDULER_ENABLED = env_bool("SCHEDULER_ENABLED", True)
+UNIFIED_CORPUS_SHADOW_ENABLED = env_bool("UNIFIED_CORPUS_SHADOW_ENABLED", False)
+UNIFIED_CORPUS_ENABLED = env_bool("UNIFIED_CORPUS_ENABLED", True)
+LEGACY_PROFILE_ROUTING_ENABLED = env_bool("LEGACY_PROFILE_ROUTING_ENABLED", False)
 HISTORY_RETENTION_DAYS = max(1, int(os.environ.get("HISTORY_RETENTION_DAYS", "30")))
 CRAWL_LOOKBACK_DAYS = max(1, int(os.environ.get("CRAWL_LOOKBACK_DAYS", "1")))
 WEB_SEARCH_ENRICHMENT_ENABLED = env_bool("WEB_SEARCH_ENRICHMENT_ENABLED", False)
@@ -379,42 +392,59 @@ def resolve_pipeline_capabilities(force=False):
 # ==========================================
 DEFAULT_PROFILE = "default"
 BROADCAST_PROFILE = "broadcast"
+UNIFIED_PROFILE = DEFAULT_PROFILE
 BROADCAST_SPECIAL_IPS = env_ip_set(
     "BROADCAST_SPECIAL_IPS",
-    "107.109.202.212,107.109.202.33,109.109.201.228",
+    "",
 )
 ANALYTICS_ALLOWED_IPS = env_ip_set(
     "ANALYTICS_ALLOWED_IPS",
-    "127.0.0.1,::1,107.109.201.245",
+    "127.0.0.1,::1",
 )
 GATEKEEPER_ALLOWED_IPS = env_ip_set(
     "GATEKEEPER_ALLOWED_IPS",
-    "127.0.0.1,::1,107.109.201.245",
+    "127.0.0.1,::1",
 )
 PROFILE_SETTINGS_ALLOWED_IPS = env_ip_set(
     "PROFILE_SETTINGS_ALLOWED_IPS",
-    "127.0.0.1,::1,107.109.201.245",
+    "127.0.0.1,::1",
 )
 SYSTEM_STATUS_ALLOWED_IPS = env_ip_set(
     "SYSTEM_STATUS_ALLOWED_IPS",
-    "127.0.0.1,::1,107.109.201.245",
+    "127.0.0.1,::1",
 )
 TRUSTED_PROXY_IPS = env_ip_set("TRUSTED_PROXY_IPS", "127.0.0.1,::1")
 
 DEFAULT_SITES_FILE = str(NEWS_CONFIG_DIR / "sites.json")
 BROADCAST_SITES_FILE = str(NEWS_CONFIG_DIR / "sites_broadcast.json")
 INTELLIGENCE_STORE_DIR = os.path.join(ROOT_DIR, "intelligence_store")
+UNIFIED_HISTORY_DIR = os.path.join(INTELLIGENCE_STORE_DIR, "unified", "history")
+
+
+def merge_keyword_packs(*packs):
+    values = []
+    for pack in packs:
+        values.extend(part.strip() for part in str(pack or "").split(","))
+    return ", ".join(dict.fromkeys(value for value in values if value))
+
+
+UNIFIED_MORNING_KEYWORDS = merge_keyword_packs(
+    MORNING_KEYWORDS,
+    BROADCAST_MORNING_KEYWORDS,
+)
 
 PROFILE_CONFIGS = {
     DEFAULT_PROFILE: {
-        "label": "Default Intelligence",
-        "keywords": MORNING_KEYWORDS,
+        "label": "Unified Intelligence",
+        "keywords": UNIFIED_MORNING_KEYWORDS,
         "sites_file": DEFAULT_SITES_FILE,
-        "history_dir": os.path.join(INTELLIGENCE_STORE_DIR, DEFAULT_PROFILE, "history"),
+        "history_dir": UNIFIED_HISTORY_DIR,
         "use_bouncer": True,
     },
+    # Rollback metadata only. Serving functions normalize this legacy name to
+    # DEFAULT_PROFILE while unified mode is active.
     BROADCAST_PROFILE: {
-        "label": "Broadcast Intelligence",
+        "label": "Legacy Broadcast Rollback",
         "keywords": BROADCAST_MORNING_KEYWORDS,
         "sites_file": BROADCAST_SITES_FILE,
         "history_dir": os.path.join(INTELLIGENCE_STORE_DIR, BROADCAST_PROFILE, "history"),
@@ -423,41 +453,28 @@ PROFILE_CONFIGS = {
 }
 WORKFLOW_FILES = {
     DEFAULT_PROFILE: WORKFLOW_FILE,
-    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "workflow_store_broadcast.json"),
+    BROADCAST_PROFILE: WORKFLOW_FILE,
 }
 NOT_INTERESTED_FILES = {
     DEFAULT_PROFILE: NOT_INTERESTED_FILE,
-    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "not_interested_store_broadcast.json"),
+    BROADCAST_PROFILE: NOT_INTERESTED_FILE,
 }
 TRAINING_FILES = {
     DEFAULT_PROFILE: TRAINING_FILE,
-    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "trainingData_broadcast.json"),
+    BROADCAST_PROFILE: TRAINING_FILE,
 }
 BOUNCER_MODEL_FILES = {
     DEFAULT_PROFILE: os.path.join(ROOT_DIR, "bouncer_model.pkl"),
-    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "bouncer_model_broadcast.pkl"),
+    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "bouncer_model.pkl"),
 }
 REGION_LEARNING_FILES = {
     DEFAULT_PROFILE: os.path.join(ROOT_DIR, "region_learning.json"),
-    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "region_learning_broadcast.json"),
+    BROADCAST_PROFILE: os.path.join(ROOT_DIR, "region_learning.json"),
 }
 
-DEFAULT_TEAM_IP_MAP = {
-    "107.109.202.151": "Shreya Gupta",
-    "107.109.201.245": "Vineet Singh",
-    "107.109.202.48": "Shivani Goyal",
-    "107.109.201.45": "ASHOK JAIN",
-    "107.109.201.66": "Priya Arora",
-    "107.109.201.83": "Vinod Sati",
-    "107.109.201.58": "Ravi Kant Bansal",
-    "107.109.202.178": "Traxon PC(HOST)",
-    "107.109.201.101": "Utkarsh Tiwari",
-    "109.109.201.228": "Navin Kumar",
-}
-TEAM_IP_MAP = {
-    **{normalize_ip(address): owner for address, owner in DEFAULT_TEAM_IP_MAP.items()},
-    **env_ip_map("TEAM_IP_MAP"),
-}
+# Personnel/network mappings are deployment data, never source-code defaults.
+# Configure them only in the untracked .env file on the internal server.
+TEAM_IP_MAP = env_ip_map("TEAM_IP_MAP")
 
 
 def get_client_ip(request: Request = None):
@@ -471,6 +488,8 @@ def get_client_ip(request: Request = None):
 
 
 def get_profile_for_request(request: Request = None):
+    if UNIFIED_CORPUS_ENABLED and not LEGACY_PROFILE_ROUTING_ENABLED:
+        return UNIFIED_PROFILE
     client_ip = get_client_ip(request)
     if request:
         requested_profile = (
@@ -498,46 +517,61 @@ def get_active_profile_name(request: Request = None):
     return get_profile_for_request(request)
 
 
+def public_profile_name(profile: str) -> str:
+    return "unified" if UNIFIED_CORPUS_ENABLED else profile
+
+
 def get_profile_config(profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     return PROFILE_CONFIGS.get(profile, PROFILE_CONFIGS[DEFAULT_PROFILE])
 
 
 def get_sites_file_for_profile(profile: str):
-    return get_profile_config(profile)["sites_file"]
+    return DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_profile_config(profile)["sites_file"]
 
 
 def get_profile_history_dir(profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     history_dir = get_profile_config(profile)["history_dir"]
     os.makedirs(history_dir, exist_ok=True)
     return history_dir
 
 
 def ensure_profile_storage():
-    for profile in PROFILE_CONFIGS:
+    profiles = [UNIFIED_PROFILE] if UNIFIED_CORPUS_ENABLED else list(PROFILE_CONFIGS)
+    for profile in profiles:
         os.makedirs(get_profile_history_dir(profile), exist_ok=True)
 
 
 def get_profile_history_files(profile: str, include_legacy_default: bool = True):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     files = glob.glob(os.path.join(get_profile_history_dir(profile), "*.json"))
-    if include_legacy_default and profile == DEFAULT_PROFILE:
+    if include_legacy_default and profile == DEFAULT_PROFILE and not UNIFIED_CORPUS_ENABLED:
         files.extend(glob.glob(os.path.join(HISTORY_DIR, "*.json")))
     return list(dict.fromkeys(os.path.abspath(file_path) for file_path in files))
 
 
 def resolve_profile_history_file(filename: str, profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     safe_name = Path(filename).name
     profile_path = os.path.join(get_profile_history_dir(profile), safe_name)
     if os.path.exists(profile_path):
         return profile_path
     legacy_path = os.path.join(HISTORY_DIR, safe_name)
-    if profile == DEFAULT_PROFILE and os.path.exists(legacy_path):
+    if not UNIFIED_CORPUS_ENABLED and profile == DEFAULT_PROFILE and os.path.exists(legacy_path):
         return legacy_path
     return None
 
 
 def get_latest_briefing_file_for_profile(profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     files = glob.glob(os.path.join(get_profile_history_dir(profile), "briefing_*.json"))
-    if profile == DEFAULT_PROFILE and not files:
+    if not UNIFIED_CORPUS_ENABLED and profile == DEFAULT_PROFILE and not files:
         files = glob.glob(os.path.join(HISTORY_DIR, "briefing_*.json"))
     valid_files = []
     for file_path in files:
@@ -572,22 +606,33 @@ def purge_expired_history(profile: str, keep_days: int = HISTORY_RETENTION_DAYS)
 
 
 def get_workflow_file_for_request(request: Request = None):
-    return WORKFLOW_FILES.get(get_profile_for_request(request), WORKFLOW_FILE)
+    profile = get_profile_for_request(request)
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
+    return WORKFLOW_FILES.get(profile, WORKFLOW_FILE)
 
 
 def get_not_interested_file_for_profile(profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     return NOT_INTERESTED_FILES.get(profile, NOT_INTERESTED_FILE)
 
 
 def get_training_file_for_profile(profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     return TRAINING_FILES.get(profile, TRAINING_FILE)
 
 
 def get_bouncer_model_file_for_profile(profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     return BOUNCER_MODEL_FILES.get(profile, BOUNCER_MODEL_FILES[DEFAULT_PROFILE])
 
 
 def get_bouncer_model_for_profile(profile: str):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     return bouncer_models.get(profile) if bouncer_embedder is not None else None
 
 
@@ -668,6 +713,80 @@ SCHEDULER_STATUS = {
     "message": "System Ready.",
     "mode": "idle",
 }
+SCHEDULER_STATE_STORE = JsonStore(
+    NEWS_RUNTIME_DIR / "scheduler_state.json",
+    lambda: {
+        "schema_version": 1,
+        "status": "idle",
+        "stage": "idle",
+        "completed_partitions": [],
+        "failures": [],
+    },
+)
+
+
+def update_durable_scheduler_state(**changes):
+    """Persist scheduler progress atomically for diagnostics and restart audits."""
+
+    def updater(current):
+        state = current if isinstance(current, dict) else {}
+        return {"schema_version": 1, **state, **changes}
+
+    return SCHEDULER_STATE_STORE.update(updater)
+
+
+def _load_briefing_articles(path):
+    if not path:
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return payload if isinstance(payload, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def publish_unified_shadow(run_id):
+    """Create non-serving parity artifacts after both legacy partitions succeed."""
+
+    catalog_report = write_shadow_catalog(
+        Path(DEFAULT_SITES_FILE),
+        Path(BROADCAST_SITES_FILE),
+        NEWS_RUNTIME_DIR,
+    )
+    default_items = _load_briefing_articles(
+        get_latest_briefing_file_for_profile(DEFAULT_PROFILE)
+    )
+    broadcast_items = _load_briefing_articles(
+        get_latest_briefing_file_for_profile(BROADCAST_PROFILE)
+    )
+    destination = (
+        NEWS_RUNTIME_DIR
+        / "unified_shadow"
+        / "history"
+        / f"briefing_{run_id}.json"
+    )
+    briefing_report = build_shadow_briefing(
+        default_items,
+        broadcast_items,
+        destination,
+        semantic=True,
+    )
+    report = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "catalog": catalog_report,
+        "briefing": briefing_report,
+        "serving_enabled": False,
+        "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(
+            timespec="seconds"
+        ),
+    }
+    JsonStore(
+        NEWS_RUNTIME_DIR / "unified_shadow" / "latest_parity_report.json",
+        dict,
+    ).write(report)
+    return report
 
 scheduler_lock = threading.Lock()
 scheduler_process_lock = threading.Lock()
@@ -678,13 +797,15 @@ scheduler_retry_scheduled = False
 file_lock = threading.Lock()
 train_lock = threading.Lock()
 not_interested_lock = threading.Lock()
+briefing_lock = threading.RLock()
 tracker_lock = threading.Lock()
 workflow_lock = threading.RLock()
 voc_lock = threading.Lock()
 sites_lock = threading.Lock()
 viewer_hidden_lock = threading.Lock()
-viewer_saved_lock = threading.Lock()
+viewer_saved_lock = threading.RLock()
 viewer_briefing_lock = threading.RLock()
+viewer_identity_lock = threading.RLock()
 region_learning_lock = threading.Lock()
 dropped_lock = threading.Lock()
 opinion_lock = threading.Lock()
@@ -1529,6 +1650,44 @@ def cache_success(store, key, item):
     store.update(update)
 
 
+CHAT_SUMMARY_CACHE_FIELDS = {
+    "title",
+    "summary",
+    "summary_lead",
+    "summary_points",
+    "key_points",
+    "master_summary",
+    "ppt_summary",
+    "why_it_matters",
+    "why_matters",
+    "attention_hook",
+    "what_changed",
+    "why_now",
+    "watch_next",
+    "hook_type",
+    "hook_source",
+    "hook_grounded",
+    "article_intent",
+    "category",
+    "region",
+    "importance_score",
+    "chat_summary_status",
+    "summarized_by",
+    "summary_format",
+    "chat_model_id",
+}
+
+
+def chat_summary_cache_payload(item):
+    """Cache generated fields only, never a private or source article body."""
+
+    return {
+        key: value
+        for key, value in dict(item or {}).items()
+        if key in CHAT_SUMMARY_CACHE_FIELDS
+    }
+
+
 def keyword_terms(keywords):
     if isinstance(keywords, str):
         values = keywords.split(",")
@@ -1581,6 +1740,7 @@ def run_bouncer_filter_on_items(items, profile=DEFAULT_PROFILE, stage="raw"):
         )
         if decision["keep"]:
             item["profile"] = profile
+            item["bouncer_profile"] = profile
             item["bouncer_stage"] = stage
             item["bouncer_decision"] = decision["decision"]
             item["bouncer_score"] = decision["score"]
@@ -1590,6 +1750,7 @@ def run_bouncer_filter_on_items(items, profile=DEFAULT_PROFILE, stage="raw"):
                 low_priority_count += 1
         else:
             dropped_count += 1
+            item["bouncer_profile"] = profile
             item["bouncer_stage"] = stage
             log_dropped_article(
                 item.get("title", ""),
@@ -1825,12 +1986,19 @@ def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
                 else None
             )
             if isinstance(cached, dict):
-                item = dict(cached)
+                # Preserve this request's identity, source, full text and
+                # private-scope metadata. The cache only supplies generated
+                # summary fields for matching article content.
+                item.update(chat_summary_cache_payload(cached))
                 item["chat_summary_cache"] = "hit"
             else:
                 summarized = summarize_article_with_chat(item)
                 if summarized.get("chat_summary_status") == "success":
-                    cache_success(CHAT_SUMMARY_CACHE, cache_key, summarized)
+                    cache_success(
+                        CHAT_SUMMARY_CACHE,
+                        cache_key,
+                        chat_summary_cache_payload(summarized),
+                    )
                 item = summarized
                 item["chat_summary_cache"] = "miss"
             if item.get("chat_summary_status") != "success":
@@ -1862,6 +2030,7 @@ def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
 
 
 PERSONAL_BRIEFING_STORE = JsonStore(Path(VIEWER_BRIEFING_FILE), dict)
+PRIVATE_VIEWER_CLAIMS = JsonStore(Path(VIEWER_IDENTITY_CLAIMS_FILE), dict)
 PERSONALIZATION_SERVICE = PersonalizationService(
     Path(VIEWER_PERSONALIZATION_FILE),
     window_days=30,
@@ -2217,16 +2386,38 @@ def resume_personal_briefing_jobs():
                         progress=5,
                         message="Resumed after server restart.",
                     )
-                    personal_briefing_executor.submit(
-                        process_personal_briefing_job,
-                        viewer_key,
-                        profile,
-                        job.get("id"),
-                        job.get("url"),
-                    )
+                    try:
+                        personal_briefing_executor.submit(
+                            process_personal_briefing_job,
+                            viewer_key,
+                            profile,
+                            job.get("id"),
+                            job.get("url"),
+                        )
+                    except Exception as error:
+                        update_personal_briefing_job(
+                            viewer_key,
+                            profile,
+                            job.get("id"),
+                            status="failed",
+                            stage="dispatch_failed",
+                            progress=100,
+                            message=(
+                                "The private briefing worker could not restart. "
+                                "Use Retry when the service is ready."
+                            ),
+                            error=f"{type(error).__name__}: {error}"[:500],
+                        )
+                        print(
+                            f"[PERSONAL:{profile}] Could not resume job "
+                            f"{job.get('id')}: {type(error).__name__}: {error}",
+                            flush=True,
+                        )
 
 
 def save_training_vote(keywords, summary, vote, title="", profile=DEFAULT_PROFILE):
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     training_file = get_training_file_for_profile(profile)
     new_row = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -2277,6 +2468,8 @@ def save_training_vote(keywords, summary, vote, title="", profile=DEFAULT_PROFIL
 
 def reload_bouncer_model_for_profile(profile=DEFAULT_PROFILE):
     global bouncer_model
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     model_file = get_bouncer_model_file_for_profile(profile)
     if not os.path.exists(model_file):
         return False
@@ -2300,6 +2493,8 @@ def retrain_and_reload(profile=DEFAULT_PROFILE):
     """
 
     profile = profile if profile in PROFILE_CONFIGS else DEFAULT_PROFILE
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     with train_lock:
         try:
             print(f"\n[BOUNCER:{profile}] Retraining with new data...", flush=True)
@@ -2373,6 +2568,8 @@ def enqueue_bouncer_retrain(profile=DEFAULT_PROFILE):
     """Queue a profile retrain without losing rapid successive votes."""
 
     profile = profile if profile in PROFILE_CONFIGS else DEFAULT_PROFILE
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     _ensure_training_worker()
     with training_queue_lock:
         if profile in training_running_profiles:
@@ -2412,6 +2609,78 @@ def get_device_id(ip, fingerprint):
 
 def get_viewer_key(ip):
     return hashlib.sha256(f"{IP_HASH_SECRET}:{ip}".encode("utf-8")).hexdigest()
+
+
+def get_private_viewer_key(request: Request):
+    """Use the signed browser identity, with IP hash as a legacy fallback."""
+
+    return str(
+        getattr(request.state, "private_viewer_key", "")
+        or get_viewer_key(get_client_ip(request))
+    )
+
+
+def _private_item_identity(item):
+    if not isinstance(item, dict):
+        return str(item)
+    return str(
+        item.get("id")
+        or item.get("article_key")
+        or item.get("canonical_link")
+        or item.get("link")
+        or item.get("url")
+        or item.get("title")
+        or ""
+    ).strip().casefold()
+
+
+def _merge_private_buckets(current, legacy):
+    """Merge legacy profile lists without duplicating saved items or jobs."""
+
+    merged = dict(current) if isinstance(current, dict) else {}
+    for profile, legacy_items in (legacy.items() if isinstance(legacy, dict) else []):
+        destination = merged.setdefault(profile, [])
+        if not isinstance(destination, list) or not isinstance(legacy_items, list):
+            continue
+        seen = {_private_item_identity(item) for item in destination}
+        for item in legacy_items:
+            identity = _private_item_identity(item)
+            if identity and identity not in seen:
+                destination.append(item)
+                seen.add(identity)
+    return merged
+
+
+def claim_legacy_private_bucket(store: dict, request: Request):
+    """Move an IP-keyed desk once to the first signed browser at that IP."""
+
+    private_key = get_private_viewer_key(request)
+    legacy_key = get_viewer_key(get_client_ip(request))
+    if private_key == legacy_key:
+        return private_key, False
+
+    with viewer_identity_lock:
+        claims = PRIVATE_VIEWER_CLAIMS.read()
+        claims = claims if isinstance(claims, dict) else {}
+        owner = claims.get(legacy_key)
+        if owner is None:
+            # Only a newly issued browser identity may reserve old data for
+            # this IP. An existing identity that merely roamed onto a new IP
+            # must never inherit that network's legacy private records.
+            if not bool(getattr(request.state, "private_viewer_created", False)):
+                return private_key, False
+            claims[legacy_key] = private_key
+            PRIVATE_VIEWER_CLAIMS.write(claims)
+            owner = private_key
+
+    if owner != private_key or legacy_key not in store:
+        return private_key, False
+    store[private_key] = _merge_private_buckets(
+        store.get(private_key, {}),
+        store.get(legacy_key, {}),
+    )
+    store.pop(legacy_key, None)
+    return private_key, True
 
 
 def migrate_tracker_privacy():
@@ -2496,29 +2765,23 @@ def save_viewer_hidden_store(data):
 
 
 def load_viewer_saved_store():
-    if not os.path.exists(VIEWER_SAVED_FILE):
-        return {}
-    try:
-        with open(VIEWER_SAVED_FILE, "r", encoding="utf-8") as file_obj:
-            data = json.load(file_obj)
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
+    data = JsonStore(Path(VIEWER_SAVED_FILE), dict).read()
+    return data if isinstance(data, dict) else {}
 
 
 def save_viewer_saved_store(data):
-    temp_file = f"{VIEWER_SAVED_FILE}.tmp"
-    with open(temp_file, "w", encoding="utf-8") as file_obj:
-        json.dump(data, file_obj, indent=2, ensure_ascii=False)
-    os.replace(temp_file, VIEWER_SAVED_FILE)
+    return JsonStore(Path(VIEWER_SAVED_FILE), dict).write(data)
 
 
 def get_viewer_saved_items(request, profile=None):
     profile_name = profile or get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
-    store = load_viewer_saved_store()
-    viewer_store = store.get(viewer_key, {})
-    items = viewer_store.get(profile_name, [])
+    with viewer_saved_lock:
+        store = load_viewer_saved_store()
+        viewer_key, migrated = claim_legacy_private_bucket(store, request)
+        if migrated:
+            save_viewer_saved_store(store)
+        viewer_store = store.get(viewer_key, {})
+        items = viewer_store.get(profile_name, [])
     return items if isinstance(items, list) else []
 
 
@@ -2540,6 +2803,57 @@ def filter_viewer_hidden(items, request, profile=None):
         item for item in (items or [])
         if _article_identity(item) not in hidden_keys
     ]
+
+
+def record_usage_best_effort(ip, profile, fingerprint, action, detail=""):
+    """Never turn a committed private desk action into an apparent failure."""
+
+    try:
+        return record_usage_activity(
+            ip, profile, fingerprint, action, detail
+        )
+    except Exception as error:
+        print(
+            f"[USAGE] {action} tracking failed after the desk action committed: "
+            f"{type(error).__name__}: {error}",
+            flush=True,
+        )
+        return False
+
+
+def record_recommendation_best_effort(
+    request,
+    response,
+    action,
+    detail,
+    *,
+    event_id="",
+    occurred_at="",
+    active_ms=0,
+    visible_ratio=0.0,
+):
+    """Bridge a validated shared-surface action without breaking its UI task."""
+
+    try:
+        from news_scrapper.recommendation.router import record_shared_briefing_event
+
+        return record_shared_briefing_event(
+            request,
+            response,
+            track_action=action,
+            detail=detail if isinstance(detail, dict) else {},
+            event_id=event_id,
+            occurred_at=occurred_at,
+            active_ms=active_ms,
+            visible_ratio=visible_ratio,
+        )
+    except Exception as error:
+        print(
+            f"[FOR YOU BRIDGE] Could not record {action}: "
+            f"{type(error).__name__}: {error}",
+            flush=True,
+        )
+        return {"accepted": 0, "duplicates": 0, "rejected": 1, "ignored": True}
 
 
 def get_today():
@@ -2767,10 +3081,20 @@ def _legacy_run_morning_briefing():
 # PROFILE-AWARE AUTONOMOUS SCHEDULER
 # ==========================================
 def run_scheduler_for_profile(profile: str, capabilities=None):
+    if UNIFIED_CORPUS_ENABLED and profile != UNIFIED_PROFILE:
+        print(
+            f"[SCHEDULER] Ignoring legacy '{profile}' partition; the unified "
+            "catalog is scanned once per cycle.",
+            flush=True,
+        )
+        return True
+    if UNIFIED_CORPUS_ENABLED:
+        profile = UNIFIED_PROFILE
     config = get_profile_config(profile)
     capabilities = capabilities or resolve_pipeline_capabilities()
     today = datetime.datetime.now()
-    scheduler_job_id = f"scheduler_{profile}_{today.strftime('%Y%m%d_%H%M%S')}"
+    run_label = "unified" if UNIFIED_CORPUS_ENABLED else profile
+    scheduler_job_id = f"scheduler_{run_label}_{today.strftime('%Y%m%d_%H%M%S')}"
     output_file = os.path.join(ROOT_DIR, f"ui_results_{scheduler_job_id}.json")
     cluster_file = os.path.join(ROOT_DIR, f"clustered_results_{scheduler_job_id}.json")
     history_dir = get_profile_history_dir(profile)
@@ -2952,7 +3276,20 @@ def run_scheduler_for_profile(profile: str, capabilities=None):
                 results, profile, "scheduler_final"
             )
         for item in results:
-            item["profile"] = profile
+            verticals = item.get("verticals") or []
+            if isinstance(verticals, str):
+                verticals = [verticals]
+            vertical = str(item.get("vertical") or (verticals[0] if verticals else "")).strip().lower()
+            legacy_profile = str(item.get("legacy_profile") or item.get("keyword_pack") or "").strip().lower()
+            if vertical not in {"technology", "broadcast"}:
+                vertical = "broadcast" if legacy_profile == BROADCAST_PROFILE else "technology"
+            item["profile"] = "unified" if UNIFIED_CORPUS_ENABLED else profile
+            item["legacy_profile"] = legacy_profile or (
+                BROADCAST_PROFILE if vertical == "broadcast" else DEFAULT_PROFILE
+            )
+            item["vertical"] = vertical
+            item["verticals"] = list(dict.fromkeys([*verticals, vertical]))
+            item["audiences"] = item.get("audiences") or ["all"]
             item["category"] = assign_category(
                 item.get("title", ""),
                 item.get("master_summary", "") or item.get("snippet", ""),
@@ -2972,7 +3309,10 @@ def run_scheduler_for_profile(profile: str, capabilities=None):
         with open(history_path, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=4, ensure_ascii=False)
         purge_expired_history(profile)
-        print(f"[SCHEDULER:{profile}] Briefing complete: {history_path}")
+        print(
+            f"[SCHEDULER:{run_label}] Unified briefing complete: {history_path}",
+            flush=True,
+        )
         return True
     except subprocess.TimeoutExpired:
         print(f"[SCHEDULER:{profile}] Process timed out and was terminated.")
@@ -3011,6 +3351,10 @@ def _schedule_scheduler_retry(delay_seconds: int = SCHEDULER_RETRY_DELAY_SECONDS
 
 def run_morning_briefing():
     global SCHEDULER_STATUS, scheduler_pending_run
+    run_id = f"cycle_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    scheduled_at = datetime.datetime.now(datetime.timezone.utc).isoformat(
+        timespec="seconds"
+    )
     defer_for_manual = False
     with scheduler_lock:
         if scheduler_shutdown_event.is_set():
@@ -3037,20 +3381,92 @@ def run_morning_briefing():
             )
     if defer_for_manual:
         print("[SCHEDULER] Manual scan admitted first. Deferring autonomous scan.", flush=True)
+        update_durable_scheduler_state(
+            run_id=run_id,
+            scheduled_at=scheduled_at,
+            status="deferred",
+            stage="waiting_for_manual_scan",
+            retry_state="scheduled",
+            completed_partitions=[],
+            failures=[],
+        )
         _schedule_scheduler_retry()
         return
 
     failed_profiles = []
+    completed_profiles = []
+    update_durable_scheduler_state(
+        run_id=run_id,
+        scheduled_at=scheduled_at,
+        status="running",
+        stage="capability_preflight",
+        completed_partitions=[],
+        failures=[],
+        retry_state="none",
+        publish_timestamp=None,
+    )
     try:
         ensure_profile_storage()
         capabilities = resolve_pipeline_capabilities()
-        for profile in [DEFAULT_PROFILE, BROADCAST_PROFILE]:
+        serving_profiles = (
+            [UNIFIED_PROFILE]
+            if UNIFIED_CORPUS_ENABLED
+            else [DEFAULT_PROFILE, BROADCAST_PROFILE]
+        )
+        for profile in serving_profiles:
             if scheduler_shutdown_event.is_set():
                 break
             with scheduler_lock:
                 SCHEDULER_STATUS["message"] = f"Autonomous Engine Scanning {profile} profile..."
+            update_durable_scheduler_state(
+                stage=f"processing_{profile}",
+                active_partition=profile,
+                completed_partitions=completed_profiles,
+            )
             if not run_scheduler_for_profile(profile, capabilities):
                 failed_profiles.append(profile)
+                update_durable_scheduler_state(
+                    failures=[
+                        *failed_profiles,
+                    ],
+                    stage=f"failed_{profile}",
+                )
+            else:
+                completed_profiles.append(profile)
+                update_durable_scheduler_state(
+                    completed_partitions=completed_profiles,
+                    stage=f"completed_{profile}",
+                )
+        if (
+            not UNIFIED_CORPUS_ENABLED
+            and
+            UNIFIED_CORPUS_SHADOW_ENABLED
+            and not failed_profiles
+            and set(completed_profiles) == {DEFAULT_PROFILE, BROADCAST_PROFILE}
+        ):
+            update_durable_scheduler_state(stage="publishing_unified_shadow")
+            shadow_report = publish_unified_shadow(run_id)
+            update_durable_scheduler_state(
+                stage="unified_shadow_published",
+                shadow_report=shadow_report,
+                publish_timestamp=datetime.datetime.now(
+                    datetime.timezone.utc
+                ).isoformat(timespec="seconds"),
+            )
+            print(
+                "[SCHEDULER] Unified shadow briefing and parity report published; "
+                "legacy serving remains active.",
+                flush=True,
+            )
+    except Exception as error:
+        failed_profiles = failed_profiles or ["orchestration"]
+        update_durable_scheduler_state(
+            status="failed",
+            stage="orchestration_failed",
+            failures=failed_profiles,
+            last_error=str(error),
+        )
+        print(f"[SCHEDULER] Orchestration failure: {error}", flush=True)
     finally:
         with scheduler_lock:
             pending = scheduler_pending_run or bool(failed_profiles)
@@ -3078,7 +3494,11 @@ def run_morning_briefing():
                     "mode": "idle",
                     "last_completed_at": completed_at.isoformat(timespec="seconds"),
                     "next_run": next_due.isoformat(timespec="seconds"),
-                    "last_profiles": [DEFAULT_PROFILE, BROADCAST_PROFILE],
+                    "last_profiles": (
+                        ["unified"]
+                        if UNIFIED_CORPUS_ENABLED
+                        else [DEFAULT_PROFILE, BROADCAST_PROFILE]
+                    ),
                     "last_failed_profiles": failed_profiles,
                     "last_error": (
                         f"Retry scheduled for: {', '.join(failed_profiles)}"
@@ -3087,6 +3507,18 @@ def run_morning_briefing():
                     ),
                 }
             )
+        update_durable_scheduler_state(
+            status="failed" if failed_profiles else "complete",
+            stage="retry_wait" if failed_profiles else "complete",
+            active_partition=None,
+            completed_partitions=completed_profiles,
+            failures=failed_profiles,
+            retry_state="scheduled" if pending else "none",
+            completed_at=completed_at.astimezone(datetime.timezone.utc).isoformat(
+                timespec="seconds"
+            ),
+            next_due_at=next_due.astimezone().isoformat(timespec="seconds"),
+        )
         if pending and not scheduler_shutdown_event.is_set():
             _schedule_scheduler_retry(1 if not failed_profiles else SCHEDULER_RETRY_DELAY_SECONDS)
 
@@ -3100,6 +3532,12 @@ async def lifespan(app: FastAPI):
     ensure_profile_storage()
     migrate_tracker_privacy()
     resume_personal_briefing_jobs()
+    if UNIFIED_MIGRATION_REPORT.get("model_needs_retrain"):
+        print(
+            "[BOUNCER] Legacy feedback was merged; queuing one unified model retrain.",
+            flush=True,
+        )
+        enqueue_bouncer_retrain(UNIFIED_PROFILE)
     scheduler_shutdown_event.clear()
     scheduler = BackgroundScheduler()
     next_run = datetime.datetime.now() + datetime.timedelta(minutes=2)
@@ -3107,7 +3545,12 @@ async def lifespan(app: FastAPI):
     if SCHEDULER_ENABLED:
         now = datetime.datetime.now()
         due_times = []
-        for profile in [DEFAULT_PROFILE, BROADCAST_PROFILE]:
+        due_profiles = (
+            [UNIFIED_PROFILE]
+            if UNIFIED_CORPUS_ENABLED
+            else [DEFAULT_PROFILE, BROADCAST_PROFILE]
+        )
+        for profile in due_profiles:
             latest_file = get_latest_briefing_file_for_profile(profile)
             if not latest_file:
                 print(f"[SCHEDULER:{profile}] No briefing exists; profile is due after startup.", flush=True)
@@ -3116,21 +3559,21 @@ async def lifespan(app: FastAPI):
             last_run = datetime.datetime.fromtimestamp(os.path.getmtime(latest_file))
             due_times.append(max(now + datetime.timedelta(seconds=5), last_run + datetime.timedelta(hours=4)))
         if due_times:
-            # One stale or missing profile must not be hidden by the other
-            # profile's fresh briefing. The run processes both in sequence.
+            # Unified mode has one authoritative briefing timestamp. The
+            # legacy loop remains only for an explicit rollback configuration.
             next_run = min(due_times)
         SCHEDULER_STATUS["next_run"] = next_run.isoformat(timespec="seconds")
-        print(f"[SCHEDULER] Next profile-aware scan: {next_run.strftime('%I:%M %p')}.", flush=True)
+        print(f"[SCHEDULER] Next unified scan: {next_run.strftime('%I:%M %p')}.", flush=True)
         scheduler.add_job(
             run_morning_briefing,
             "interval",
             hours=4,
             next_run_time=next_run,
-            id="profile_aware_briefing",
+            id="unified_briefing",
             max_instances=1,
-            coalesce=False,
-            # A sleeping/restarted Windows host should catch up instead of
-            # silently discarding a due interval.
+            # If a Windows host sleeps through several four-hour ticks, run one
+            # catch-up scan when it wakes instead of replaying every missed tick.
+            coalesce=True,
             misfire_grace_time=24 * 60 * 60,
         )
         scheduler.start()
@@ -3158,20 +3601,39 @@ async def lifespan(app: FastAPI):
 # --- APP INIT ---
 # ==========================================
 app = FastAPI(lifespan=lifespan)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_allowed_origins = sorted(env_csv("NEWSSCRAPPER_CORS_ALLOWED_ORIGINS"))
+if cors_allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "X-Sense-Profile"],
+    )
+
+
+@app.middleware("http")
+async def bind_private_viewer(request: Request, call_next):
+    """Give every private viewer API a signed, browser-scoped identity."""
+
+    identity = None
+    if request.url.path == "/viewer" or request.url.path.startswith("/viewer/"):
+        request.state.private_viewer_cookie_middleware = True
+        identity = bind_viewer_request(request)
+        if identity[1]:
+            # Reserve any IP-keyed legacy desk for the first browser identity
+            # created on that IP. The individual Saved/Briefing stores move
+            # their bucket lazily when their endpoint is opened.
+            claim_legacy_private_bucket({}, request)
+    response = await call_next(request)
+    if identity and identity[1]:
+        set_viewer_cookie(request, response, identity[2])
+    return response
 
 # ==========================================
 # --- STATIC FILES ---
 # ==========================================
-abs_frontend_path = os.environ.get(
-    "NEWSSCRAPPER_FRONTEND_DIST",
-    str(FRONTEND_DIST),
-)
+abs_frontend_path = str(FRONTEND_DIST)
 if os.path.exists(os.path.join(abs_frontend_path, "assets")):
     app.mount(
         "/assets",
@@ -3190,9 +3652,10 @@ def get_profile(request: Request):
     response = {
         "status": "success",
         "ip": get_client_ip(request),
-        "profile": profile,
+        "profile": public_profile_name(profile),
         "label": config["label"],
-        "is_broadcast": profile == BROADCAST_PROFILE,
+        "is_broadcast": False if UNIFIED_CORPUS_ENABLED else profile == BROADCAST_PROFILE,
+        "corpus": "unified" if UNIFIED_CORPUS_ENABLED else "partitioned",
     }
     # Local storage paths and cross-profile configuration are operational
     # diagnostics, not normal viewer data.
@@ -3205,10 +3668,14 @@ def get_profile(request: Request):
             "training_file": get_training_file_for_profile(profile),
             "bouncer_model_file": get_bouncer_model_file_for_profile(profile),
         }
-        response["all_profiles"] = {
-            DEFAULT_PROFILE: get_profile_debug_info(DEFAULT_PROFILE),
-            BROADCAST_PROFILE: get_profile_debug_info(BROADCAST_PROFILE),
-        }
+        response["all_profiles"] = (
+            {"unified": get_profile_debug_info(UNIFIED_PROFILE)}
+            if UNIFIED_CORPUS_ENABLED
+            else {
+                DEFAULT_PROFILE: get_profile_debug_info(DEFAULT_PROFILE),
+                BROADCAST_PROFILE: get_profile_debug_info(BROADCAST_PROFILE),
+            }
+        )
     return response
 
 
@@ -3823,33 +4290,136 @@ def correct_region(request: Request, payload: dict = Body(...)):
 # ==========================================
 @app.get("/sites")
 def get_sites(request: Request):
-    profile = get_profile_for_request(request)
-    sites_path = get_sites_file_for_profile(profile)
+    profile = UNIFIED_PROFILE if UNIFIED_CORPUS_ENABLED else get_profile_for_request(request)
+    sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(profile)
     if os.path.exists(sites_path):
-        with open(sites_path, "r", encoding="utf-8") as f:
-            sites = json.load(f)
-            sites.sort(key=lambda x: x.get("name", "").lower())
-            return sites
+        sites = load_sites(Path(sites_path))
+        sites.sort(key=lambda x: x.get("name", "").lower())
+        return sites
     return []
 
 
 @app.post("/sites")
 def add_site(site: dict, request: Request):
-    profile = get_profile_for_request(request)
-    sites_path = get_sites_file_for_profile(profile)
+    profile = UNIFIED_PROFILE if UNIFIED_CORPUS_ENABLED else get_profile_for_request(request)
+    sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(profile)
     with sites_lock:
-        sites = []
-        if os.path.exists(sites_path):
-            with open(sites_path, "r", encoding="utf-8") as f:
-                sites = json.load(f)
-        sites.append(site)
+        sites = load_sites(Path(sites_path)) if os.path.exists(sites_path) else []
+        requested_verticals = site.get("verticals") or site.get("vertical") or ["technology"]
+        if isinstance(requested_verticals, str):
+            requested_verticals = [requested_verticals]
+        legacy_profile = (
+            BROADCAST_PROFILE
+            if "broadcast" in {str(value).strip().lower() for value in requested_verticals}
+            else DEFAULT_PROFILE
+        )
+        normalized = normalize_site(
+            {
+                **site,
+                "verticals": requested_verticals,
+                "legacy_profile": site.get("legacy_profile") or legacy_profile,
+                "audiences": site.get("audiences") or ["all"],
+            },
+            legacy_profile,
+        )
+        entrypoint = canonical_source_url(normalized.get("rss_url") or normalized.get("url"))
+        if any(
+            canonical_source_url(existing.get("rss_url") or existing.get("url")) == entrypoint
+            for existing in sites
+        ):
+            raise HTTPException(status_code=409, detail="This source entrypoint already exists.")
+        sites.append(normalized)
         temp_file = f"{sites_path}.{secrets.token_hex(6)}.tmp"
         with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(sites, f, indent=4)
             f.flush()
             os.fsync(f.fileno())
         os.replace(temp_file, sites_path)
-    return {"status": "success", "profile": profile, "sites_file": sites_path}
+    return {
+        "status": "success",
+        "profile": "unified" if UNIFIED_CORPUS_ENABLED else profile,
+        "sites_file": sites_path,
+        "source": normalized,
+    }
+
+
+def _write_unified_sites(sites_path: str, sites: list[dict]):
+    temp_file = f"{sites_path}.{secrets.token_hex(6)}.tmp"
+    try:
+        with open(temp_file, "w", encoding="utf-8") as handle:
+            json.dump(sites, handle, indent=4, ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_file, sites_path)
+    finally:
+        if os.path.exists(temp_file):
+            os.unlink(temp_file)
+
+
+def _source_record_index(sites: list[dict], source_id: str) -> int | None:
+    needle = str(source_id or "").strip().casefold()
+    for index, source in enumerate(sites):
+        aliases = {
+            str(source.get("id") or "").strip().casefold(),
+            canonical_source_url(source.get("rss_url") or source.get("url")).casefold(),
+        }
+        if needle in aliases:
+            return index
+    return None
+
+
+@app.put("/sites/{source_id}")
+def update_site(source_id: str, request: Request, payload: dict = Body(...)):
+    """Update/toggle one record in the authoritative unified catalog."""
+
+    sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(
+        get_profile_for_request(request)
+    )
+    with sites_lock:
+        sites = load_sites(Path(sites_path)) if os.path.exists(sites_path) else []
+        index = _source_record_index(sites, source_id)
+        if index is None:
+            raise HTTPException(status_code=404, detail="Source not found.")
+        existing = sites[index]
+        protected = {
+            "id": existing.get("id"),
+            "legacy_profile": existing.get("legacy_profile") or DEFAULT_PROFILE,
+            "verticals": existing.get("verticals") or ["technology"],
+            "audiences": existing.get("audiences") or ["all"],
+        }
+        updated = normalize_site({**existing, **payload, **protected}, protected["legacy_profile"])
+        updated_entrypoint = canonical_source_url(updated.get("rss_url") or updated.get("url"))
+        if any(
+            position != index
+            and canonical_source_url(source.get("rss_url") or source.get("url")) == updated_entrypoint
+            for position, source in enumerate(sites)
+        ):
+            raise HTTPException(status_code=409, detail="This source entrypoint already exists.")
+        sites[index] = updated
+        _write_unified_sites(sites_path, sites)
+    return {"status": "success", "profile": public_profile_name(UNIFIED_PROFILE), "source": updated}
+
+
+@app.delete("/sites/{source_id}")
+def delete_site(source_id: str, request: Request):
+    """Remove one explicitly addressed source from the unified catalog."""
+
+    sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(
+        get_profile_for_request(request)
+    )
+    with sites_lock:
+        sites = load_sites(Path(sites_path)) if os.path.exists(sites_path) else []
+        index = _source_record_index(sites, source_id)
+        if index is None:
+            raise HTTPException(status_code=404, detail="Source not found.")
+        removed = sites.pop(index)
+        _write_unified_sites(sites_path, sites)
+    return {
+        "status": "success",
+        "profile": public_profile_name(UNIFIED_PROFILE),
+        "removed": removed,
+        "count": len(sites),
+    }
 
 
 # ==========================================
@@ -3868,7 +4438,7 @@ def get_system_status(request: Request):
         )
         response = {
             **SCHEDULER_STATUS,
-            "active_profile": active_profile,
+            "active_profile": public_profile_name(active_profile),
             "active_manual_jobs": running_jobs,
             "capacity_remaining": crawl_semaphore._value,
             "details_allowed": details_allowed,
@@ -3893,10 +4463,14 @@ def get_system_status(request: Request):
         }
         if details_allowed:
             response["pipeline"]["last_preflight"] = cached_capabilities
-            response["profiles"] = {
-                DEFAULT_PROFILE: get_profile_debug_info(DEFAULT_PROFILE),
-                BROADCAST_PROFILE: get_profile_debug_info(BROADCAST_PROFILE),
-            }
+            response["profiles"] = (
+                {"unified": get_profile_debug_info(UNIFIED_PROFILE)}
+                if UNIFIED_CORPUS_ENABLED
+                else {
+                    DEFAULT_PROFILE: get_profile_debug_info(DEFAULT_PROFILE),
+                    BROADCAST_PROFILE: get_profile_debug_info(BROADCAST_PROFILE),
+                }
+            )
         return response
 
 
@@ -3935,7 +4509,7 @@ def get_briefing_meta(request: Request):
     profile = get_profile_for_request(request)
     latest = get_latest_briefing_file_for_profile(profile)
     if not latest:
-        return {"last_updated": None, "count": 0, "filename": None, "profile": profile}
+        return {"last_updated": None, "count": 0, "filename": None, "profile": public_profile_name(profile)}
     try:
         with open(latest, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -3943,10 +4517,10 @@ def get_briefing_meta(request: Request):
             "last_updated": datetime.datetime.fromtimestamp(os.path.getmtime(latest)).isoformat(),
             "filename": os.path.basename(latest),
             "count": len(data),
-            "profile": profile,
+            "profile": public_profile_name(profile),
         }
     except Exception:
-        return {"last_updated": None, "count": 0, "filename": None, "profile": profile}
+        return {"last_updated": None, "count": 0, "filename": None, "profile": public_profile_name(profile)}
 
 
 # ==========================================
@@ -3984,65 +4558,145 @@ def get_latest_briefing(request: Request):
                         "result": ranked_data,
                         "type": "scheduler",
                         "source": "shared",
-                        "profile": profile,
+                        "profile": public_profile_name(profile),
                         "filename": os.path.basename(latest),
                         "generated_at": datetime.datetime.fromtimestamp(os.path.getmtime(latest)).strftime("%d %b %Y, %I:%M %p"),
                         "personalization": personalization,
                     }
         except Exception as e:
-            return {"status": "error", "result": [], "profile": profile, "message": str(e)}
-    return {"status": "empty", "result": [], "profile": profile}
+            return {"status": "error", "result": [], "profile": public_profile_name(profile), "message": str(e)}
+    return {"status": "empty", "result": [], "profile": public_profile_name(profile)}
 
 
 # ==========================================
 # --- BRIEFING REMOVE/RESTORE (Disk) ---
 # ==========================================
+def _load_briefing_items(file_path: str) -> list:
+    """Read one briefing as a list or fail before any paired state mutates."""
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as file_obj:
+            items = json.load(file_obj)
+    except (OSError, ValueError, TypeError) as error:
+        raise RuntimeError(f"Could not read the shared briefing: {error}") from error
+    if not isinstance(items, list):
+        raise RuntimeError("The shared briefing has an invalid JSON shape.")
+    return items
+
+
+def _save_briefing_items(file_path: str, items: list):
+    """Replace a briefing atomically so a failed write preserves the old file."""
+
+    destination = os.path.abspath(file_path)
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    temp_file = f"{destination}.{secrets.token_hex(6)}.tmp"
+    try:
+        with open(temp_file, "w", encoding="utf-8") as file_obj:
+            json.dump(items, file_obj, indent=4, ensure_ascii=False)
+            file_obj.flush()
+            os.fsync(file_obj.fileno())
+        os.replace(temp_file, destination)
+    finally:
+        if os.path.exists(temp_file):
+            try:
+                os.unlink(temp_file)
+            except OSError:
+                pass
+
+
+def _paired_state_failure(operation: str, error: Exception, rollback_error: Exception = None):
+    """Raise a machine-readable failure for a paired briefing/store mutation."""
+
+    if rollback_error is not None:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "partial",
+                "operation": operation,
+                "state": "recovery_required",
+                "recoverable": True,
+                "message": (
+                    f"The {operation} operation was interrupted and automatic rollback "
+                    "also failed. Refresh the briefing and retry; an administrator can "
+                    "reconcile the Not Interested store if needed."
+                ),
+                "cause": str(error),
+                "rollback_error": str(rollback_error),
+            },
+        )
+    raise HTTPException(
+        status_code=503,
+        detail={
+            "status": "error",
+            "operation": operation,
+            "state": "rolled_back",
+            "recoverable": True,
+            "message": (
+                f"The {operation} operation could not be completed. No paired state "
+                "change was kept; retry safely."
+            ),
+            "cause": str(error),
+        },
+    )
+
+
 @app.post("/briefing/remove")
 def remove_from_briefing(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
-    title = payload.get("title", "")
+    title = str(payload.get("title", "")).strip()
     if not title:
-        return {"status": "error", "message": "No title provided"}
+        raise HTTPException(status_code=400, detail="No title provided")
 
     latest = get_latest_briefing_file_for_profile(profile)
     if not latest:
-        return {"status": "error", "message": "No briefing file found"}
+        raise HTTPException(status_code=404, detail="No briefing file found")
     try:
-        with open(latest, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        original_count = len(data)
-        data = [item for item in data if item.get("title", "") != title]
-        removed = original_count - len(data)
-        if removed > 0:
-            with open(latest, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            print(f"[BRIEFING] Removed '{title[:50]}' from {os.path.basename(latest)}")
+        with briefing_lock:
+            data = _load_briefing_items(latest)
+            original_count = len(data)
+            normalized_title = title.casefold()
+            data = [
+                item for item in data
+                if str(item.get("title", "")).strip().casefold() != normalized_title
+            ]
+            removed = original_count - len(data)
+            if removed > 0:
+                _save_briefing_items(latest, data)
+                print(f"[BRIEFING] Removed '{title[:50]}' from {os.path.basename(latest)}")
         return {"status": "success", "removed": removed, "remaining": len(data), "profile": profile}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail=f"Could not remove article from briefing: {e}") from e
 
 
 @app.post("/briefing/restore")
 def restore_to_briefing(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
     article = payload.get("article")
-    if not article:
-        return {"status": "error", "message": "No article provided"}
+    if not isinstance(article, dict) or not str(article.get("title", "")).strip():
+        raise HTTPException(status_code=400, detail="A titled article is required")
 
     latest = get_latest_briefing_file_for_profile(profile)
     if not latest:
-        return {"status": "error", "message": "No briefing file found"}
+        raise HTTPException(status_code=404, detail="No briefing file found")
     try:
-        with open(latest, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if not any(item.get("title") == article.get("title") for item in data):
-            data.insert(0, article)
-            with open(latest, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            print(f"[BRIEFING] Restored '{article.get('title', '')[:50]}' to {os.path.basename(latest)}")
-        return {"status": "success", "count": len(data), "profile": profile}
+        with briefing_lock:
+            data = _load_briefing_items(latest)
+            normalized_title = str(article.get("title", "")).strip().casefold()
+            restored = not any(
+                str(item.get("title", "")).strip().casefold() == normalized_title
+                for item in data
+            )
+            if restored:
+                data.insert(0, article)
+                _save_briefing_items(latest, data)
+                print(f"[BRIEFING] Restored '{article.get('title', '')[:50]}' to {os.path.basename(latest)}")
+        return {"status": "success", "restored": restored, "count": len(data), "profile": profile}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        if isinstance(e, HTTPException):
+            raise
+        raise HTTPException(status_code=500, detail=f"Could not restore article to briefing: {e}") from e
 
 
 # ==========================================
@@ -4686,7 +5340,9 @@ def save_training_data(request: Request, data: VotePayload, background_tasks: Ba
 @app.post("/not-interested")
 def add_not_interested(request: Request, background_tasks: BackgroundTasks, payload: dict = Body(...)):
     profile = get_active_profile_name(request)
-    title = payload.get("title", "")
+    title = str(payload.get("title", "")).strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="An article title is required.")
     summary = (
         payload.get("master_summary")
         or payload.get("summary")
@@ -4696,43 +5352,97 @@ def add_not_interested(request: Request, background_tasks: BackgroundTasks, payl
         or ""
     )
     keywords = payload.get("keywords_found", [])
+    entry = {
+        "title": title,
+        "master_summary": summary,
+        "ppt_summary": payload.get("ppt_summary", ""),
+        "snippet": payload.get("snippet", ""),
+        "date": payload.get("date", ""),
+        "link": payload.get("link", ""),
+        "top_image": payload.get("top_image", ""),
+        "sources": payload.get("sources", []),
+        "importance_score": payload.get("importance_score", 0),
+        "keywords_found": keywords,
+        "region": payload.get("region", "Global"),
+        "full_contents": payload.get("full_contents", ""),
+        "category": payload.get("category", "Tech News"),
+        "source": payload.get("source", "Unknown"),
+        "sentiment": payload.get("sentiment", "neutral"),
+        "is_fresh": payload.get("is_fresh", True),
+        "first_seen": payload.get("first_seen", ""),
+        "source_count": payload.get("source_count", 1),
+        "entities": payload.get("entities", {}),
+        "profile": profile,
+        "rejected_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "rejected_by": payload.get("rejected_by", "unknown"),
+    }
+    store_before = []
+    store_changed = False
+    try:
+        with not_interested_lock, briefing_lock:
+            store_before = load_not_interested_store(request)
+            already_rejected = is_already_rejected(title, store_before)
+            latest = get_latest_briefing_file_for_profile(profile)
+            briefing_before = _load_briefing_items(latest) if latest else []
+            normalized_title = title.casefold()
+            briefing_after = [
+                item for item in briefing_before
+                if str(item.get("title", "")).strip().casefold() != normalized_title
+            ]
+            store_after = list(store_before)
+            if not already_rejected:
+                store_after.append(entry)
+                save_not_interested_store(store_after, request)
+                store_changed = True
+            try:
+                if latest and len(briefing_after) != len(briefing_before):
+                    _save_briefing_items(latest, briefing_after)
+            except Exception as error:
+                rollback_error = None
+                if store_changed:
+                    try:
+                        save_not_interested_store(store_before, request)
+                    except Exception as rollback:
+                        rollback_error = rollback
+                _paired_state_failure("reject", error, rollback_error)
+    except HTTPException:
+        raise
+    except Exception as error:
+        _paired_state_failure("reject", error)
 
-    with not_interested_lock:
-        store = load_not_interested_store(request)
-        if is_already_rejected(title, store):
-            return {"status": "exists", "message": "Already in Not Interested", "count": len(store), "profile": profile}
-
-        entry = {
-            "title": title,
-            "master_summary": summary,
-            "ppt_summary": payload.get("ppt_summary", ""),
-            "snippet": payload.get("snippet", ""),
-            "date": payload.get("date", ""),
-            "link": payload.get("link", ""),
-            "top_image": payload.get("top_image", ""),
-            "sources": payload.get("sources", []),
-            "importance_score": payload.get("importance_score", 0),
-            "keywords_found": keywords,
-            "region": payload.get("region", "Global"),
-            "full_contents": payload.get("full_contents", ""),
-            "category": payload.get("category", "Tech News"),
-            "source": payload.get("source", "Unknown"),
-            "sentiment": payload.get("sentiment", "neutral"),
-            "is_fresh": payload.get("is_fresh", True),
-            "first_seen": payload.get("first_seen", ""),
-            "source_count": payload.get("source_count", 1),
-            "entities": payload.get("entities", {}),
+    if already_rejected:
+        return {
+            "status": "exists",
+            "message": "Already in Not Interested; shared briefing state reconciled.",
+            "count": len(store_before),
+            "briefing_removed": len(briefing_before) - len(briefing_after),
             "profile": profile,
-            "rejected_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "rejected_by": payload.get("rejected_by", "unknown"),
         }
-        store.append(entry)
-        save_not_interested_store(store, request)
 
-    save_training_vote(keywords, summary, "not_interested", title, profile)
+    try:
+        save_training_vote(keywords, summary, "not_interested", title, profile)
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "partial",
+                "operation": "reject",
+                "state": "content_committed_training_pending",
+                "recoverable": True,
+                "message": "The article was removed, but its learning vote could not be saved. Refresh before retrying.",
+                "cause": str(error),
+            },
+        ) from error
     background_tasks.add_task(enqueue_bouncer_retrain, profile)
 
-    return {"status": "success", "message": "Moved to Not Interested", "count": len(store), "profile": profile, "retrain_scheduled": True}
+    return {
+        "status": "success",
+        "message": "Moved to Not Interested and removed from the shared briefing",
+        "count": len(store_before) + 1,
+        "briefing_removed": len(briefing_before) - len(briefing_after),
+        "profile": profile,
+        "retrain_scheduled": True,
+    }
 
 
 # ==========================================
@@ -4820,9 +5530,12 @@ def restore_for_current_viewer(request: Request, payload: dict = Body(...)):
 @app.get("/viewer/briefings")
 def get_personal_url_briefings(request: Request):
     profile = get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
-    store = PERSONAL_BRIEFING_STORE.read()
-    jobs = store.get(viewer_key, {}).get(profile, [])
+    with viewer_briefing_lock:
+        store = PERSONAL_BRIEFING_STORE.read()
+        viewer_key, migrated = claim_legacy_private_bucket(store, request)
+        if migrated:
+            PERSONAL_BRIEFING_STORE.write(store)
+        jobs = store.get(viewer_key, {}).get(profile, [])
     jobs = jobs if isinstance(jobs, list) else []
     return {
         "status": "success",
@@ -4846,7 +5559,7 @@ def get_personal_url_briefings(request: Request):
 def create_personal_url_briefings(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
     client_ip = get_client_ip(request)
-    viewer_key = get_viewer_key(client_ip)
+    viewer_key = get_private_viewer_key(request)
     fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
     raw_value = payload.get("urls", [])
     if isinstance(raw_value, list):
@@ -4880,6 +5593,7 @@ def create_personal_url_briefings(request: Request, payload: dict = Body(...)):
     accepted, duplicates = [], []
     with viewer_briefing_lock:
         store = PERSONAL_BRIEFING_STORE.read()
+        viewer_key, _ = claim_legacy_private_bucket(store, request)
         viewer = store.setdefault(viewer_key, {})
         jobs = viewer.setdefault(profile, [])
         existing_by_url = {
@@ -4923,15 +5637,50 @@ def create_personal_url_briefings(request: Request, payload: dict = Body(...)):
             accepted.append(job)
         PERSONAL_BRIEFING_STORE.write(store)
 
+    dispatch_failures = []
     for job in accepted:
-        personal_briefing_executor.submit(
-            process_personal_briefing_job,
-            viewer_key,
-            profile,
-            job["id"],
-            job["url"],
-        )
-    record_usage_activity(
+        try:
+            personal_briefing_executor.submit(
+                process_personal_briefing_job,
+                viewer_key,
+                profile,
+                job["id"],
+                job["url"],
+            )
+        except Exception as error:
+            failure = {
+                "status": "failed",
+                "stage": "dispatch_failed",
+                "progress": 100,
+                "message": (
+                    "The private briefing worker could not start. "
+                    "Use Retry when the service is ready."
+                ),
+                "error": f"{type(error).__name__}: {error}"[:500],
+            }
+            update_personal_briefing_job(
+                viewer_key,
+                profile,
+                job["id"],
+                **failure,
+            )
+            # Keep the response consistent with the committed job record so
+            # the UI never claims work started when dispatch actually failed.
+            job.update(failure)
+            dispatch_failures.append(
+                {
+                    "job_id": job["id"],
+                    "url": job["url"],
+                    "error": failure["error"],
+                    "retryable": True,
+                }
+            )
+            print(
+                f"[PERSONAL:{profile}] Could not dispatch job {job['id']}: "
+                f"{failure['error']}",
+                flush=True,
+            )
+    activity_tracked = record_usage_best_effort(
         client_ip,
         profile,
         fingerprint,
@@ -4945,10 +5694,12 @@ def create_personal_url_briefings(request: Request, payload: dict = Body(...)):
         ),
     )
     return {
-        "status": "accepted",
+        "status": "partial" if dispatch_failures else "accepted",
         "accepted": accepted,
         "duplicates": duplicates,
         "invalid": invalid,
+        "dispatch_failures": dispatch_failures,
+        "activity_tracked": activity_tracked,
         "profile": profile,
         "scope": "current_viewer_only",
     }
@@ -4960,38 +5711,80 @@ def retry_personal_url_briefing(
     request: Request,
 ):
     profile = get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
-    store = PERSONAL_BRIEFING_STORE.read()
-    jobs = store.get(viewer_key, {}).get(profile, [])
-    job = next(
-        (
-            candidate
-            for candidate in jobs
-            if candidate.get("id") == job_id
-        ),
-        None,
-    )
+    viewer_key = get_private_viewer_key(request)
+    transition = {"job": None, "queued": False}
+
+    def updater(store):
+        nonlocal viewer_key
+        viewer_key, _ = claim_legacy_private_bucket(store, request)
+        jobs = store.setdefault(viewer_key, {}).setdefault(profile, [])
+        job = next(
+            (candidate for candidate in jobs if candidate.get("id") == job_id),
+            None,
+        )
+        if not job:
+            return store
+        transition["job"] = dict(job)
+        if job.get("status") in {"queued", "processing"}:
+            return store
+        job.update(
+            {
+                "status": "queued",
+                "stage": "queued",
+                "progress": 5,
+                "message": "Retry queued.",
+                "error": None,
+                "updated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            }
+        )
+        transition["job"] = dict(job)
+        transition["queued"] = True
+        return store
+
+    # The read/check/update is one critical section. Two simultaneous Retry
+    # clicks can no longer submit the same URL to the worker twice.
+    with viewer_briefing_lock:
+        PERSONAL_BRIEFING_STORE.update(updater)
+
+    job = transition["job"]
     if not job:
         raise HTTPException(status_code=404, detail="Private briefing job not found.")
-    if job.get("status") in {"queued", "processing"}:
+    if not transition["queued"]:
         return {"status": "already_running", "job": job}
-    update_personal_briefing_job(
-        viewer_key,
-        profile,
-        job_id,
-        status="queued",
-        stage="queued",
-        progress=5,
-        message="Retry queued.",
-        error=None,
-    )
-    personal_briefing_executor.submit(
-        process_personal_briefing_job,
-        viewer_key,
-        profile,
-        job_id,
-        job.get("url"),
-    )
+    try:
+        personal_briefing_executor.submit(
+            process_personal_briefing_job,
+            viewer_key,
+            profile,
+            job_id,
+            job.get("url"),
+        )
+    except Exception as error:
+        failure_message = (
+            "The private briefing worker could not start. "
+            "Use Retry when the service is ready."
+        )
+        update_personal_briefing_job(
+            viewer_key,
+            profile,
+            job_id,
+            status="failed",
+            stage="dispatch_failed",
+            progress=100,
+            message=failure_message,
+            error=f"{type(error).__name__}: {error}"[:500],
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "error",
+                "operation": "personal_briefing_retry",
+                "state": "dispatch_failed",
+                "recoverable": True,
+                "message": failure_message,
+                "job_id": job_id,
+            },
+        ) from error
     return {"status": "queued", "job_id": job_id}
 
 
@@ -5001,7 +5794,7 @@ def clear_personal_url_briefings(request: Request, payload: dict = Body(default=
 
     profile = get_profile_for_request(request)
     client_ip = get_client_ip(request)
-    viewer_key = get_viewer_key(client_ip)
+    viewer_key = get_private_viewer_key(request)
     fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
     requested_scope = str(payload.get("scope") or "finished").strip().lower()
     if requested_scope not in {"finished", "failed", "complete"}:
@@ -5019,7 +5812,8 @@ def clear_personal_url_briefings(request: Request, payload: dict = Body(default=
 
     with viewer_briefing_lock:
         def updater(store):
-            nonlocal removed, remaining
+            nonlocal removed, remaining, viewer_key
+            viewer_key, _ = claim_legacy_private_bucket(store, request)
             viewer = store.setdefault(viewer_key, {})
             jobs = viewer.get(profile, [])
             jobs = jobs if isinstance(jobs, list) else []
@@ -5031,8 +5825,9 @@ def clear_personal_url_briefings(request: Request, payload: dict = Body(default=
 
         PERSONAL_BRIEFING_STORE.update(updater)
 
+    activity_tracked = False
     if removed:
-        record_usage_activity(
+        activity_tracked = record_usage_best_effort(
             client_ip,
             profile,
             fingerprint,
@@ -5046,6 +5841,7 @@ def clear_personal_url_briefings(request: Request, payload: dict = Body(default=
         "removed": removed,
         "remaining": remaining,
         "active_jobs_preserved": True,
+        "activity_tracked": activity_tracked,
         "profile": profile,
         "scope": "current_viewer_only",
     }
@@ -5070,10 +5866,14 @@ def get_personal_saved(request: Request):
 
 
 @app.post("/viewer/saved")
-def save_for_current_viewer(request: Request, payload: dict = Body(...)):
+def save_for_current_viewer(
+    request: Request,
+    payload: dict = Body(...),
+    response: Response = None,
+):
     profile = get_profile_for_request(request)
     client_ip = get_client_ip(request)
-    viewer_key = get_viewer_key(client_ip)
+    viewer_key = get_private_viewer_key(request)
     fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
     article_payload = {
         key: value
@@ -5087,6 +5887,7 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
     changed = False
     with viewer_saved_lock:
         store = load_viewer_saved_store()
+        viewer_key, migrated = claim_legacy_private_bucket(store, request)
         viewer_store = store.setdefault(viewer_key, {})
         items = viewer_store.setdefault(profile, [])
         existing = next(
@@ -5104,8 +5905,9 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
             entry["saved_at"] = datetime.datetime.now().isoformat(timespec="seconds")
             entry["saved_scope"] = "current_viewer_only"
             items.insert(0, entry)
-            save_viewer_saved_store(store)
             changed = True
+        if changed or migrated:
+            save_viewer_saved_store(store)
 
     activity_tracked = False
     if changed:
@@ -5120,12 +5922,20 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
             if article_payload.get(key) not in (None, "", [])
         }
         activity_detail["screen"] = "saved_endpoint"
-        activity_tracked = record_usage_activity(
+        activity_tracked = record_usage_best_effort(
             client_ip,
             profile,
             fingerprint,
             "save_for_later",
             json.dumps(activity_detail, ensure_ascii=False),
+        )
+        record_recommendation_best_effort(
+            request,
+            response or Response(),
+            "save_for_later",
+            activity_detail,
+            event_id=str(payload.get("recommendation_event_id") or ""),
+            occurred_at=str(payload.get("occurred_at") or ""),
         )
 
     return {
@@ -5142,10 +5952,14 @@ def save_for_current_viewer(request: Request, payload: dict = Body(...)):
 
 
 @app.post("/viewer/saved/remove")
-def remove_saved_for_current_viewer(request: Request, payload: dict = Body(...)):
+def remove_saved_for_current_viewer(
+    request: Request,
+    payload: dict = Body(...),
+    response: Response = None,
+):
     profile = get_profile_for_request(request)
     client_ip = get_client_ip(request)
-    viewer_key = get_viewer_key(client_ip)
+    viewer_key = get_private_viewer_key(request)
     fingerprint = str(payload.get("_tracking_fingerprint") or "unknown")
     target_key = str(payload.get("article_key") or _article_identity(payload))
     if not target_key:
@@ -5153,6 +5967,7 @@ def remove_saved_for_current_viewer(request: Request, payload: dict = Body(...))
 
     with viewer_saved_lock:
         store = load_viewer_saved_store()
+        viewer_key, migrated = claim_legacy_private_bucket(store, request)
         viewer_store = store.setdefault(viewer_key, {})
         items = viewer_store.get(profile, [])
         remaining = [
@@ -5163,25 +5978,34 @@ def remove_saved_for_current_viewer(request: Request, payload: dict = Body(...))
         ]
         viewer_store[profile] = remaining
         changed = len(remaining) != len(items)
-        if changed:
+        if changed or migrated:
             save_viewer_saved_store(store)
 
     activity_tracked = False
     if changed:
-        activity_tracked = record_usage_activity(
+        removal_detail = {
+            "title": payload.get("title", ""),
+            "link": payload.get("link") or payload.get("url", ""),
+            "source": payload.get("source", ""),
+            "screen": "saved_endpoint",
+        }
+        activity_tracked = record_usage_best_effort(
             client_ip,
             profile,
             fingerprint,
             "save_for_later_remove",
             json.dumps(
-                {
-                    "title": payload.get("title", ""),
-                    "link": payload.get("link") or payload.get("url", ""),
-                    "source": payload.get("source", ""),
-                    "screen": "saved_endpoint",
-                },
+                removal_detail,
                 ensure_ascii=False,
             ),
+        )
+        record_recommendation_best_effort(
+            request,
+            response or Response(),
+            "save_for_later_remove",
+            removal_detail,
+            event_id=str(payload.get("recommendation_event_id") or ""),
+            occurred_at=str(payload.get("occurred_at") or ""),
         )
 
     return {
@@ -5234,34 +6058,89 @@ def get_not_interested(request: Request):
 @app.post("/not-interested/restore")
 def restore_from_not_interested(request: Request, background_tasks: BackgroundTasks, payload: dict = Body(...)):
     profile = get_active_profile_name(request)
-    title = payload.get("title", "")
+    title = str(payload.get("title", "")).strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="An article title is required.")
 
-    with not_interested_lock:
-        store = load_not_interested_store(request)
-        article_to_restore = None
-        remaining = []
-        for item in store:
-            if item.get("title", "").strip().lower() == title.strip().lower():
-                article_to_restore = item
+    store_before = []
+    try:
+        with not_interested_lock, briefing_lock:
+            store_before = load_not_interested_store(request)
+            article_to_restore = None
+            remaining = []
+            normalized_title = title.casefold()
+            for item in store_before:
+                if str(item.get("title", "")).strip().casefold() == normalized_title:
+                    article_to_restore = dict(item)
+                else:
+                    remaining.append(item)
+
+            if not article_to_restore:
+                raise HTTPException(status_code=404, detail="Article not found in Not Interested")
+
+            article_to_restore.pop("rejected_at", None)
+            article_to_restore.pop("rejected_by", None)
+            article_to_restore = apply_learned_region(article_to_restore, profile)
+            latest = get_latest_briefing_file_for_profile(profile)
+            if latest:
+                briefing_before = _load_briefing_items(latest)
             else:
-                remaining.append(item)
+                history_dir = get_profile_history_dir(profile)
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                latest = os.path.join(history_dir, f"briefing_{timestamp}.json")
+                briefing_before = []
+            briefing_after = list(briefing_before)
+            briefing_restored = not any(
+                str(item.get("title", "")).strip().casefold() == normalized_title
+                for item in briefing_after
+            )
+            if briefing_restored:
+                briefing_after.insert(0, article_to_restore)
 
-        if not article_to_restore:
-            return {"status": "error", "message": "Article not found in Not Interested", "profile": profile}
-        save_not_interested_store(remaining, request)
+            save_not_interested_store(remaining, request)
+            try:
+                if briefing_restored:
+                    _save_briefing_items(latest, briefing_after)
+            except Exception as error:
+                rollback_error = None
+                try:
+                    save_not_interested_store(store_before, request)
+                except Exception as rollback:
+                    rollback_error = rollback
+                _paired_state_failure("restore", error, rollback_error)
+    except HTTPException:
+        raise
+    except Exception as error:
+        _paired_state_failure("restore", error)
 
     summary = article_to_restore.get("master_summary", "")
     keywords = article_to_restore.get("keywords_found", [])
-    save_training_vote(keywords, summary, "interested", article_to_restore.get("title", ""), profile)
+    try:
+        save_training_vote(keywords, summary, "interested", article_to_restore.get("title", ""), profile)
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "partial",
+                "operation": "restore",
+                "state": "content_committed_training_pending",
+                "recoverable": True,
+                "message": "The article was restored, but its learning vote could not be saved. Refresh before retrying.",
+                "cause": str(error),
+            },
+        ) from error
 
     print(f"Restored: {title[:60]}. Counter-vote saved. Triggering retrain...")
     background_tasks.add_task(enqueue_bouncer_retrain, profile)
-
-    article_to_restore.pop("rejected_at", None)
-    article_to_restore.pop("rejected_by", None)
-
-    article_to_restore = apply_learned_region(article_to_restore, profile)
-    return {"status": "success", "message": "Restored to main feed", "article": article_to_restore, "count": len(remaining), "profile": profile, "retrain_scheduled": True}
+    return {
+        "status": "success",
+        "message": "Restored to the shared briefing",
+        "article": article_to_restore,
+        "count": len(remaining),
+        "briefing_restored": briefing_restored,
+        "profile": profile,
+        "retrain_scheduled": True,
+    }
 
 
 # ==========================================
@@ -5327,6 +6206,9 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
             "search",
             "article_click",
             "dossier_open",
+            "dossier_dwell",
+            "source_open",
+            "why_this_story_open",
             "vote",
             "vote_interested",
             "vote_not_interested",
@@ -5458,14 +6340,34 @@ def record_usage_activity(ip, profile, fingerprint, action, detail=""):
 
 
 @app.post("/track")
-def track_activity(payload: dict = Body(...), request: Request = None):
+def track_activity(request: Request, response: Response, payload: dict = Body(...)):
     ip = get_client_ip(request)
     profile = get_active_profile_name(request)
     fingerprint = payload.get("fingerprint", "unknown")
     action = payload.get("action", "")
     detail = payload.get("detail", "")
     tracked = record_usage_activity(ip, profile, fingerprint, action, detail)
-    return {"status": "ok", "tracked": tracked}
+    try:
+        parsed_detail = json.loads(detail) if isinstance(detail, str) else detail
+    except (TypeError, ValueError):
+        parsed_detail = {}
+    parsed_detail = parsed_detail if isinstance(parsed_detail, dict) else {}
+    recommendation = record_recommendation_best_effort(
+        request,
+        response,
+        action,
+        parsed_detail,
+        event_id=str(
+            payload.get("recommendation_event_id")
+            or payload.get("event_id")
+            or parsed_detail.get("event_id")
+            or ""
+        ),
+        occurred_at=str(payload.get("occurred_at") or parsed_detail.get("occurred_at") or ""),
+        active_ms=payload.get("active_ms") or parsed_detail.get("active_ms") or 0,
+        visible_ratio=payload.get("visible_ratio") or parsed_detail.get("visible_ratio") or 0.0,
+    )
+    return {"status": "ok", "tracked": tracked, "recommendation": recommendation}
 
 
 @app.get("/analytics/access")

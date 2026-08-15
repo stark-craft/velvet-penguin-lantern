@@ -11,23 +11,16 @@ import requests
 
 from core.rate_limit import PacedRateLimiter
 from core.secure_http import tls_verify
+from news_scrapper.recommendation.hooks import ensure_article_hooks, validate_hook
 
 
-DEFAULT_URL = (
-    "https://genai-openapi.sec.samsung.net/swahq/trial/"
-    "api-chat/openapi/chat/v1/messages"
-)
+DEFAULT_URL = ""
 
 
 def normalize_chat_url(value: str) -> str:
-    """Upgrade the legacy product base URL to the proven messages route."""
+    """Normalize the fully configured company-internal messages URL."""
 
-    url = str(value or "").strip().rstrip("/")
-    if not url:
-        return DEFAULT_URL
-    if url.endswith("/api-chat"):
-        return f"{url}/openapi/chat/v1/messages"
-    return url
+    return str(value or "").strip().rstrip("/")
 
 
 URL = normalize_chat_url(os.environ.get("SAMSUNG_CHAT_URL", DEFAULT_URL))
@@ -97,6 +90,8 @@ def safe_error_excerpt(response, limit: int = 1200) -> str:
 
 
 def call_samsung_chat(prompt: str) -> dict:
+    if not URL:
+        raise RuntimeError("Missing SAMSUNG_CHAT_URL")
     if not CLIENT:
         raise RuntimeError("Missing SAMSUNG_CHAT_CLIENT")
     if not TOKEN:
@@ -134,8 +129,8 @@ def call_samsung_chat(prompt: str) -> dict:
     if response.status_code >= 400:
         excerpt = safe_error_excerpt(response)
         route_hint = (
-            " The configured SAMSUNG_CHAT_URL route was not found; use the "
-            "full /openapi/chat/v1/messages route."
+            " The configured SAMSUNG_CHAT_URL route was not found; copy the "
+            "full messages endpoint from the internal service documentation."
             if response.status_code == 404
             else ""
         )
@@ -201,12 +196,17 @@ Return strict JSON only with these keys:
 - key_points: an array of 3 to 5 factual, non-repetitive important points
 - ppt_summary: a concise presentation-ready summary
 - why_it_matters: one or two sentences describing strategic impact without repeating the summary
+- attention_hook: 18 to 35 grounded words explaining why this development deserves attention now
+- what_changed: the concrete new development, independently understandable
+- why_now: timing or decision-window context, or an empty string when unsupported
+- watch_next: a verifiable next event or signal to monitor, or an empty string when unsupported
+- hook_type: exactly change, risk, opportunity, follow_up, disagreement, or watch
 - article_intent: one concise label such as Product Launch, Research, Regulation, Partnership, Investment, Market Update, Security, or Corporate Strategy
 - category: a concise technology category
 - region: exactly Global or Local
 - importance_score: an integer from 1 to 10
 
-Do not invent facts, numbers, quotations, dates, or implications. Use only the supplied article and source metadata.
+Do not invent facts, numbers, quotations, dates, urgency, consequences, or implications. Use only the supplied article and source metadata. Preserve uncertainty. Do not use curiosity gaps or phrases such as "You won't believe", "shocking", or "game-changing". Return an empty string when the evidence does not support a hook field.
 
 Title: {clean(output.get('title'))}
 Source: {clean(output.get('source'))}
@@ -236,6 +236,13 @@ Article: {content}"""
         output["ppt_summary"] = clean(parsed.get("ppt_summary")) or combined_summary
         output["why_it_matters"] = clean(parsed.get("why_it_matters"))
         output["why_matters"] = output["why_it_matters"]
+        output["attention_hook"] = validate_hook(parsed.get("attention_hook"), output)
+        output["what_changed"] = clean(parsed.get("what_changed"))
+        output["why_now"] = clean(parsed.get("why_now"))
+        output["watch_next"] = clean(parsed.get("watch_next"))
+        output["hook_type"] = clean(parsed.get("hook_type")).lower()
+        output["hook_source"] = "samsung_chat"
+        output["hook_grounded"] = bool(output["attention_hook"])
         output["article_intent"] = clean(parsed.get("article_intent"))
         output["category"] = clean(parsed.get("category")) or output.get("category", "Tech News")
         output["region"] = "Local" if clean(parsed.get("region")).lower() == "local" else "Global"
@@ -251,4 +258,4 @@ Article: {content}"""
     except Exception as error:
         output["chat_summary_status"] = "failed"
         output["chat_summary_error"] = str(error)[:500]
-    return output
+    return ensure_article_hooks(output)

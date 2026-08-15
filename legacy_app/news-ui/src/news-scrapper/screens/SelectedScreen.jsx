@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import WorkflowBriefingCard from '../components/WorkflowBriefingCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
@@ -24,17 +24,25 @@ export default function SelectedScreen() {
   const [pending, setPending] = useState(null);
   const [lens, setLens] = useState('All');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [busyActions, setBusyActions] = useState({});
+  const actionLocks = useRef(new Set());
 
-  const refresh = () => {
+  const refresh = async () => {
+    if (loading && items.length) return;
     setLoad(true);
     setError('');
-    getWorkflow()
-      .then((w) => setItems(normalizeList(w?.selected || [])))
-      .catch((err) => setError(err?.message || 'Could not load the Review Queue.'))
-      .finally(() => setLoad(false));
+    try {
+      const workflow = await getWorkflow();
+      setItems(normalizeList(workflow?.selected || []));
+    } catch (err) {
+      setError(err?.message || 'Could not load the Review Queue.');
+    } finally {
+      setLoad(false);
+    }
   };
 
-  useEffect(refresh, []);
+  useEffect(() => { refresh(); }, []);
 
   const highSignals = items.filter((a) => scoreOf(a) >= 80).length;
   const topSelector = topValue(items, (item) => item.selected_by);
@@ -51,24 +59,43 @@ export default function SelectedScreen() {
     setOpen(item);
   };
   const confirmApprove = async (item, key) => {
+    const actionKey = item.id || item.title;
+    if (actionLocks.current.has(actionKey)) return;
+    actionLocks.current.add(actionKey);
+    setBusyActions((current) => ({ ...current, [actionKey]: 'approve' }));
     setError('');
+    setNotice('');
     try {
       await approveWorkflow(item.title, key);
       setItems((arr) => arr.filter((x) => x.title !== item.title));
       trackAction('approve', item.title?.slice(0, 60));
+      setNotice('Signal approved and moved to Approved Briefing.');
     } catch (err) {
       setError(err?.message || 'Approval failed. The signal remains in Review Queue.');
+      throw err;
+    } finally {
+      actionLocks.current.delete(actionKey);
+      setBusyActions((current) => { const next = { ...current }; delete next[actionKey]; return next; });
     }
   };
 
   const onRemove = async (item) => {
+    const actionKey = item.id || item.title;
+    if (actionLocks.current.has(actionKey)) return;
+    actionLocks.current.add(actionKey);
+    setBusyActions((current) => ({ ...current, [actionKey]: 'remove' }));
     setError('');
+    setNotice('');
     try {
       await removeWorkflow(item.title, 'selected');
       setItems((arr) => arr.filter((x) => x.title !== item.title));
       trackAction('remove_selected', item.title?.slice(0, 60));
+      setNotice('Signal removed from Review Queue.');
     } catch (err) {
       setError(err?.message || 'Could not remove this signal from Review Queue.');
+    } finally {
+      actionLocks.current.delete(actionKey);
+      setBusyActions((current) => { const next = { ...current }; delete next[actionKey]; return next; });
     }
   };
 
@@ -89,7 +116,7 @@ export default function SelectedScreen() {
             <h1>Review selected signals.</h1>
             <p>Open dossiers, verify the coverage, and approve the items that belong in the final briefing.</p>
           </div>
-          <button className="btn-dark-secondary" onClick={refresh} type="button"><Icon name="refresh" /> Refresh Queue</button>
+          <button className="btn-dark-secondary" disabled={loading} onClick={refresh} type="button"><Icon name="refresh" /> {loading ? 'Refreshing…' : 'Refresh Queue'}</button>
         </div>
         <aside className="workflow-status">
           <div className="workflow-status-head"><span className="workflow-beacon review" /> Awaiting Approval</div>
@@ -103,6 +130,7 @@ export default function SelectedScreen() {
       </section>
 
       {error && <div className="error-banner" role="alert">{error}</div>}
+      {notice && <div className="personal-notice" role="status">{notice}</div>}
 
       <section className="workflow-metric-row">
         <div className="workflow-metric"><Icon name="inbox" /><span>Total in review</span><strong>{items.length}</strong></div>
@@ -117,6 +145,7 @@ export default function SelectedScreen() {
           <button
             key={chip}
             className={lens === chip ? 'workflow-filter-chip active' : 'workflow-filter-chip'}
+            aria-pressed={lens === chip}
             onClick={() => setLens(chip)}
             type="button"
           >
@@ -128,6 +157,8 @@ export default function SelectedScreen() {
 
       {loading ? (
         <div className="workflow-empty"><Icon name="refresh" size={24} /><h2>Loading Review Queue</h2></div>
+      ) : error && items.length === 0 ? (
+        <div className="workflow-empty"><Icon name="warning" size={26} /><h2>Review Queue could not be loaded</h2><p>Your workflow has not been changed.</p><button className="btn-dark-secondary" onClick={refresh} type="button"><Icon name="refresh" size={14} /> Try again</button></div>
       ) : items.length === 0 ? (
         <div className="workflow-empty">
           <Icon name="inbox" size={26} />
@@ -147,6 +178,7 @@ export default function SelectedScreen() {
               key={item.id}
               item={item}
               mode="review"
+              busyAction={busyActions[item.id || item.title] || ''}
               onOpen={openDossier}
               onApprove={onApprove}
               onRemove={onRemove}

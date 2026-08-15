@@ -15,30 +15,32 @@ def request_from(ip, headers=None, query=b""):
 
 
 class ProfileRoutingTests(unittest.TestCase):
-    def test_228_address_automatically_gets_broadcast_profile(self):
-        with patch.object(main, "BROADCAST_SPECIAL_IPS", {"109.109.201.228"}), patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", {"127.0.0.1"}):
-            request = request_from("109.109.201.228", {"X-Sense-Profile": "default"})
-            self.assertEqual(main.get_client_ip(request), "109.109.201.228")
-            self.assertEqual(main.get_profile_for_request(request), "broadcast")
+    def test_unified_mode_ignores_the_retired_broadcast_ip_split(self):
+        with patch.object(main, "BROADCAST_SPECIAL_IPS", {"192.0.2.10"}), patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", {"127.0.0.1"}):
+            request = request_from("192.0.2.10", {"X-Sense-Profile": "default"})
+            self.assertEqual(main.get_client_ip(request), "192.0.2.10")
+            self.assertEqual(main.get_profile_for_request(request), "default")
 
     def test_normal_user_cannot_force_profile_with_header(self):
         with patch.object(main, "BROADCAST_SPECIAL_IPS", set()), patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", {"127.0.0.1"}):
             self.assertEqual(main.get_profile_for_request(request_from("10.20.30.40", {"X-Sense-Profile": "broadcast"})), "default")
 
-    def test_authorized_developer_can_switch_profile(self):
-        with patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", {"127.0.0.1"}):
+    def test_legacy_rollback_can_still_switch_profile_explicitly(self):
+        with patch.object(main, "UNIFIED_CORPUS_ENABLED", False), patch.object(
+            main, "LEGACY_PROFILE_ROUTING_ENABLED", True
+        ), patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", {"127.0.0.1"}):
             self.assertEqual(main.get_profile_for_request(request_from("127.0.0.1", {"X-Sense-Profile": "broadcast"})), "broadcast")
 
     def test_forwarded_ip_is_ignored_from_untrusted_peer(self):
         with patch.object(main, "TRUSTED_PROXY_IPS", {"127.0.0.1"}):
-            self.assertEqual(main.get_client_ip(request_from("10.0.0.99", {"X-Forwarded-For": "109.109.201.228"})), "10.0.0.99")
+            self.assertEqual(main.get_client_ip(request_from("10.0.0.99", {"X-Forwarded-For": "192.0.2.10"})), "10.0.0.99")
 
     def test_forwarded_ip_is_used_from_trusted_proxy(self):
         with patch.object(main, "TRUSTED_PROXY_IPS", {"127.0.0.1"}):
-            self.assertEqual(main.get_client_ip(request_from("127.0.0.1", {"X-Forwarded-For": "109.109.201.228, 127.0.0.1"})), "109.109.201.228")
+            self.assertEqual(main.get_client_ip(request_from("127.0.0.1", {"X-Forwarded-For": "192.0.2.10, 127.0.0.1"})), "192.0.2.10")
 
     def test_ipv4_mapped_ipv6_is_normalized(self):
-        self.assertEqual(main.normalize_ip("::ffff:109.109.201.228"), "109.109.201.228")
+        self.assertEqual(main.normalize_ip("::ffff:192.0.2.10"), "192.0.2.10")
 
 
 if __name__ == "__main__":

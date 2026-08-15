@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
   articleKey,
+  groupedByDatePreservingOrder,
   keywordOptions,
   matchesKeyword,
 } from '../src/news-scrapper/utils/intelligence.js';
@@ -166,6 +168,14 @@ test('briefing keyword filters count articles and match without case sensitivity
   assert.equal(matchesKeyword(articles[2], 'all'), true);
 });
 
+test('the unified Briefing exposes an explicit technology and broadcast scope filter', () => {
+  const feedSource = readFileSync(new URL('../src/news-scrapper/screens/FeedScreen.jsx', import.meta.url), 'utf8');
+  assert.match(feedSource, /scope:\s*'all'/);
+  assert.match(feedSource, /All Intelligence/);
+  assert.match(feedSource, /Broadcast &amp; Media/);
+  assert.match(feedSource, /articleScopes\(item\)\.has\(filters\.scope\)/);
+});
+
 test('critical navigation and dossier controls have immediate Korean labels', () => {
   assert.equal(staticKoreanTranslation('Scan'), '스캔');
   assert.equal(staticKoreanTranslation('Open Dossier'), '상세 브리핑 열기');
@@ -173,4 +183,96 @@ test('critical navigation and dossier controls have immediate Korean labels', ()
   assert.equal(staticKoreanTranslation('Why This Matters'), '중요한 이유');
   assert.equal(staticKoreanTranslation('Intelligence Dossier'), '정보 분석 보고서');
   assert.equal(staticKoreanTranslation('LED'), 'LED');
+  assert.equal(staticKoreanTranslation('For You'), '맞춤 추천');
+});
+
+test('For You grouping preserves backend recommendation order across dates', () => {
+  const ranked = [
+    { title: 'Highest rank, older date', date: '2026-08-13' },
+    { title: 'Second rank, newest date', date: '2026-08-15' },
+    { title: 'Third rank, middle date', date: '2026-08-14' },
+  ];
+  const groups = groupedByDatePreservingOrder(ranked);
+  assert.deepEqual(Object.values(groups).flatMap((items) => items.map((item) => item.title)), ranked.map((item) => item.title));
+});
+
+test('hook and recommendation explanation survive frontend normalization', () => {
+  const normalized = normalizeArticle({
+    title: 'Grounded signal',
+    link: 'https://example.test/grounded',
+    attention_hook: 'A grounded context sentence remains visible without replacing the original source headline or introducing unsupported urgency into the intelligence card.',
+    what_changed: 'A concrete product update was announced.',
+    why_now: 'The release window begins this quarter.',
+    watch_next: 'Watch for verified regional availability.',
+    hook_type: 'change',
+    hook_source: 'samsung_chat',
+    hook_grounded: true,
+    recommendation: { score: 0.84, reason_codes: ['explicit_topic'], reasons: ['Matches your AI preference'] },
+  });
+  assert.equal(normalized.hook_grounded, true);
+  assert.equal(normalized.watch_next, 'Watch for verified regional availability.');
+  assert.deepEqual(normalized.recommendation.reason_codes, ['explicit_topic']);
+});
+
+test('For You data uses the viewer API without colliding with the SPA deep link', () => {
+  const apiSource = readFileSync(new URL('../src/news-scrapper/api.js', import.meta.url), 'utf8');
+  assert.match(apiSource, /jsonFetch\(`\/viewer\/for-you\?\$\{params\.toString\(\)\}`\)/);
+  assert.doesNotMatch(apiSource, /jsonFetch\(`\/for-you\?\$\{params\.toString\(\)\}`\)/);
+});
+
+test('stale profile overrides cannot leak into the unified production experience', () => {
+  const apiSource = readFileSync(new URL('../src/news-scrapper/api.js', import.meta.url), 'utf8');
+  const appSource = readFileSync(new URL('../src/news-scrapper/App.jsx', import.meta.url), 'utf8');
+  assert.match(apiSource, /import\.meta\.env\.DEV/);
+  assert.match(apiSource, /VITE_ENABLE_PROFILE_SWITCHER/);
+  assert.match(apiSource, /if \(!developerSwitcherEnabled\) return ''/);
+  assert.match(appSource, /profile_mode:\s*"unified"/);
+  assert.match(appSource, /setActiveProfile\("default"\)/);
+  assert.match(appSource, /PROFILE_SWITCHER_ENABLED\s*&&\s*<Route path="\/trends"/);
+});
+
+test('global reject and restore use one recoverable backend operation', () => {
+  const apiSource = readFileSync(new URL('../src/news-scrapper/api.js', import.meta.url), 'utf8');
+  const rejectFlow = apiSource.match(/export async function rejectArticle[\s\S]*?\n}/)?.[0] || '';
+  const restoreFlow = apiSource.match(/export async function unrejectArticle[\s\S]*?\n}/)?.[0] || '';
+  assert.match(rejectFlow, /return markNotInterested\(article\)/);
+  assert.doesNotMatch(rejectFlow, /removeFromBriefing|catch\s*\{\s*\}/);
+  assert.match(restoreFlow, /return restoreNotInterested\(article\.title\)/);
+  assert.doesNotMatch(restoreFlow, /restoreToBriefing|catch\s*\{\s*\}/);
+  assert.match(apiSource, /body\.status === 'error'/);
+});
+
+test('large briefing archives render progressively instead of mounting every card', () => {
+  const historySource = readFileSync(new URL('../src/news-scrapper/screens/HistoryScreen.jsx', import.meta.url), 'utf8');
+  assert.match(historySource, /const ARCHIVE_PAGE_SIZE = 48/);
+  assert.match(historySource, /filteredArticles\.slice\(0, renderLimit\)/);
+  assert.match(historySource, /Show next/);
+});
+
+test('Korean translation is progressive, private, retryable, and always reversible', () => {
+  const topBarSource = readFileSync(new URL('../src/news-scrapper/components/TopBar.jsx', import.meta.url), 'utf8');
+  const translationSource = readFileSync(new URL('../src/news-scrapper/translation/usePageTranslation.js', import.meta.url), 'utf8');
+  assert.match(topBarSource, /private on-device translation/i);
+  assert.match(topBarSource, /role="alertdialog"/);
+  assert.doesNotMatch(topBarSource, /translationLocked/);
+  assert.match(topBarSource, /translation-failure-notice/);
+  assert.match(topBarSource, /Return to English/);
+  assert.match(topBarSource, /Retry translation/);
+  assert.match(translationSource, /translating:\s*true/);
+  assert.match(translationSource, /window\.sessionStorage/);
+  assert.match(translationSource, /browserTranslationCapability/);
+  assert.match(topBarSource, /translationState\?\.prepareBrowser\?\.\(\)/);
+  assert.match(translationSource, /Call create\(\) synchronously inside the user's confirmation click/);
+  assert.match(translationSource, /targets\.get\(source\)/);
+  assert.match(translationSource, /warmupKoreanTranslation/);
+});
+
+test('the primary interface font is bundled instead of fetched at runtime', () => {
+  const indexSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const entrySource = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
+  const polishSource = readFileSync(new URL('../src/news-scrapper/ui-polish.css', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(indexSource, /fonts\.googleapis|fonts\.gstatic|api\.fontshare/);
+  assert.match(entrySource, /@fontsource-variable\/geist\/wght\.css/);
+  assert.match(polishSource, /font-family:\s*"Geist Variable"/);
 });

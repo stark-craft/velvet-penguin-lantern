@@ -5,33 +5,44 @@ import useModalFocus from './useModalFocus.js';
 export default function DirectorKeyModal({ open, onClose, onConfirm, article }) {
   const [key, setKey] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   const dialogRef = useModalFocus(open, onClose);
 
   useEffect(() => {
     if (open) {
       setKey('');
       setErr('');
+      setBusy(false);
     }
   }, [open]);
 
   if (!open) return null;
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     if (key === '1357') {
-      onConfirm(article, key);
-      onClose();
+      setBusy(true);
+      setErr('');
+      try {
+        await onConfirm(article, key);
+        onClose();
+      } catch (error) {
+        setErr(error?.message || 'Approval could not be completed. Please try again.');
+      } finally {
+        setBusy(false);
+      }
     } else {
       setErr('Invalid approval key');
     }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={busy ? undefined : onClose}>
       <div aria-labelledby="approval-dialog-title" aria-modal="true" className="modal sm compact-dialog approval-dialog" onClick={(e) => e.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="head">
           <Icon name="shield" />
           <h3 id="approval-dialog-title">Approval Required</h3>
-          <button aria-label="Close approval dialog" className="x" onClick={onClose} type="button"><Icon name="x" /></button>
+          <button aria-label="Close approval dialog" className="x" disabled={busy} onClick={onClose} type="button"><Icon name="x" /></button>
         </div>
         <div className="body">
           <div className="text-sm text-slate-400">Enter 4-digit approval key.</div>
@@ -45,6 +56,9 @@ export default function DirectorKeyModal({ open, onClose, onConfirm, article }) 
             <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Approval key</div>
             <input
               className="dark-input text-center tracking-[0.45em]"
+              aria-describedby={err ? 'approval-dialog-error' : undefined}
+              aria-invalid={Boolean(err)}
+              disabled={busy}
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -55,13 +69,13 @@ export default function DirectorKeyModal({ open, onClose, onConfirm, article }) 
               placeholder="••••"
               autoFocus
             />
-            {err && <div className="mt-2 text-sm text-red-300">{err}</div>}
+            {err && <div className="mt-2 text-sm text-red-300" id="approval-dialog-error" role="alert">{err}</div>}
           </div>
         </div>
         <div className="foot">
-          <button className="btn-dark-secondary" onClick={onClose} type="button">Cancel</button>
-          <button className="btn-dark-primary" onClick={submit} type="button">
-            <Icon name="shield" /> Approve Briefing
+          <button className="btn-dark-secondary" disabled={busy} onClick={onClose} type="button">Cancel</button>
+          <button aria-busy={busy} className="btn-dark-primary" disabled={busy} onClick={submit} type="button">
+            <Icon name="shield" /> {busy ? 'Approving…' : 'Approve Briefing'}
           </button>
         </div>
       </div>

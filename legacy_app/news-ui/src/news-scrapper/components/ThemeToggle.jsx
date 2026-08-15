@@ -27,6 +27,7 @@ export default function ThemeToggle({ theme, onToggle, language = "en" }) {
   const actionLabel = isKorean
     ? `${nextTheme === "light" ? "라이트" : "다크"} 테마로 전환`
     : `Switch to ${nextTheme} theme`;
+  const switchLabel = isKorean ? "라이트 테마" : "Light theme";
   useEffect(
     () => () => {
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
@@ -47,13 +48,14 @@ export default function ThemeToggle({ theme, onToggle, language = "en" }) {
   return (
     <>
       <button
-        aria-label={actionLabel}
-        aria-pressed={isLight}
+        aria-checked={isLight}
+        aria-label={switchLabel}
         className={`theme-toggle premium-theme-toggle is-${theme}`}
         data-no-translate
         onClick={handleToggle}
         title={actionLabel}
         type="button"
+        role="switch"
       >
         <span className="premium-theme-track" aria-hidden="true">
           <span className="premium-theme-glyph premium-theme-sun"><SunIcon /></span>

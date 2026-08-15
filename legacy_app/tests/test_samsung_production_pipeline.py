@@ -192,6 +192,68 @@ class SamsungProductionPipelineTests(unittest.TestCase):
         self.assertEqual(first[0]["summary_lead"], "Lead.")
         self.assertEqual(second[0]["chat_summary_cache"], "hit")
 
+    def test_chat_cache_never_replaces_private_article_metadata_or_full_text(self):
+        def summarize(item):
+            return {
+                **item,
+                "summary": "Generated lead.",
+                "summary_lead": "Generated lead.",
+                "summary_points": ["Generated point."],
+                "chat_summary_status": "success",
+                "summarized_by": "samsung_chat",
+            }
+
+        common = {
+            "title": "Shared source story",
+            "link": "https://example.test/story",
+            "date": "2026-07-27",
+            "full_contents": "The same extracted article body.",
+            "sources": [{
+                "name": "Example",
+                "link": "https://example.test/story",
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            cache = JsonStore(Path(directory) / "chat.json", dict)
+            with (
+                patch.object(application, "CHAT_SUMMARY_CACHE", cache),
+                patch.object(application, "FINAL_CHAT_SUMMARY_ENABLED", True),
+                patch.object(application, "enrich_article_image_metadata", None),
+                patch.object(application, "summarize_article_with_chat", summarize),
+            ):
+                application.enrich_final_articles([
+                    {
+                        **common,
+                        "id": "private-a",
+                        "submitted_url": "https://private.test/a",
+                        "private_scope": "viewer-a",
+                    }
+                ])
+                second = application.enrich_final_articles([
+                    {
+                        **common,
+                        "id": "private-b",
+                        "submitted_url": "https://private.test/b",
+                        "private_scope": "viewer-b",
+                    }
+                ])[0]
+                cached_payload = next(iter(cache.read().values()))
+
+        self.assertEqual(second["chat_summary_cache"], "hit")
+        self.assertEqual(second["id"], "private-b")
+        self.assertEqual(second["submitted_url"], "https://private.test/b")
+        self.assertEqual(second["private_scope"], "viewer-b")
+        self.assertEqual(second["full_contents"], common["full_contents"])
+        for forbidden in (
+            "id",
+            "submitted_url",
+            "private_scope",
+            "full_contents",
+            "link",
+            "sources",
+        ):
+            self.assertNotIn(forbidden, cached_payload)
+
     def test_chat_item_failure_uses_local_summary_fallback(self):
         def failed(item):
             return {

@@ -19,12 +19,8 @@ const RATING_LABELS = {
 };
 
 function getApiBase() {
-  if (import.meta.env.VITE_API_BASE_URL) {
-    return import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '');
-  }
-  if (['5173', '5174', '3000'].includes(window.location.port)) {
-    return 'http://127.0.0.1:8000';
-  }
+  // Vite proxies /voc in development and FastAPI owns the same path in the
+  // portable production build. Same-origin requests work on any server IP.
   return '';
 }
 

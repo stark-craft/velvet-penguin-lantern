@@ -87,6 +87,17 @@ a { color: inherit; text-decoration: none; }
 .vl-top-actions a { color: var(--vl-muted); font-size: 13px; }
 .vl-top-actions button { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(117, 224, 181, .26); border-radius: 999px; padding: 10px 15px; background: rgba(117, 224, 181, .08); color: var(--vl-mint); cursor: pointer; }
 .vl-top-actions button:disabled { cursor: wait; opacity: .7; }
+.vl-top-actions .vl-guide-trigger {
+  border-color: var(--vl-line);
+  background: rgba(255, 255, 255, .025);
+  color: var(--vl-muted);
+}
+.vl-top-actions .vl-guide-trigger:hover,
+.vl-top-actions .vl-guide-trigger.active {
+  border-color: rgba(117, 224, 181, .34);
+  background: rgba(117, 224, 181, .09);
+  color: var(--vl-mint);
+}
 .vl-top-actions i { font-style: normal; font-size: 17px; }
 .vl-top-actions i.spinning { animation: vl-spin .8s linear infinite; }
 @keyframes vl-spin { to { transform: rotate(360deg); } }
@@ -165,7 +176,7 @@ a { color: inherit; text-decoration: none; }
 .vl-repo-card > p { margin: 23px 0 0; color: var(--vl-muted); line-height: 1.65; overflow-wrap: anywhere; }
 .vl-card-tags { margin: auto 0 0; padding-top: 22px; display: flex; flex-wrap: wrap; gap: 5px; }
 .vl-card-tags span { border: 1px solid rgba(205,236,224,.08); border-radius: 6px; padding: 4px 7px; background: rgba(255,255,255,.02); color: var(--vl-dim); font-size: 10px; }
-.vl-repo-card footer { margin-top: 18px; padding-top: 15px; display: flex; gap: 14px; border-top: 1px solid rgba(205,236,224,.07); color: var(--vl-muted); font-size: 11px; }
+.vl-repo-card footer { margin-top: 18px; padding-top: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; border-top: 1px solid rgba(205,236,224,.07); color: var(--vl-muted); font-size: 11px; }
 .vl-repo-card footer span:first-child { margin-right: auto; }
 .vl-language-dot { width: 7px; height: 7px; display: inline-block; margin-right: 6px; border-radius: 50%; background: var(--vl-green); }
 
@@ -186,7 +197,8 @@ a { color: inherit; text-decoration: none; }
 .vl-paper-actions { margin-top: 18px; display: flex; gap: 9px; }
 .vl-paper-actions a { display: flex; align-items: center; gap: 8px; border-radius: 9px; padding: 9px 12px; background: var(--vl-green); color: #07100f; font-size: 12px; font-weight: 700; }
 .vl-paper-actions a.secondary { border: 1px solid var(--vl-line); background: transparent; color: var(--vl-muted); }
-.vl-empty { margin-top: 28px; padding: 44px; border: 1px dashed var(--vl-line); border-radius: 16px; color: var(--vl-muted); text-align: center; }
+.vl-empty { margin-top: 28px; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 44px; border: 1px dashed var(--vl-line); border-radius: 16px; color: var(--vl-muted); text-align: center; }
+.vl-repo-grid > .vl-empty,.vl-paper-grid > .vl-empty { grid-column: 1 / -1; width: 100%; }
 
 .vl-footer { min-height: 160px; padding: 38px max(24px, calc((100vw - 1480px) / 2 + 4vw)); display: flex; align-items: center; gap: 40px; border-top: 1px solid var(--vl-line); background: rgba(5, 13, 12, .72); }
 .vl-footer p { margin: 0 auto; color: var(--vl-dim); font-size: 12px; }
@@ -281,7 +293,7 @@ a { color: inherit; text-decoration: none; }
 
 /* Radar */
 .vl-radar-section { padding-top: 42px; }
-.vl-signal-radar { min-height: 640px; margin-top: 34px; display: grid; grid-template-columns: minmax(340px,.78fr) minmax(0,1.22fr); gap: 22px; border: 1px solid var(--vl-line); border-radius: 30px; padding: 22px; overflow: hidden; background: radial-gradient(circle at 18% 50%, rgba(117,224,181,.09), transparent 34rem), rgba(9,21,18,.62); }
+.vl-signal-radar,.vl-radar-layout { min-height: 640px; margin-top: 34px; display: grid; grid-template-columns: minmax(340px,.78fr) minmax(0,1.22fr); gap: 22px; border: 1px solid var(--vl-line); border-radius: 30px; padding: 22px; overflow: hidden; background: radial-gradient(circle at 18% 50%, rgba(117,224,181,.09), transparent 34rem), rgba(9,21,18,.62); }
 .vl-radar-axis { min-height: 590px; position: relative; display: grid; place-items: center; border: 1px solid rgba(117,224,181,.13); border-radius: 24px; overflow: hidden; background: radial-gradient(circle, transparent 0 14%, rgba(117,224,181,.11) 14.3% 14.7%, transparent 15% 29%, rgba(117,224,181,.09) 29.3% 29.7%, transparent 30% 44%, rgba(117,224,181,.07) 44.3% 44.7%, transparent 45% 59%, rgba(117,224,181,.055) 59.3% 59.7%, transparent 60%), rgba(4,14,12,.52); }
 .vl-radar-axis::before,
 .vl-radar-axis::after { content:""; position:absolute; background:rgba(117,224,181,.08); }
@@ -360,10 +372,7 @@ a { color: inherit; text-decoration: none; }
 .vl-compare-table { margin-top:20px; display:grid; grid-template-columns:130px repeat(var(--compare-columns),minmax(150px,1fr)); overflow:auto; }
 .vl-compare-table > div { min-width:0; padding:15px; border-right:1px solid var(--vl-line); border-bottom:1px solid var(--vl-line); }
 .vl-compare-label { color:var(--vl-dim); font-size:9px; text-transform:uppercase; }
-.vl-compare-title span { color:var(--vl-green); font-size:8px; text-transform:uppercase; }
-.vl-compare-title strong,.vl-compare-title small { display:block; margin-top:5px; }
-.vl-compare-title strong { font-size:11px; line-height:1.35; }
-.vl-compare-title small { color:var(--vl-dim); font-size:9px; }
+.vl-compare-name { color:var(--vl-text); font:600 11px/1.4 "Manrope",sans-serif; overflow-wrap:anywhere; }
 .vl-compare-cell strong { font:600 20px "Manrope",sans-serif; }
 .vl-compare-cell i { height:4px; display:block; margin-top:7px; background:rgba(255,255,255,.05); }
 .vl-compare-cell b { height:100%; display:block; background:var(--vl-green); }
@@ -420,7 +429,7 @@ a { color: inherit; text-decoration: none; }
 }
 
 @media (max-width: 900px) {
-  .vl-signal-radar,.vl-dossier-body,.vl-watch-layout { grid-template-columns:1fr; }
+  .vl-signal-radar,.vl-radar-layout,.vl-dossier-body,.vl-watch-layout { grid-template-columns:1fr; }
   .vl-radar-axis { min-height:430px; }
   .vl-dossier-body > aside { border-top:1px solid var(--vl-line); border-left:0; }
   .vl-compare-selection,.vl-graph-stage { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -430,7 +439,7 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 620px) {
   .vl-top-actions > a,.vl-top-actions > button:last-child { display:none; }
   .vl-brand { min-width:0; }
-  .vl-signal-radar { grid-template-columns:minmax(0,1fr); padding:12px; }
+  .vl-signal-radar,.vl-radar-layout { grid-template-columns:minmax(0,1fr); padding:12px; }
   .vl-radar-signals,.vl-compare-selection,.vl-graph-stage { grid-template-columns:minmax(0,1fr); }
   .vl-graph-cluster { grid-template-columns:1fr; justify-items:center; }
   .vl-graph-cluster::before { display:none; }
@@ -453,7 +462,30 @@ a { color: inherit; text-decoration: none; }
 .vl-page { min-height: calc(100vh - 82px); }
 .vl-page-section { min-height: calc(100vh - 82px); padding-top: 88px; }
 .vl-notice { margin-top: 28px; position: relative; }
-.vl-notice button { margin-left: auto; border: 0; background: transparent; color: var(--vl-muted); cursor: pointer; }
+.vl-notice span { flex: 1; }
+.vl-notice button { border: 1px solid rgba(236,188,104,.18); border-radius: 8px; padding: 5px 9px; background: transparent; color: #d7bd8d; cursor: pointer; }
+.vl-notice button:last-child { display: grid; place-items: center; border: 0; padding: 3px; color: var(--vl-muted); }
+
+.vl-workspace-state { min-height: calc(100vh - 242px); display: grid; place-content: center; justify-items: center; gap: 9px; padding: 64px 24px; text-align: center; }
+.vl-workspace-state > svg { color: var(--vl-green); }
+.vl-workspace-state strong { font: 600 22px "Manrope",sans-serif; }
+.vl-workspace-state p { max-width: 520px; margin: 0; color: var(--vl-muted); }
+.vl-workspace-state button { margin-top: 8px; border: 0; border-radius: 999px; padding: 11px 17px; background: var(--vl-green); color: #07100f; font-weight: 700; cursor: pointer; }
+.vl-workspace-state.is-error > svg { color: #e4c992; }
+
+.vl-open-dossier { border: 0; padding: 0; background: transparent; color: var(--vl-green); cursor: pointer; font-size: 11px; }
+.vl-load-more { width: 100%; margin-top: 22px; border: 1px solid rgba(117,224,181,.22); border-radius: 12px; padding: 13px 18px; background: rgba(117,224,181,.065); color: var(--vl-mint); cursor: pointer; }
+.vl-load-more:hover { border-color: rgba(117,224,181,.4); background: rgba(117,224,181,.1); }
+
+.vl-compare-tray { position: fixed; right: 24px; bottom: 24px; z-index: 40; display: flex; align-items: center; gap: 9px; padding: 10px; border: 1px solid rgba(117,224,181,.25); border-radius: 16px; background: rgba(8,19,17,.96); box-shadow: 0 22px 70px rgba(0,0,0,.46); backdrop-filter: blur(18px); }
+.vl-compare-tray > div { display: flex; align-items: center; gap: 9px; padding: 0 7px; color: var(--vl-muted); font-size: 11px; }
+.vl-compare-tray > div svg { color: var(--vl-green); }
+.vl-compare-tray strong { color: var(--vl-text); }
+.vl-compare-tray button { border: 1px solid var(--vl-line); border-radius: 9px; padding: 8px 11px; background: rgba(255,255,255,.025); color: var(--vl-muted); cursor: pointer; }
+.vl-compare-tray button:first-of-type { border-color: rgba(117,224,181,.28); background: rgba(117,224,181,.1); color: var(--vl-mint); }
+
+.venture-lens :is(button,a,input):focus-visible { outline: 2px solid var(--vl-green); outline-offset: 3px; }
+.vl-icon-action:disabled { cursor: wait; opacity: .55; }
 
 .vl-hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 32px; }
 .vl-hero-actions button { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(117,224,181,.24); border-radius: 999px; padding: 12px 18px; background: rgba(117,224,181,.1); color: var(--vl-mint); cursor: pointer; }
@@ -504,6 +536,12 @@ a { color: inherit; text-decoration: none; }
   .vl-topbar nav::-webkit-scrollbar { display: none; }
   .vl-topbar nav button { padding-inline: 10px; }
 }
+@media (max-width: 1320px) {
+  .vl-topbar nav { order: 3; width: 100%; max-width: none; margin: 0; padding: 7px 18px; position: absolute; top: 70px; left: 0; display: grid; grid-template-columns: repeat(8,minmax(0,1fr)); gap: 6px; overflow: visible; border-bottom: 1px solid var(--vl-line); background: rgba(7,16,15,.96); }
+  .vl-topbar nav button { justify-content: center; min-width: 0; }
+  .vl-topbar { height: 70px; }
+  .vl-page { padding-top: 46px; }
+}
 @media (max-width: 1120px) {
   .vl-topbar nav { order: 3; width: 100%; max-width: none; margin: 0; padding: 7px 18px; position: absolute; top: 70px; left: 0; display: grid; grid-template-columns: repeat(8,minmax(0,1fr)); gap: 6px; overflow: visible; border-bottom: 1px solid var(--vl-line); background: rgba(7,16,15,.94); }
   .vl-topbar nav button { justify-content: center; min-width: 0; }
@@ -519,12 +557,371 @@ a { color: inherit; text-decoration: none; }
   .vl-topbar nav button span { display: none; }
   .vl-topbar nav { padding-inline: 10px; gap: 4px; }
   .vl-topbar nav button { padding-inline: 0; }
+  .vl-guide-trigger span { display: none; }
+  .vl-top-actions .vl-guide-trigger { padding-inline: 11px; }
   .vl-hero { padding-inline: 0; }
   .vl-hot-layout > div { padding: 12px; }
   .vl-workspace-links > div { grid-template-columns: 1fr 1fr; }
-  .vl-section-head { align-items: flex-start; }
+  .vl-section-head { align-items: stretch; flex-direction: column; gap: 24px; }
   .vl-section-head > div { min-width: 0; }
   .vl-section-head .vl-inline-search { width: 100%; min-width: 0; }
   .vl-compare-guidance { align-items: flex-start; flex-wrap: wrap; }
   .vl-compare-guidance button { margin-left: 35px; }
+  .vl-compare-tray { right: 12px; bottom: 12px; left: 12px; }
+  .vl-compare-tray > div { flex: 1; min-width: 0; }
+  .vl-compare-tray > div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* ========================================================================== */
+/* Floating Venture Lens navigation                                           */
+/* ========================================================================== */
+
+.vl-topbar.vl-floating-navigation {
+  width: min(1500px, calc(100% - 28px));
+  height: 64px;
+  margin: 12px auto 0;
+  padding: 7px 8px 7px 14px;
+  gap: clamp(10px, 1.2vw, 20px);
+  top: 10px;
+  border: 1px solid rgba(190, 235, 218, 0.13);
+  border-radius: 22px;
+  background:
+    linear-gradient(105deg, rgba(117, 224, 181, 0.075), transparent 27%),
+    rgba(7, 16, 15, 0.8);
+  box-shadow:
+    0 22px 68px rgba(0, 0, 0, 0.34),
+    0 3px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px rgba(255, 255, 255, 0.045);
+  backdrop-filter: blur(30px) saturate(140%);
+}
+
+.vl-floating-navigation .vl-brand {
+  min-width: 158px;
+  flex: none;
+  gap: 10px;
+  padding: 0 5px;
+  border-radius: 14px;
+}
+
+.vl-floating-navigation .vl-brand-mark {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  padding: 9px;
+  border-color: rgba(117, 224, 181, 0.28);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(117, 224, 181, 0.17), transparent 65%),
+    rgba(117, 224, 181, 0.055);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.045), 0 7px 22px rgba(24, 118, 84, 0.08);
+}
+
+.vl-floating-navigation .vl-brand-mark::after {
+  position: absolute;
+  inset: 6px;
+  border: 1px solid rgba(117, 224, 181, 0.11);
+  border-radius: 50%;
+  content: "";
+}
+
+.vl-floating-navigation .vl-brand-mark i {
+  position: relative;
+  z-index: 1;
+  width: 3px;
+}
+
+.vl-floating-navigation .vl-brand strong {
+  font-size: 14px;
+  letter-spacing: -0.025em;
+}
+
+.vl-floating-navigation .vl-brand small {
+  margin-top: 1px;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav {
+  display: flex;
+  min-width: 0;
+  max-width: none;
+  flex: 0 1 auto;
+  order: initial;
+  align-items: center;
+  gap: 2px;
+  margin: 0 auto;
+  padding: 3px;
+  position: static;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px rgba(205, 236, 224, 0.075), inset 0 1px rgba(255, 255, 255, 0.018);
+  scrollbar-width: none;
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav button {
+  position: relative;
+  min-width: 0;
+  min-height: 42px;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 clamp(9px, 0.72vw, 13px);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--vl-muted);
+  font-size: 10.5px;
+  transition: color 170ms ease, background 170ms ease, transform 170ms ease, box-shadow 170ms ease;
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav button:hover {
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--vl-text);
+  transform: translateY(-1px);
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav button.active,
+.vl-topbar.vl-floating-navigation .vl-nav button[aria-current="page"] {
+  background: linear-gradient(135deg, rgba(117, 224, 181, 0.16), rgba(117, 224, 181, 0.07));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.045), 0 7px 22px rgba(34, 140, 102, 0.08);
+  color: var(--vl-mint);
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav button.active::after {
+  position: absolute;
+  right: 10px;
+  bottom: 4px;
+  left: 10px;
+  height: 2px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, transparent, var(--vl-green), transparent);
+  content: "";
+  opacity: 0.75;
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav svg {
+  flex: none;
+  opacity: 0.65;
+}
+
+.vl-topbar.vl-floating-navigation .vl-nav button.active svg {
+  color: var(--vl-green);
+  opacity: 1;
+}
+
+.vl-floating-navigation .vl-top-actions {
+  min-width: 0;
+  flex: none;
+  gap: 5px;
+  margin-left: 0;
+}
+
+.vl-floating-navigation .vl-return-link,
+.vl-floating-navigation .vl-top-actions > button,
+.vl-floating-navigation .vl-notification-trigger {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid rgba(205, 236, 224, 0.09);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--vl-muted);
+  font-size: 10px;
+  transition: border-color 170ms ease, background 170ms ease, color 170ms ease, transform 170ms ease;
+}
+
+.vl-floating-navigation .vl-return-link:hover,
+.vl-floating-navigation .vl-top-actions > button:hover:not(:disabled),
+.vl-floating-navigation .vl-notification-trigger:hover {
+  border-color: rgba(117, 224, 181, 0.22);
+  background: rgba(117, 224, 181, 0.065);
+  color: var(--vl-mint);
+  transform: translateY(-1px);
+}
+
+.vl-floating-navigation .vl-return-link {
+  padding-left: 12px;
+}
+
+.vl-floating-navigation .vl-return-link svg {
+  color: var(--vl-green);
+}
+
+.vl-floating-navigation .vl-language-toggle,
+.vl-floating-navigation .vl-guide-trigger {
+  padding-inline: 10px !important;
+  border-color: rgba(205, 236, 224, 0.09) !important;
+  background: rgba(255, 255, 255, 0.025) !important;
+  color: var(--vl-muted) !important;
+}
+
+.vl-floating-navigation .vl-guide-trigger.active {
+  border-color: rgba(117, 224, 181, 0.26) !important;
+  background: rgba(117, 224, 181, 0.085) !important;
+  color: var(--vl-mint) !important;
+}
+
+.vl-floating-navigation .vl-notification-trigger {
+  width: 42px !important;
+  height: 42px !important;
+  min-height: 42px;
+  padding: 0 !important;
+}
+
+.vl-floating-navigation .vl-notification-trigger b {
+  top: -5px;
+  right: -4px;
+  border-color: #091411;
+  background: var(--vl-green);
+  color: #07100f;
+}
+
+.vl-floating-navigation .vl-sync-control {
+  border-color: rgba(117, 224, 181, 0.24) !important;
+  background: rgba(117, 224, 181, 0.085) !important;
+  color: var(--vl-mint) !important;
+}
+
+.vl-floating-navigation .vl-notification-panel {
+  top: 50px;
+}
+
+.vl-topbar.vl-floating-navigation :is(button, a):focus-visible {
+  outline: 2px solid var(--vl-green);
+  outline-offset: 3px;
+}
+
+.vl-floating-navigation + .vl-page {
+  min-height: calc(100vh - 88px);
+}
+
+@media (max-width: 1420px) {
+  .vl-floating-navigation .vl-return-link span,
+  .vl-floating-navigation .vl-language-toggle span,
+  .vl-floating-navigation .vl-guide-trigger span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .vl-floating-navigation .vl-return-link,
+  .vl-floating-navigation .vl-language-toggle,
+  .vl-floating-navigation .vl-guide-trigger {
+    width: 42px;
+    padding: 0 !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .vl-topbar.vl-floating-navigation .vl-nav button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .vl-topbar.vl-floating-navigation .vl-nav button {
+    width: 39px;
+    flex: 0 0 39px;
+    padding: 0;
+  }
+
+  .vl-floating-navigation .vl-sync-control span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .vl-floating-navigation .vl-sync-control {
+    width: 42px;
+    padding: 0 !important;
+  }
+}
+
+@media (max-width: 850px) {
+  .vl-topbar.vl-floating-navigation {
+    width: calc(100% - 18px);
+    height: 58px;
+    margin-top: 8px;
+    padding: 6px 7px 6px 12px;
+    top: 7px;
+    border-radius: 19px;
+  }
+
+  .vl-topbar.vl-floating-navigation .vl-brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+
+  .vl-topbar.vl-floating-navigation .vl-nav {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    left: 0;
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 2px;
+    padding: 5px;
+    overflow: visible;
+    border: 1px solid rgba(190, 235, 218, 0.11);
+    background: rgba(7, 16, 15, 0.9);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.3), inset 0 1px rgba(255, 255, 255, 0.035);
+    backdrop-filter: blur(26px) saturate(135%);
+  }
+
+  .vl-topbar.vl-floating-navigation .vl-nav button {
+    width: auto;
+    min-width: 0;
+    min-height: 40px;
+  }
+
+  .vl-floating-navigation + .vl-page {
+    padding-top: 55px;
+  }
+}
+
+@media (max-width: 620px) {
+  .vl-topbar.vl-floating-navigation .vl-brand {
+    min-width: 0;
+  }
+
+  .vl-floating-navigation .vl-brand small,
+  .vl-floating-navigation .vl-brand > span:last-child {
+    display: none !important;
+  }
+
+  .vl-floating-navigation .vl-top-actions {
+    margin-left: auto;
+  }
+
+  .vl-topbar.vl-floating-navigation .vl-nav {
+    border-radius: 17px;
+  }
+
+  .vl-floating-navigation .vl-notification-panel {
+    right: -47px;
+  }
+}
+
+@media (max-width: 410px) {
+  .vl-floating-navigation .vl-brand > span:last-child {
+    display: none;
+  }
 }

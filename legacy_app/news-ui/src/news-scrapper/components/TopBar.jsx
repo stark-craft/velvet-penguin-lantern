@@ -1,16 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useGuidePet } from "../../shared/guide/GuidePetContext.jsx";
 import Icon from "./Icon.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
+import useModalFocus from "./modals/useModalFocus.js";
+import { NEWS_SCRAPPER_NAV_STYLE } from "./navigationStyle.js";
 import {
   getAnalyticsAccess,
   getGatekeeperAccess,
   getProfile,
-  getTrendsAccess,
 } from "../api.js";
 import "./premium-navigation.css";
 
 const mainNav = [
+  { to: "/for-you", label: "For You", labelKo: "추천", icon: "sparkle", forYouOnly: true },
   { to: "/home", label: "Briefing", labelKo: "브리핑", icon: "home" },
   { to: "/scan", label: "Scan", labelKo: "스캔", icon: "search" },
   { to: "/saved", label: "Saved", labelKo: "나의 데스크", icon: "bookmark" },
@@ -33,7 +37,6 @@ const baseSettingsNav = [
 ];
 
 const protectedSettingsNav = [
-  { to: "/trends", label: "Profile Switcher", labelKo: "프로필 전환", icon: "trend", access: "trends" },
   {
     to: "/gatekeeper-review",
     label: "Gatekeeper Review",
@@ -53,8 +56,6 @@ const protectedSettingsNav = [
 const copy = {
   en: {
     primaryNavigation: "Primary navigation",
-    profileDefault: "Default Intelligence",
-    profileBroadcast: "Broadcast Intelligence",
     loadingProfile: "Loading profile",
     setupProfile: "Set up profile",
     yourDesk: "Your desk",
@@ -81,6 +82,12 @@ const copy = {
     ventureTitle: "Venture Lens",
     ventureNote: "Research papers, repositories and emerging technology.",
     openVenture: "Open Venture Lens",
+    guideEyebrow: "Optional guide",
+    guideTitle: "Scout, your Sense.ai guide",
+    guideNote: "Turn on route-aware tips when you want them. Scout stays off by default and never blocks your work.",
+    guideLaunch: "Show guide",
+    guideEnabled: "Guide enabled",
+    guideDisabled: "Guide off",
     language: "Language",
     currentInterface: "Current interface",
     english: "English",
@@ -88,12 +95,31 @@ const copy = {
     translating: "Translating interface…",
     translationReady: "Language changes apply only to your browser.",
     translationError: "Some dynamic content could not be translated. Check the local Korean model.",
+    translationConfirmEyebrow: "Language change",
+    translationConfirmTitle: "Switch TechScout to Korean?",
+    translationConfirmBody: "Interface labels change first, then loaded stories follow progressively.",
+    translationConfirmLock: "TechScout uses private on-device translation when your browser supports it, with the local server model as fallback. You can return to English at any time.",
+    translationCancel: "Stay in English",
+    translationStart: "Start Korean translation",
+    translationProgressTitle: "Korean translation in progress",
+    translationProgressBody: "Keep browsing while visible content is translated first. Your exact English originals remain available.",
+    translationPreparing: "Preparing the page",
+    translationDownloading: "Downloading the private on-device language pack",
+    translationLoadingModel: "Preparing the private local language model",
+    translationRetrying: "Retrying the local translator",
+    translationItems: "text items remaining",
+    translationCompleted: "translated",
+    translationEngineBrowser: "On-device browser engine",
+    translationEngineLocal: "Private local server engine",
+    translationRetry: "Retry translation",
+    translationStop: "Show English now",
+    translationFailureTitle: "Korean translation paused",
+    translationFailureBody: "Some content could not be translated. Your English content is still safe and you can switch back immediately.",
+    translationReturnEnglish: "Return to English",
     scanRunning: "Scan running",
   },
   ko: {
     primaryNavigation: "기본 탐색",
-    profileDefault: "기본 인텔리전스",
-    profileBroadcast: "방송 인텔리전스",
     loadingProfile: "프로필 불러오는 중",
     setupProfile: "프로필 설정",
     yourDesk: "나의 데스크",
@@ -120,6 +146,12 @@ const copy = {
     ventureTitle: "벤처 렌즈",
     ventureNote: "연구 논문, 저장소 및 신흥 기술을 살펴보세요.",
     openVenture: "벤처 렌즈 열기",
+    guideEyebrow: "선택형 가이드",
+    guideTitle: "Sense.ai 가이드 Scout",
+    guideNote: "필요할 때만 화면별 도움말을 켜세요. 기본값은 꺼짐이며 작업을 방해하지 않습니다.",
+    guideLaunch: "가이드 보기",
+    guideEnabled: "가이드 켜짐",
+    guideDisabled: "가이드 꺼짐",
     language: "언어",
     currentInterface: "현재 인터페이스",
     english: "영어",
@@ -127,6 +159,27 @@ const copy = {
     translating: "인터페이스 번역 중…",
     translationReady: "언어 변경은 현재 브라우저에만 적용됩니다.",
     translationError: "일부 동적 콘텐츠를 번역할 수 없습니다. 로컬 한국어 모델을 확인하세요.",
+    translationConfirmEyebrow: "언어 변경",
+    translationConfirmTitle: "TechScout를 한국어로 전환할까요?",
+    translationConfirmBody: "인터페이스 레이블이 먼저 바뀌고, 불러온 기사는 순차적으로 번역됩니다.",
+    translationConfirmLock: "지원되는 브라우저에서는 비공개 온디바이스 번역을 사용하고, 그렇지 않으면 로컬 서버 모델을 사용합니다. 언제든 영어로 돌아갈 수 있습니다.",
+    translationCancel: "영어 유지",
+    translationStart: "한국어 번역 시작",
+    translationProgressTitle: "한국어 번역 진행 중",
+    translationProgressBody: "계속 탐색해도 됩니다. 화면에 보이는 콘텐츠부터 번역하며 영어 원문은 그대로 보존됩니다.",
+    translationPreparing: "페이지 준비 중",
+    translationDownloading: "비공개 온디바이스 언어 팩 다운로드 중",
+    translationLoadingModel: "비공개 로컬 언어 모델 준비 중",
+    translationRetrying: "로컬 번역기 재시도 중",
+    translationItems: "개 텍스트 항목 남음",
+    translationCompleted: "개 번역 완료",
+    translationEngineBrowser: "브라우저 온디바이스 엔진",
+    translationEngineLocal: "비공개 로컬 서버 엔진",
+    translationRetry: "번역 다시 시도",
+    translationStop: "지금 영어로 보기",
+    translationFailureTitle: "한국어 번역이 일시 중지되었습니다",
+    translationFailureBody: "일부 콘텐츠를 번역할 수 없습니다. 영어 원문은 안전하게 유지되며 즉시 영어로 돌아갈 수 있습니다.",
+    translationReturnEnglish: "영어로 돌아가기",
     scanRunning: "스캔 실행 중",
   },
 };
@@ -181,6 +234,142 @@ function SettingsLink({ item, language, pathname, onNavigate, viewer }) {
   );
 }
 
+function KoreanTranslationDialog({ open, ui, onCancel, onConfirm, returnFocusRef }) {
+  const dialogRef = useRef(null);
+  const cancelRef = useRef(onCancel);
+  const startRef = useRef(null);
+  cancelRef.current = onCancel;
+  useEffect(() => {
+    if (!open) return undefined;
+    const previous = document.activeElement;
+    const previousOverflow = document.documentElement.style.overflow;
+    const appRoot = document.getElementById("root");
+    const rootWasInert = appRoot?.hasAttribute("inert");
+    const previousRootAria = appRoot?.getAttribute("aria-hidden");
+    document.documentElement.style.overflow = "hidden";
+    appRoot?.setAttribute("inert", "");
+    appRoot?.setAttribute("aria-hidden", "true");
+    startRef.current?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") cancelRef.current?.();
+      if (event.key !== "Tab") return;
+      const actions = dialogRef.current?.querySelectorAll("button") || [];
+      if (!actions.length) return;
+      const first = actions[0];
+      const last = actions[actions.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.documentElement.style.overflow = previousOverflow;
+      if (!rootWasInert) appRoot?.removeAttribute("inert");
+      if (previousRootAria === null) appRoot?.removeAttribute("aria-hidden");
+      else appRoot?.setAttribute("aria-hidden", previousRootAria);
+      if (previous?.isConnected) previous.focus?.();
+      else returnFocusRef?.current?.focus?.();
+    };
+  }, [open, returnFocusRef]);
+
+  if (!open) return null;
+  return createPortal(
+    <div className="translation-confirm-overlay" data-no-translate role="presentation">
+      <section
+        aria-describedby="translation-confirm-description"
+        aria-labelledby="translation-confirm-title"
+        aria-modal="true"
+        className="translation-confirm-dialog"
+        ref={dialogRef}
+        role="alertdialog"
+      >
+        <div className="translation-confirm-symbol" aria-hidden="true">
+          <span>EN</span><Icon name="chevR" size={15} /><strong>한</strong>
+        </div>
+        <div className="translation-confirm-copy">
+          <span>{ui.translationConfirmEyebrow}</span>
+          <h2 id="translation-confirm-title">{ui.translationConfirmTitle}</h2>
+          <p id="translation-confirm-description">{ui.translationConfirmBody}</p>
+        </div>
+        <div className="translation-confirm-note">
+          <Icon name="clock" size={17} />
+          <p>{ui.translationConfirmLock}</p>
+        </div>
+        <div className="translation-confirm-actions">
+          <button className="translation-confirm-cancel" onClick={onCancel} type="button">
+            {ui.translationCancel}
+          </button>
+          <button className="translation-confirm-start" onClick={onConfirm} ref={startRef} type="button">
+            <Icon name="sparkle" size={16} />
+            {ui.translationStart}
+          </button>
+        </div>
+      </section>
+    </div>,
+    document.body,
+  );
+}
+
+function TranslationProgressNotice({ state, ui, onReturnToEnglish }) {
+  const pending = Number(state?.pending || 0);
+  const completed = Number(state?.completed || 0);
+  const total = Number(state?.total || 0);
+  const engineLabel = state?.engine === "browser-native"
+    ? ui.translationEngineBrowser
+    : state?.engine === "local-marian"
+      ? ui.translationEngineLocal
+      : "";
+  const phaseLabel = state?.phase === "downloading"
+    ? `${ui.translationDownloading}${Number.isFinite(state?.downloadProgress) ? ` · ${state.downloadProgress}%` : ""}`
+    : state?.phase === "loading-model"
+      ? ui.translationLoadingModel
+      : state?.phase === "retrying"
+        ? ui.translationRetrying
+        : pending > 0
+          ? `${pending} ${ui.translationItems}`
+          : ui.translationPreparing;
+  return createPortal(
+    <aside className="translation-progress-notice" data-no-translate>
+      <span className="translation-progress-orbit" aria-hidden="true"><span /></span>
+      <div aria-live="polite" role="status">
+        <strong>{ui.translationProgressTitle}</strong>
+        <p>{ui.translationProgressBody}</p>
+        <small>
+          {phaseLabel}
+          {engineLabel ? ` · ${engineLabel}` : ""}
+          {total > 0 ? ` · ${completed}/${total} ${ui.translationCompleted}` : ""}
+        </small>
+      </div>
+      <button onClick={onReturnToEnglish} type="button">{ui.translationStop}</button>
+    </aside>,
+    document.body,
+  );
+}
+
+function TranslationFailureNotice({ ui, onRetry, onReturnToEnglish }) {
+  return createPortal(
+    <aside aria-live="assertive" className="translation-failure-notice" data-no-translate role="alert">
+      <span className="translation-failure-icon" aria-hidden="true">
+        <Icon name="warning" size={17} />
+      </span>
+      <div>
+        <strong>{ui.translationFailureTitle}</strong>
+        <p>{ui.translationFailureBody}</p>
+      </div>
+      <div className="translation-failure-actions">
+        <button onClick={onRetry} type="button">{ui.translationRetry}</button>
+        <button onClick={onReturnToEnglish} type="button">{ui.translationReturnEnglish}</button>
+      </div>
+    </aside>,
+    document.body,
+  );
+}
+
 export default function TopBar({
   manualScan,
   theme,
@@ -191,21 +380,34 @@ export default function TopBar({
   language,
   onToggleLanguage,
   translationState,
+  forYouEnabled = false,
+  profileMode = "legacy",
 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { enabled: guideEnabled, requestGuide, setEnabled: setGuideEnabled } = useGuidePet();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [translationConfirmOpen, setTranslationConfirmOpen] = useState(false);
   const settingsControlRef = useRef(null);
   const settingsTriggerRef = useRef(null);
+  const settingsDialogRef = useModalFocus(settingsOpen, () => setSettingsOpen(false));
   const [profile, setProfile] = useState(
-    localStorage.getItem("news-profile") || "default",
+    profileMode === "unified"
+      ? "default"
+      : localStorage.getItem("news-profile") || "default",
   );
   const [analyticsAllowed, setAnalyticsAllowed] = useState(isLocalDevHost());
   const [gatekeeperAllowed, setGatekeeperAllowed] = useState(isLocalDevHost());
-  const [profileSwitchAllowed, setProfileSwitchAllowed] = useState(isLocalDevHost());
   const ui = language === "ko" ? copy.ko : copy.en;
+  const visibleMainNav = mainNav.filter((item) => !item.forYouOnly || forYouEnabled);
 
   useEffect(() => {
+    if (profileMode === "unified") {
+      localStorage.removeItem("news-profile-override");
+      localStorage.removeItem("news-profile");
+      setProfile("default");
+      return undefined;
+    }
     async function syncProfileFromBackend() {
       try {
         const response = await getProfile();
@@ -226,35 +428,60 @@ export default function TopBar({
       }
     }
     syncProfileFromBackend();
-  }, []);
+    return undefined;
+  }, [profileMode]);
 
   useEffect(() => {
-    const onProfile = () => setProfile(localStorage.getItem("news-profile") || "default");
+    const onProfile = () => setProfile(
+      profileMode === "unified"
+        ? "default"
+        : localStorage.getItem("news-profile") || "default",
+    );
     window.addEventListener("news-profile-change", onProfile);
     window.addEventListener("storage", onProfile);
     return () => {
       window.removeEventListener("news-profile-change", onProfile);
       window.removeEventListener("storage", onProfile);
     };
-  }, []);
+  }, [profileMode]);
 
   useEffect(() => {
     if (!settingsOpen) return undefined;
+    const main = document.getElementById("news-main-content");
+    const backgroundHeaderItems = [
+      document.querySelector(".premium-header-identity"),
+      document.querySelector(".premium-command-nav"),
+      document.querySelector(".premium-theme-toggle"),
+    ].filter(Boolean);
+    const mainWasInert = main?.hasAttribute("inert");
+    const previousMainAria = main?.getAttribute("aria-hidden");
+    const previousHeaderState = backgroundHeaderItems.map((element) => ({
+      element,
+      inert: element.hasAttribute("inert"),
+      ariaHidden: element.getAttribute("aria-hidden"),
+    }));
+    main?.setAttribute("inert", "");
+    main?.setAttribute("aria-hidden", "true");
+    backgroundHeaderItems.forEach((element) => {
+      element.setAttribute("inert", "");
+      element.setAttribute("aria-hidden", "true");
+    });
     const onPointerDown = (event) => {
       if (settingsOpen && !settingsControlRef.current?.contains(event.target)) {
         setSettingsOpen(false);
       }
     };
-    const onKeyDown = (event) => {
-      if (event.key !== "Escape") return;
-      setSettingsOpen(false);
-      window.requestAnimationFrame(() => settingsTriggerRef.current?.focus());
-    };
     document.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
+      if (!mainWasInert) main?.removeAttribute("inert");
+      if (previousMainAria === null) main?.removeAttribute("aria-hidden");
+      else main?.setAttribute("aria-hidden", previousMainAria);
+      previousHeaderState.forEach(({ element, inert, ariaHidden }) => {
+        if (!inert) element.removeAttribute("inert");
+        if (ariaHidden === null) element.removeAttribute("aria-hidden");
+        else element.setAttribute("aria-hidden", ariaHidden);
+      });
     };
   }, [settingsOpen]);
 
@@ -265,10 +492,9 @@ export default function TopBar({
   useEffect(() => {
     let cancelled = false;
     async function checkPrivateAccess() {
-      const [analyticsResult, gatekeeperResult, trendsResult] = await Promise.allSettled([
+      const [analyticsResult, gatekeeperResult] = await Promise.allSettled([
         getAnalyticsAccess(),
         getGatekeeperAccess(),
-        getTrendsAccess(),
       ]);
       if (cancelled) return;
       const localDevelopment = isLocalDevHost();
@@ -282,11 +508,6 @@ export default function TopBar({
           ? Boolean(gatekeeperResult.value?.allowed) || localDevelopment
           : localDevelopment,
       );
-      setProfileSwitchAllowed(
-        trendsResult.status === "fulfilled"
-          ? Boolean(trendsResult.value?.allowed) || localDevelopment
-          : localDevelopment,
-      );
     }
     checkPrivateAccess();
     return () => {
@@ -294,9 +515,8 @@ export default function TopBar({
     };
   }, []);
 
-  const isBroadcast = profile === "broadcast";
+  const isBroadcast = profileMode !== "unified" && profile === "broadcast";
   const privilegedNav = protectedSettingsNav.filter((item) => {
-    if (item.access === "trends") return profileSwitchAllowed;
     if (item.access === "gatekeeper") return gatekeeperAllowed;
     if (item.access === "analytics") return analyticsAllowed;
     return false;
@@ -306,16 +526,28 @@ export default function TopBar({
   );
   const closeSettings = () => setSettingsOpen(false);
   const selectLanguage = (nextLanguage) => {
-    if (nextLanguage === language || translationState?.pending) return;
+    if (nextLanguage === language) return;
+    if (nextLanguage === "ko") {
+      setSettingsOpen(false);
+      setTranslationConfirmOpen(true);
+      return;
+    }
     onToggleLanguage?.();
   };
+  const translationBusy = language === "ko" && (
+    !translationState?.active
+    || translationState?.translating
+    || Number(translationState?.pending || 0) > 0
+  );
 
   return (
     <header
       className={[
         "design-header premium-command-header fixed inset-x-0 top-0 z-40 w-full",
         isBroadcast ? "is-broadcast" : "is-default",
+        `nav-style-${NEWS_SCRAPPER_NAV_STYLE}`,
       ].join(" ")}
+      data-navigation-style={NEWS_SCRAPPER_NAV_STYLE}
       data-no-translate
     >
       <div className="command-header-inner premium-command-inner">
@@ -323,20 +555,16 @@ export default function TopBar({
           <button
             aria-label={language === "ko" ? "브리핑 홈으로 이동" : "Go to briefing home"}
             className="news-wordmark premium-wordmark"
-            onClick={() => navigate("/home")}
+            onClick={() => navigate("/for-you")}
             type="button"
           >
             <span className="news-word">Samsung</span>
             <span className="scrapper-word">TechScout</span>
           </button>
-          <span className="profile-badge premium-profile-badge">
-            <span aria-hidden="true" />
-            {isBroadcast ? ui.profileBroadcast : ui.profileDefault}
-          </span>
         </div>
 
         <nav aria-label={ui.primaryNavigation} className="command-nav premium-command-nav">
-          {mainNav.map((item) => (
+          {visibleMainNav.map((item) => (
             <NavLink
               key={item.to}
               className={({ isActive }) =>
@@ -382,9 +610,12 @@ export default function TopBar({
             {settingsOpen && (
               <div
                 aria-label={ui.settingsTitle}
+                aria-modal="true"
                 className="command-settings-menu premium-settings-center"
                 id="premium-settings-center"
+                ref={settingsDialogRef}
                 role="dialog"
+                tabIndex={-1}
               >
                 <div className="premium-settings-heading">
                   <div>
@@ -421,7 +652,7 @@ export default function TopBar({
                 <section className="premium-settings-primary" aria-labelledby="premium-desk-heading">
                   <h3 id="premium-desk-heading">{ui.deskSection}</h3>
                   <div className="premium-settings-grid">
-                    {mainNav.map((item) => (
+                    {visibleMainNav.map((item) => (
                       <SettingsLink
                         item={item}
                         key={`mobile-${item.to}`}
@@ -445,6 +676,39 @@ export default function TopBar({
                   </span>
                   <Icon className="premium-venture-arrow" name="external" size={17} />
                 </a>
+
+                <section className="premium-guide-panel" aria-labelledby="premium-guide-heading">
+                  <span className="premium-guide-avatar" aria-hidden="true">
+                    <Icon name="sparkle" size={18} />
+                  </span>
+                  <div className="premium-guide-copy">
+                    <small>{ui.guideEyebrow}</small>
+                    <strong id="premium-guide-heading">{ui.guideTitle}</strong>
+                    <span>{ui.guideNote}</span>
+                  </div>
+                  <div className="premium-guide-controls">
+                    <button
+                      aria-checked={guideEnabled}
+                      aria-label={guideEnabled ? ui.guideEnabled : ui.guideDisabled}
+                      className={guideEnabled ? "premium-guide-switch is-on" : "premium-guide-switch"}
+                      onClick={() => setGuideEnabled(!guideEnabled)}
+                      role="switch"
+                      type="button"
+                    >
+                      <span aria-hidden="true" />
+                    </button>
+                    <button
+                      className="premium-guide-launch"
+                      onClick={() => {
+                        closeSettings();
+                        requestGuide();
+                      }}
+                      type="button"
+                    >
+                      {ui.guideLaunch}
+                    </button>
+                  </div>
+                </section>
 
                 <div className="premium-settings-columns">
                   <section aria-labelledby="premium-workspace-heading">
@@ -492,7 +756,6 @@ export default function TopBar({
                     <button
                       aria-pressed={language === "en"}
                       className={language === "en" ? "active" : ""}
-                      disabled={translationState?.pending}
                       onClick={() => selectLanguage("en")}
                       type="button"
                     >
@@ -502,7 +765,6 @@ export default function TopBar({
                     <button
                       aria-pressed={language === "ko"}
                       className={language === "ko" ? "active" : ""}
-                      disabled={translationState?.pending}
                       onClick={() => selectLanguage("ko")}
                       type="button"
                     >
@@ -523,6 +785,34 @@ export default function TopBar({
           </div>
         </div>
       </div>
+      <KoreanTranslationDialog
+        onCancel={() => setTranslationConfirmOpen(false)}
+        onConfirm={() => {
+          // Start browser-native model creation inside this user gesture. The
+          // hook still owns fallback, progress, cleanup, and exact rollback.
+          translationState?.prepareBrowser?.();
+          setTranslationConfirmOpen(false);
+          setSettingsOpen(false);
+          onToggleLanguage?.();
+        }}
+        open={translationConfirmOpen}
+        returnFocusRef={settingsTriggerRef}
+        ui={ui}
+      />
+      {translationBusy && !translationState?.error && (
+        <TranslationProgressNotice
+          onReturnToEnglish={() => onToggleLanguage?.()}
+          state={translationState}
+          ui={ui}
+        />
+      )}
+      {language === "ko" && translationState?.error && (
+        <TranslationFailureNotice
+          onRetry={() => translationState?.retry?.()}
+          ui={ui}
+          onReturnToEnglish={() => onToggleLanguage?.()}
+        />
+      )}
     </header>
   );
 }

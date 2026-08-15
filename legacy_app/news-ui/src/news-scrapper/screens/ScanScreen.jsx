@@ -568,6 +568,9 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const [hiddenCount, setHiddenCount] = useState(0);
   const [resultFilter, setResultFilter] = useState('All');
   const [tourStep, setTourStep] = useState(null);
+  const [actionBusy, setActionBusy] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [actionNotice, setActionNotice] = useState('');
   const queryRef = useRef(null);
   const dateRangeRef = useRef(null);
   const sourcesRef = useRef(null);
@@ -647,7 +650,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const groups = useMemo(() => groupedByDate(visibleCards), [visibleCards]);
   const highSignals = cards.filter((a) => scoreOf(a) >= 80).length;
   const scanSourceLabel = pickedSites.length ? `${pickedSites.length} selected` : 'All stored';
-  const scanStateLabel = running ? 'Searching archive' : started ? 'Search complete' : 'Ready';
+  const scanFailed = !running && logs[logs.length - 1]?.level === 'error';
+  const scanStateLabel = running ? 'Searching archive' : scanFailed ? 'Search unavailable' : started ? 'Search complete' : 'Ready';
   const hasFilteredOut = cards.length > 0 && visibleCards.length === 0;
   const milestones = [
     { label: 'Query captured', state: query.trim() ? 'complete' : 'waiting' },
@@ -667,12 +671,15 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   };
 
   const onVote = async (item, v) => {
-    setVotes((p) => ({ ...p, [item.id]: v }));
-    trackAction(v === 'down' ? 'vote_not_interested' : 'vote_interested', articleActivityDetail(item, 'scan'));
+    const operationKey = `vote:${articleKey(item)}`;
+    if (actionBusy) return;
+    setActionBusy(operationKey);
+    setActionError('');
+    setActionNotice('');
     try {
       if (v === 'down') {
         await rejectArticle(item);
-        setCards((c) => c.filter((x) => x.id !== item.id));
+        setCards((c) => c.filter((x) => articleKey(x) !== articleKey(item)));
       } else if (v === 'up') {
         await trainVote(
           item.keywords_found || item.keywords || query,
@@ -681,14 +688,33 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
           item.title
         );
       }
-    } catch {}
+      setVotes((previous) => ({ ...previous, [articleKey(item)]: v }));
+      trackAction(v === 'down' ? 'vote_not_interested' : 'vote_interested', articleActivityDetail(item, 'scan'));
+      setActionNotice(v === 'down' ? 'Feedback saved and the signal was removed from these results.' : 'Interested feedback saved.');
+    } catch (error) {
+      setActionError(error?.message || 'Could not save this feedback. Nothing was changed; try again.');
+    } finally {
+      setActionBusy('');
+    }
   };
 
   const hideArticle = async (item) => {
-    setCards((current) => current.filter((article) => articleKey(article) !== articleKey(item)));
-    setHiddenCount((count) => count + 1);
-    trackAction('hide_personal', articleActivityDetail(item, 'scan'));
-    try { await hideArticleForViewer(item); } catch {}
+    const operationKey = `hide:${articleKey(item)}`;
+    if (actionBusy) return;
+    setActionBusy(operationKey);
+    setActionError('');
+    setActionNotice('');
+    try {
+      await hideArticleForViewer(item);
+      setCards((current) => current.filter((article) => articleKey(article) !== articleKey(item)));
+      setHiddenCount((count) => count + 1);
+      trackAction('hide_personal', articleActivityDetail(item, 'scan'));
+      setActionNotice('Signal hidden from your private view. Other viewers are unaffected.');
+    } catch (error) {
+      setActionError(error?.message || 'Could not hide this signal. It remains in your results; try again.');
+    } finally {
+      setActionBusy('');
+    }
   };
 
   const hideFromDossier = async (item) => {
@@ -714,24 +740,59 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   };
 
   const confirmSelect = async (item, name) => {
+    if (actionBusy) return;
     const payload = { ...item, selected_by: name, selected_at: new Date().toISOString().slice(0, 16).replace('T', ' ') };
-    setCards((arr) => arr.map((a) => (a.id === item.id ? { ...a, selected_by: name } : a)));
-    trackAction('select', articleActivityDetail(item, 'scan'));
-    try { await selectWorkflow(payload); } catch {}
+    setActionBusy(`select:${articleKey(item)}`);
+    setActionError('');
+    setActionNotice('');
+    try {
+      await selectWorkflow(payload);
+      setCards((arr) => arr.map((a) => (articleKey(a) === articleKey(item) ? { ...a, selected_by: name } : a)));
+      trackAction('select', articleActivityDetail(item, 'scan'));
+      setActionNotice('Signal sent to the Review Queue.');
+    } catch (error) {
+      setActionError(error?.message || 'Could not send this signal to the Review Queue. Try again.');
+    } finally {
+      setActionBusy('');
+    }
   };
 
   const confirmBatch = async (_item, name) => {
+    if (actionBusy || !selectedBatch.length) return;
     const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
     const payloads = selectedBatch.map((item) => ({ ...item, selected_by: name, selected_at: stamp }));
-    setCards((arr) => arr.map((item) => (checked[articleKey(item)] ? { ...item, selected_by: name } : item)));
-    setChecked({});
+    setActionBusy('batch-select');
+    setActionError('');
+    setActionNotice('');
     setBatchSelect(null);
-    trackAction('batch_select', {
-      item_count: payloads.length,
-      items: payloads.map((item) => articleActivityDetail(item, 'scan')),
-      screen: 'scan',
-    });
-    await Promise.all(payloads.map((payload) => selectWorkflow(payload).catch(() => null)));
+    try {
+      const results = await Promise.allSettled(payloads.map((payload) => selectWorkflow(payload)));
+      const accepted = payloads.filter((_payload, index) => results[index].status === 'fulfilled');
+      const acceptedKeys = new Set(accepted.map(articleKey));
+      setCards((items) => items.map((item) => (acceptedKeys.has(articleKey(item)) ? { ...item, selected_by: name } : item)));
+      setChecked((current) => {
+        const next = { ...current };
+        acceptedKeys.forEach((key) => { delete next[key]; });
+        return next;
+      });
+      if (accepted.length) {
+        trackAction('batch_select', {
+          item_count: accepted.length,
+          items: accepted.map((item) => articleActivityDetail(item, 'scan')),
+          screen: 'scan',
+        });
+      }
+      const failedCount = payloads.length - accepted.length;
+      if (failedCount) {
+        setActionError(`${failedCount} of ${payloads.length} signals could not be sent. They remain selected so you can retry.`);
+      } else {
+        setActionNotice(`${accepted.length} signal${accepted.length === 1 ? '' : 's'} sent to the Review Queue.`);
+      }
+    } catch (error) {
+      setActionError(error?.message || 'Could not send the selected signals. They remain selected so you can retry.');
+    } finally {
+      setActionBusy('');
+    }
   };
 
   const onCheck = (item, isOn) => {
@@ -773,12 +834,12 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
             <div className="scan-readout-head">
               <div className={`scan-orbit ${running ? 'is-live' : ''}`} aria-hidden="true">
                 <span className="scan-orbit-ring" />
-                <span className="scan-orbit-core"><Icon name={running ? 'refresh' : started ? 'check2' : 'search'} size={18} /></span>
+                <span className="scan-orbit-core"><Icon name={running ? 'refresh' : scanFailed ? 'warning' : started ? 'check2' : 'search'} size={18} /></span>
               </div>
               <div>
                 <span className="scan-readout-label">Workspace status</span>
                 <strong>{scanStateLabel}</strong>
-                <small>{running ? 'Reading local files now' : started ? 'Ready for your next query' : 'Waiting for a query'}</small>
+                <small>{running ? 'Reading local files now' : scanFailed ? 'Retry when the archive is available' : started ? 'Ready for your next query' : 'Waiting for a query'}</small>
               </div>
             </div>
             <dl className="scan-readout-metrics">
@@ -807,9 +868,10 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                 className="scan-query-input"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); start(); } }}
                 placeholder="Try “Samsung OLED”, “AI regulation”, or a specific phrase"
                 aria-describedby="scan-query-boundary"
+                aria-invalid={scanFailed}
               />
               {query && (
                 <button className="scan-query-clear" onClick={() => setQuery('')} type="button" aria-label="Clear search query">
@@ -913,6 +975,23 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         </div>
       </section>
 
+      {(actionBusy || actionError || actionNotice) && (
+        <div
+          className={actionError
+            ? 'my-4 flex flex-col gap-3 rounded-2xl border border-red-300/20 bg-red-950/20 p-4 text-sm text-red-200 sm:flex-row sm:items-center sm:justify-between'
+            : 'my-4 flex flex-col gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between'}
+          role={actionError ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          <span>{actionBusy ? 'Saving your change…' : actionError || actionNotice}</span>
+          {!actionBusy && (
+            <button className="scan-secondary-action" onClick={() => { setActionError(''); setActionNotice(''); }} type="button">
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
+
       {tourStep !== null && (
         <ScanTour
           step={tourStep}
@@ -922,22 +1001,24 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         />
       )}
 
-      <section className="scan-results-workspace" aria-busy={running} aria-labelledby="scan-results-title">
+      <section className="scan-results-workspace" aria-busy={running || Boolean(actionBusy)} aria-labelledby="scan-results-title">
         <header className="scan-results-header">
           <div>
             <span className="scan-results-kicker">03 · Intelligence return</span>
             <h2 id="scan-results-title">
-              {running ? 'Scanning the retained archive' : started ? `${cards.length} signals surfaced` : 'Your local results will land here'}
+              {running ? 'Scanning the retained archive' : scanFailed ? 'The archive search needs attention' : started ? `${cards.length} signals surfaced` : 'Your local results will land here'}
             </h2>
             <p>
-              {started
+              {scanFailed
+                ? status
+                : started
                 ? `${articlesSearched} stored articles checked across ${archiveFiles} archive file${archiveFiles === 1 ? '' : 's'} · ${highSignals} high-signal result${highSignals === 1 ? '' : 's'}`
                 : 'Results are ranked from extracted titles, summaries, keywords, sources, categories, and regions.'}
             </p>
           </div>
           <div className={`scan-result-state ${running ? 'is-live' : ''}`}>
             <span className={running ? 'scan-beacon active' : 'scan-beacon'} aria-hidden="true" />
-            <div><strong>{running ? 'Live local search' : started ? 'Search complete' : 'Standing by'}</strong><small>{from} → {to}</small></div>
+            <div><strong>{running ? 'Live local search' : scanFailed ? 'Search failed' : started ? 'Search complete' : 'Standing by'}</strong><small>{from} → {to}</small></div>
           </div>
         </header>
 
@@ -990,7 +1071,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                     <ArticleCard
                       item={item}
                       variant={cardVariant(item)}
-                      vote={votes[item.id]}
+                      vote={votes[articleKey(item)]}
                       onVote={onVote}
                       onSelect={setPendingSelect}
                       onOpen={openDossier}
@@ -1010,14 +1091,16 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                 <span className="radar-ring two" />
                 <span className="radar-crosshair" />
                 <span className="scan-radar-sweep" />
-                <Icon name={running ? 'refresh' : hasFilteredOut ? 'filter' : started ? 'search' : 'archive'} size={24} />
+                <Icon name={running ? 'refresh' : scanFailed ? 'warning' : hasFilteredOut ? 'filter' : started ? 'search' : 'archive'} size={24} />
               </div>
               <div className="scan-idle-copy">
-                <span className="scan-idle-kicker">{running ? 'Local search active' : hasFilteredOut ? 'Lens applied' : started ? 'Archive search complete' : 'Extracted intelligence ready'}</span>
-                <h3>{running ? 'Reading and ranking your stored signals' : hasFilteredOut ? `No results match the ${resultFilter} lens` : started ? 'No stored signals matched this search' : 'Begin with one useful question'}</h3>
+                <span className="scan-idle-kicker">{running ? 'Local search active' : scanFailed ? 'Search interrupted' : hasFilteredOut ? 'Lens applied' : started ? 'Archive search complete' : 'Extracted intelligence ready'}</span>
+                <h3>{running ? 'Reading and ranking your stored signals' : scanFailed ? 'The retained archive could not be searched' : hasFilteredOut ? `No results match the ${resultFilter} lens` : started ? 'No stored signals matched this search' : 'Begin with one useful question'}</h3>
                 <p>
                   {running
                     ? 'Scan is checking extracted briefing files locally. Keep working elsewhere—the search state will stay here.'
+                    : scanFailed
+                      ? `${status} Check that the backend is running, then retry this same query.`
                     : hasFilteredOut
                       ? 'The full result set is still available. Reset the lens to see every matching signal.'
                       : started
@@ -1026,7 +1109,9 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                 </p>
                 {!running && (
                   <div className="scan-idle-actions">
-                    {hasFilteredOut ? (
+                    {scanFailed ? (
+                      <button onClick={start} type="button"><Icon name="refresh" size={14} /> Retry this search</button>
+                    ) : hasFilteredOut ? (
                       <button onClick={() => setResultFilter('All')} type="button"><Icon name="rotate" size={14} /> Show every result</button>
                     ) : (
                       <>
@@ -1089,9 +1174,9 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
           <div className="batch-action-bar scan-batch-bar">
             <div className="scan-batch-count"><span>{selectedBatch.length}</span><strong>signal{selectedBatch.length === 1 ? '' : 's'} selected</strong></div>
             <div className="scan-batch-actions">
-              <button className="scan-secondary-action" onClick={() => setChecked({})} type="button">Clear</button>
-              <button className="scan-primary-action" onClick={() => setBatchSelect({ title: `${selectedBatch.length} selected signals` })} type="button"><Icon name="check2" size={15} /> Send to review</button>
-              <button className="scan-secondary-action" onClick={() => setDraftExportOpen(true)} type="button"><Icon name="download" size={15} /> Draft export</button>
+              <button className="scan-secondary-action" disabled={Boolean(actionBusy)} onClick={() => setChecked({})} type="button">Clear</button>
+              <button className="scan-primary-action" disabled={Boolean(actionBusy)} onClick={() => setBatchSelect({ title: `${selectedBatch.length} selected signals` })} type="button"><Icon name="check2" size={15} /> {actionBusy === 'batch-select' ? 'Sending…' : 'Send to review'}</button>
+              <button className="scan-secondary-action" disabled={Boolean(actionBusy)} onClick={() => setDraftExportOpen(true)} type="button"><Icon name="download" size={15} /> Draft export</button>
             </div>
           </div>
         </div>

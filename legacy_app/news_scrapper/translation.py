@@ -12,6 +12,7 @@ import os
 import json
 import re
 import threading
+import time
 from collections import OrderedDict
 from pathlib import Path
 from typing import Iterable
@@ -47,7 +48,7 @@ ENABLED = os.environ.get("KOREAN_TRANSLATION_ENABLED", "true").strip().lower() i
     "yes",
     "on",
 }
-MAX_ITEMS = max(1, min(100, int(os.environ.get("KOREAN_TRANSLATION_MAX_ITEMS", "80"))))
+MAX_ITEMS = max(1, min(100, int(os.environ.get("KOREAN_TRANSLATION_MAX_ITEMS", "100"))))
 MAX_TEXT_CHARS = max(
     256,
     min(50_000, int(os.environ.get("KOREAN_TRANSLATION_MAX_TEXT_CHARS", "20000"))),
@@ -60,7 +61,7 @@ INFERENCE_BATCH_SIZE = max(
 )
 GENERATION_BEAMS = max(
     1,
-    min(4, int(os.environ.get("KOREAN_TRANSLATION_NUM_BEAMS", "2"))),
+    min(4, int(os.environ.get("KOREAN_TRANSLATION_NUM_BEAMS", "1"))),
 )
 
 LATIN_RE = re.compile(r"[A-Za-z]")
@@ -82,6 +83,11 @@ class TranslationResponse(BaseModel):
     translations: list[TranslationResult]
     engine: str
     model: str
+    input_items: int = 0
+    unique_items: int = 0
+    cache_hits: int = 0
+    translated_items: int = 0
+    duration_ms: int = 0
 
 
 def _local_model_available() -> bool:
@@ -96,7 +102,11 @@ def _local_model_available() -> bool:
 def _device() -> str:
     if DEVICE_SETTING != "auto":
         return DEVICE_SETTING
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 def _split_text(text: str, target_chars: int = 900) -> list[str]:
@@ -195,8 +205,13 @@ class KoreanTranslator:
         self._model = None
         self._device = _device()
         self._load_error: str | None = None
+        self._loading = False
         self._cache: OrderedDict[str, str] = OrderedDict()
         self._cache_lock = threading.Lock()
+        self._stats_lock = threading.Lock()
+        self._request_count = 0
+        self._cache_hit_count = 0
+        self._inference_item_count = 0
 
     @property
     def source(self) -> str:
@@ -205,14 +220,26 @@ class KoreanTranslator:
         return MODEL_ID
 
     def status(self) -> dict:
+        with self._cache_lock:
+            cache_entries = len(self._cache)
+        with self._stats_lock:
+            requests = self._request_count
+            cache_hits = self._cache_hit_count
+            inference_items = self._inference_item_count
         return {
             "enabled": ENABLED,
             "ready": self._model is not None,
+            "loading": self._loading,
             "installed": _local_model_available(),
             "model": MODEL_ID,
             "model_path": str(MODEL_PATH),
             "local_only": LOCAL_ONLY,
             "device": self._device,
+            "max_items": MAX_ITEMS,
+            "cache_entries": cache_entries,
+            "requests": requests,
+            "cache_hits": cache_hits,
+            "inference_items": inference_items,
             "error": self._load_error,
         }
 
@@ -231,6 +258,7 @@ class KoreanTranslator:
                     "SentencePiece, and model-weight files at "
                     f"{MODEL_PATH}"
                 )
+            self._loading = True
             try:
                 print(
                     f"[TRANSLATION] Loading English→Korean model from {source} "
@@ -262,6 +290,14 @@ class KoreanTranslator:
                     flush=True,
                 )
                 raise RuntimeError(self._load_error) from error
+            finally:
+                self._loading = False
+
+    def warmup(self) -> dict:
+        """Load the model once without translating or retaining user content."""
+
+        self._ensure_loaded()
+        return self.status()
 
     def _cache_get(self, text: str) -> str | None:
         with self._cache_lock:
@@ -277,16 +313,20 @@ class KoreanTranslator:
             while len(self._cache) > CACHE_SIZE:
                 self._cache.popitem(last=False)
 
-    def _translate_chunks(self, chunks: list[str]) -> list[str]:
+    def _translate_chunks_unlocked(self, chunks: list[str]) -> list[str]:
         if not chunks:
             return []
         self._ensure_loaded()
         assert self._tokenizer is not None and self._model is not None
-        translated: list[str] = []
+        # Similar-length batches waste substantially less work on padding. Keep
+        # positions so the public response remains byte-for-byte ordered.
+        indexed_chunks = sorted(enumerate(chunks), key=lambda item: len(item[1]))
+        translated: list[str | None] = [None] * len(chunks)
         batch_size = INFERENCE_BATCH_SIZE
-        with self._inference_lock, torch.inference_mode():
-            for start in range(0, len(chunks), batch_size):
-                batch = chunks[start : start + batch_size]
+        with torch.inference_mode():
+            for start in range(0, len(indexed_chunks), batch_size):
+                indexed_batch = indexed_chunks[start : start + batch_size]
+                batch = [value for _, value in indexed_batch]
                 encoded = self._tokenizer(
                     batch,
                     return_tensors="pt",
@@ -301,38 +341,95 @@ class KoreanTranslator:
                     num_beams=GENERATION_BEAMS,
                     early_stopping=True,
                 )
-                translated.extend(
-                    self._tokenizer.batch_decode(generated, skip_special_tokens=True)
-                )
-        return [value.strip() for value in translated]
+                decoded = self._tokenizer.batch_decode(generated, skip_special_tokens=True)
+                for (original_index, _), value in zip(indexed_batch, decoded):
+                    translated[original_index] = value.strip()
+        return [str(value or "") for value in translated]
 
-    def translate_many(self, texts: Iterable[str]) -> list[str]:
+    def _translate_chunks(self, chunks: list[str]) -> list[str]:
+        """Compatibility wrapper used by diagnostics and older callers."""
+
+        with self._inference_lock:
+            return self._translate_chunks_unlocked(chunks)
+
+    def translate_many_with_stats(self, texts: Iterable[str]) -> tuple[list[str], dict]:
+        started = time.perf_counter()
         values = [str(value or "") for value in texts]
-        results: list[str | None] = [None] * len(values)
-        pending: list[tuple[int, str, list[str]]] = []
-        all_chunks: list[str] = []
-
-        for index, text in enumerate(values):
+        sources: list[str | None] = []
+        unique_sources: list[str] = []
+        seen: set[str] = set()
+        for text in values:
             stripped = text.strip()
             if not stripped or not LATIN_RE.search(stripped):
-                results[index] = text
+                sources.append(None)
                 continue
-            cached = self._cache_get(stripped)
-            if cached is not None:
-                results[index] = cached
+            sources.append(stripped)
+            if stripped in seen:
                 continue
-            chunks = _split_text(stripped)
-            pending.append((index, stripped, chunks))
-            all_chunks.extend(chunks)
+            seen.add(stripped)
+            unique_sources.append(stripped)
 
-        chunk_translations = iter(self._translate_chunks(all_chunks))
-        for index, source, chunks in pending:
-            translated = " ".join(next(chunk_translations) for _ in chunks).strip()
-            translated = translated or source
-            self._cache_put(source, translated)
-            results[index] = translated
+        translated_by_source: dict[str, str] = {}
+        cache_hits = 0
+        pending_sources: list[str] = []
+        for source in unique_sources:
+            cached = self._cache_get(source)
+            if cached is None:
+                pending_sources.append(source)
+            else:
+                cache_hits += 1
+                translated_by_source[source] = cached
 
-        return [str(value if value is not None else values[index]) for index, value in enumerate(results)]
+        inferred_sources = 0
+        if pending_sources:
+            # One inference owner at a time. Recheck after entering the lock so
+            # simultaneous browser requests never translate the same text twice.
+            with self._inference_lock:
+                truly_missing: list[str] = []
+                for source in pending_sources:
+                    cached = self._cache_get(source)
+                    if cached is None:
+                        truly_missing.append(source)
+                    else:
+                        cache_hits += 1
+                        translated_by_source[source] = cached
+
+                if truly_missing:
+                    chunks_by_source = [(_split_text(source), source) for source in truly_missing]
+                    all_chunks = [
+                        chunk
+                        for chunks, _source in chunks_by_source
+                        for chunk in chunks
+                    ]
+                    chunk_translations = iter(self._translate_chunks_unlocked(all_chunks))
+                    for chunks, source in chunks_by_source:
+                        translated = " ".join(
+                            next(chunk_translations) for _ in chunks
+                        ).strip() or source
+                        self._cache_put(source, translated)
+                        translated_by_source[source] = translated
+                    inferred_sources = len(truly_missing)
+
+        results = [
+            values[index] if source is None else translated_by_source.get(source, values[index])
+            for index, source in enumerate(sources)
+        ]
+        stats = {
+            "input_items": len(values),
+            "unique_items": len(unique_sources),
+            "cache_hits": cache_hits,
+            "translated_items": inferred_sources,
+            "duration_ms": max(0, round((time.perf_counter() - started) * 1000)),
+        }
+        with self._stats_lock:
+            self._request_count += 1
+            self._cache_hit_count += cache_hits
+            self._inference_item_count += inferred_sources
+        return results, stats
+
+    def translate_many(self, texts: Iterable[str]) -> list[str]:
+        translated, _stats = self.translate_many_with_stats(texts)
+        return translated
 
 
 translator = KoreanTranslator()
@@ -342,6 +439,14 @@ router = APIRouter(prefix="/translation", tags=["translation"])
 @router.get("/status")
 def translation_status():
     return translator.status()
+
+
+@router.post("/warmup")
+def warmup_korean_translation():
+    try:
+        return translator.warmup()
+    except RuntimeError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
 
 
 @router.post("/korean", response_model=TranslationResponse)
@@ -361,7 +466,7 @@ def translate_to_korean(payload: TranslationRequest):
             ),
         )
     try:
-        translated = translator.translate_many(payload.texts)
+        translated, stats = translator.translate_many_with_stats(payload.texts)
     except RuntimeError as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
     return TranslationResponse(
@@ -371,4 +476,5 @@ def translate_to_korean(payload: TranslationRequest):
         ],
         engine="local-marian",
         model=MODEL_ID,
+        **stats,
     )

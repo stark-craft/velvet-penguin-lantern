@@ -607,7 +607,7 @@ Put real client IP addresses after `BROADCAST_SPECIAL_IPS=`, separated by
 commas:
 
 ```env
-BROADCAST_SPECIAL_IPS=109.109.201.228,109.109.201.229
+BROADCAST_SPECIAL_IPS=192.0.2.10,192.0.2.11
 ```
 
 Restart the backend after changing `.env`; environment settings are read at

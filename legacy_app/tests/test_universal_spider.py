@@ -192,6 +192,35 @@ class UniversalSpiderTests(unittest.TestCase):
             self.assertEqual(len(requests), 1)
             self.assertEqual(requests[0].url, "https://example.com")
 
+    def test_explicit_rss_entrypoint_is_preferred_and_metadata_survives(self):
+        with tempfile.TemporaryDirectory() as directory:
+            sites_file = Path(directory) / "sites.json"
+            sites_file.write_text(json.dumps({"sites": [{
+                "id": "nvidia-ai-feed",
+                "name": "NVIDIA AI",
+                "url": "https://nvidianews.nvidia.com/",
+                "rss_url": "https://nvidianews.nvidia.com/rss/ai.xml",
+                "enabled": True,
+                "verticals": ["technology"],
+                "source_family": "primary",
+                "keyword_pack": "default",
+            }]}))
+            spider = NewsSpider(keyword="AI", sites_file=str(sites_file))
+            request = list(spider.build_initial_requests())[0]
+            self.assertEqual(request.url, "https://nvidianews.nvidia.com/rss/ai.xml")
+            self.assertEqual(request.meta["source_id"], "nvidia-ai-feed")
+            self.assertEqual(request.meta["source_family"], "primary")
+
+    def test_allow_deep_scan_false_prevents_archive_expansion(self):
+        spider = NewsSpider(keyword="broadcast")
+        html = """<html><body><main><h1>Broadcast archive 15 August 2026</h1>
+        <article><a href="/news/one-broadcast-story.html">Broadcaster launches a new television service today</a></article>
+        </main></body></html>"""
+        response = make_response(HtmlResponse, "https://example.com/archive/2026-08-15", html, {
+            "site_name": "Example", "discovery_depth": 1, "allow_deep_scan": False,
+        })
+        self.assertEqual(list(spider.parse_article_page(response)), [])
+
 
 if __name__ == "__main__":
     unittest.main()

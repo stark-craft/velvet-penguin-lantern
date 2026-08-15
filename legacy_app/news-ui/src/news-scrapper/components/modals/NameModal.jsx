@@ -17,6 +17,7 @@ export default function NameModal({
     || ''
   );
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   const dialogRef = useModalFocus(open, onClose);
 
   useEffect(() => {
@@ -27,29 +28,39 @@ export default function NameModal({
         || ''
       );
       setErr('');
+      setBusy(false);
     }
   }, [open]);
 
   if (!open) return null;
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     const v = name.trim();
     if (!v) {
       setErr('Name is required to send articles to Review Queue.');
       return;
     }
     localStorage.setItem('initiator-name', v);
-    onConfirm(article, v);
-    onClose();
+    setBusy(true);
+    setErr('');
+    try {
+      await onConfirm(article, v);
+      onClose();
+    } catch (error) {
+      setErr(error?.message || 'This action could not be completed. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={busy ? undefined : onClose}>
       <div aria-labelledby="selection-dialog-title" aria-modal="true" className="modal sm compact-dialog selection-dialog" onClick={(e) => e.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="head">
           <Icon name="check" />
           <h3 id="selection-dialog-title">{title}</h3>
-          <button aria-label="Close selection dialog" className="x" onClick={onClose} type="button"><Icon name="x" /></button>
+          <button aria-label="Close selection dialog" className="x" disabled={busy} onClick={onClose} type="button"><Icon name="x" /></button>
         </div>
         <div className="body">
           <div className="text-sm text-slate-400">
@@ -75,6 +86,9 @@ export default function NameModal({
               <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Name</div>
               <input
                 className="dark-input"
+                aria-describedby={err ? 'selection-dialog-error' : undefined}
+                aria-invalid={Boolean(err)}
+                disabled={busy}
                 value={name}
                 onChange={(e) => { setName(e.target.value); setErr(''); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
@@ -83,12 +97,12 @@ export default function NameModal({
               />
             </div>
           )}
-          {err && <div className="mt-2 text-sm text-red-300">{err}</div>}
+          {err && <div className="mt-2 text-sm text-red-300" id="selection-dialog-error" role="alert">{err}</div>}
         </div>
         <div className="foot">
-          <button className="btn-dark-secondary" onClick={onClose} type="button">Cancel</button>
-          <button className="btn-dark-primary" onClick={submit} type="button">
-            <Icon name="check" /> {confirmLabel}
+          <button className="btn-dark-secondary" disabled={busy} onClick={onClose} type="button">Cancel</button>
+          <button aria-busy={busy} className="btn-dark-primary" disabled={busy} onClick={submit} type="button">
+            <Icon name="check" /> {busy ? 'Submitting…' : confirmLabel}
           </button>
         </div>
       </div>

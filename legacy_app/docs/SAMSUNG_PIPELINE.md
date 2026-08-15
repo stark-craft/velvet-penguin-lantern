@@ -63,7 +63,7 @@ therefore treats `content_references` as untrusted discovery metadata:
 
 The adapter uses the confirmed non-streaming Samsung Chat contract:
 
-- route: `/api-chat/openapi/chat/v1/messages`;
+- full messages endpoint configured in the server's untracked `.env` file;
 - `modelIds`: one configured model ID in an array;
 - `contents`: the prompt in an array;
 - `isStream`: `false`;
@@ -72,9 +72,9 @@ The adapter uses the confirmed non-streaming Samsung Chat contract:
 - authentication headers: `x-generative-ai-client` and
   `x-openapi-token`.
 
-If an older `.env` contains only the product base URL ending in `/api-chat`,
-the adapter upgrades it to the confirmed messages route automatically. A 404
-prints a route-specific diagnostic and a sanitized response excerpt.
+The adapter requires the complete messages URL; a product landing/base URL is
+not sufficient. A 404 prints a route-specific diagnostic and a sanitized
+response excerpt without publishing the private endpoint in source control.
 
 TLS verification remains enabled. If the company network uses a private
 certificate authority, configure the CA bundle described in the deployment

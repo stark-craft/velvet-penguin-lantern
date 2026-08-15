@@ -13,7 +13,7 @@ class PrivacyMigrationTests(unittest.TestCase):
             tracker_file = Path(directory) / "usage_tracker.json"
             tracker_file.write_text(json.dumps({
                 "legacy-device": {
-                    "ip": "109.109.201.228",
+                    "ip": "192.0.2.10",
                     "fingerprint": "browser-one",
                     "display_name": "Navin",
                     "activity": {"2026-07-22": {"page_loads": 3}},

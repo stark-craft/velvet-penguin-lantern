@@ -55,7 +55,7 @@ const PATHS = {
 
 export default function Icon({ name, className = 'i', size = 16 }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" width={size} height={size}
+    <svg aria-hidden="true" className={className} focusable="false" viewBox="0 0 24 24" width={size} height={size}
          fill="none" stroke="currentColor" strokeWidth="1.7"
          strokeLinecap="round" strokeLinejoin="round">
       {PATHS[name] || null}

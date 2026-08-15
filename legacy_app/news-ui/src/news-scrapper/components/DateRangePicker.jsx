@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon.jsx';
+import useModalFocus from './modals/useModalFocus.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 const toISO = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -38,6 +39,7 @@ export default function DateRangePicker({
   const [month, setMonth] = useState(parseISO(from || to));
   const [anchor, setAnchor] = useState({ left: 0, top: 0 });
   const triggerRef = useRef(null);
+  const dialogRef = useModalFocus(open, () => setOpen(false));
 
   const days = useMemo(() => buildMonth(month), [month]);
   const start = draftFrom || draftTo;
@@ -117,6 +119,10 @@ export default function DateRangePicker({
       </div>
       <button
         ref={triggerRef}
+        aria-controls="date-range-dialog"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-label={`${label}: ${from || 'Start'} to ${to || 'End'}`}
         className="date-range-trigger dark-input flex items-center justify-between gap-3 text-left"
         onClick={syncOpen}
         type="button"
@@ -134,8 +140,14 @@ export default function DateRangePicker({
             aria-label="Close date range picker"
           />
           <div
-            className="date-range-popover fixed z-[150] w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-[24px] border border-white/10 bg-[#101827]/98 shadow-cockpit backdrop-blur-xl"
-            style={{ left: `${anchor.left}px`, top: `${Math.max(16, anchor.top)}px` }}
+            className="date-range-popover fixed z-[150] w-[min(420px,calc(100vw-2rem))] overflow-y-auto rounded-[24px] border border-white/10 bg-[#101827]/98 shadow-cockpit backdrop-blur-xl"
+            id="date-range-dialog"
+            ref={dialogRef}
+            style={{
+              left: `${anchor.left}px`,
+              maxHeight: 'calc(100dvh - 2rem)',
+              top: `${Math.max(16, anchor.top)}px`,
+            }}
             role="dialog"
             aria-modal="true"
             aria-label="Select date range"
@@ -171,6 +183,13 @@ export default function DateRangePicker({
                 return (
                   <button
                     key={iso}
+                    aria-current={iso === toISO(new Date()) ? 'date' : undefined}
+                    aria-label={day.toLocaleDateString(undefined, {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                    aria-pressed={selected}
                     className={[
                       'date-range-day h-10 rounded-xl text-sm font-semibold transition',
                       selected ? 'selected' : ranged ? 'in-range' : '',

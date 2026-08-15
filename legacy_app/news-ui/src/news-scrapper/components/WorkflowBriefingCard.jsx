@@ -20,6 +20,7 @@ export default function WorkflowBriefingCard({
   onOpen,
   onApprove,
   onRemove,
+  busyAction = '',
 }) {
   const approved = mode === 'approved';
   const score = scoreOf(item);
@@ -28,7 +29,7 @@ export default function WorkflowBriefingCard({
     : (item.selected_at || item.date);
 
   return (
-    <article className={`workflow-brief-card ${mode}`}>
+    <article aria-busy={Boolean(busyAction)} className={`workflow-brief-card ${mode}`}>
       <button
         className="workflow-brief-visual"
         onClick={() => onOpen(item)}
@@ -76,12 +77,12 @@ export default function WorkflowBriefingCard({
           <Icon name="file" size={14} /> Open Dossier
         </button>
         {!approved && (
-          <button className="btn-dark-primary" onClick={() => onApprove(item)} type="button">
-            <Icon name="shield" size={14} /> Approve
+          <button className="btn-dark-primary" disabled={Boolean(busyAction)} onClick={() => onApprove(item)} type="button">
+            <Icon name="shield" size={14} /> {busyAction === 'approve' ? 'Approving…' : 'Approve'}
           </button>
         )}
-        <button className="workflow-brief-remove" onClick={() => onRemove(item)} type="button">
-          {approved ? 'Remove approval' : 'Remove'}
+        <button className="workflow-brief-remove" disabled={Boolean(busyAction)} onClick={() => onRemove(item)} type="button">
+          {busyAction === 'remove' ? 'Removing…' : approved ? 'Remove approval' : 'Remove'}
         </button>
       </footer>
     </article>

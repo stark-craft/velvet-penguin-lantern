@@ -6,7 +6,18 @@
     "rss_url": "https://www.huaweicentral.com/feed/",
     "category": "Mobile & OS Competitors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "f72977ae01cf9956da",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Android Authority",
@@ -15,7 +26,18 @@
     "rss_url": "https://www.androidauthority.com/feed/",
     "category": "Mobile & OS Competitors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "0ffc96bc5c3d21d402",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "MacRumors",
@@ -24,7 +46,18 @@
     "rss_url": "https://feeds.macrumors.com/MacRumors-All",
     "category": "Mobile & OS Competitors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "c2a3bc508ccc4d8588",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "XDA Developers",
@@ -33,7 +66,18 @@
     "rss_url": "https://www.xda-developers.com/feed/",
     "category": "Mobile & OS Competitors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "99353852097d3526f1",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "SamMobile",
@@ -42,7 +86,18 @@
     "rss_url": "https://www.sammobile.com/feed/",
     "category": "Samsung / Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "347e10801cc5d4b593",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Samsung Newsroom",
@@ -51,7 +106,18 @@
     "rss_url": "https://news.samsung.com/global/feed",
     "category": "Samsung / Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "1f85a88558ab3769bb",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "AnandTech",
@@ -60,7 +126,18 @@
     "rss_url": "https://www.anandtech.com/rss/",
     "category": "Hardware & Semiconductors",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "cc441c3455c4996135",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Tom's Hardware",
@@ -69,7 +146,18 @@
     "rss_url": "https://www.tomshardware.com/feeds/all",
     "category": "Hardware & Semiconductors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "92d761b93c4daa0f59",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "AI News",
@@ -78,7 +166,18 @@
     "rss_url": "https://www.artificialintelligence-news.com/feed/",
     "category": "AI & ML",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "82767c4997670ad9b2",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "IEEE Spectrum - Robotics",
@@ -87,7 +186,18 @@
     "rss_url": "https://spectrum.ieee.org/rss/robotics/fulltext",
     "category": "Robotics & Automation",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "0aacbe405c957aeb88",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "DeepMind Blog",
@@ -96,7 +206,18 @@
     "rss_url": "https://deepmind.google/blog/rss.xml",
     "category": "AI & ML",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "217df60810548700ae",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Robotics Business Review",
@@ -105,7 +226,18 @@
     "rss_url": "https://www.roboticsbusinessreview.com/feed/",
     "category": "Robotics & Automation",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "a880b13341a2a6c406",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "The Robot Report",
@@ -114,7 +246,18 @@
     "rss_url": "https://www.therobotreport.com/feed/",
     "category": "Robotics & Automation",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "525003b55d3f584cc8",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Wired - General Tech",
@@ -123,7 +266,18 @@
     "rss_url": "https://www.wired.com/feed/rss",
     "category": "General Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "b095e3627109bc93f7",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Engadget",
@@ -132,7 +286,18 @@
     "rss_url": "https://www.engadget.com/rss.xml",
     "category": "Consumer Tech & Devices",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "78c90c42452aa51a64",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Ars Technica",
@@ -141,7 +306,18 @@
     "rss_url": "https://feeds.arstechnica.com/arstechnica/index",
     "category": "General Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "edc02ecccefd353796",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "ZDNet",
@@ -150,7 +326,18 @@
     "rss_url": "https://www.zdnet.com/news/rss.xml",
     "category": "Enterprise / Cloud",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "20fb3ff172c41e99aa",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Financial Times Tech",
@@ -159,7 +346,18 @@
     "rss_url": "https://www.ft.com/technology?format=rss",
     "category": "Strategic / Business",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "cc5094ad6895f60f15",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Economic Times - Tech",
@@ -168,7 +366,18 @@
     "rss_url": "https://economictimes.indiatimes.com/tech/rssfeeds/13357200.cms",
     "category": "Strategic / Business",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "c7e5643cc74688cb52",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Gadgets360 (NDTV)",
@@ -177,7 +386,18 @@
     "rss_url": "https://feeds.feedburner.com/gadgets360-latest",
     "category": "Consumer Tech & Devices",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "67a1b9dd826d8255c2",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Indian Express - Technology",
@@ -186,7 +406,18 @@
     "rss_url": "https://indianexpress.com/section/technology/feed/",
     "category": "India Tech & Consumer",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "6d164f44c80fbf16e4",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Indian Express - TechReviews",
@@ -195,7 +426,18 @@
     "rss_url": "https://indianexpress.com/section/technology/tech-reviews/feed/",
     "category": "India Tech & Consumer",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "b4cb805b9ec18120cc",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Indian Express - TechNews",
@@ -204,7 +446,18 @@
     "rss_url": "https://indianexpress.com/section/technology/tech-news-technology/feed/",
     "category": "India Tech & Consumer",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "2e598a475d5eb658ff",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Indian Express - AI News",
@@ -213,7 +466,18 @@
     "rss_url": "https://indianexpress.com/section/technology/artificial-intelligence/feed/",
     "category": "AI & ML",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "6fd7a141ab419933c1",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Times of India - Tech",
@@ -222,7 +486,18 @@
     "rss_url": "https://timesofindia.indiatimes.com/rssfeeds/66949542.cms",
     "category": "India Tech & Consumer",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "3edc738d517dc46a9e",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "MoneyControl - Technology",
@@ -231,7 +506,18 @@
     "rss_url": "https://www.moneycontrol.com/rss/technology.xml",
     "category": "Strategic / Business",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "cf073a47754f90df24",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "YourStory - AI/Startups",
@@ -240,7 +526,18 @@
     "rss_url": "https://yourstory.com/feed",
     "category": "India Startups & AI",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "94b7b5ee69505d1b4b",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Inc42",
@@ -249,7 +546,18 @@
     "rss_url": "https://inc42.com/feed/",
     "category": "India Startups & AI",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "b7aab5ff6e8fd0606e",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Swarajya - Tech & Infra",
@@ -258,7 +566,18 @@
     "rss_url": "https://swarajyamag.com/feed",
     "category": "Policy & Regulation",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "0ca043edbf94271f0e",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "9to5Google",
@@ -267,7 +586,18 @@
     "rss_url": "https://9to5google.com/feed/",
     "category": "Mobile & OS Competitors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "cc00d3aa0bb8b91ce6",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "9to5Mac",
@@ -276,7 +606,18 @@
     "rss_url": "https://9to5mac.com/feed/",
     "category": "Mobile & OS Competitors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "19e06d8f2b39817d7b",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "TechCrunch",
@@ -285,7 +626,18 @@
     "rss_url": "https://techcrunch.com/feed/",
     "category": "Strategic / Business",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "c372e1b720895d75d5",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "CNet",
@@ -294,7 +646,18 @@
     "rss_url": "https://www.cnet.com/rss/news/",
     "category": "Consumer Tech & Devices",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "a39f1338b7f884eec5",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "The Verge",
@@ -303,7 +666,18 @@
     "rss_url": "https://www.theverge.com/rss/index.xml",
     "category": "General Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "95e17a32d32bbf2909",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Interesting Engineering",
@@ -312,7 +686,18 @@
     "rss_url": "https://interestingengineering.com/feed",
     "category": "Research & Deep Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "7b1f93defc382b500f",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "EE Times",
@@ -321,7 +706,18 @@
     "rss_url": "https://www.eetimes.com/feed/",
     "category": "Hardware & Semiconductors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "772738ce35a7d770f7",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Electronics For You",
@@ -330,7 +726,18 @@
     "rss_url": "https://www.electronicsforyou.biz/feed",
     "category": "Hardware & Semiconductors",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "eb40ef30c9e92c5581",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "New Atlas",
@@ -339,7 +746,18 @@
     "rss_url": "https://newatlas.com/index.rss",
     "category": "Research & Deep Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "18ff9004d622657b37",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "TechPowerUp",
@@ -348,7 +766,18 @@
     "rss_url": "https://www.techpowerup.com/rss/news",
     "category": "Hardware & Semiconductors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "990696f92e4572432a",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Exchange4Media",
@@ -357,7 +786,18 @@
     "rss_url": "https://www.exchange4media.com/rss/digital-news.xml",
     "category": "Broadcast / OTT / Media",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "cb3f224a1cc36ecd34",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "TCL India News",
@@ -366,7 +806,19 @@
     "category": "Display & TV Competitors",
     "enabled": false,
     "allow_deep_scan": false,
-    "manual_deep_scan_candidate": true
+    "manual_deep_scan_candidate": true,
+    "id": "b84a4bec69e188e7cf",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "Gizbot (India Tech)",
@@ -375,7 +827,18 @@
     "rss_url": "https://www.gizbot.com/rss/gizbot-fb.xml",
     "category": "Consumer Tech & Devices",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "25055e7baac2521be5",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Device Next",
@@ -384,7 +847,18 @@
     "rss_url": "https://devicenext.com/feed/",
     "category": "Consumer Tech & Devices",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "b4f55f91d780a8bce1",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Telecom Talk",
@@ -393,7 +867,18 @@
     "rss_url": "https://telecomtalk.info/feed/",
     "category": "Telecom & Connectivity",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "e2e217061f2d64e516",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Communication Today",
@@ -402,7 +887,18 @@
     "rss_url": "https://www.communicationstoday.co.in/feed/",
     "category": "Telecom & Connectivity",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "684ee6aaae5704e8cd",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Mirage News (Science/Tech)",
@@ -411,7 +907,18 @@
     "rss_url": "https://www.miragenews.com/news/technology/rss/",
     "category": "Research & Deep Tech",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "894bf777f70b2e8da5",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "CIO East India / Elets",
@@ -420,7 +927,18 @@
     "rss_url": "https://cio.eletsonline.com/feed/",
     "category": "Enterprise / Cloud",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "2886225fbfe434b6cc",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "MediaBrief",
@@ -429,7 +947,18 @@
     "rss_url": "https://mediabrief.com/feed/",
     "category": "Broadcast / OTT / Media",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "f4592b1ae7da55bc7a",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Semiconsult (Industry)",
@@ -438,7 +967,18 @@
     "rss_url": "https://www.semiconductor-digest.com/feed/",
     "category": "Hardware & Semiconductors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "e60a1e2c3f5f045bf8",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "IEEE Spectrum - Computing",
@@ -447,7 +987,18 @@
     "rss_url": "https://spectrum.ieee.org/feeds/topic/computing.rss",
     "category": "Research & Deep Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "5397e1a4ae5104153b",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "MeitY Newsroom",
@@ -456,7 +1007,18 @@
     "rss_url": "https://www.meity.gov.in/rss.xml",
     "category": "Policy & Regulation",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "454b08800a0d863c04",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "public_sector",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Department of Telecom (DoT)",
@@ -465,7 +1027,18 @@
     "rss_url": "https://dot.gov.in/rss.xml",
     "category": "Policy & Regulation",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "9b5372c14dcacf4489",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "public_sector",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "BIF (Broadband India Forum)",
@@ -474,7 +1047,18 @@
     "rss_url": "https://broadbandindiaforum.com/feed/",
     "category": "Telecom & Connectivity",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "6560eaff32306e7521",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "TelecomLead",
@@ -483,7 +1067,18 @@
     "rss_url": "https://www.telecomlead.com/feed",
     "category": "Telecom & Connectivity",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "b8dda83ea67ef9182c",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Krutrim Blog",
@@ -492,7 +1087,18 @@
     "rss_url": "https://blog.olakrutrim.com/feed/",
     "category": "India Startups & AI",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "841e6cc999835f49f6",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Semiconductor Today",
@@ -501,7 +1107,18 @@
     "rss_url": "https://www.semiconductor-today.com/rss.shtml",
     "category": "Hardware & Semiconductors",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "0bc16cb0705ecaa999",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "The Telegraph UK - Technology",
@@ -510,7 +1127,18 @@
     "rss_url": "https://www.telegraph.co.uk/technology/rss.xml",
     "category": "Policy & Regulation",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "a56a4135777443c23c",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "The Telegraph UK - Business",
@@ -519,7 +1147,18 @@
     "rss_url": "https://www.telegraph.co.uk/business/rss.xml",
     "category": "Strategic / Business",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "e6284d21d0eeabc735",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NYT World",
@@ -528,7 +1167,18 @@
     "rss_url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "category": "Global News & Macro",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "9a7ef19b7cf8283d34",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "MIT Tech Review",
@@ -537,7 +1187,18 @@
     "rss_url": "https://www.technologyreview.com/feed/",
     "category": "Research & Deep Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "75fd94e9a57b7db576",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "MeitY (PIB India)",
@@ -545,7 +1206,19 @@
     "domain": "pib.gov.in",
     "category": "Policy & Regulation",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "edc890e4ece9d8aee4",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "public_sector",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "MediaNama (Policy)",
@@ -554,7 +1227,18 @@
     "rss_url": "https://www.medianama.com/feed/",
     "category": "Policy & Regulation",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "f6a4e38d1fe3996532",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Inc42 - AI News",
@@ -563,7 +1247,18 @@
     "rss_url": "https://inc42.com/buzz/artificial-intelligence/feed/",
     "category": "India Startups & AI",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "cd40475d51a37cf3fe",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "FlatPanelsHD (Displays)",
@@ -572,7 +1267,19 @@
     "category": "Display & TV Competitors",
     "enabled": false,
     "allow_deep_scan": false,
-    "manual_deep_scan_candidate": true
+    "manual_deep_scan_candidate": true,
+    "id": "4ddba3b231d38ac5ef",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "Gizmochina (Xiaomi/TCL)",
@@ -581,7 +1288,18 @@
     "rss_url": "https://www.gizmochina.com/feed/",
     "category": "Consumer Tech & Devices",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "093818f15dc961e4ee",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "LG Global Newsroom",
@@ -590,7 +1308,19 @@
     "category": "Display & TV Competitors",
     "enabled": false,
     "allow_deep_scan": false,
-    "manual_deep_scan_candidate": true
+    "manual_deep_scan_candidate": true,
+    "id": "404999004f89d3cb7a",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "Sony Press Center",
@@ -598,7 +1328,19 @@
     "domain": "sony.com",
     "category": "Display & TV Competitors",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "f9fbb09438484e712d",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "TCL Global News",
@@ -607,7 +1349,19 @@
     "category": "Display & TV Competitors",
     "enabled": false,
     "allow_deep_scan": false,
-    "manual_deep_scan_candidate": true
+    "manual_deep_scan_candidate": true,
+    "id": "c693790b2dd82c6ece",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "CBS News",
@@ -616,7 +1370,18 @@
     "rss_url": "https://www.cbsnews.com/latest/rss/technology",
     "category": "General Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "67e41bbfe7703f2bd0",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NewYork Times - Tech",
@@ -625,7 +1390,18 @@
     "rss_url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
     "category": "General Tech",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "c701de32e763e91cb7",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Google News",
@@ -634,7 +1410,18 @@
     "rss_url": "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en",
     "category": "Aggregators",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "e1617552f2ef49b11d",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Wall Street Journal",
@@ -643,7 +1430,18 @@
     "rss_url": "https://feeds.content.dowjones.io/public/rss/RSSWSJD",
     "category": "Strategic / Business",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "7a4d8dc06cdf9a6647",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Wired - Latest AI",
@@ -652,7 +1450,18 @@
     "rss_url": "https://www.wired.com/feed/tag/ai/latest/rss",
     "category": "AI & ML",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "875fc62f6f9d7da2e9",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Hindustan Times - Tech",
@@ -661,7 +1470,18 @@
     "rss_url": "https://www.hindustantimes.com/feeds/rss/technology/rssfeed.xml",
     "category": "India Tech & Consumer",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "4fb4a067c0016ff480",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "startuppedia",
@@ -670,7 +1490,19 @@
     "category": "India Startups & AI",
     "enabled": false,
     "allow_deep_scan": false,
-    "manual_deep_scan_candidate": true
+    "manual_deep_scan_candidate": true,
+    "id": "e9715ff810c2e89d81",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "startuppedia - Trending News",
@@ -679,7 +1511,19 @@
     "category": "India Startups & AI",
     "enabled": false,
     "allow_deep_scan": false,
-    "manual_deep_scan_candidate": true
+    "manual_deep_scan_candidate": true,
+    "id": "cfea331650ef15db51",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "TechRadar",
@@ -688,7 +1532,18 @@
     "rss_url": "https://www.techradar.com/feeds.xml",
     "category": "Consumer Tech & Devices",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "9dba45d0d5e0c73bfd",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "TechRadar - Television Feed",
@@ -697,7 +1552,18 @@
     "rss_url": "https://www.techradar.com/feeds/tag/televisions",
     "category": "Display & TV Competitors",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "61afd19def416f4ce2",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "ET Telecom",
@@ -706,7 +1572,18 @@
     "rss_url": "https://telecom.economictimes.indiatimes.com/rss/devices",
     "category": "Telecom & Connectivity",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "02c41f217954e596ef",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "ET Telecom - Enterprise Service",
@@ -715,7 +1592,18 @@
     "rss_url": "https://telecom.economictimes.indiatimes.com/rss/enterprise-services",
     "category": "Telecom & Connectivity",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "637207353d25501ef4",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "ET Telecom - Internet",
@@ -724,7 +1612,18 @@
     "rss_url": "https://telecom.economictimes.indiatimes.com/rss/internet",
     "category": "Telecom & Connectivity",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "4fd7f9b6fb20a448b7",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "ET Telecom - Satcom",
@@ -733,7 +1632,18 @@
     "rss_url": "https://telecom.economictimes.indiatimes.com/rss/satcom",
     "category": "Telecom & Connectivity",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "4e5d22da61aa6ec773",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Korea Herald",
@@ -742,7 +1652,19 @@
     "category": "Strategic / Business",
     "enabled": false,
     "allow_deep_scan": false,
-    "manual_deep_scan_candidate": true
+    "manual_deep_scan_candidate": true,
+    "id": "ec436f9cd55cfd8cca",
+    "rss_url": null,
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default"
   },
   {
     "name": "Nvidia NewsRoom - All News",
@@ -751,7 +1673,18 @@
     "rss_url": "https://nvidianews.nvidia.com/releases.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "dd35f97797bff90097",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Nvidia - Automotive",
@@ -760,7 +1693,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/automotive.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "50d9eaa0beb59caf97",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Nvidia Newsroom - Cloud",
@@ -769,7 +1713,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/cloud.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "6def7e8e6f4c19ff8c",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Nvidia Newsroom - Corporate",
@@ -778,7 +1733,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/corporate.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "902f5b7ed0bb28961f",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Nvidia Newsroom - Enterprise HPC",
@@ -787,7 +1753,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/enterprise_hpc.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "e03a14d35a1f0a883e",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - AI Platforms / Deployment",
@@ -796,7 +1773,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/ai_platforms_deployment.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "ea0b0897feb52163a0",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - AR / VR",
@@ -805,7 +1793,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/ar_vr.xml",
     "category": "NVIDIA Official",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "ff87b4f204f96b0699",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Computer Vision / Video Analytics",
@@ -814,7 +1813,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/computer_vision_video_analytics.xml",
     "category": "NVIDIA Official",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "7e5375526075a2cdcf",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Content Creation / Rendering",
@@ -823,7 +1833,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/content_creation_rendering.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "a4eb0e5a68e96652df",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Conversational All",
@@ -832,7 +1853,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/conversational_all.xml",
     "category": "NVIDIA Official",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "8d24b663b8b5b9ce75",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Cybersecurity / Data Center / Cloud",
@@ -841,7 +1873,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/cybersecurity_data_center_cloud.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "78c27d38c07cc343ff",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Data Science",
@@ -850,7 +1893,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/data_science.xml",
     "category": "NVIDIA Official",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "79b738c15b50046d57",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Development & Optimization",
@@ -859,7 +1913,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/development_optimization.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "43570eb4a7da3d63ef",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Driving",
@@ -868,7 +1933,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/driving.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "56b199586fd1f96b41",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Edge Computing",
@@ -877,7 +1953,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/edge_computing.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "dc973b7825d2b4f906",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Generative AI",
@@ -886,7 +1973,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/generative_al.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "625a94c633bd2ce813",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Healthcare and Life Sciences",
@@ -895,7 +1993,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/healthcare_and_life_sciences.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "825cf93e6f8c597710",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - MLOps",
@@ -904,7 +2013,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/mlops.xml",
     "category": "NVIDIA Official",
     "enabled": false,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "05dca053a28b5f1120",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Models / Libraries / Frameworks",
@@ -913,7 +2033,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/models_libraries_frameworks.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "48f2d136c055b11765",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Networking / Communications",
@@ -922,7 +2053,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/networking_communications.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "05b4f376a73166be03",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Nvidia Newsroom - Robotics",
@@ -931,7 +2073,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/robotics.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "a926ea268561d20196",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Simulation / Modeling / Design",
@@ -940,7 +2093,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/simulation_modeling_design.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "7cb3e9f1632e08a28b",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "NVIDIA Newsroom - Telecommunications",
@@ -949,7 +2113,18 @@
     "rss_url": "https://nvidianews.nvidia.com/cats/telecommunications.xml",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "ad7b80d6816a54fda4",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
   },
   {
     "name": "Nvidia Blogs",
@@ -958,6 +2133,1197 @@
     "rss_url": "https://feeds.feedburner.com/nvidiablog",
     "category": "NVIDIA Official",
     "enabled": true,
-    "allow_deep_scan": false
+    "allow_deep_scan": false,
+    "id": "d352bb04c8c36ae9cb",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default"
+  },
+  {
+    "name": "Indian Broadcasting World",
+    "url": "https://www.indianbroadcastingworld.com/",
+    "category": "Broadcast / DTH / Cable",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "02bea7a96e214b61cc",
+    "domain": "indianbroadcastingworld.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "BestMediaInfo - Television",
+    "url": "https://bestmediainfo.com/mediainfo/television",
+    "category": "Media / Television / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "67f0578e9d467c6c70",
+    "domain": "bestmediainfo.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Exchange4Media - Media & TV",
+    "url": "https://www.exchange4media.com/media-tv-news.html",
+    "category": "Media / Television / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "5f9823036c2816ebaa",
+    "domain": "exchange4media.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Exchange4Media - Digital",
+    "url": "https://www.exchange4media.com/digital-news.html",
+    "category": "Media / Digital / Advertising",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "1804fa4634a355b7cd",
+    "domain": "exchange4media.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Storyboard18 - Latest News",
+    "url": "https://www.storyboard18.com/latest-news",
+    "category": "Media / Advertising / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "b97106a7d1c9dc3eb1",
+    "domain": "storyboard18.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "HomeTechnologyReview - News",
+    "url": "https://hometechnologyreview.com/news/",
+    "category": "TV / Home Entertainment / Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "8635958f511a576e1f",
+    "domain": "hometechnologyreview.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "TechRadar Australia - Television News",
+    "url": "https://www.techradar.com/au/televisions/news",
+    "category": "TV / Display / Consumer Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "11a0a7251e7435d1c3",
+    "domain": "techradar.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "TechRadar New Zealand - Television News",
+    "url": "https://www.techradar.com/nz/televisions/news",
+    "category": "TV / Display / Consumer Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "faa3a67a72b8788e81",
+    "domain": "techradar.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "TechRadar Singapore - Television News",
+    "url": "https://www.techradar.com/sg/televisions/news",
+    "category": "TV / Display / Consumer Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "bfcff8b167479b70ee",
+    "domain": "techradar.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Light Reading - Regulatory & Politics",
+    "url": "https://www.lightreading.com/business-management/regulatory-politics",
+    "category": "Telecom / Regulation / Policy",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "c030042561616b8d12",
+    "domain": "lightreading.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Light Reading - General",
+    "url": "https://www.lightreading.com/",
+    "category": "Telecom / Broadband / Video",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "f1dfcb21a986e023f1",
+    "domain": "lightreading.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Asia-Pacific Broadcasting Union - News",
+    "url": "https://www.abu.org.my/news/",
+    "category": "Broadcast / Asia-Pacific / Industry",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "f560167d26ca3234e8",
+    "domain": "abu.org.my",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Advanced Television - Articles",
+    "url": "https://www.advanced-television.com/category/articles/",
+    "category": "Broadcast / Pay TV / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "4ba38c9c934db9c453",
+    "domain": "advanced-television.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Advanced Television - Press Releases",
+    "url": "https://www.advanced-television.com/category/press-releases/",
+    "category": "Broadcast / Pay TV / Press Releases",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "104c88d7bcf34a850e",
+    "domain": "advanced-television.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Indian Television - Regulators",
+    "url": "https://indiantelevision.com/category/regulators/",
+    "category": "Broadcast / Regulation / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "5da702a8dbbd21a981",
+    "domain": "indiantelevision.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Indian Television - Cable TV",
+    "url": "https://indiantelevision.com/category/cable-tv/",
+    "category": "Broadcast / Cable TV / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "6678db234ff9519b71",
+    "domain": "indiantelevision.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Indian Television - DTH",
+    "url": "https://indiantelevision.com/category/dth/",
+    "category": "Broadcast / DTH / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "0ae810a9931001720f",
+    "domain": "indiantelevision.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "NextTV - Broadcasting & Cable",
+    "url": "https://www.nexttv.com/broadcasting-cable/news",
+    "category": "Broadcast / Cable / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "653f0cd285c5fba888",
+    "domain": "nexttv.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Telecompaper - Asia",
+    "url": "https://www.telecompaper.com/asia",
+    "category": "Telecom / Asia / Regional",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "a37af7c948a46d3621",
+    "domain": "telecompaper.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Telecompaper - Oceania",
+    "url": "https://www.telecompaper.com/oceania",
+    "category": "Telecom / Oceania / Regional",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "74d2bfd7ca4d153e2f",
+    "domain": "telecompaper.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Telecompaper - Middle East",
+    "url": "https://www.telecompaper.com/middle-east",
+    "category": "Telecom / Middle East / Regional",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "9f019ddbc66526c442",
+    "domain": "telecompaper.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Broadband TV News - TV",
+    "url": "https://www.broadbandtvnews.com/category/tv/",
+    "category": "Broadcast / Pay TV / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "1eb9e923b8e728cdbd",
+    "domain": "broadbandtvnews.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Broadband TV News - Technology",
+    "url": "https://www.broadbandtvnews.com/category/tech/",
+    "category": "Broadcast / Technology / Platforms",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "5ea85735ba2bd70e75",
+    "domain": "broadbandtvnews.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "APB+ News - News & Views",
+    "url": "https://apb-news.com/category/news-views/",
+    "category": "Broadcast / Asia-Pacific / Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "95e03877216027dae1",
+    "domain": "apb-news.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "TV Technology - News",
+    "url": "https://www.tvtechnology.com/news",
+    "category": "Broadcast / Production / Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "baf1cd38b7ed8f5daa",
+    "domain": "tvtechnology.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "TRAI - Regulations",
+    "url": "https://www.trai.gov.in/release-publication/regulations",
+    "category": "Regulation / Telecom / Broadcasting / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "3abb27f8b4c25772d3",
+    "domain": "trai.gov.in",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "public_sector",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "TRAI - Press Releases",
+    "url": "https://www.trai.gov.in/notifications/press-release",
+    "category": "Regulation / Telecom / Broadcasting / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "bdddafeb889e208465",
+    "domain": "trai.gov.in",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "public_sector",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "DVB - News",
+    "url": "https://dvb.org/news-events/news/",
+    "category": "Broadcast Standards / DVB / Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "0521cf3ad0be7ab96a",
+    "domain": "dvb.org",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "DVB Scene",
+    "url": "https://dvb.org/dvb-scene/",
+    "category": "Broadcast Standards / DVB / Industry",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "95f05396c5f8eedacd",
+    "domain": "dvb.org",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Global Media Alliance - Regulatory News",
+    "url": "https://gma.trade/regulatory-news/",
+    "category": "Media / Regulation / Global",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "895e1dc8d57baf748a",
+    "domain": "gma.trade",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Developing Telecoms - Asia Pacific",
+    "url": "https://www.developingtelecoms.com/regions/asia-pacific-telecommunications.html",
+    "category": "Telecom / Asia-Pacific / Emerging Markets",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "7917a25c1f83ac4d7d",
+    "domain": "developingtelecoms.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Developing Telecoms - Middle East & North Africa",
+    "url": "https://www.developingtelecoms.com/regions/middle-east-north-africa-telecommunications.html",
+    "category": "Telecom / MENA / Emerging Markets",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "12e66d6bb93a33ee8c",
+    "domain": "developingtelecoms.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Developing Telecoms - Regulation",
+    "url": "https://www.developingtelecoms.com/telecom-business/telecom-regulation.html",
+    "category": "Telecom / Regulation / Emerging Markets",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "8c7ec70587b7d1d0c5",
+    "domain": "developingtelecoms.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "EBU Technology & Innovation - News",
+    "url": "https://tech.ebu.ch/news",
+    "category": "Broadcast / Technology / Standards",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "79cb22bf3cec5fb26f",
+    "domain": "tech.ebu.ch",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "EY India - Technology",
+    "url": "https://www.ey.com/en_in/technology",
+    "category": "Technology / Research / Consulting",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "68195a907017333d98",
+    "domain": "ey.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "research",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "BroadcastPro ME - News",
+    "url": "https://www.broadcastprome.com/category/news/",
+    "category": "Broadcast / Middle East / Production",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "39987fa984f100ff45",
+    "domain": "broadcastprome.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "CSI Magazine - News Archive",
+    "url": "https://www.csimagazine.com/csi/archive-news-list.php",
+    "category": "Broadcast / Cable / Satellite / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "cb6efe81c71ea272ef",
+    "domain": "csimagazine.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "EuropaWire - Technology",
+    "url": "https://news.europawire.eu/markets/technology/",
+    "category": "Technology / Europe / Press Releases",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "827e86023b364fff07",
+    "domain": "news.europawire.eu",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "informitv - News",
+    "url": "https://informitv.com/news/",
+    "category": "Interactive TV / Streaming / Media",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "78d6655623347c1aef",
+    "domain": "informitv.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "BuzzInContent - News",
+    "url": "https://www.buzzincontent.com/news",
+    "category": "Media / Content / Advertising",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "9b39159d7fa31c5952",
+    "domain": "buzzincontent.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Electronics Media - News",
+    "url": "https://www.electronicsmedia.info/news/",
+    "category": "Electronics / Technology / Industry",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "c01666075a5d3f6617",
+    "domain": "electronicsmedia.info",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Electronics Media - India Technology News",
+    "url": "https://www.electronicsmedia.info/technology-news-in-india/",
+    "category": "Electronics / Technology / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "00b4bf6deab8befd74",
+    "domain": "electronicsmedia.info",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "EVENTFAQS India - News Articles",
+    "url": "https://in.eventfaqs.com/category/articles/news-articles/",
+    "category": "Media / Events / Entertainment",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "a3bf3e342adc82810e",
+    "domain": "in.eventfaqs.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "CIOL - News",
+    "url": "https://www.ciol.com/news",
+    "category": "Enterprise Technology / Digital / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "159cd1498292d20472",
+    "domain": "ciol.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "afaqs! - Media News",
+    "url": "https://www.afaqs.com/news/media",
+    "category": "Media / Advertising / Broadcasting",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "b9202ed8c469d29257",
+    "domain": "afaqs.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "MediaNama - News",
+    "url": "https://www.medianama.com/category/news/",
+    "category": "Digital Media / Policy / Technology",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "2fd2e119f124a5a7a8",
+    "domain": "medianama.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "ET Telecom - Policy",
+    "url": "https://telecom.economictimes.indiatimes.com/news/policy",
+    "category": "Telecom / Policy / Regulation / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "e7794f694f16ca778f",
+    "domain": "telecom.economictimes.indiatimes.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "TelecomTalk - DTH",
+    "url": "https://telecomtalk.info/category/dth/",
+    "category": "DTH / Telecom / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "4f4ec992a3c8c31f13",
+    "domain": "telecomtalk.info",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "MediaBrief - Television",
+    "url": "https://mediabrief.com/category/media/television/",
+    "category": "Media / Television / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "ace275c451ec2e671a",
+    "domain": "mediabrief.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Marketing-Interactive - News",
+    "url": "https://www.marketing-interactive.com/news",
+    "category": "Marketing / Media / Asia",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "e378e20415b2396593",
+    "domain": "marketing-interactive.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Marketing-Interactive - Technology",
+    "url": "https://www.marketing-interactive.com/tech",
+    "category": "Marketing / Technology / Asia",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "eaa09877056966c12a",
+    "domain": "marketing-interactive.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "business_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Android Authority - News",
+    "url": "https://www.androidauthority.com/news/",
+    "category": "Consumer Technology / Android / Devices",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "a73f2e60a6c4152752",
+    "domain": "androidauthority.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Swarajya - Technology",
+    "url": "https://swarajyamag.com/section/tech",
+    "category": "Technology / Policy / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "5fa3659bdda6110f64",
+    "domain": "swarajyamag.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "What Hi-Fi? - News",
+    "url": "https://www.whathifi.com/news",
+    "category": "TV / Audio / Home Entertainment",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "acf7bfcfb6ce7f026b",
+    "domain": "whathifi.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "FlatpanelsHD - News Archive",
+    "url": "https://www.flatpanelshd.com/newsarchive.php",
+    "category": "TV / Display / Streaming",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "8ac28b1ec58f542444",
+    "domain": "flatpanelshd.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "CABSAT - Industry Insights",
+    "url": "https://cabsat.com/news-articles-and-industry-insights",
+    "category": "Broadcast / Satellite / Middle East",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "59537820a8a397880e",
+    "domain": "cabsat.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "VideoWeek - News",
+    "url": "https://videoweek.com/news/",
+    "category": "Video / Streaming / Advertising",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "c1419c6490343691a8",
+    "domain": "videoweek.com",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "KPI Indonesia - Main News",
+    "url": "https://kpi.go.id/news?kategori=berita-utama",
+    "category": "Broadcast / Regulation / Indonesia",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "4c0183b9f65353da5e",
+    "domain": "kpi.go.id",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "industry_trade",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
+  },
+  {
+    "name": "India Today - Technology News",
+    "url": "https://www.indiatoday.in/technology/news",
+    "category": "Technology / Consumer Electronics / India",
+    "enabled": true,
+    "allow_deep_scan": true,
+    "id": "cf8490ef3a42b2d247",
+    "domain": "indiatoday.in",
+    "rss_url": null,
+    "verticals": [
+      "broadcast"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "broadcast",
+    "discovery_mode": "website",
+    "legacy_profile": "broadcast"
   }
 ]

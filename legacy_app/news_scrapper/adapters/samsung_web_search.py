@@ -17,7 +17,7 @@ from core.secure_http import tls_verify
 ENDPOINT = (
     os.environ.get("SAMSUNG_WEB_SEARCH_URL")
     or os.environ.get("SAMSUNG_WEB_SEARCH_ENDPOINT")
-    or "https://genai-openapi.sec.samsung.net/swahq/trial/api-web-search/openapi/web-search/v1/search"
+    or ""
 ).strip()
 TIMEOUT = int(os.environ.get("SAMSUNG_WEB_SEARCH_TIMEOUT", "90"))
 ARTICLE_FETCH_TIMEOUT = int(
@@ -194,6 +194,8 @@ def build_query(item: dict, keywords=None) -> str:
 def call_samsung_web_search_api(query: str, chat_id: str | None = None) -> dict:
     token = os.environ.get("SAMSUNG_WEB_SEARCH_TOKEN", "").strip()
     client = os.environ.get("SAMSUNG_WEB_SEARCH_CLIENT", "sense-news-intelligence").strip()
+    if not ENDPOINT:
+        raise RuntimeError("Missing SAMSUNG_WEB_SEARCH_URL")
     if not token:
         raise RuntimeError("Missing SAMSUNG_WEB_SEARCH_TOKEN")
     if not client:

@@ -342,6 +342,76 @@ class MinimalSemanticEngine:
             f"Keywords: {keywords} Content: {self.get_article_content(article)[:MAX_CLUSTER_TEXT_CHARS]}"
         )
 
+    @staticmethod
+    def _metadata_values(value):
+        """Return non-empty metadata values without treating a string as characters."""
+        values = value if isinstance(value, (list, tuple, set)) else [value]
+        return [str(item).strip() for item in values if str(item or "").strip()]
+
+    def cluster_scope_metadata(self, cluster, main_article):
+        """Preserve source-scope metadata when raw articles are fused into one event."""
+        collected = {
+            "verticals": [],
+            "audiences": [],
+            "source_ids": [],
+            "source_families": [],
+            "keyword_packs": [],
+            "legacy_profiles": [],
+            "keywords_found": [],
+        }
+
+        def add_unique(key, values):
+            for value in self._metadata_values(values):
+                if value not in collected[key]:
+                    collected[key].append(value)
+
+        for article in cluster:
+            verticals = self._metadata_values(article.get("verticals"))
+            vertical = str(article.get("vertical") or "").strip()
+            if vertical:
+                verticals.append(vertical)
+            legacy_profile = str(article.get("legacy_profile") or "").strip()
+            keyword_pack = str(article.get("keyword_pack") or "").strip()
+            if not verticals:
+                if legacy_profile == "broadcast" or keyword_pack == "broadcast":
+                    verticals = ["broadcast"]
+                elif legacy_profile:
+                    verticals = ["technology"]
+            add_unique("verticals", verticals)
+            add_unique("audiences", article.get("audiences"))
+            add_unique("source_ids", article.get("source_id"))
+            add_unique("source_families", article.get("source_family"))
+            add_unique("keyword_packs", keyword_pack)
+            add_unique("legacy_profiles", legacy_profile)
+            add_unique("keywords_found", article.get("keywords_found") or article.get("keywords"))
+
+        primary_vertical = str(main_article.get("vertical") or "").strip()
+        if primary_vertical not in {"technology", "broadcast"}:
+            primary_vertical = collected["verticals"][0] if collected["verticals"] else "technology"
+        if primary_vertical not in collected["verticals"]:
+            collected["verticals"].insert(0, primary_vertical)
+
+        main_legacy_profile = str(main_article.get("legacy_profile") or "").strip()
+        legacy_profile = (
+            "unified"
+            if len(collected["legacy_profiles"]) > 1
+            else (main_legacy_profile or (collected["legacy_profiles"][0] if collected["legacy_profiles"] else "unified"))
+        )
+        return {
+            "vertical": primary_vertical,
+            "verticals": collected["verticals"],
+            "audiences": collected["audiences"] or ["all"],
+            "source_id": main_article.get("source_id") or None,
+            "source_ids": collected["source_ids"],
+            "source_family": main_article.get("source_family") or (collected["source_families"][0] if collected["source_families"] else ""),
+            "source_families": collected["source_families"],
+            "keyword_pack": main_article.get("keyword_pack") or (collected["keyword_packs"][0] if collected["keyword_packs"] else ""),
+            "keyword_packs": collected["keyword_packs"],
+            "legacy_profile": legacy_profile,
+            "legacy_profiles": collected["legacy_profiles"],
+            "keywords_found": collected["keywords_found"],
+        }
+
     def semantic_cluster(self, articles, distance_threshold=DEFAULT_CLUSTER_DISTANCE_THRESHOLD):
         if not self.semantic_model or not CLUSTERING_AVAILABLE or len(articles) < 2:
             print(f"FUSION WARNING: Clustering skipped. Model loaded: {self.semantic_model is not None}", flush=True)
@@ -488,6 +558,7 @@ class MinimalSemanticEngine:
         sentiment = self.get_sentiment(dynamic_summary)
         entities = self.extract_entities_simple(article.get("title", ""))
         importance = self.calculate_importance_score([article], all_articles)
+        scope_metadata = self.cluster_scope_metadata([article], article)
         sources_list = [{
             "name": article.get("source", "Unknown"),
             "link": article.get("link", "#"),
@@ -506,7 +577,7 @@ class MinimalSemanticEngine:
             "sentiment": sentiment,
             "importance_score": importance,
             "entities": entities,
-            "keywords_found": article.get("keywords_found", []),
+            **scope_metadata,
             "full_contents": full_contents,
             "is_fresh": is_fresh,
             "first_seen": first_seen_label,
@@ -638,6 +709,7 @@ class MinimalSemanticEngine:
             all_text = " ".join([art.get("title", "") for art in cluster])
             entities = self.extract_entities_simple(all_text)
             importance = self.calculate_importance_score(cluster, raw_articles)
+            scope_metadata = self.cluster_scope_metadata(cluster, main_art)
 
             sources_list = []
             for art in cluster:
@@ -660,7 +732,7 @@ class MinimalSemanticEngine:
                 "sentiment": sentiment,
                 "importance_score": importance,
                 "entities": entities,
-                "keywords_found": main_art.get("keywords_found", []),
+                **scope_metadata,
                 "full_contents": full_contents,
                 "is_fresh": is_fresh,
                 "first_seen": first_seen_label,
@@ -780,6 +852,7 @@ class MinimalSemanticEngine:
             all_text = " ".join([art.get("title", "") for art in cluster])
             entities = self.extract_entities_simple(all_text)
             importance = self.calculate_importance_score(cluster, raw_articles)
+            scope_metadata = self.cluster_scope_metadata(cluster, main_art)
 
             sources_list = []
             for art in cluster:
@@ -802,7 +875,7 @@ class MinimalSemanticEngine:
                 "sentiment": sentiment,
                 "importance_score": importance,
                 "entities": entities,
-                "keywords_found": main_art.get("keywords_found", []),
+                **scope_metadata,
                 "full_contents": full_contents,
                 "is_fresh": is_fresh,
                 "first_seen": first_seen_label,

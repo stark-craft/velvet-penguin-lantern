@@ -236,10 +236,13 @@ class NewsSpider(scrapy.Spider):
         # feed, an Atom feed, or a normal website page.
         for site in active_sites:
             site_name = site.get("name", "Unknown Source")
-            configured_url = site.get("url", "")
+            # An explicit RSS/Atom entrypoint is authoritative. Website URLs
+            # remain the fallback for sources without feeds or failed feeds.
+            configured_url = site.get("rss_url") or site.get("url", "")
             if not configured_url:
                 continue
-            print(f"LOG: Checking feed for {site_name}...", flush=True)
+            method = "configured RSS" if site.get("rss_url") else "configured website"
+            print(f"LOG: Checking {method} for {site_name}...", flush=True)
             yield scrapy.Request(
                 url=configured_url,
                 # parse_source_response decides whether this response is a feed
@@ -249,7 +252,7 @@ class NewsSpider(scrapy.Spider):
                 errback=self.handle_source_error,
                 # meta is Scrapy's per-request context bag. These values travel
                 # with the response into later callbacks.
-                meta=self.source_meta(site_name, configured_url),
+                meta=self.source_meta(site, configured_url),
                 # Source URLs may repeat between runs; this request should always
                 # be allowed within this spider run.
                 dont_filter=True,
@@ -273,13 +276,28 @@ class NewsSpider(scrapy.Spider):
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}/"
 
-    def source_meta(self, site_name, configured_url):
+    def source_meta(self, site, configured_url):
         """Build request metadata shared across feed/listing/article callbacks."""
 
+        site_name = site.get("name", "Unknown Source")
+        website_url = site.get("url") or configured_url
+        verticals = site.get("verticals") or site.get("vertical") or []
+        if isinstance(verticals, str):
+            verticals = [verticals]
+        audiences = site.get("audiences") or site.get("audience") or ["all"]
+        if isinstance(audiences, str):
+            audiences = [audiences]
         return {
             "site_name": site_name,
             "configured_url": configured_url,
-            "source_home": self.source_home(configured_url),
+            "source_home": self.source_home(website_url),
+            "source_id": site.get("id") or "",
+            "vertical": verticals[0] if verticals else "",
+            "verticals": verticals,
+            "audiences": audiences,
+            "source_family": site.get("source_family") or "",
+            "keyword_pack": site.get("keyword_pack") or "",
+            "allow_deep_scan": bool(site.get("allow_deep_scan", False)),
         }
 
     def is_in_range(self, date_obj):
@@ -467,6 +485,7 @@ class NewsSpider(scrapy.Spider):
                 seed_snippet=seed_snippet,
                 configured_url=response.meta.get("configured_url"),
                 source_home=response.meta.get("source_home"),
+                source_context=response.meta,
             )
 
             if request:
@@ -627,6 +646,7 @@ class NewsSpider(scrapy.Spider):
                 discovery_depth=next_depth,
                 configured_url=response.meta.get("configured_url"),
                 source_home=response.meta.get("source_home"),
+                source_context=response.meta,
             )
 
             if request:
@@ -755,6 +775,7 @@ class NewsSpider(scrapy.Spider):
         discovery_depth=0,
         configured_url=None,
         source_home=None,
+        source_context=None,
     ):
         """Create a Scrapy request for one normalized article page."""
 
@@ -777,7 +798,7 @@ class NewsSpider(scrapy.Spider):
             )
             if isinstance(discovered_date, datetime):
                 discovered_date = discovered_date.date()
-            return {
+            result = {
                 "source": site_name,
                 "title": self.clean_text(title) or normalized,
                 "link": normalized,
@@ -790,6 +811,10 @@ class NewsSpider(scrapy.Spider):
                 "needs_web_search_enrichment": True,
                 "top_image": "",
             }
+            for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack"):
+                if source_context and source_context.get(key):
+                    result[key] = source_context[key]
+            return result
 
         return scrapy.Request(
             normalized,
@@ -808,6 +833,11 @@ class NewsSpider(scrapy.Spider):
                 "discovery_depth": discovery_depth,
                 "configured_url": configured_url or normalized,
                 "source_home": source_home or self.source_home(configured_url or normalized),
+                **{
+                    key: source_context[key]
+                    for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack", "allow_deep_scan")
+                    if source_context and key in source_context
+                },
             },
         )
 
@@ -909,9 +939,16 @@ class NewsSpider(scrapy.Spider):
         # before body extraction and use them as one additional discovery layer.
         if self.is_listing_or_archive_page(response, title):
             depth = int(response.meta.get("discovery_depth", 0))
-            if depth <= 2:
+            allow_deep_scan = bool(response.meta.get("allow_deep_scan", True))
+            if allow_deep_scan and depth <= 2:
                 print(f"LOG: Expanding archive/listing page: {response.url[:70]}", flush=True)
                 yield from self.parse_listing_page(response)
+            elif not allow_deep_scan:
+                print(
+                    f"LOG: Deep listing expansion disabled for {site_name}: "
+                    f"{response.url[:65]}",
+                    flush=True,
+                )
             return
 
         # Primary body text from newspaper3k.
@@ -971,6 +1008,9 @@ class NewsSpider(scrapy.Spider):
             "word_count": len(full_text.split()),
             "method": response.meta.get("method", "Website Discovery"),
         }
+        for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack"):
+            if response.meta.get(key):
+                item[key] = response.meta[key]
 
         print(f"LOG: Collected clean article: {title[:55]}...", flush=True)
 

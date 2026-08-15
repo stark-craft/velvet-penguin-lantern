@@ -193,6 +193,13 @@ export function normalizeArticle(raw, idx = 0) {
     region:        decodeHtmlEntities(raw.region || 'Global'),
     region_basis:  decodeHtmlEntities(raw.region_basis || ''),
     category:      decodeHtmlEntities(raw.category || raw.topic || 'News'),
+    vertical:      decodeHtmlEntities(raw.vertical || ''),
+    verticals:     decodeTextArray(raw.verticals),
+    audiences:     decodeTextArray(raw.audiences),
+    source_family: decodeHtmlEntities(raw.source_family || ''),
+    source_id:     raw.source_id || '',
+    keyword_pack:  raw.keyword_pack || '',
+    bouncer_profile: raw.bouncer_profile || raw.profile || '',
     importance:    raw.importance ?? conf,
     conf,
     mark:          typeof raw.mark === 'string' ? decodeHtmlEntities(raw.mark) : raw.mark,
@@ -205,6 +212,13 @@ export function normalizeArticle(raw, idx = 0) {
     cluster_id:    raw.cluster_id || '',
     image_url:     raw.image_url || raw.image || raw.thumbnail || raw.top_image || raw.media_url || '',
     why_matters:   decodeHtmlEntities(raw.why_it_matters || raw.why_matters || raw.insight || raw.ai_opinion || ''),
+    attention_hook: decodeHtmlEntities(raw.attention_hook || ''),
+    what_changed: decodeHtmlEntities(raw.what_changed || ''),
+    why_now: decodeHtmlEntities(raw.why_now || ''),
+    watch_next: decodeHtmlEntities(raw.watch_next || ''),
+    hook_type: raw.hook_type || '',
+    hook_source: raw.hook_source || '',
+    hook_grounded: Boolean(raw.hook_grounded),
     // workflow fields passthrough
     selected_by:   typeof raw.selected_by === 'string' ? decodeHtmlEntities(raw.selected_by) : raw.selected_by,
     selected_at:   raw.selected_at,
@@ -237,6 +251,16 @@ export function normalizeArticle(raw, idx = 0) {
             : {}),
         }
       : null,
+    recommendation: raw.recommendation && typeof raw.recommendation === 'object'
+      ? {
+          ...raw.recommendation,
+          reasons: decodeTextArray(raw.recommendation.reasons),
+          reason_codes: Array.isArray(raw.recommendation.reason_codes)
+            ? raw.recommendation.reason_codes.map(String)
+            : [],
+        }
+      : null,
+    article_id: raw.article_id || raw.article_key || '',
   };
 }
 
