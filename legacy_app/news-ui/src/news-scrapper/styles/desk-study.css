@@ -1,0 +1,318 @@
+/* Personal Desk — "The Private Study" hero.
+   Typography sits directly on the shared page background: no card box, no glow.
+   Champagne/brass is reserved for hairlines, the active-tab stroke and quiet
+   emphasis; interactive accents stay on the platform violet/steel tokens. */
+
+.personal-desk {
+  --study-brass: #d8c49a;
+  --study-brass-strong: #e7d7b0;
+  --study-brass-line: rgba(216, 196, 154, 0.38);
+}
+
+html[data-theme="light"] .personal-desk {
+  --study-brass: #7a5f38;
+  --study-brass-strong: #5f4a2b;
+  --study-brass-line: rgba(122, 95, 56, 0.4);
+}
+
+/* Hero ---------------------------------------------------------- */
+
+.desk-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: clamp(22px, 3vw, 48px);
+  padding-top: clamp(10px, 2vw, 26px);
+}
+
+.desk-kicker-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-faint);
+}
+
+.desk-kicker {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.desk-kicker-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.desk-kicker-date::before {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--study-brass);
+  content: "";
+}
+
+.desk-greeting {
+  max-width: 24ch;
+  margin: clamp(14px, 2vw, 24px) 0 0 !important;
+  color: var(--text);
+  font-size: clamp(2rem, 3.6vw, 3.3rem) !important;
+  font-weight: 250 !important;
+  letter-spacing: -0.035em !important;
+  line-height: 1.04 !important;
+  overflow-wrap: anywhere;
+}
+
+.desk-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.82em;
+  margin-left: 4px;
+  background: var(--study-brass);
+  vertical-align: -0.06em;
+  animation: desk-caret-blink 900ms steps(1, end) infinite;
+}
+
+.desk-caret.is-done {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes desk-caret-blink {
+  50% { opacity: 0; }
+}
+
+.desk-status {
+  max-width: 58ch !important;
+  min-height: 1.65em;
+  margin: clamp(10px, 1.4vw, 16px) 0 0 !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.desk-trust-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 0;
+  margin-top: clamp(14px, 1.8vw, 22px);
+}
+
+.desk-trust-row span {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.desk-trust-row span svg { color: var(--study-brass); opacity: 0.85; }
+
+.desk-trust-row span:not(:last-child)::after {
+  margin: 0 14px;
+  color: var(--study-brass-line);
+  content: "·";
+}
+
+/* Snapshot counters — each one is a door into its workspace ------ */
+
+.desk-hero .personal-desk-snapshot {
+  display: flex;
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  gap: 0;
+}
+
+.desk-hero .personal-desk-snapshot button {
+  appearance: none;
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+  padding: 6px clamp(16px, 2vw, 28px);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 160ms ease;
+}
+
+.desk-hero .personal-desk-snapshot button:first-child { padding-left: 0; }
+.desk-hero .personal-desk-snapshot button:last-child { padding-right: 0; }
+
+.desk-hero .personal-desk-snapshot button + button {
+  border-left: 1px solid var(--line-soft);
+}
+
+.desk-hero .personal-desk-snapshot strong {
+  color: var(--text);
+  font-size: 1.7rem;
+  font-weight: 275;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  transition: color 160ms ease;
+}
+
+.desk-hero .personal-desk-snapshot strong.is-zero,
+.desk-hero .personal-desk-snapshot strong.is-pending { color: var(--text-faint); }
+
+.desk-hero .personal-desk-snapshot small {
+  color: var(--text-faint);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.desk-hero .personal-desk-snapshot button:hover { background: var(--accent-faint); }
+.desk-hero .personal-desk-snapshot button:hover strong { color: var(--study-brass-strong); }
+
+/* The rule — drawer tabs sit on a single hairline ---------------- */
+
+.desk-rule {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 26px;
+  border-bottom: 1px solid var(--line);
+}
+
+.desk-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: clamp(14px, 2.4vw, 34px);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.desk-tabs button {
+  appearance: none;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 15px 2px 13px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.desk-tabs button svg { opacity: 0.75; }
+
+.desk-tabs button:hover { color: var(--text-secondary); }
+
+.desk-tabs button.active {
+  border-bottom-color: var(--study-brass);
+  color: var(--text);
+}
+
+.desk-tabs button.active svg { color: var(--study-brass); opacity: 1; }
+
+.desk-tab-count {
+  color: var(--text-faint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.desk-tabs button.active .desk-tab-count { color: var(--study-brass); }
+
+/* Fine print — For You controls dissolve into the furniture ------ */
+
+.desk-fineprint {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-left: auto;
+  padding-bottom: 12px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.desk-fineprint > span { letter-spacing: 0.01em; }
+
+.desk-fineprint button {
+  appearance: none;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: color 160ms ease;
+}
+
+.desk-fineprint button:hover { color: var(--study-brass-strong); }
+.desk-fineprint button:disabled { cursor: default; opacity: 0.55; }
+
+/* Focus ---------------------------------------------------------- */
+
+.desk-hero .personal-desk-snapshot button:focus-visible,
+.desk-tabs button:focus-visible,
+.desk-fineprint button:focus-visible {
+  outline: none;
+  border-radius: 8px;
+  box-shadow: var(--focus);
+}
+
+/* Narrow widths --------------------------------------------------- */
+
+@media (max-width: 940px) {
+  .desk-hero {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .desk-hero .personal-desk-snapshot { justify-content: flex-start; }
+
+  .desk-hero .personal-desk-snapshot button { padding: 10px 20px 10px 0; }
+
+  .desk-hero .personal-desk-snapshot button + button { padding-left: 20px; }
+
+  .desk-fineprint {
+    width: 100%;
+    margin-left: 0;
+    padding-bottom: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .desk-greeting { font-size: clamp(1.7rem, 7.5vw, 2.1rem) !important; }
+
+  .desk-trust-row span:nth-child(n + 2)::after { display: none; }
+
+  .desk-trust-row { gap: 6px 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desk-caret { display: none; }
+
+  .desk-hero *,
+  .desk-rule * {
+    transition: none !important;
+  }
+}

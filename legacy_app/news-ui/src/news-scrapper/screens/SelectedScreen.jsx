@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
 import WorkflowBriefingCard from '../components/WorkflowBriefingCard.jsx';
+import ContributionReviewDesk from '../components/ContributionReviewDesk.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import DirectorKeyModal from '../components/modals/DirectorKeyModal.jsx';
 import { approveWorkflow, correctRegion, getWorkflow, removeWorkflow } from '../api.js';
@@ -17,6 +18,14 @@ function topValue(items, getter) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
 }
 
+const REVIEW_DESK_VIEWS = ['news', 'contributions'];
+
+function initialReviewDeskView() {
+  if (typeof window === 'undefined') return 'news';
+  const stored = window.sessionStorage.getItem('review-desk-tab');
+  return REVIEW_DESK_VIEWS.includes(stored) ? stored : 'news';
+}
+
 export default function SelectedScreen() {
   const [items, setItems] = useState([]);
   const [loading, setLoad] = useState(true);
@@ -26,7 +35,10 @@ export default function SelectedScreen() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busyActions, setBusyActions] = useState({});
+  const [deskView, setDeskView] = useState(initialReviewDeskView);
   const actionLocks = useRef(new Set());
+
+  useEffect(() => { window.sessionStorage.setItem('review-desk-tab', deskView); }, [deskView]);
 
   const refresh = async () => {
     if (loading && items.length) return;
@@ -129,6 +141,28 @@ export default function SelectedScreen() {
         </aside>
       </section>
 
+      <div className="review-desk-tabs" role="tablist" aria-label="Review surfaces">
+        {[
+          { id: 'news', label: 'News signals' },
+          { id: 'contributions', label: 'Contributions' },
+        ].map((view) => (
+          <button
+            aria-selected={deskView === view.id}
+            className={deskView === view.id ? 'active' : ''}
+            key={view.id}
+            onClick={() => setDeskView(view.id)}
+            role="tab"
+            type="button"
+          >
+            {view.label}
+          </button>
+        ))}
+      </div>
+
+      {deskView === 'contributions' ? (
+        <ContributionReviewDesk />
+      ) : (
+        <>
       {error && <div className="error-banner" role="alert">{error}</div>}
       {notice && <div className="personal-notice" role="status">{notice}</div>}
 
@@ -195,6 +229,8 @@ export default function SelectedScreen() {
         onCorrectRegion={onCorrectRegion}
       />
       <DirectorKeyModal open={!!pending} article={pending} onClose={() => setPending(null)} onConfirm={confirmApprove} />
+        </>
+      )}
     </div>
   );
 }

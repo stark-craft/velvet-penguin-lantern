@@ -339,6 +339,55 @@ function BriefingStream({
 </button>
 </aside>;
 }
+function BriefingKeywordRibbon({
+  keywords,
+  activeKeyword,
+  total,
+  onKeyword
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const featured = useMemo(() => {
+    const top = keywords.slice(0, 6);
+    if (activeKeyword === 'all' || top.some(item => item.value === activeKeyword)) return top;
+    const active = keywords.find(item => item.value === activeKeyword);
+    return active ? [...top.slice(0, 5), active] : top;
+  }, [activeKeyword, keywords]);
+  const visibleKeywords = expanded ? keywords : featured;
+  if (!keywords.length) return null;
+  return <section className={expanded ? 'briefing-topic-ribbon is-expanded' : 'briefing-topic-ribbon'} aria-label="Matched keyword highlights">
+    <div className="briefing-topic-intro">
+      <span className="briefing-topic-mark"><Icon name="sparkle" size={15} /></span>
+      <div>
+        <span>Signal topics</span>
+        <small>{activeKeyword === 'all' ? `${keywords.length} matched across ${total} signals` : `Filtered by ${activeKeyword}`}</small>
+      </div>
+    </div>
+    <div className="briefing-topic-list" id="briefing-topic-list" role="group" aria-label="Filter briefing by matched keyword">
+      {visibleKeywords.map(({ value, count: keywordCount }) => <button
+        aria-pressed={activeKeyword === value}
+        className={activeKeyword === value ? 'briefing-topic-chip is-active' : 'briefing-topic-chip'}
+        key={value}
+        onClick={() => onKeyword(activeKeyword === value ? 'all' : value)}
+        title={`Show ${keywordCount} signals matching ${value}`}
+        type="button"
+      >
+        <span>{value}</span><strong>{keywordCount}</strong>
+      </button>)}
+    </div>
+    <button
+      aria-controls="briefing-topic-list"
+      aria-expanded={expanded}
+      aria-label={expanded ? 'Show fewer matched keywords' : `Show all ${keywords.length} matched keywords`}
+      className="briefing-topic-expand"
+      onClick={() => setExpanded(value => !value)}
+      title={expanded ? 'Show top topics' : 'Show every matched keyword'}
+      type="button"
+    >
+      <span>{expanded ? 'Top six' : 'All topics'}</span>
+      <Icon name="chevD" size={15} />
+    </button>
+  </section>;
+}
 function LatestDaySignals({
   articles,
   excludeKeys,
@@ -454,23 +503,6 @@ function SearchLoadedBriefing({
 </select>
 </div>
 <div className="mt-3 flex flex-wrap gap-2">        {[['all', 'All status'], ['selected', 'Selected'], ['unselected', 'Unselected']].map(([value, label]) => <button key={value} className={filters.selected === value ? 'rounded-full border border-sky-300/25 bg-sky-400/12 px-4 py-2 text-sm font-medium text-sky-100' : 'rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-medium text-slate-400'} onClick={() => update('selected', value)} type="button">            {label}          </button>)}      </div>
-      {!!options.keywords.length && <div className="briefing-keyword-filter mt-4">
-        <div className="briefing-keyword-heading">
-          <div>
-            <span>Matched keywords</span>
-            <small>Filter this briefing by the topics that produced these signals</small>
-          </div>
-          {filters.keyword !== 'all' && <button onClick={() => update('keyword', 'all')} type="button">Clear keyword</button>}
-        </div>
-        <div className="briefing-keyword-list" role="group" aria-label="Filter briefing by matched keyword">
-          <button className={filters.keyword === 'all' ? 'briefing-keyword-chip active' : 'briefing-keyword-chip'} onClick={() => update('keyword', 'all')} type="button" aria-pressed={filters.keyword === 'all'}>
-            All keywords <strong>{total}</strong>
-          </button>
-          {options.keywords.map(({ value, count: keywordCount }) => <button className={filters.keyword === value ? 'briefing-keyword-chip active' : 'briefing-keyword-chip'} key={value} onClick={() => update('keyword', filters.keyword === value ? 'all' : value)} type="button" aria-pressed={filters.keyword === value} title={`Show ${keywordCount} signals matching ${value}`}>
-            <span>{value}</span><strong>{keywordCount}</strong>
-          </button>)}
-        </div>
-      </div>}
 </section>;
 }
 function ImageFeedCard({
@@ -921,6 +953,12 @@ export default function FeedScreen() {
 <TopClusterCarousel articles={heroFeed} onOpen={openDossier} onSelect={setPendingSelect} workflowReady={supportingState.workflow === 'ready'} />
 <BriefingStream articles={articles} onOpen={openDossier} navigate={navigate} />
 </div>
+<BriefingKeywordRibbon
+  activeKeyword={filters.keyword}
+  keywords={options.keywords}
+  onKeyword={(keyword) => setFilters(previous => ({ ...previous, keyword }))}
+  total={articles.length}
+/>
 <LatestDaySignals articles={articles} excludeKeys={heroFeedKeys} onOpen={openDossier} />
 </section>
 <SearchLoadedBriefing filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={articles.length} />

@@ -1,3 +1,4 @@
+import datetime
 import json
 import tempfile
 import unittest
@@ -91,7 +92,9 @@ class NotInterestedAtomicityTests(unittest.TestCase):
             briefing.write_text("[]", encoding="utf-8")
             rejected = {
                 **self.article(),
-                "rejected_at": "2026-08-15 12:00:00",
+                # Restore is intentionally limited to a short review window. Keep
+                # this atomicity fixture inside that window on every test date.
+                "rejected_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "rejected_by": "test",
             }
             (root / "not_interested.json").write_text(json.dumps([rejected]), encoding="utf-8")

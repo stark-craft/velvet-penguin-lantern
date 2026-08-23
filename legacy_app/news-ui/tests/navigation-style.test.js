@@ -19,10 +19,10 @@ test("NewsScrapper keeps a reversible classic navbar while defaulting to floatin
   assert.match(navigationCss, /\.premium-command-header\.nav-style-classic/);
 });
 
-test("both floating navigation systems retain named, keyboard-visible controls", () => {
+test("the shared floating shell and research subnavigation retain named, keyboard-visible controls", () => {
   assert.match(navigationCss, /:focus-visible/);
-  assert.match(venture, /aria-label="Venture Lens pages"/);
-  assert.match(venture, /className="vl-return-link"/);
-  assert.match(ventureCss, /\.vl-topbar\.vl-floating-navigation/);
+  assert.match(venture, /aria-label="Research workspaces"/);
+  assert.match(venture, /className="vl-research-shell-head"/);
+  assert.match(ventureCss, /\.vl-research-shell-head/);
   assert.match(ventureCss, /:focus-visible/);
 });

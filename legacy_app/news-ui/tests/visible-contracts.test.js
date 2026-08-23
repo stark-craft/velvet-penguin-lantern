@@ -168,6 +168,21 @@ test('briefing keyword filters count articles and match without case sensitivity
   assert.equal(matchesKeyword(articles[2], 'all'), true);
 });
 
+test('briefing keeps the premium keyword rail above latest-day signals and removes the lower duplicate', () => {
+  const feedSource = readFileSync(new URL('../src/news-scrapper/screens/FeedScreen.jsx', import.meta.url), 'utf8');
+  const heroPosition = feedSource.lastIndexOf('<TopClusterCarousel');
+  const ribbonPosition = feedSource.lastIndexOf('<BriefingKeywordRibbon');
+  const latestPosition = feedSource.lastIndexOf('<LatestDaySignals');
+  const searchPosition = feedSource.lastIndexOf('<SearchLoadedBriefing');
+
+  assert.ok(heroPosition < ribbonPosition);
+  assert.ok(ribbonPosition < latestPosition);
+  assert.ok(latestPosition < searchPosition);
+  assert.match(feedSource, /aria-expanded=\{expanded\}/);
+  assert.match(feedSource, /keywords\.slice\(0, 6\)/);
+  assert.doesNotMatch(feedSource, /briefing-keyword-filter/);
+});
+
 test('the unified Briefing exposes an explicit technology and broadcast scope filter', () => {
   const feedSource = readFileSync(new URL('../src/news-scrapper/screens/FeedScreen.jsx', import.meta.url), 'utf8');
   assert.match(feedSource, /scope:\s*'all'/);
@@ -247,6 +262,13 @@ test('large briefing archives render progressively instead of mounting every car
   assert.match(historySource, /const ARCHIVE_PAGE_SIZE = 48/);
   assert.match(historySource, /filteredArticles\.slice\(0, renderLimit\)/);
   assert.match(historySource, /Show next/);
+});
+
+test('large archive ranges stay inside one shrinkable page track', () => {
+  const archiveStyles = readFileSync(new URL('../src/news-scrapper/screens/history-redesign.css', import.meta.url), 'utf8');
+  assert.match(archiveStyles, /\.archive-v2-page\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/);
+  assert.match(archiveStyles, /\.archive-v2-page\s*>\s*\*\s*\{[\s\S]*?min-width:\s*0/);
+  assert.match(archiveStyles, /\.archive-v2-run-track\s*\{[\s\S]*?max-width:\s*100%/);
 });
 
 test('Korean translation is progressive, private, retryable, and always reversible', () => {

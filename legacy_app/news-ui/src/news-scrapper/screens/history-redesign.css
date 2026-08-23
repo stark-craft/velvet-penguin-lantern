@@ -6,11 +6,21 @@
   --archive-paper-soft: color-mix(in srgb, var(--surface-soft) 88%, transparent);
   --archive-rule: color-mix(in srgb, var(--line-strong) 55%, var(--line));
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   width: min(100%, 1540px);
   margin: 0 auto;
   padding: clamp(1.25rem, 2.6vw, 2.75rem) clamp(1rem, 2.6vw, 2.75rem) 7rem;
   gap: clamp(1.25rem, 2.2vw, 2rem);
   color: var(--text);
+}
+
+/* Keep large retained ranges inside the archive canvas. The edition strip is
+   the only surface that may scroll horizontally; it must never enlarge the
+   implicit page grid track and pull every sibling beyond the viewport. */
+.archive-v2-page > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .archive-v2-page *,
@@ -630,6 +640,9 @@ html[data-theme="light"] .archive-v2-import-one {
 
 .archive-v2-run-track {
   display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   grid-auto-columns: minmax(180px, 0.25fr);
   grid-auto-flow: column;
   gap: 0.7rem;

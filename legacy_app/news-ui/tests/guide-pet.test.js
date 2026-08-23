@@ -75,10 +75,11 @@ test('NewsScrapper Settings exposes accessible guide controls and opens For You'
   assert.match(topBar, /navigate\("\/for-you"\)/);
 });
 
-test('Venture Lens exposes the guide and its NewsScrapper link opens For You', () => {
-  assert.match(venture, /className="vl-nav"/);
-  assert.match(venture, /className=\{guideEnabled \? "vl-guide-trigger active" : "vl-guide-trigger"\}/);
-  assert.match(venture, /href="\/for-you"/);
+test('Venture Lens stays inside the shared shell where Settings exposes the guide', () => {
+  assert.match(venture, /aria-label="Research workspaces"/);
+  assert.match(venture, /navigate\("\/research"\)/);
+  assert.match(topBar, /requestGuide\(\)/);
+  assert.match(topBar, /navigate\("\/for-you"\)/);
 });
 
 test('Scout remains original code-native artwork and never captures the full page', () => {

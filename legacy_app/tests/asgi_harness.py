@@ -13,9 +13,12 @@ class AsgiResponse:
         return json.loads(self.content or b"{}")
 
 
-def request(app, method, path, *, headers=None, json_body=None, client_ip="10.0.0.25"):
+def request(app, method, path, *, headers=None, json_body=None, body=None, client_ip="10.0.0.25"):
     async def run():
-        body = b"" if json_body is None else json.dumps(json_body).encode("utf-8")
+        payload = b"" if json_body is None else json.dumps(json_body).encode("utf-8")
+        if body is not None:
+            # Raw request bodies (e.g. multipart uploads) take precedence.
+            payload = body
         raw_headers = {
             str(key).lower(): str(value)
             for key, value in (headers or {}).items()
@@ -29,7 +32,7 @@ def request(app, method, path, *, headers=None, json_body=None, client_ip="10.0.
             nonlocal received
             if not received:
                 received = True
-                return {"type": "http.request", "body": body, "more_body": False}
+                return {"type": "http.request", "body": payload, "more_body": False}
             await asyncio.sleep(0)
             return {"type": "http.disconnect"}
 

@@ -4744,6 +4744,32 @@ def _article_source_names(article: dict):
     return list(dict.fromkeys(names))
 
 
+@app.get("/internal-content/samsung-feed")
+def get_samsung_internal_feed(request: Request, limit: int = Query(100, ge=1, le=100)):
+    """Return Samsung channels projected from the one retained corpus.
+
+    This endpoint is read-only.  It never starts Scrapy, enrichment, or a
+    scheduler run: it scans the already-generated briefing history and applies
+    the explicit source contracts used by Samsung Internal.
+    """
+
+    from news_scrapper.samsung_internal_feed import build_samsung_internal_feed
+
+    profile = get_profile_for_request(request)
+    archive_files = [
+        file_path
+        for file_path in get_profile_history_files(profile)
+        if os.path.basename(file_path).startswith("briefing_")
+    ]
+    payload = build_samsung_internal_feed(archive_files, limit=limit)
+    for channel in ("global", "local", "sampark"):
+        visible = filter_viewer_hidden(payload[channel], request, profile)
+        payload[channel] = apply_learned_regions(visible, profile)
+        payload["counts"][channel] = len(payload[channel])
+    payload["profile"] = public_profile_name(profile)
+    return payload
+
+
 def _archive_search_terms(query: str):
     """Produce useful OR-search terms from natural text or comma-separated input."""
 

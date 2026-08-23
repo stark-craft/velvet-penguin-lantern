@@ -26,6 +26,22 @@ async function jsonFetch(url, opts = {}) {
       ...(opts.headers || {}),
     },
   });
+  return readApiResponse(res);
+}
+
+// Same-origin multipart upload. The browser supplies the Content-Type with its
+// form boundary; adding one manually would break the request.
+async function uploadFetch(url, formData, method = 'POST') {
+  const profileOverride = selectedProfileOverride();
+  const res = await fetch(BASE + url, {
+    method,
+    headers: profileOverride ? { 'X-Sense-Profile': profileOverride } : undefined,
+    body: formData,
+  });
+  return readApiResponse(res);
+}
+
+async function readApiResponse(res) {
   const contentType = res.headers.get('content-type') || '';
   const body = contentType.includes('application/json')
     ? await res.json().catch(() => ({}))
@@ -64,6 +80,8 @@ function normalizeKeywordsForApi(keywords) {
 // ---------- Briefing / feed ----------
 export const getLatestBriefing = () => jsonFetch('/latest-briefing');
 export const getSharedBriefing = () => jsonFetch('/briefing/shared/latest');
+export const getSamsungInternalFeed = (limit = 100) =>
+  jsonFetch(`/internal-content/samsung-feed?limit=${Math.max(1, Math.min(Number(limit) || 100, 100))}`);
 export const getBriefingMeta   = () => jsonFetch('/briefing/meta');
 export const removeFromBriefing  = (title)   => jsonFetch('/briefing/remove',  { method:'POST', body: JSON.stringify({ title }) });
 export const restoreToBriefing   = (article) => jsonFetch('/briefing/restore', { method:'POST', body: JSON.stringify({ article }) });
@@ -287,6 +305,43 @@ function gatekeeperHeaders(key) {
   return normalizedKey ? { 'X-Gatekeeper-Key': normalizedKey } : {};
 }
 
+// ---------- Internal contributions editorial review ----------
+// The editor session lives in an HttpOnly cookie set by /review/unlock; page
+// JavaScript never stores or sees the key.
+export const getInternalReviewQueue = () => jsonFetch('/internal-content/review');
+
+export const unlockInternalReview = (key) =>
+  jsonFetch('/internal-content/review/unlock', {
+    method: 'POST',
+    body: JSON.stringify({ key: String(key || '') }),
+  });
+
+export const lockInternalReview = () =>
+  jsonFetch('/internal-content/review/lock', { method: 'POST' });
+
+export const publishInternalContent = (recordId) =>
+  jsonFetch(`/internal-content/${recordId}/publish`, { method: 'POST' });
+
+export const requestInternalContentChanges = (recordId, note) =>
+  jsonFetch(`/internal-content/${recordId}/changes`, {
+    method: 'POST',
+    body: JSON.stringify({ note: String(note || '') }),
+  });
+
+export const rejectInternalContent = (recordId, note = '') =>
+  jsonFetch(`/internal-content/${recordId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ note: String(note || '') }),
+  });
+
+export const getInternalNotifications = () => jsonFetch('/internal-content/notifications');
+
+export const markInternalNotificationsRead = (ids) =>
+  jsonFetch('/internal-content/notifications/read', {
+    method: 'POST',
+    body: JSON.stringify({ ids: Array.isArray(ids) ? ids : [] }),
+  });
+
 export const getGatekeeperAccess = () => jsonFetch('/gatekeeper/access');
 
 export function getGatekeeperDropped({
@@ -451,3 +506,104 @@ async function exportBinary(path, items, filename) {
 export const exportPpt   = (items, filename='digest.pptx') => exportBinary('/export-ppt',   items, filename);
 export const exportExcel = (items, filename='digest.xlsx') => exportBinary('/export-excel', items, filename);
 export const exportWord  = (items, filename='digest.docx') => exportBinary('/export-word',  items, filename);
+
+// ==========================================
+// --- INTERNAL CONTRIBUTIONS (Contribute) ---
+// ==========================================
+// The backend owns parsing, cover normalization, and persistence. These
+// wrappers stay same-origin in dev (Vite proxy), portable builds, and Linux.
+
+const toBackendDraftFields = (draft) => ({
+  title: draft.title || '',
+  summary: draft.summary || '',
+  body: draft.body || '',
+  category: draft.category || '',
+  team: draft.team || '',
+  author: draft.author || '',
+  owner_name: draft.ownerName || localStorage.getItem('news-viewer-name') || '',
+  content_type: draft.contentType || '',
+});
+
+const fromBackendRecord = (record) => ({
+  id: record.id,
+  contentType: ['document_import', 'leadership', 'announcement'].includes(record.content_type)
+    ? record.content_type
+    : 'story',
+  title: record.title || '',
+  summary: record.summary || '',
+  body: record.body || '',
+  category: record.category || '',
+  team: record.team || '',
+  author: record.author || '',
+  ownerName: record.owner_name || '',
+  cover: record.cover
+    ? {
+        name: record.cover.name || '',
+        type: record.cover.type || '',
+        size: Number(record.cover.size) || 0,
+        width: Number(record.cover.width) || 0,
+        height: Number(record.cover.height) || 0,
+        focalX: Number.isFinite(Number(record.cover.focal_x)) ? Number(record.cover.focal_x) : 0.5,
+        focalY: Number.isFinite(Number(record.cover.focal_y)) ? Number(record.cover.focal_y) : 0.5,
+        // Cache-bust on every update so replaced covers render immediately.
+        url: `/internal-content/${record.id}/cover?v=${encodeURIComponent(record.updated_at || '')}`,
+      }
+    : null,
+  sourceDocument: record.source_document
+    ? {
+        name: record.source_document.name || '',
+        type: record.source_document.type || '',
+        size: Number(record.source_document.size) || 0,
+        pageCount: record.source_document.page_count ?? null,
+        extractedCharacters: Number(record.source_document.extracted_characters) || 0,
+        url: `/internal-content/${record.id}/document`,
+      }
+    : null,
+  status: record.status || 'draft',
+  createdAt: record.created_at || '',
+  updatedAt: record.updated_at || '',
+  submittedAt: record.submitted_at || null,
+  publishedAt: record.published_at || null,
+});
+
+export const getMyContributions = async () => {
+  const response = await jsonFetch('/internal-content/mine');
+  return (response?.items || []).map(fromBackendRecord);
+};
+
+// Future Samsung Internal contract: only records already marked published.
+export const getPublishedInternalContent = async () => {
+  const response = await jsonFetch('/internal-content/published');
+  return (response?.items || []).map(fromBackendRecord);
+};
+
+export const importContributionDocument = async (file, ownerName = '', contentType = '') => {
+  const form = new FormData();
+  form.append('document', file);
+  if (ownerName) form.append('owner_name', ownerName);
+  if (contentType) form.append('content_type', contentType);
+  return fromBackendRecord(await uploadFetch('/internal-content/import', form));
+};
+
+export const createContributionDraft = async (fields) =>
+  fromBackendRecord(
+    await jsonFetch('/internal-content/drafts', { method: 'POST', body: JSON.stringify(toBackendDraftFields(fields)) }),
+  );
+
+export const updateContributionDraft = async (id, fields) =>
+  fromBackendRecord(
+    await jsonFetch(`/internal-content/${id}`, { method: 'PUT', body: JSON.stringify(toBackendDraftFields(fields)) }),
+  );
+
+export const uploadContributionCover = async (id, file, focalX = 0.5, focalY = 0.5) => {
+  const form = new FormData();
+  form.append('cover', file);
+  form.append('focal_x', String(focalX));
+  form.append('focal_y', String(focalY));
+  return fromBackendRecord(await uploadFetch(`/internal-content/${id}/cover`, form));
+};
+
+export const deleteContributionDraft = (id) => jsonFetch(`/internal-content/${id}`, { method: 'DELETE' });
+
+export const submitContributionDraft = async (id) =>
+  fromBackendRecord(await jsonFetch(`/internal-content/${id}/submit`, { method: 'POST' }));

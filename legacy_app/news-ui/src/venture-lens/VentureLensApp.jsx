@@ -10,7 +10,6 @@ import {
   GitCompareArrows,
   GitFork,
   Home,
-  Languages,
   Network,
   Newspaper,
   Radar,
@@ -21,8 +20,6 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { useLanguage } from "../news-scrapper/translation/LanguageProvider.jsx";
-import { useGuidePet } from "../shared/guide/GuidePetContext.jsx";
 import {
   compareVentureSignals,
   getPaperDossier,
@@ -146,7 +143,7 @@ function DossierModal({ dossier, loading, watched, onClose, onWatch, onOpenRelat
     if (!open) return undefined;
     const previousFocus = document.activeElement;
     const priorOverflow = document.body.style.overflow;
-    const background = document.querySelectorAll(".venture-lens > .vl-topbar, .venture-lens > .vl-page, .venture-lens > .vl-footer");
+    const background = document.querySelectorAll(".venture-lens > .vl-research-shell-head, .venture-lens > .vl-page, .venture-lens > .vl-footer");
     background.forEach((node) => { node.setAttribute("inert", ""); node.setAttribute("aria-hidden", "true"); });
     document.body.style.overflow = "hidden";
     const focusTimer = window.setTimeout(() => dialogRef.current?.querySelector("button, a[href]")?.focus(), 0);
@@ -197,8 +194,6 @@ function RelationshipGraph({ graph, onOpen }) {
 export default function VentureLensApp() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { language, toggleLanguage, translationState } = useLanguage();
-  const { enabled: guideEnabled, requestGuide } = useGuidePet();
   const page = currentPage(location.pathname);
   const [payload, setPayload] = useState(null);
   const [intelligence, setIntelligence] = useState(null);
@@ -299,64 +294,15 @@ export default function VentureLensApp() {
   return (
     <div className="venture-lens">
       <div className="vl-orb vl-orb-one" aria-hidden="true" /><div className="vl-orb vl-orb-two" aria-hidden="true" />
-      <header className="vl-topbar vl-floating-navigation">
-        <button
-          aria-label="Open Venture Lens overview"
-          className="vl-brand"
-          onClick={() => navigate("/venturelens")}
-          type="button"
-        >
-          <span className="vl-brand-mark" aria-hidden="true"><i /><i /><i /></span>
-          <span><strong>Venture Lens</strong><small>Sense.AI intelligence</small></span>
-        </button>
-
-        <nav aria-label="Venture Lens pages" className="vl-nav">
-          {pages.map(([id, label, PageIcon]) => (
-            <button
-              aria-current={page === id ? "page" : undefined}
-              aria-label={label}
-              className={page === id ? "active" : ""}
-              key={id}
-              onClick={() => navigate(routeFor(id))}
-              title={label}
-              type="button"
-            >
-              <PageIcon aria-hidden="true" size={15} />
-              <span>{label}</span>
-            </button>
-          ))}
+      <section className="vl-research-shell-head">
+        <div className="vl-research-heading">
+          <button aria-label="Return to Research landing" onClick={() => navigate("/research")} type="button"><Radar size={20} /></button>
+          <div><span>Sense.AI Research</span><strong>Venture Lens</strong><small>Evidence-led technology decision intelligence</small></div>
+        </div>
+        <nav aria-label="Research workspaces" className="vl-nav">
+          {pages.map(([id, label, PageIcon]) => <button aria-current={page === id ? "page" : undefined} className={page === id ? "active" : ""} key={id} onClick={() => navigate(routeFor(id))} title={label} type="button"><PageIcon aria-hidden="true" size={15} /><span>{label}</span></button>)}
         </nav>
-
         <div className="vl-top-actions">
-          <a className="vl-return-link" href="/for-you" title="Open NewsScrapper">
-            <Newspaper aria-hidden="true" size={15} />
-            <span>NewsScrapper</span>
-          </a>
-          <button
-            aria-busy={translationState.pending > 0}
-            aria-label={language === "ko" ? "Switch to English" : "한국어로 전환"}
-            className="vl-language-toggle"
-            data-no-translate
-            onClick={() => {
-              if (language !== "ko") translationState?.prepareBrowser?.();
-              toggleLanguage();
-            }}
-            title={translationState.error || (language === "ko" ? "Switch to English" : "한국어로 전환")}
-            type="button"
-          >
-            <Languages aria-hidden="true" size={15} />
-            <span>{translationState.pending > 0 ? (language === "ko" ? "번역 중" : "Translating") : language === "ko" ? "English" : "한국어"}</span>
-          </button>
-          <button
-            aria-pressed={guideEnabled}
-            className={guideEnabled ? "vl-guide-trigger active" : "vl-guide-trigger"}
-            onClick={requestGuide}
-            title="Show the optional Sense.ai guide"
-            type="button"
-          >
-            <Sparkles aria-hidden="true" size={15} />
-            <span>Guide</span>
-          </button>
           <div className="vl-notification-wrap" ref={notificationRef}>
             <button
               aria-controls="venture-notifications"
@@ -409,7 +355,7 @@ export default function VentureLensApp() {
             <span>{syncing ? "Syncing" : "Sync live"}</span>
           </button>
         </div>
-      </header>
+      </section>
 
       <main className={`vl-page vl-page-${page}`}>
         {initialLoading && <WorkspaceLoading />}

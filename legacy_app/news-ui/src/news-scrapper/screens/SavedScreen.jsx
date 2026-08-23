@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import ArticleCard from '../components/ArticleCard.jsx';
 import Icon from '../components/Icon.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
@@ -10,6 +10,7 @@ import {
   getViewerPersonalization,
   getViewerPreferences,
   getViewerBriefings,
+  getViewerProfile,
   getViewerSaved,
   removeSavedArticle,
   retryViewerBriefing,
@@ -21,10 +22,99 @@ import {
 import { normalizeArticle, normalizeList } from '../utils/normalize.js';
 import { articleKey } from '../utils/intelligence.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
+import { CONTRIBUTION_STATUS } from '../internal/contributionModel.js';
+import ContributionWorkspace from '../components/personal-desk/ContributionWorkspace.jsx';
+import useContributions from '../components/personal-desk/useContributions.js';
 import '../styles/personal-desk.css';
 import '../styles/personal-desk-redesign.css';
+import '../styles/desk-study.css';
+import '../styles/contribution-workspace.css';
 
 const terminalStatuses = new Set(['complete', 'failed']);
+
+// Ordered desk workspaces. Saved Signals leads; Contribute sits between it and
+// My Briefing. Keyboard arrows cycle through this array in order.
+const DESK_TABS = [
+  { id: 'saved', label: 'Saved Signals', icon: 'bookmark' },
+  { id: 'contribute', label: 'Contribute', icon: 'note' },
+  { id: 'briefings', label: 'My Briefing', icon: 'sparkle' },
+];
+const DESK_TAB_IDS = DESK_TABS.map((entry) => entry.id);
+const DEFAULT_DESK_TAB = DESK_TAB_IDS[0];
+
+function initialDeskTab() {
+  if (typeof window === 'undefined') return DEFAULT_DESK_TAB;
+  const stored = window.sessionStorage.getItem('personal-desk-tab');
+  return DESK_TAB_IDS.includes(stored) ? stored : DEFAULT_DESK_TAB;
+}
+
+// Deep-linkable desk addresses: /saved/contribute, /saved/briefings and
+// /saved/leadership (which opens the contribute tab with the leadership
+// composer already open). Plain /saved shows the saved signals ledger.
+function tabFromPathname(pathname) {
+  if (pathname === '/saved/contribute' || pathname === '/saved/leadership') return 'contribute';
+  if (pathname === '/saved/briefings') return 'briefings';
+  return '';
+}
+
+function initialAuthorSuggestion() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.localStorage.getItem('news-viewer-name') || '';
+  } catch {
+    return '';
+  }
+}
+
+function deskGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function deskDateLabel(date = new Date()) {
+  if (typeof date.toLocaleDateString !== 'function') return '';
+  try {
+    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  } catch {
+    return '';
+  }
+}
+
+// The greeting types itself in, like someone writing it for you. Screen
+// readers receive the full sentence immediately; reduced motion skips straight
+// to the finished line.
+function TypeGreeting({ text }) {
+  const reduceMotion = useMemo(
+    () => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches),
+    [],
+  );
+  const [visible, setVisible] = useState(reduceMotion ? text.length : 0);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      setVisible(text.length);
+      return undefined;
+    }
+    setVisible(0);
+    let index = 0;
+    const timer = window.setInterval(() => {
+      index += 1;
+      setVisible(index);
+      if (index >= text.length) window.clearInterval(timer);
+    }, 34);
+    return () => window.clearInterval(timer);
+  }, [text, reduceMotion]);
+
+  const done = visible >= text.length;
+  return (
+    <h1 aria-label={text} className="desk-greeting">
+      <span aria-hidden="true">{text.slice(0, visible)}</span>
+      <span aria-hidden="true" className={done ? 'desk-caret is-done' : 'desk-caret'} />
+    </h1>
+  );
+}
 
 function jobLabel(job) {
   const labels = {
@@ -80,7 +170,9 @@ function BriefingJob({ job, index, onOpen, onRetry, retrying = false }) {
 
 export default function SavedScreen() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState(() => (typeof window === 'undefined' ? 'briefings' : window.sessionStorage.getItem('personal-desk-tab') || 'briefings'));
+  const location = useLocation();
+  const [tab, setTab] = useState(() => tabFromPathname(location.pathname) || initialDeskTab());
+  const [autoStart, setAutoStart] = useState(() => (location.pathname === '/saved/leadership' ? 'leadership' : ''));
   const [savedItems, setSavedItems] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [openArticle, setOpenArticle] = useState(null);
@@ -98,6 +190,8 @@ export default function SavedScreen() {
   const [retryingJobs, setRetryingJobs] = useState(new Set());
   const [resetting, setResetting] = useState(false);
   const [pauseBusy, setPauseBusy] = useState(false);
+  const [authorSuggestion] = useState(initialAuthorSuggestion);
+  const [viewerName, setViewerName] = useState(initialAuthorSuggestion);
   const loadInFlight = useRef(false);
   const refreshPending = useRef(false);
   const mounted = useRef(true);
@@ -113,12 +207,14 @@ export default function SavedScreen() {
       .filter(Boolean),
     [jobs],
   );
+  const { contributions } = useContributions();
+  const contributionDrafts = contributions.filter((record) => record.status !== CONTRIBUTION_STATUS.SUBMITTED).length;
+  const contributionSubmitted = contributions.filter((record) => record.status === CONTRIBUTION_STATUS.SUBMITTED).length;
   const savedKeys = useMemo(
     () => new Set(savedItems.map(articleKey)),
     [savedItems],
   );
   const activeJobs = jobs.some((job) => !terminalStatuses.has(job.status));
-  const activeJobCount = jobs.filter((job) => !terminalStatuses.has(job.status)).length;
   const finishedJobs = jobs.filter((job) => terminalStatuses.has(job.status)).length;
   const exportItems = briefingItems.filter((item) => selectedKeys.has(articleKey(item)));
   const enteredUrlCount = useMemo(
@@ -126,8 +222,82 @@ export default function SavedScreen() {
     [urlText],
   );
 
+  useEffect(() => {
+    let alive = true;
+    getViewerProfile()
+      .then((profile) => {
+        if (!alive) return;
+        const name = String(profile?.display_name || '').trim();
+        if (name) setViewerName(name);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // One honest sentence about the desk, composed from live data. Ordered by
+  // urgency: work in progress beats finished work beats quiet filing.
+  const deskStatusLine = useMemo(() => {
+    if (loading) return 'Opening your desk…';
+    if (error) return "The desk couldn't reach everything just now.";
+    const preparing = jobs.filter((job) => !terminalStatuses.has(job.status)).length;
+    const ready = briefingItems.length;
+    const saved = savedItems.length;
+    if (preparing > 0) {
+      return preparing === 1
+        ? 'One briefing is still preparing — it will be waiting here when you return.'
+        : `${preparing} briefings are still preparing — they will be waiting here when you return.`;
+    }
+    if (ready > 0) {
+      return ready === 1
+        ? 'Your private briefing is ready below.'
+        : `${ready} finished briefings are filed below.`;
+    }
+    if (saved > 0) {
+      return `${saved} signal${saved === 1 ? '' : 's'} filed. Everything else is quiet.`;
+    }
+    return 'Everything is filed. Nothing needs you right now.';
+  }, [loading, error, jobs, briefingItems, savedItems]);
+
   useEffect(() => { window.sessionStorage.setItem('personal-desk-tab', tab); }, [tab]);
   useEffect(() => { window.sessionStorage.setItem('personal-desk-url-draft', urlText); }, [urlText]);
+
+  // React Router keeps this screen mounted while moving between /saved/*
+  // addresses. Mirror the address into screen state so client-side deep links
+  // behave the same way as a fresh page load.
+  useEffect(() => {
+    const routedTab = tabFromPathname(location.pathname);
+    if (routedTab) setTab(routedTab);
+    else if (location.pathname === '/saved') {
+      setTab((current) => (DESK_TAB_IDS.includes(current) ? current : initialDeskTab()));
+    }
+    setAutoStart(location.pathname === '/saved/leadership' ? 'leadership' : '');
+  }, [location.pathname]);
+
+  // The URL mirrors the desk tab so every desk surface has a stable,
+  // professional address. /saved/leadership additionally opens the leadership
+  // composer; once consumed, it degrades to the plain contribute address.
+  const deskPathFor = (nextTab, compose = '') => {
+    if (compose === 'leadership') return '/saved/leadership';
+    if (nextTab === 'contribute') return '/saved/contribute';
+    if (nextTab === 'briefings') return '/saved/briefings';
+    return '/saved';
+  };
+  const goToTab = (nextTab) => {
+    setAutoStart('');
+    setTab(nextTab);
+    navigate(deskPathFor(nextTab), { replace: location.pathname !== '/' && location.pathname.startsWith('/saved') });
+  };
+
+  const cycleDeskTab = (direction) => {
+    const index = Math.max(0, DESK_TAB_IDS.indexOf(tab));
+    goToTab(DESK_TAB_IDS[(index + direction + DESK_TAB_IDS.length) % DESK_TAB_IDS.length]);
+  };
+  const deskTabCount = (id) => {
+    if (id === 'saved') return savedItems.length;
+    if (id === 'contribute') return contributions.length;
+    if (id === 'briefings') return briefingItems.length;
+    return 0;
+  };
 
   const loadAll = async ({ quiet = false } = {}) => {
     if (loadInFlight.current) {
@@ -368,52 +538,79 @@ export default function SavedScreen() {
 
   return (
     <div className="page-stack personal-desk">
-      <section className="page-hero personal-desk-hero">
-        <div className="personal-desk-hero-copy">
-          <div className="personal-desk-orbit" aria-hidden="true"><Icon name="sparkle" size={22} /></div>
-          <div>
-            <div className="eyebrow">Private intelligence workspace</div>
-            <h1>Your desk, shaped by you.</h1>
-            <p>Bring your own links, preserve the signals worth returning to, and move only your strongest intelligence into the shared workflow.</p>
-            <div className="personal-desk-trust-row">
-              <span><Icon name="shield" size={13} /> Private by default</span>
-              <span><Icon name="sparkle" size={13} /> AI structured</span>
-              <span><Icon name="check" size={13} /> Shared only by you</span>
-            </div>
+      <section className="desk-hero">
+        <div className="desk-hero-copy">
+          <div className="desk-kicker-row">
+            <span className="desk-kicker">Private intelligence workspace</span>
+            <span className="desk-kicker-date">{deskDateLabel()}</span>
+          </div>
+          <TypeGreeting text={viewerName ? `${deskGreeting()}, ${viewerName}.` : `${deskGreeting()}.`} />
+          <p className="desk-status" aria-live="polite">{deskStatusLine}</p>
+          <div className="desk-trust-row">
+            <span><Icon name="shield" size={13} /> Private by default</span>
+            <span><Icon name="sparkle" size={13} /> AI structured</span>
+            <span><Icon name="check" size={13} /> Shared only by you</span>
           </div>
         </div>
-        <div className="personal-desk-control-deck">
-          <div className="personal-desk-snapshot" aria-label="Personal desk summary">
-            <span><strong>{briefingItems.length}</strong><small>briefings</small></span>
-            <span><strong>{savedItems.length}</strong><small>saved</small></span>
-            <span><strong>{activeJobCount}</strong><small>preparing</small></span>
-          </div>
-          <div className="personal-desk-tabs" role="tablist" aria-label="Personal desk sections" onKeyDown={(event) => { if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); setTab((current) => current === 'briefings' ? 'saved' : 'briefings'); }}>
-            <button aria-controls="personal-desk-panel" aria-selected={tab === 'briefings'} className={tab === 'briefings' ? 'active' : ''} id="personal-desk-briefings-tab" onClick={() => setTab('briefings')} role="tab" tabIndex={tab === 'briefings' ? 0 : -1} type="button">
-              <Icon name="sparkle" size={15} /> My Briefing <span>{briefingItems.length}</span>
-            </button>
-            <button aria-controls="personal-desk-panel" aria-selected={tab === 'saved'} className={tab === 'saved' ? 'active' : ''} id="personal-desk-saved-tab" onClick={() => setTab('saved')} role="tab" tabIndex={tab === 'saved' ? 0 : -1} type="button">
-              <Icon name="bookmark" size={15} /> Saved Signals <span>{savedItems.length}</span>
-            </button>
-          </div>
+        <div className="personal-desk-snapshot" aria-label="Personal desk summary">
+          <button onClick={() => goToTab('saved')} type="button">
+            <strong className={!loading && !savedItems.length ? 'is-zero' : ''}>{loading ? '—' : savedItems.length}</strong>
+            <small>saved</small>
+          </button>
+          <button onClick={() => goToTab('contribute')} type="button">
+            <strong className={!loading && !contributionDrafts ? 'is-zero' : ''}>{loading ? '—' : contributionDrafts}</strong>
+            <small>drafts</small>
+          </button>
+          <button onClick={() => goToTab('contribute')} type="button">
+            <strong className={!loading && !contributionSubmitted ? 'is-zero' : ''}>{loading ? '—' : contributionSubmitted}</strong>
+            <small>submitted</small>
+          </button>
         </div>
       </section>
 
-      {recommendationPreferences && (
-        <section className="personal-learning-strip" aria-label="For You controls">
-          <div><Icon name="sparkle" size={16} /><span><strong>Your followed stories help tune For You</strong><small>Preferences change private order only; the shared Briefing and Bouncer remain unchanged.</small></span></div>
-          <div className="personal-section-actions">
-            <button className="btn-dark-secondary" onClick={() => navigate('/for-you')} type="button">Tune For You</button>
-            <button aria-busy={pauseBusy} className="btn-dark-secondary" disabled={pauseBusy} onClick={togglePersonalization} type="button">{pauseBusy ? 'Updating…' : recommendationPreferences.personalization_paused ? 'Resume personalization' : 'Pause personalization'}</button>
+      <div className="desk-rule">
+        <div
+          className="desk-tabs"
+          role="tablist"
+          aria-label="Personal desk sections"
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft') { event.preventDefault(); cycleDeskTab(-1); }
+            if (event.key === 'ArrowRight') { event.preventDefault(); cycleDeskTab(1); }
+          }}
+        >
+          {DESK_TABS.map((entry) => (
+            <button
+              aria-controls="personal-desk-panel"
+              aria-selected={tab === entry.id}
+              className={tab === entry.id ? 'active' : ''}
+              id={`personal-desk-${entry.id}-tab`}
+              key={entry.id}
+              onClick={() => goToTab(entry.id)}
+              role="tab"
+              tabIndex={tab === entry.id ? 0 : -1}
+              type="button"
+            >
+              <Icon name={entry.icon} size={15} /> {entry.label} <span className="desk-tab-count">{deskTabCount(entry.id)}</span>
+            </button>
+          ))}
+        </div>
+        {recommendationPreferences && (
+          <div className="desk-fineprint" aria-label="For You controls">
+            <span>Saved stories tune For You privately.</span>
+            <button onClick={() => navigate('/for-you')} type="button">Tune For You</button>
+            <button aria-busy={pauseBusy} disabled={pauseBusy} onClick={togglePersonalization} type="button">
+              {pauseBusy ? 'Updating…' : recommendationPreferences.personalization_paused ? 'Resume personalization' : 'Pause personalization'}
+            </button>
           </div>
-        </section>
-      )}
+        )}
+      </div>
 
       {error && <div className="error-banner" role="alert"><span>{error}</span><button className="ml-3 underline" disabled={loading} onClick={() => loadAll()} type="button">Retry desk data</button></div>}
       {notice && <div className="personal-notice" role="status">{notice}</div>}
 
-      <div aria-labelledby={tab === 'briefings' ? 'personal-desk-briefings-tab' : 'personal-desk-saved-tab'} id="personal-desk-panel" role="tabpanel">
-      {tab === 'briefings' ? (
+      <div aria-labelledby={`personal-desk-${tab}-tab`} id="personal-desk-panel" role="tabpanel">
+      {tab === 'contribute' && <ContributionWorkspace authorSuggestion={authorSuggestion} autoStart={autoStart} />}
+      {tab === 'briefings' && (
         <>
           <section className="personal-url-studio">
             <div className="personal-url-copy">
@@ -502,9 +699,11 @@ export default function SavedScreen() {
             </div>
           )}
         </>
-      ) : loading ? (
-        <div className="workflow-empty"><Icon name="refresh" size={24} /><h2>Loading Saved Signals</h2></div>
-      ) : savedItems.length === 0 ? (
+      )}
+      {tab === 'saved' && (
+        loading ? (
+          <div className="workflow-empty"><Icon name="refresh" size={24} /><h2>Loading Saved Signals</h2></div>
+        ) : savedItems.length === 0 ? (
         <>
           <div className="personal-learning-strip">
             <div><Icon name="sparkle" size={16} /><span><strong>Private preference learning</strong><small>{personalization?.event_count || 0} recent interaction signals · 30-day window</small></span></div>
@@ -529,6 +728,7 @@ export default function SavedScreen() {
             ))}
           </div>
         </>
+        )
       )}
       </div>
 

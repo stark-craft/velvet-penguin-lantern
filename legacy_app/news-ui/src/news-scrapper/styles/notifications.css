@@ -1,0 +1,139 @@
+/* Private review notifications — bell trigger and panel.
+   Styling mirrors the premium settings control so it reads as native
+   header furniture in both themes. */
+
+.notification-bell-control {
+  position: relative;
+}
+
+.notification-bell-trigger {
+  position: relative;
+}
+
+.notification-bell-badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: var(--accent-ink);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.notification-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 40px));
+  max-height: 420px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow-lg);
+}
+
+.notification-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text);
+}
+
+.notification-panel-head button {
+  appearance: none;
+  padding: 3px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.notification-panel-head button:hover { color: var(--accent); }
+
+.notification-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.notification-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-list button {
+  appearance: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 11px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.notification-list button:hover { background: var(--accent-faint); }
+
+.notification-list button.is-unread .notification-copy strong { color: var(--text); }
+
+.notification-kind {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.notification-kind.is-published { background: var(--success-soft, rgba(83, 167, 140, 0.13)); color: var(--success, #78bea8); }
+.notification-kind.is-rejected { background: var(--danger-soft); color: var(--danger); }
+
+.notification-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.notification-copy strong {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-copy small { color: var(--text-faint); font-size: 0.75rem; line-height: 1.45; }
+
+.notification-dot {
+  flex: none;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}

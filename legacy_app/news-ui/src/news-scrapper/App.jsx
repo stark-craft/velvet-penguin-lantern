@@ -21,6 +21,10 @@ import AnalyticsScreen from "./screens/AnalyticsScreen.jsx";
 import GatekeeperReviewScreen from "./screens/GatekeeperReviewScreen.jsx";
 import SavedScreen from "./screens/SavedScreen.jsx";
 import ForYouScreen from "./for-you/ForYouScreen.jsx";
+import ResearchScreen from "./screens/ResearchScreen.jsx";
+import SamsungInternalScreen from "./screens/SamsungInternalScreen.jsx";
+import InternalPublishingScreen from "./screens/InternalPublishingScreen.jsx";
+import VentureLensApp from "../venture-lens/VentureLensApp.jsx";
 import UserProfileModal from "./components/UserProfileModal.jsx";
 import Icon from "./components/Icon.jsx";
 import { getRecommendationStatus, getViewerProfile } from "./api.js";
@@ -382,7 +386,11 @@ export default function App() {
             />{" "}
             <Route path="/selected" element={<SelectedScreen />} />{" "}
             <Route path="/approved" element={<ApprovedScreen />} />{" "}
-            <Route path="/saved" element={<SavedScreen />} />{" "}
+            <Route path="/saved/*" element={<SavedScreen />} />{" "}
+            <Route path="/research" element={<ResearchScreen />} />{" "}
+            <Route path="/samsung-internal" element={<SamsungInternalScreen />} />{" "}
+            <Route path="/internal-publishing" element={<InternalPublishingScreen />} />{" "}
+            <Route path="/venturelens/*" element={<VentureLensApp />} />{" "}
             <Route path="/rejected" element={<RejectedScreen />} />{" "}
             <Route path="/sources" element={<SourcesScreen />} />{" "}
             <Route path="/manage-sources" element={<SourcesScreen />} />{" "}

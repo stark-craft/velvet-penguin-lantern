@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from news_scrapper.application import app, abs_frontend_path
+from news_scrapper.internal_content.router import router as internal_content_router
 from news_scrapper.recommendation import router as recommendation_router
 from news_scrapper.translation import router as translation_router
 from venture_lens.router import router as venture_lens_router
@@ -24,6 +25,7 @@ from venture_lens.router import router as venture_lens_router
 app.include_router(venture_lens_router)
 app.include_router(translation_router)
 app.include_router(recommendation_router)
+app.include_router(internal_content_router)
 
 
 @app.middleware("http")
@@ -64,6 +66,7 @@ API_ROUTES = {
     "venture-lens",
     "translation",
     "for-you",
+    "internal-content",
     "assets",
 }
 

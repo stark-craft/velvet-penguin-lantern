@@ -10,6 +10,7 @@ const proxyPaths = [
   '/gatekeeper', '/trends',
   '/translation',
   '/venture-lens',
+  '/internal-content',
   '/export-ppt', '/export-excel', '/export-word', '/assets',
 ];
 

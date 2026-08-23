@@ -4,6 +4,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useGuidePet } from "../../shared/guide/GuidePetContext.jsx";
 import Icon from "./Icon.jsx";
 import ThemeToggle from "./ThemeToggle.jsx";
+import NotificationBell from "./NotificationBell.jsx";
 import useModalFocus from "./modals/useModalFocus.js";
 import { NEWS_SCRAPPER_NAV_STYLE } from "./navigationStyle.js";
 import {
@@ -18,11 +19,13 @@ const mainNav = [
   { to: "/home", label: "Briefing", labelKo: "브리핑", icon: "home" },
   { to: "/scan", label: "Scan", labelKo: "스캔", icon: "search" },
   { to: "/saved", label: "Saved", labelKo: "나의 데스크", icon: "bookmark" },
-  { to: "/selected", label: "Review Queue", labelKo: "검토 대기열", icon: "check2" },
-  { to: "/approved", label: "Approved Briefing", labelKo: "승인된 브리핑", icon: "star" },
+  { to: "/research", label: "Research", labelKo: "리서치", icon: "note", matches: ["/research", "/venturelens"] },
+  { to: "/samsung-internal", label: "Samsung Internal", labelKo: "삼성 내부", icon: "layers" },
 ];
 
 const baseSettingsNav = [
+  { to: "/selected", label: "Review Queue", labelKo: "검토 대기열", icon: "check2" },
+  { to: "/approved", label: "Approved Briefing", labelKo: "승인된 브리핑", icon: "star" },
   { to: "/history", label: "Briefing Archive", labelKo: "브리핑 아카이브", icon: "archive" },
   { to: "/rejected", label: "Hidden Signals", labelKo: "숨긴 시그널", icon: "eye" },
   {
@@ -34,6 +37,8 @@ const baseSettingsNav = [
   },
   { to: "/scheduler", label: "Scheduler", labelKo: "스케줄러", icon: "clock" },
   { to: "/voc", label: "Voice of Customer", labelKo: "고객 의견", icon: "note" },
+  { to: "/saved/contribute", label: "Contribute Desk", labelKo: "기여", icon: "note" },
+  { to: "/internal-publishing", label: "Announcements", labelKo: "공지", icon: "megaphone" },
 ];
 
 const protectedSettingsNav = [
@@ -567,9 +572,10 @@ export default function TopBar({
           {visibleMainNav.map((item) => (
             <NavLink
               key={item.to}
-              className={({ isActive }) =>
-                ["command-nav-link premium-command-link", isActive ? "active" : ""].join(" ")
-              }
+              className={() => [
+                "command-nav-link premium-command-link",
+                routeMatches(pathname, item) ? "active" : "",
+              ].join(" ")}
               to={item.to}
             >
               <Icon name={item.icon} size={16} />
@@ -583,6 +589,8 @@ export default function TopBar({
 
         <div className="header-actions premium-header-actions">
           <ThemeToggle language={language} theme={theme} onToggle={onToggleTheme} />
+
+          <NotificationBell />
 
           <div className="premium-settings-control" ref={settingsControlRef}>
             <button
@@ -665,7 +673,7 @@ export default function TopBar({
                   </div>
                 </section>
 
-                <a className="premium-venture-card" href="/venturelens" title={ui.openVenture}>
+                <NavLink className="premium-venture-card" onClick={closeSettings} to="/research" title={ui.openVenture}>
                   <span className="premium-venture-icon" aria-hidden="true">
                     <Icon name="sparkle" size={19} />
                   </span>
@@ -675,7 +683,7 @@ export default function TopBar({
                     <span>{ui.ventureNote}</span>
                   </span>
                   <Icon className="premium-venture-arrow" name="external" size={17} />
-                </a>
+                </NavLink>
 
                 <section className="premium-guide-panel" aria-labelledby="premium-guide-heading">
                   <span className="premium-guide-avatar" aria-hidden="true">
