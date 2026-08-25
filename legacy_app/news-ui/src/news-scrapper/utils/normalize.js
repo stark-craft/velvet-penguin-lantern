@@ -260,6 +260,19 @@ export function normalizeArticle(raw, idx = 0) {
             : [],
         }
       : null,
+    reactions: raw.reactions && typeof raw.reactions === 'object'
+      ? {
+          like_count: Math.max(0, Number(raw.reactions.like_count || 0)),
+          dislike_count: Math.max(0, Number(raw.reactions.dislike_count || 0)),
+          viewer_reaction: ['like', 'dislike'].includes(raw.reactions.viewer_reaction) ? raw.reactions.viewer_reaction : 'neutral',
+        }
+      : { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' },
+    follow_match: raw.follow_match && typeof raw.follow_match === 'object'
+      ? {
+          method: decodeHtmlEntities(raw.follow_match.method || ''),
+          score: Math.max(0, Math.min(1, Number(raw.follow_match.score || 0))),
+        }
+      : null,
     article_id: raw.article_id || raw.article_key || '',
   };
 }

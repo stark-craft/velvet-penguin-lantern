@@ -233,6 +233,12 @@ export const sendRecommendationEvents = (feedRequestId, events, options = {}) =>
     body: JSON.stringify({ feed_request_id: feedRequestId || '', events }),
     ...options,
   });
+export const setViewerReaction = (article, reaction) =>
+  jsonFetch('/viewer/reactions', {
+    method: 'PUT',
+    body: JSON.stringify({ article, reaction }),
+  });
+export const getFollowingThreads = () => jsonFetch('/viewer/following');
 
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');

@@ -31,14 +31,31 @@ Snapshot date: **2026-08-25**. Always verify this snapshot with `git status`,
   real momentum deltas, and starter-snapshot labelling are implemented.
 - Venture Lens gained model, dataset, and patent workspaces and dossier APIs;
   model/dataset/patent dossiers do not expose unsupported watch actions.
-- The default For You desk now uses a 58px personal-workspace command strip and
-  a compact command-deck greeting. The friendly greeting, interest controls,
-  mix explanation, refresh action, and counters remain, while the first
-  recommendation section is visible in the initial desktop viewport.
 - Released in commit `bd4aa55`. Verified after the final accessibility pass:
   frontend 87/87, backend 183/183, production build (1,906 modules), live
   light/dark and 700px QA, keyboard workspace navigation, no page overflow or
   broken Samsung images, and Vite/FastAPI production deep links.
+
+## 2026-08-25: Compact For You feedback architecture
+
+- The default For You workspace now uses a compact `Your Feed | Following |
+  Create` command strip with a trailing `Tune interests` action. The oversized
+  greeting, mix counter, explanation/refresh controls and duplicate desk chrome
+  are removed so the five executive signals become the first desktop content.
+- For You cards open from their surface, use one consistent Follow/Following
+  vocabulary, omit redundant Open/Select/Why-this-story controls, and expose
+  reversible per-viewer Like/Dislike reactions with aggregate counts. Reactions
+  never remove a card. They affect private ranking immediately and enter shared
+  Bouncer training only through an idempotent four-hour consensus batch (five
+  unique votes and 70% agreement by default).
+- Following is a private semantic story-thread workspace backed by MiniLM
+  similarity, entity/topic overlap and recency. Create combines private URL
+  briefings with the existing IP-authorized Samsung Internal contribution flow;
+  old `/saved/*` and earlier `/for-you/*` desk links redirect to the new routes.
+- Verified with frontend 90/90, backend 187/187, the production build (1,906
+  modules), desktop light/dark browser QA, live reaction/following/create
+  interactions, and Vite/FastAPI production deep links. Mobile QA was
+  intentionally deferred at the user's request.
 
 ## 2026-08-24: For You and User's Desk merge
 

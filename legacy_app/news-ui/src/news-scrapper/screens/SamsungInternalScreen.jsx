@@ -281,7 +281,7 @@ export default function SamsungInternalScreen({ contributionAllowed = false }) {
   }, [channels, published]);
 
   const counts = { global: model.global.length, local: model.local.length, internal: model.inside.length + model.stories.length };
-  const contributorAction = contributionAllowed ? <button className="btn-dark-secondary" onClick={() => navigate('/for-you/contributions')} type="button"><Icon name="plus" size={14} /> Open contributions</button> : null;
+  const contributorAction = contributionAllowed ? <button className="btn-dark-secondary" onClick={() => navigate('/for-you/create/contributions')} type="button"><Icon name="plus" size={14} /> Open contributions</button> : null;
   const renderTab = () => {
     if (tab === 'global') return model.global.length ? <DateGroupedSignals items={model.global.slice(0, 100)} /> : <EmptyPanel copy="The next unified archive run may bring fresh Samsung coverage." title="Nothing on the global wire yet" />;
     if (tab === 'local') return model.local.length ? <DateGroupedSignals items={model.local.slice(0, 100)} /> : <EmptyPanel copy="This channel accepts records whose configured source is Samsung Local or Samsung India." title="The local desk is quiet" />;
@@ -296,6 +296,6 @@ export default function SamsungInternalScreen({ contributionAllowed = false }) {
     {!model.leadership && <p className="sni-note" role="note">A published leadership message will take the first Samsung Focus position automatically.</p>}
     <nav aria-label="Samsung Internal archive channels" className="sni-tabs" role="tablist">{CHANNELS.map((entry) => <button aria-selected={tab === entry.id} className={`sni-tab${tab === entry.id ? ' is-active' : ''}`} key={entry.id} onClick={() => setTab(entry.id)} role="tab" type="button"><Icon name={entry.icon} size={15} /><span>{entry.label}</span><small>{counts[entry.id]}</small></button>)}</nav>
     <section aria-label={`${CHANNELS.find((entry) => entry.id === tab)?.label} archive`} className="sni-panel" role="tabpanel">{renderTab()}</section>
-    <footer className="sni-foot"><span>Samsung Internal · curated by your editorial desk</span>{contributionAllowed && <button className="btn-dark-secondary" onClick={() => navigate('/for-you/contributions')} type="button"><Icon name="plus" size={14} /> Contribute a story</button>}</footer>
+    <footer className="sni-foot"><span>Samsung Internal · curated by your editorial desk</span>{contributionAllowed && <button className="btn-dark-secondary" onClick={() => navigate('/for-you/create/contributions')} type="button"><Icon name="plus" size={14} /> Contribute a story</button>}</footer>
   </div>;
 }

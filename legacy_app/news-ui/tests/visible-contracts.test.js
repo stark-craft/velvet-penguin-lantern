@@ -261,6 +261,43 @@ test('hook and recommendation explanation survive frontend normalization', () =>
   assert.deepEqual(normalized.recommendation.reason_codes, ['explicit_topic']);
 });
 
+test('reaction counts and semantic follow metadata survive frontend normalization', () => {
+  const normalized = normalizeArticle({
+    title: 'A followed update',
+    link: 'https://example.test/followed',
+    reactions: { like_count: 12, dislike_count: 3, viewer_reaction: 'like' },
+    follow_match: { score: 0.82, method: 'semantic' },
+  });
+  assert.deepEqual(normalized.reactions, { like_count: 12, dislike_count: 3, viewer_reaction: 'like' });
+  assert.deepEqual(normalized.follow_match, { score: 0.82, method: 'semantic' });
+});
+
+test('For You cards are direct-open, followable and reaction-counted without workflow selection', () => {
+  const cardSource = readFileSync(new URL('../src/news-scrapper/for-you/ForYouCard.jsx', import.meta.url), 'utf8');
+  const screenSource = readFileSync(new URL('../src/news-scrapper/for-you/ForYouScreen.jsx', import.meta.url), 'utf8');
+  const cssSource = readFileSync(new URL('../src/news-scrapper/for-you/for-you.css', import.meta.url), 'utf8');
+  assert.match(cardSource, /fy-card-open-layer/);
+  assert.match(cardSource, /Following' : 'Follow'/);
+  assert.match(cardSource, /reactions\.like_count/);
+  assert.match(cardSource, /reactions\.dislike_count/);
+  assert.match(cardSource, /title="Like" type="button"/);
+  assert.match(cardSource, /title="Dislike" type="button"/);
+  assert.doesNotMatch(cardSource, /Select for Review|RecommendationReason|Why this story/);
+  assert.doesNotMatch(screenSource, /selectWorkflow|trainVote/);
+  assert.match(cssSource, /\.fy-executive\s*>\s*\.fy-card-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(5/);
+  assert.match(cssSource, /\.fy-card-body\{z-index:auto\}/);
+});
+
+test('reaction and following APIs stay same-origin and reactions do not append stale events', () => {
+  const apiSource = readFileSync(new URL('../src/news-scrapper/api.js', import.meta.url), 'utf8');
+  const screenSource = readFileSync(new URL('../src/news-scrapper/for-you/ForYouScreen.jsx', import.meta.url), 'utf8');
+  assert.match(apiSource, /jsonFetch\('\/viewer\/reactions'/);
+  assert.match(apiSource, /jsonFetch\('\/viewer\/following'\)/);
+  const reactionFlow = screenSource.match(/const react = async[\s\S]*?\n  \}\);/)?.[0] || '';
+  assert.match(reactionFlow, /setViewerReaction/);
+  assert.doesNotMatch(reactionFlow, /record\(/);
+});
+
 test('For You data uses the viewer API without colliding with the SPA deep link', () => {
   const apiSource = readFileSync(new URL('../src/news-scrapper/api.js', import.meta.url), 'utf8');
   assert.match(apiSource, /jsonFetch\(`\/viewer\/for-you\?\$\{params\.toString\(\)\}`\)/);

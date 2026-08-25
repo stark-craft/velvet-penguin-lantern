@@ -77,12 +77,12 @@ function ProductAtmosphere({ live }) {
 function LegacySavedRedirect() {
   const { pathname } = useLocation();
   const target = pathname === "/saved/contribute"
-    ? "/for-you/contributions"
+    ? "/for-you/create/contributions"
     : pathname === "/saved/leadership"
-      ? "/for-you/contributions/leadership"
+      ? "/for-you/create/contributions/leadership"
       : pathname === "/saved/briefings"
-        ? "/for-you/private-briefings"
-        : "/for-you/saved";
+        ? "/for-you/create"
+        : "/for-you/following";
   return <Navigate to={target} replace />;
 }
 

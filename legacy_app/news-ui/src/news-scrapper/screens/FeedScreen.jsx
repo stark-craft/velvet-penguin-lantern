@@ -523,8 +523,8 @@ function ImageFeedCard({
 <div className="feed-card-actions mt-4">
 <div className="flex flex-wrap items-center gap-2">
 <button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" disabled={Boolean(busyAction) || !workflowReady} onClick={() => onSelect(item)} title={!workflowReady ? 'Review Queue state is unavailable' : undefined} type="button">                  Select for Review                </button>}              <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button">                {busyAction === 'hide' ? 'Hiding…' : 'Hide'}              </button>
-<button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction) || !savedReady} onClick={() => onSave(item)} title={!savedReady ? 'Saved Signals state is unavailable' : isSaved ? 'Remove from Saved for Later' : 'Save this signal for later'} type="button">
-<Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {busyAction === 'save' ? 'Saving…' : isSaved ? 'Saved' : 'Save'}
+<button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction) || !savedReady} onClick={() => onSave(item)} title={!savedReady ? 'Following state is unavailable' : isSaved ? 'Unfollow this story' : 'Follow this story'} type="button">
+<Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {busyAction === 'save' ? 'Updating…' : isSaved ? 'Following' : 'Follow'}
 </button>
 </div>
 <Bouncer disabled={Boolean(busyAction)} vote={vote} onVote={value => onVote(item, value)} />
@@ -717,7 +717,7 @@ export default function FeedScreen() {
   };
   const toggleSave = async item => {
     if (supportingState.saved !== 'ready') {
-      setActionFeedback({ type: 'error', message: 'Saved Signals state is unavailable. Retry personal state before changing this story.' });
+      setActionFeedback({ type: 'error', message: 'Following state is unavailable. Retry personal state before changing this story.' });
       return;
     }
     const key = articleKey(item);
@@ -733,7 +733,7 @@ export default function FeedScreen() {
       if (wasSaved) await removeSavedArticle(item);
       else await saveArticleForLater(item);
       await refreshPersonalizedOrder();
-      setActionFeedback({ type: 'success', message: wasSaved ? 'Removed from your Saved Signals.' : 'Saved privately to your desk.' });
+      setActionFeedback({ type: 'success', message: wasSaved ? 'Story unfollowed.' : 'Following privately.' });
       } catch (error) {
       setSavedKeys(current => {
         const next = new Set(current);
@@ -741,7 +741,7 @@ export default function FeedScreen() {
         else next.delete(key);
         return next;
       });
-      setActionFeedback({ type: 'error', message: error?.message || 'Saved Signals could not be updated. Your previous state was restored.' });
+      setActionFeedback({ type: 'error', message: error?.message || 'Following could not be updated. Your previous state was restored.' });
       }
     });
   };

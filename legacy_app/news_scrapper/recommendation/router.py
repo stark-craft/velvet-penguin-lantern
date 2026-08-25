@@ -16,9 +16,11 @@ from .candidates import article_id, collect_candidates
 from .events import aggregate_quality_metrics
 from .migration import legacy_migration_offer
 from .preferences import ViewerRepository, taxonomy
-from .schemas import PauseRequest, RecommendationEventBatch, ViewerPreferences
+from .schemas import PauseRequest, ReactionRequest, RecommendationEventBatch, ViewerPreferences
 from .service import RecommendationService
 from .scoring import article_outcomes, article_topics, source_family
+from .following import build_following_threads
+from .reactions import ReactionRepository
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -43,6 +45,11 @@ SEMANTIC_AFFINITY_ENABLED = env_bool("FOR_YOU_SEMANTIC_AFFINITY_ENABLED", False)
 EXPLORATION_PERCENT = env_int("FOR_YOU_EXPLORATION_PERCENT", 15, 0, 50)
 EVENT_BATCH_SIZE = env_int("FOR_YOU_EVENT_BATCH_SIZE", 10, 1, 100)
 EVENT_FLUSH_SECONDS = env_int("FOR_YOU_EVENT_FLUSH_SECONDS", 15, 2, 120)
+REACTION_CONSENSUS_MIN_VOTES = env_int("REACTION_CONSENSUS_MIN_VOTES", 5, 3, 1000)
+try:
+    REACTION_CONSENSUS_RATIO = max(0.51, min(1.0, float(os.environ.get("REACTION_CONSENSUS_RATIO", "0.70"))))
+except (TypeError, ValueError):
+    REACTION_CONSENSUS_RATIO = 0.70
 BROADCAST_VISIBILITY_MODE = os.environ.get(
     "BROADCAST_VISIBILITY_MODE", "interest"
 ).strip().lower()
@@ -50,6 +57,7 @@ if BROADCAST_VISIBILITY_MODE not in {"interest", "restricted"}:
     BROADCAST_VISIBILITY_MODE = "interest"
 
 REPOSITORY = ViewerRepository(NEWS_RUNTIME_DIR / "recommendation" / "viewers")
+REACTIONS = ReactionRepository(NEWS_RUNTIME_DIR / "recommendation" / "reactions.json")
 SERVICE = RecommendationService(
     REPOSITORY,
     exploration_percent=EXPLORATION_PERCENT,
@@ -399,6 +407,86 @@ def recommendation_events(payload: RecommendationEventBatch, request: Request, r
     }
 
 
+@router.get("/viewer/reactions")
+def read_reactions(request: Request, response: Response, article_id: list[str] = Query(default=[])):
+    key, _, _ = _resolve(request, response)
+    identifiers = [str(value)[:128] for value in article_id[:100] if str(value).strip()]
+    return {"status": "success", "reactions": REACTIONS.snapshots(key, identifiers)}
+
+
+@router.put("/viewer/reactions")
+def update_reaction(payload: ReactionRequest, request: Request, response: Response):
+    key, _, _ = _resolve(request, response)
+    supplied = payload.article if isinstance(payload.article, dict) else {}
+    article = _resolve_shared_article(request, supplied)
+    if article is None:
+        raise HTTPException(status_code=404, detail="This article is no longer available in the shared briefing.")
+    identifier = article_id(article)
+    article["article_id"] = identifier
+    detail = {
+        "title": str(article.get("title") or "")[:500],
+        "source": str(article.get("source") or article.get("src") or "")[:300],
+        "topics": article_topics(article),
+        "outcomes": article_outcomes(article),
+        "source_family": source_family(article),
+    }
+    try:
+        snapshot = REACTIONS.set(key, article, payload.reaction)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    REPOSITORY.set_reaction(key, identifier, payload.reaction, detail)
+    return {"status": "success", "article_id": identifier, **snapshot, "scope": "one_vote_per_viewer"}
+
+
+@router.get("/viewer/following")
+def following_threads(request: Request, response: Response):
+    _resolve(request, response)
+    profile, articles = _profile_and_articles(request)
+    legacy = _legacy()
+    saved = legacy.get_viewer_saved_items(request, profile)
+    if UNIFIED_CORPUS_ENABLED:
+        saved = [
+            *legacy.get_viewer_saved_items(request, "default"),
+            *legacy.get_viewer_saved_items(request, "broadcast"),
+        ]
+    threads = build_following_threads(saved, articles)
+    return {"status": "success", "threads": threads, "count": len(threads), "scope": "current_viewer_only"}
+
+
+def process_reaction_consensus() -> dict:
+    """Persist mature consensus rows and queue one coalesced Bouncer rebuild."""
+
+    candidates = REACTIONS.consensus_candidates(
+        REACTION_CONSENSUS_MIN_VOTES,
+        REACTION_CONSENSUS_RATIO,
+    )
+    if not candidates:
+        return {"processed": 0, "queued": False}
+    legacy = _legacy()
+    processed = 0
+    for candidate in candidates:
+        article = candidate.get("article") or {}
+        legacy.save_training_vote(
+            article.get("keywords") or [],
+            article.get("summary") or article.get("title") or "",
+            candidate["label"],
+            article.get("title") or "",
+            legacy.UNIFIED_PROFILE,
+            consensus_article_id=candidate["article_id"],
+            consensus_meta={
+                "likes": candidate["likes"],
+                "dislikes": candidate["dislikes"],
+                "total": candidate["total"],
+                "ratio": candidate["ratio"],
+            },
+        )
+        REACTIONS.mark_processed(candidate["article_id"], candidate["fingerprint"])
+        processed += 1
+    if processed:
+        legacy.enqueue_bouncer_retrain(legacy.UNIFIED_PROFILE)
+    return {"processed": processed, "queued": bool(processed)}
+
+
 @router.get("/analytics/recommendation-summary")
 def recommendation_analytics(request: Request, key: str = Query(default=None)):
     legacy = _legacy()
@@ -451,5 +539,10 @@ def for_you(
         viewer_name=str(viewer.get("display_name") or ""),
         entitled_audiences={"all", "technology", "default", "broadcast"},
     )
+    reaction_map = REACTIONS.snapshots(key, [article_id(item) for item in result.get("items") or []])
+    for item in result.get("items") or []:
+        item["reactions"] = reaction_map.get(article_id(item), {
+            "like_count": 0, "dislike_count": 0, "viewer_reaction": "neutral",
+        })
     result.update({"enabled": True, "profile": serving_profile})
     return result

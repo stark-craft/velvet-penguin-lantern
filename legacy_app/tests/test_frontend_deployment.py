@@ -61,7 +61,13 @@ class FrontendDeploymentTests(unittest.TestCase):
                 workspace_spa = asgi_request(
                     composition.app,
                     "GET",
-                    "/for-you/contributions",
+                    "/for-you/following",
+                    headers={"accept": "text/html"},
+                )
+                create_spa = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/for-you/create/contributions",
                     headers={"accept": "text/html"},
                 )
                 legacy_spa = asgi_request(
@@ -91,6 +97,8 @@ class FrontendDeploymentTests(unittest.TestCase):
             self.assertEqual(workspace_spa.status_code, 200)
             self.assertIn("desk", workspace_spa.text)
             self.assertIn("no-cache", workspace_spa.headers.get("cache-control", ""))
+            self.assertEqual(create_spa.status_code, 200)
+            self.assertIn("desk", create_spa.text)
             self.assertEqual(legacy_spa.status_code, 200)
             self.assertIn("desk", legacy_spa.text)
             self.assertEqual(leadership_reader.status_code, 200)

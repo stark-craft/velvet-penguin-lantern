@@ -85,6 +85,7 @@ def empty_state() -> dict[str, Any]:
         "feed_snapshots": {},
         "last_visit_at": "",
         "personalization_paused": False,
+        "reaction_events": {},
         "migration": {},
     }
 
@@ -161,6 +162,27 @@ class ViewerRepository:
             state = {**empty_state(), **(state if isinstance(state, dict) else {})}
             state["personalization_paused"] = bool(paused)
             state["updated_at"] = utcnow().isoformat(timespec="seconds")
+            return state
+        return self._store(viewer_key).update(updater)
+
+    def set_reaction(self, viewer_key: str, article_id: str, reaction: str, detail: dict[str, Any]) -> dict[str, Any]:
+        """Upsert the viewer's current reaction so toggles do not double-train."""
+
+        normalized = str(reaction or "neutral").strip().lower()
+        now = utcnow().isoformat(timespec="seconds")
+        def updater(state: dict[str, Any]) -> dict[str, Any]:
+            state = {**empty_state(), **(state if isinstance(state, dict) else {})}
+            reactions = state.get("reaction_events") if isinstance(state.get("reaction_events"), dict) else {}
+            if normalized == "neutral":
+                reactions.pop(str(article_id), None)
+            else:
+                reactions[str(article_id)] = {
+                    "reaction": normalized,
+                    "updated_at": now,
+                    "detail": dict(detail or {}),
+                }
+            state["reaction_events"] = dict(list(reactions.items())[-2000:])
+            state["updated_at"] = now
             return state
         return self._store(viewer_key).update(updater)
 

@@ -28,7 +28,7 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
         {onSave && (
           <button className="btn-dark-secondary justify-center" onClick={() => onSave(item)} type="button">
             <Icon name={isSaved ? 'check' : 'bookmark'} size={15} />
-            {isSaved ? 'Saved for Later' : 'Save for Later'}
+            {isSaved ? 'Following' : 'Follow'}
           </button>
         )}
         {!item.selected_by && !approved && !hidden && onSelect && (

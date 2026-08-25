@@ -7,8 +7,8 @@ const NEWS_TOURS = {
   "/for-you": [
     {
       title: "Your intelligence, ranked",
-      body: "This is your personal starting point. It learns from what you open, follow, save and dismiss without hiding the shared newsroom briefing.",
-      selector: ".fy-hero",
+      body: "This is your personal starting point. It learns from what you open, follow, like, dislike and dismiss without hiding the shared newsroom briefing.",
+      selector: ".fy-preference-strip, .fy-executive",
     },
     {
       title: "Five-minute executive scan",
@@ -22,8 +22,29 @@ const NEWS_TOURS = {
     },
     {
       title: "More when you need it",
-      body: "Continue into the longer ranked feed only when you have time. Following or saving a signal will make related updates easier to spot later.",
+      body: "Continue into the longer ranked feed only when you have time. Following a signal creates a private story thread for closely related updates.",
       selector: ".fy-section:last-of-type",
+    },
+  ],
+  "/for-you/following": [
+    {
+      title: "Story threads you follow",
+      body: "Each followed signal anchors a private thread. TechScout uses semantic similarity, topic overlap and recency to keep only genuinely related updates nearby.",
+      selector: ".fy-following-page, .fy-following-thread",
+    },
+  ],
+  "/for-you/create": [
+    {
+      title: "Create from your own material",
+      body: "Turn article links into a private briefing. Authorized contributors can also prepare Samsung Internal stories and leadership messages here.",
+      selector: ".fy-create-page, .fy-create-switcher",
+    },
+  ],
+  "/for-you/create/contributions": [
+    {
+      title: "Contribute to Samsung Internal",
+      body: "Write directly or import a supported document. Drafts remain private to your viewer identity until you submit them for editorial review.",
+      selector: ".fy-create-page, .cw-workspace",
     },
   ],
   "/home": [
@@ -58,23 +79,6 @@ const NEWS_TOURS = {
       title: "Keep working while it searches",
       body: "Your active search is preserved when you move to another tab in the app. Return here to review or select the results.",
       selector: ".scan-results-workspace, .scan-result-stage",
-    },
-  ],
-  "/saved": [
-    {
-      title: "Your private desk",
-      body: "Saved signals and URL briefings belong only to this browser identity. Other newsroom users cannot see them unless you explicitly select one for review.",
-      selector: ".personal-desk-hero, .saved-hero",
-    },
-    {
-      title: "Bring your own links",
-      body: "Paste up to twenty article URLs. The platform extracts, summarizes and turns them into private cards while the job continues safely in the background.",
-      selector: ".personal-url-composer, .url-briefing-composer",
-    },
-    {
-      title: "Choose what becomes shared",
-      body: "Save keeps an article personal. Select for review is the deliberate hand-off that moves a card into the shared editorial workflow.",
-      selector: ".personal-ready-workstream, .personal-card-grid",
     },
   ],
   "/selected": [

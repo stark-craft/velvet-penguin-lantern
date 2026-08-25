@@ -35,3 +35,8 @@ class RecommendationEvent(BaseModel):
 class RecommendationEventBatch(BaseModel):
     feed_request_id: str = Field(default="", max_length=160)
     events: list[RecommendationEvent] = Field(default_factory=list, max_length=100)
+
+
+class ReactionRequest(BaseModel):
+    article: dict[str, Any] = Field(default_factory=dict)
+    reaction: str = Field(default="neutral", max_length=16)

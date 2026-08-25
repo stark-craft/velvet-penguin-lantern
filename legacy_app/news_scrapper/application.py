@@ -2415,7 +2415,16 @@ def resume_personal_briefing_jobs():
                         )
 
 
-def save_training_vote(keywords, summary, vote, title="", profile=DEFAULT_PROFILE):
+def save_training_vote(
+    keywords,
+    summary,
+    vote,
+    title="",
+    profile=DEFAULT_PROFILE,
+    *,
+    consensus_article_id="",
+    consensus_meta=None,
+):
     if UNIFIED_CORPUS_ENABLED:
         profile = UNIFIED_PROFILE
     training_file = get_training_file_for_profile(profile)
@@ -2427,6 +2436,10 @@ def save_training_vote(keywords, summary, vote, title="", profile=DEFAULT_PROFIL
         "label": vote,
         "profile": profile,
     }
+    if consensus_article_id:
+        new_row["origin"] = "reaction_consensus"
+        new_row["consensus_article_id"] = str(consensus_article_id)[:128]
+        new_row["consensus"] = dict(consensus_meta or {})
     with file_lock:
         memory = []
         if os.path.exists(training_file):
@@ -2435,6 +2448,15 @@ def save_training_vote(keywords, summary, vote, title="", profile=DEFAULT_PROFIL
                     memory = json.load(f)
             except json.JSONDecodeError:
                 memory = []
+
+        # A mature aggregate is one authoritative row per article. If later
+        # votes flip the consensus, replace the previous aggregate instead of
+        # teaching the Bouncer contradictory labels for the same story.
+        if consensus_article_id:
+            memory = [
+                row for row in memory
+                if str(row.get("consensus_article_id") or "") != str(consensus_article_id)
+            ]
 
         normalized_title = str(title or "").strip().lower()[:150]
         normalized_new = str(summary or "").strip().lower()[:200]
@@ -3437,6 +3459,12 @@ def run_morning_briefing():
                     completed_partitions=completed_profiles,
                     stage=f"completed_{profile}",
                 )
+        try:
+            from news_scrapper.recommendation.router import process_reaction_consensus
+            consensus = process_reaction_consensus()
+            print(f"[FOR YOU] Reaction consensus batch: {consensus}", flush=True)
+        except Exception as consensus_error:
+            print(f"[FOR YOU] Reaction consensus batch failed safely: {consensus_error}", flush=True)
         if (
             not UNIFIED_CORPUS_ENABLED
             and

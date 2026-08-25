@@ -54,6 +54,12 @@ def _similarity(left: str, right: str) -> float:
         return 0.0
 
 
+def semantic_similarity(left: str, right: str) -> float:
+    """Public bounded similarity helper for private followed-story threads."""
+
+    return _similarity(str(left or ""), str(right or ""))
+
+
 def semantic_affinity(article_text: str, events: list[dict[str, Any]]) -> tuple[float, float]:
     positives = []
     negatives = []

@@ -14,6 +14,8 @@ from news_scrapper.recommendation.events import aggregate_quality_metrics
 from news_scrapper.recommendation.hooks import ensure_article_hooks, validate_hook
 from news_scrapper.recommendation.identity import issue_token, resolve_viewer, valid_token, viewer_key
 from news_scrapper.recommendation.preferences import ViewerRepository, sanitize_preferences
+from news_scrapper.recommendation.reactions import ReactionRepository
+from news_scrapper.recommendation.following import build_following_threads
 from news_scrapper.recommendation.scoring import score_candidates
 from news_scrapper.recommendation.service import RecommendationService, allocate_exclusive_sections
 from news_scrapper.source_catalog import build_shadow_briefing, build_unified_catalog
@@ -36,6 +38,68 @@ def article(index, **changes):
 
 
 class RecommendationTests(unittest.TestCase):
+    def test_reactions_are_one_reversible_vote_per_viewer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ReactionRepository(Path(directory) / "reactions.json")
+            target = article(1, article_id="article-one", keywords_found="AI agents")
+            first = repository.set("viewer-a", target, "like")
+            self.assertEqual((first["like_count"], first["dislike_count"]), (1, 0))
+            repeated = repository.set("viewer-a", target, "like")
+            self.assertEqual((repeated["like_count"], repeated["dislike_count"]), (1, 0))
+            changed = repository.set("viewer-a", target, "dislike")
+            self.assertEqual((changed["like_count"], changed["dislike_count"]), (0, 1))
+            repository.set("viewer-b", target, "like")
+            snapshot = repository.snapshots("viewer-b", ["article-one"])["article-one"]
+            self.assertEqual((snapshot["like_count"], snapshot["dislike_count"]), (1, 1))
+            self.assertEqual(snapshot["viewer_reaction"], "like")
+            neutral = repository.set("viewer-a", target, "neutral")
+            self.assertEqual((neutral["like_count"], neutral["dislike_count"]), (1, 0))
+
+    def test_reaction_consensus_is_thresholded_and_idempotent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ReactionRepository(Path(directory) / "reactions.json")
+            target = article(2, article_id="article-two")
+            for index in range(4):
+                repository.set(f"viewer-{index}", target, "dislike")
+            repository.set("viewer-4", target, "like")
+            candidates = repository.consensus_candidates(5, 0.70)
+            self.assertEqual(len(candidates), 1)
+            self.assertEqual(candidates[0]["label"], "not_interested")
+            self.assertEqual(candidates[0]["ratio"], 0.8)
+            repository.mark_processed("article-two", candidates[0]["fingerprint"])
+            self.assertEqual(repository.consensus_candidates(5, 0.70), [])
+            repository.set("viewer-5", target, "like")
+            self.assertEqual(repository.consensus_candidates(5, 0.70), [])
+
+    def test_reaction_state_updates_private_affinity_without_append_only_votes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ViewerRepository(Path(directory))
+            detail = {"topics": ["ai_models"], "outcomes": [], "source_family": "tech_press"}
+            repository.set_reaction("viewer-a", "article-one", "like", detail)
+            state = repository.read("viewer-a")
+            self.assertEqual(state["events"], [])
+            self.assertEqual(state["reaction_events"]["article-one"]["reaction"], "like")
+            repository.set_reaction("viewer-a", "article-one", "dislike", detail)
+            self.assertEqual(repository.read("viewer-a")["reaction_events"]["article-one"]["reaction"], "dislike")
+            repository.set_reaction("viewer-a", "article-one", "neutral", detail)
+            self.assertNotIn("article-one", repository.read("viewer-a")["reaction_events"])
+
+    def test_following_threads_require_semantic_closeness_and_deduplicate_anchors(self):
+        anchor = article(1, article_id="anchor", title="Nvidia launches a new inference GPU", date="2026-08-23")
+        older_close = article(2, article_id="older-close", title="Nvidia GPU deployment benchmarks begin", date="2026-08-24")
+        newer_close = article(4, article_id="newer-close", title="Nvidia GPU deployment benchmarks arrive", date="2026-08-25")
+        unrelated = article(3, article_id="far", title="Nvidia sponsors a football event", date="2026-08-25")
+        def similarity(_left, right):
+            return 0.82 if "deployment benchmarks" in right else 0.12
+        with patch("news_scrapper.recommendation.following.semantic_similarity", side_effect=similarity):
+            threads = build_following_threads([anchor, dict(anchor)], [anchor, older_close, newer_close, unrelated])
+        self.assertEqual(len(threads), 1)
+        self.assertEqual(
+            [value["title"] for value in threads[0]["updates"]],
+            ["Nvidia GPU deployment benchmarks arrive", "Nvidia GPU deployment benchmarks begin"],
+        )
+        self.assertEqual(threads[0]["updates"][0]["follow_match"]["method"], "semantic")
+
     def test_signed_identity_is_stable_and_tamper_evident(self):
         first = issue_token()
         second = issue_token()

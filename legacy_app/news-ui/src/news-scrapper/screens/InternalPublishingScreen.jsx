@@ -215,7 +215,7 @@ export default function InternalPublishingScreen() {
 
   return (
     <div className="publishing-studio">
-      <button className="publishing-back" onClick={() => navigate('/for-you/contributions')} type="button">
+      <button className="publishing-back" onClick={() => navigate('/for-you/create/contributions')} type="button">
         <Icon name="chevL" size={15} /> Back to contributions
       </button>
       <header className="publishing-studio-head">

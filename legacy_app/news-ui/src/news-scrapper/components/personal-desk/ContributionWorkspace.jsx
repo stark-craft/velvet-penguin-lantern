@@ -139,7 +139,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
       title: 'Vision of the quarter',
       author: authorSuggestion,
     }));
-    navigate('/for-you/contributions/leadership', { replace: true });
+    navigate('/for-you/create/contributions/leadership', { replace: true });
   };
 
   const startAnnouncement = () => {
@@ -267,7 +267,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     setViewing(null);
     setError('');
     setNotice('');
-    navigate('/for-you/contributions', { replace: true });
+    navigate('/for-you/create/contributions', { replace: true });
   };
 
   const resumeRecoveredDraft = () => {

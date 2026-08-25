@@ -47,6 +47,10 @@ const workspaceShellSource = readFileSync(
   new URL('../src/news-scrapper/for-you/ForYouWorkspaceScreen.jsx', import.meta.url),
   'utf8',
 );
+const createScreenSource = readFileSync(
+  new URL('../src/news-scrapper/for-you/CreateScreen.jsx', import.meta.url),
+  'utf8',
+);
 const indexSource = readFileSync(
   new URL('../index.html', import.meta.url),
   'utf8',
@@ -179,37 +183,37 @@ test('extracted text becomes an editable draft without inventing a summary', () 
   assert.equal(detectTitle(longFirstLine, 'doc.docx').length <= CONTRIBUTION_LIMITS.TITLE_MAX, true);
 });
 
-test('For You owns the ordered private workspaces and hides Contributions by capability', () => {
-  const orderMatch = workspaceShellSource.match(/const tabs = useMemo\(\(\) => \[[\s\S]*?\], \[contributionAllowed, firstName\]\);/)?.[0] || '';
-  assert.match(orderMatch, /Saved Signals[\s\S]*Contributions[\s\S]*Private Briefings/);
-  assert.match(workspaceShellSource, /label: firstName \? `\$\{firstName\}'s Desk` : 'Your Desk'/);
-  assert.match(workspaceShellSource, /contributionAccess\?\.allowed/);
+test('For You owns a compact Feed, Following and Create workspace', () => {
+  const orderMatch = workspaceShellSource.match(/const tabs = \[[\s\S]*?\];/)?.[0] || '';
+  assert.match(orderMatch, /Your Feed[\s\S]*Following[\s\S]*Create/);
+  assert.match(workspaceShellSource, /Tune interests/);
   assert.match(workspaceShellSource, /role="tablist"/);
   assert.match(workspaceShellSource, /ArrowLeft/);
   assert.match(workspaceShellSource, /ArrowRight/);
   assert.match(workspaceShellSource, /Home/);
   assert.match(workspaceShellSource, /End/);
   assert.match(workspaceShellSource, /<ForYouScreen/);
-  assert.match(workspaceShellSource, /<SavedScreen[^>]*view="saved"/);
-  assert.match(workspaceShellSource, /<SavedScreen[\s\S]{0,260}view="contribute"/);
-  assert.match(workspaceShellSource, /<SavedScreen[^>]*view="briefings"/);
+  assert.match(workspaceShellSource, /<FollowingScreen/);
+  assert.match(workspaceShellSource, /<CreateScreen contributionAllowed=\{allowed\}/);
+  assert.match(createScreenSource, /Private Briefing[\s\S]*Contributions/);
+  assert.match(createScreenSource, /contributionAllowed &&/);
 });
 
 test('one For You splat route owns the workspace and legacy Saved routes redirect', () => {
   assert.match(indexSource, /isSenseLanding[\s\S]*window\.location\.replace\("\/for-you"\)/);
   assert.match(appSource, /path="\/for-you\/\*"/);
   assert.match(appSource, /path="\/saved\/\*" element=\{<LegacySavedRedirect \/>\}/);
-  assert.match(appSource, /\/saved\/contribute[\s\S]*\/for-you\/contributions/);
-  assert.match(appSource, /\/saved\/leadership[\s\S]*\/for-you\/contributions\/leadership/);
-  assert.match(appSource, /\/saved\/briefings[\s\S]*\/for-you\/private-briefings/);
-  assert.match(workspaceShellSource, /endsWith\('\/leadership'\)/);
+  assert.match(appSource, /\/saved\/contribute[\s\S]*\/for-you\/create\/contributions/);
+  assert.match(appSource, /\/saved\/leadership[\s\S]*\/for-you\/create\/contributions\/leadership/);
+  assert.match(appSource, /\/saved\/briefings[\s\S]*\/for-you\/create/);
+  assert.match(createScreenSource, /endsWith\('\/leadership'\)/);
 });
 
 test('secondary workspace views use compact introductions instead of a duplicate desk hero', () => {
-  assert.match(workspaceShellSource, /fy-workspace-intro/);
-  assert.match(workspaceShellSource, /Private signal library/);
-  assert.match(workspaceShellSource, /Private publishing desk/);
-  assert.match(workspaceShellSource, /Private link studio/);
+  assert.match(createScreenSource, /fy-compact-intro/);
+  assert.match(createScreenSource, /Bring your own intelligence/);
+  assert.match(createScreenSource, /Private Briefing/);
+  assert.match(createScreenSource, /Contributions/);
   assert.match(savedSource, /const embedded = Boolean\(view\)/);
   assert.match(savedSource, /\{!embedded && \(/);
 });
@@ -225,7 +229,7 @@ test('leadership messages are a third contribution path feeding the same pipelin
   assert.match(modelSource, /leadership: 'Leadership message'/);
   assert.match(workspaceSource, /startLeadership/);
   assert.match(workspaceSource, /onClick=\{startLeadership\}/);
-  assert.match(workspaceSource, /navigate\('\/for-you\/contributions\/leadership', \{ replace: true \}\)/);
+  assert.match(workspaceSource, /navigate\('\/for-you\/create\/contributions\/leadership', \{ replace: true \}\)/);
   assert.match(workspaceSource, /Vision of the quarter/);
   assert.match(apiSource, /content_type: draft\.contentType \|\| ''/);
 });
@@ -248,7 +252,7 @@ test('browser session recovery never skips the contribution landing page', () =>
 
 test('the announcement studio returns explicitly to contributions', () => {
   assert.match(announcementSource, /Back to contributions/);
-  assert.match(announcementSource, /navigate\('\/for-you\/contributions'\)/);
+  assert.match(announcementSource, /navigate\('\/for-you\/create\/contributions'\)/);
 });
 
 test('contribution persistence is API-backed on same-origin internal-content endpoints', () => {

@@ -35,7 +35,7 @@ const terminalStatuses = new Set(['complete', 'failed']);
 // Ordered desk workspaces. Saved Signals leads; Contribute sits between it and
 // My Briefing. Keyboard arrows cycle through this array in order.
 const DESK_TABS = [
-  { id: 'saved', label: 'Saved Signals', icon: 'bookmark' },
+  { id: 'saved', label: 'Following', icon: 'bookmark' },
   { id: 'contribute', label: 'Contribute', icon: 'note' },
   { id: 'briefings', label: 'My Briefing', icon: 'sparkle' },
 ];
@@ -434,9 +434,9 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
       try {
         await removeSavedArticle(item);
         setSavedItems((current) => current.filter((entry) => articleKey(entry) !== articleKey(item)));
-        setNotice('Removed from Saved Signals.');
+        setNotice('Story unfollowed.');
       } catch (requestError) {
-        setError(requestError?.message || 'Could not remove this Saved Signal.');
+        setError(requestError?.message || 'Could not unfollow this story.');
       }
     });
   };
@@ -512,7 +512,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
   const resetLearning = async () => {
     if (controlLocks.current.has('reset')) return;
     const confirmed = window.confirm(
-      'Reset your recent viewing preferences for this profile? Saved Signals will stay saved.',
+      'Reset your recent viewing preferences for this profile? Followed stories will stay followed.',
     );
     if (!confirmed) return;
     controlLocks.current.add('reset');
@@ -521,7 +521,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     try {
       const response = await resetViewerPersonalization();
       setPersonalization((current) => ({ ...(current || {}), active: false, event_count: 0, top_interests: [] }));
-      setNotice(`${response?.removed_events || 0} recent preference event${response?.removed_events === 1 ? '' : 's'} cleared. Saved Signals were preserved.`);
+      setNotice(`${response?.removed_events || 0} recent preference event${response?.removed_events === 1 ? '' : 's'} cleared. Followed stories were preserved.`);
     } catch (requestError) {
       setError(requestError?.message || 'Could not reset your viewing preferences.');
     } finally {
@@ -628,7 +628,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
       {notice && <div className="personal-notice" role="status">{notice}</div>}
 
       <div
-        aria-label={embedded ? (tab === 'saved' ? 'Saved Signals' : tab === 'contribute' ? 'Contributions' : 'Private Briefings') : undefined}
+        aria-label={embedded ? (tab === 'saved' ? 'Following' : tab === 'contribute' ? 'Contributions' : 'Private Briefings') : undefined}
         aria-labelledby={embedded ? undefined : `personal-desk-${tab}-tab`}
         id="personal-desk-panel"
         role={embedded ? 'region' : 'tabpanel'}
@@ -726,7 +726,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
       )}
       {tab === 'saved' && (
         loading ? (
-          <div className="workflow-empty"><Icon name="refresh" size={24} /><h2>Loading Saved Signals</h2></div>
+          <div className="workflow-empty"><Icon name="refresh" size={24} /><h2>Loading followed stories</h2></div>
         ) : savedItems.length === 0 ? (
         <>
           <div className="personal-learning-strip">
@@ -746,7 +746,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
               <div key={articleKey(item)} className="flex min-h-0 flex-col gap-2">
                 <ArticleCard item={item} onOpen={openSaved} />
                 <button aria-busy={busyActions[articleKey(item)] === 'remove'} className="btn-dark-secondary w-full justify-center" disabled={Boolean(busyActions[articleKey(item)])} onClick={() => remove(item)} type="button">
-                  <Icon name="trash" size={14} /> {busyActions[articleKey(item)] === 'remove' ? 'Removing…' : 'Remove from Saved Signals'}
+                  <Icon name="trash" size={14} /> {busyActions[articleKey(item)] === 'remove' ? 'Updating…' : 'Unfollow'}
                 </button>
               </div>
             ))}

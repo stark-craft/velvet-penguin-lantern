@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
-import NameModal from '../components/modals/NameModal.jsx';
 import Icon from '../components/Icon.jsx';
 import {
   completeViewerPreferences, confirmViewerMigration, getForYou, getRecommendationStatus, getViewerPreferences,
-  getViewerSaved, getWorkflow, hideArticleForViewer, pauseViewerPersonalization,
-  removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote,
+  getViewerSaved, hideArticleForViewer, pauseViewerPersonalization,
+  removeSavedArticle, saveArticleForLater, setViewerReaction,
   resetRecommendationProfile,
 } from '../api.js';
 import { articleKey } from '../utils/intelligence.js';
@@ -17,7 +16,6 @@ import FollowedUpdates from './FollowedUpdates.jsx';
 import ForYouCard from './ForYouCard.jsx';
 import InterestSetup from './InterestSetup.jsx';
 import SinceLastVisit from './SinceLastVisit.jsx';
-import { recommendationGreeting, timeGreeting } from './recommendationState.js';
 import useRecommendationEvents from './useRecommendationEvents.js';
 import './for-you.css';
 
@@ -25,30 +23,26 @@ const migrationDismissKey = 'for-you-migration-dismissed';
 
 export default function ForYouScreen() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [status, setStatus] = useState(null);
   const [preferences, setPreferences] = useState(null);
   const [feed, setFeed] = useState(null);
   const [items, setItems] = useState([]);
   const [savedKeys, setSavedKeys] = useState(new Set());
-  const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [openArticle, setOpenArticle] = useState(null);
-  const [pendingSelect, setPendingSelect] = useState(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionNotice, setActionNotice] = useState(null);
   const [busyActions, setBusyActions] = useState({});
-  const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [controlBusy, setControlBusy] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [reviewed, setReviewed] = useState(new Set());
-  const [explainOpen, setExplainOpen] = useState(false);
   const dwellStarted = useRef(0);
   const dwellAccumulated = useRef(0);
   const actionLocks = useRef(new Set());
   const controlLocks = useRef(new Set());
-  const lessLikeTimers = useRef(new Map());
   const { record, flush } = useRecommendationEvents(
     feed?.feed_request_id,
     status?.event_flush_seconds || 15,
@@ -76,10 +70,9 @@ export default function ForYouScreen() {
         setPreferences(pref?.preferences || {});
         setSetupOpen(Boolean(nextStatus?.enabled && !pref?.preferences?.completed_at));
         if (nextStatus?.enabled) await loadFeed();
-        const [saved, workflow] = await Promise.all([getViewerSaved(), getWorkflow()]);
+        const saved = await getViewerSaved();
         if (cancelled) return;
         setSavedKeys(new Set(normalizeList(saved?.items || []).map(articleKey)));
-        setSelectedKeys(new Set(normalizeList([...(workflow?.selected || []), ...(workflow?.approved || [])]).map(articleKey)));
       } catch (nextError) {
         if (!cancelled) setError(nextError?.message || 'Could not prepare your intelligence mix.');
       } finally {
@@ -89,14 +82,14 @@ export default function ForYouScreen() {
     return () => { cancelled = true; };
   }, [loadAttempt, loadFeed]);
 
-  useEffect(() => () => {
-    lessLikeTimers.current.forEach(({ timer, item }) => {
-      window.clearTimeout(timer);
-      record('less_like_this', item);
-    });
-    lessLikeTimers.current.clear();
-    flush({ keepalive: true });
-  }, [flush, record]);
+  useEffect(() => () => { flush({ keepalive: true }); }, [flush]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('edit') !== 'interests') return;
+    setSetupOpen(true);
+    navigate('/for-you', { replace: true });
+  }, [location.search, navigate]);
 
   const runItemAction = async (action, item, work) => {
     const key = articleKey(item);
@@ -119,10 +112,9 @@ export default function ForYouScreen() {
   const refresh = async () => {
     if (controlLocks.current.has('refresh')) return;
     controlLocks.current.add('refresh');
-    setRefreshing(true);
     setError('');
     try { await loadFeed(); } catch (nextError) { setError(nextError?.message || 'Could not refresh For You.'); }
-    finally { controlLocks.current.delete('refresh'); setRefreshing(false); }
+    finally { controlLocks.current.delete('refresh'); }
   };
   const loadMore = async () => {
     if (!feed?.cursor || controlLocks.current.has('load-more')) return;
@@ -276,57 +268,21 @@ export default function ForYouScreen() {
       }
     });
   };
-  const interested = async (item) => {
-    return runItemAction('interested', item, async () => {
-      try {
-      await trainVote(item.keywords_found || item.keywords || [], item.master_summary || item.summary || item.title, 'interested', item.title);
-      record('interested', item);
-      setActionNotice({ message: 'Thanks—this will gently influence your future ordering.' });
-      } catch (nextError) {
-        setError(nextError?.message || 'Could not record this feedback.');
-      }
-    });
-  };
-  const lessLikeThis = (item) => {
-    const key = articleKey(item);
-    if (lessLikeTimers.current.has(key)) return;
-    const originalIndex = items.findIndex((candidate) => articleKey(candidate) === key);
-    setItems((current) => current.filter((candidate) => articleKey(candidate) !== articleKey(item)));
-    const timer = window.setTimeout(() => {
-      lessLikeTimers.current.delete(key);
-      record('less_like_this', item);
-    }, 6000);
-    lessLikeTimers.current.set(key, { timer, item });
-    setActionNotice({
-      message: 'Showing fewer stories like this. This affects only your For You ordering.',
-      label: 'Undo',
-      action: () => {
-        const pending = lessLikeTimers.current.get(key);
-        if (pending) window.clearTimeout(pending.timer);
-        lessLikeTimers.current.delete(key);
-        setItems((current) => {
-          if (current.some((candidate) => articleKey(candidate) === key)) return current;
-          const next = [...current];
-          next.splice(Math.max(0, Math.min(originalIndex, next.length)), 0, item);
-          return next;
-        });
-        setActionNotice(null);
-      },
-    });
-  };
-  const confirmSelect = async (item, name) => {
-    return runItemAction('select', item, async () => {
-      try {
-      await selectWorkflow({ ...item, selected_by: name, selected_at: new Date().toISOString() });
-      setSelectedKeys((current) => new Set(current).add(articleKey(item)));
-      record('select', item);
-      setActionNotice({ message: 'Sent to the shared Review Queue.' });
-      } catch (nextError) {
-        setError(nextError?.message || 'Could not send this story to Review Queue.');
-        throw nextError;
-      }
-    });
-  };
+  const react = async (item, reaction) => runItemAction('reaction', item, async () => {
+    try {
+      const current = item.reactions?.viewer_reaction || 'neutral';
+      const nextReaction = current === reaction ? 'neutral' : reaction;
+      const response = await setViewerReaction(item, nextReaction);
+      const apply = (candidate) => articleKey(candidate) === articleKey(item)
+        ? { ...candidate, reactions: { like_count: response.like_count, dislike_count: response.dislike_count, viewer_reaction: response.viewer_reaction } }
+        : candidate;
+      setItems((currentItems) => currentItems.map(apply));
+      setOpenArticle((currentArticle) => currentArticle && articleKey(currentArticle) === articleKey(item) ? apply(currentArticle) : currentArticle);
+      setActionNotice({ message: nextReaction === 'neutral' ? 'Reaction removed.' : `Your ${nextReaction} was counted. The story stays in your feed.` });
+    } catch (nextError) {
+      setError(nextError?.message || 'Could not record this reaction.');
+    }
+  });
 
   const sections = useMemo(() => {
     const byKey = new Map(items.map((item) => [articleKey(item), item]));
@@ -350,10 +306,10 @@ export default function ForYouScreen() {
   }, [feed, items]);
 
   const cardProps = (item, index, section) => ({
-    index, section, saved: savedKeys.has(articleKey(item)), selected: selectedKeys.has(articleKey(item)),
+    index, section, saved: savedKeys.has(articleKey(item)),
     busyAction: busyActions[articleKey(item)] || '',
-    onOpen: openDossier, onSave: toggleSave, onSelect: setPendingSelect, onHide: hide,
-    onInterested: interested, onLessLikeThis: lessLikeThis,
+    onOpen: openDossier, onSave: toggleSave, onHide: hide,
+    onReact: react,
     onImpression: (target, context) => record('qualified_impression', target, context),
   });
 
@@ -363,9 +319,14 @@ export default function ForYouScreen() {
 
   return (
     <div className="fy-page">
-      <section className="fy-hero">
-        <div className="fy-hero-copy"><span className="fy-kicker">{recommendationGreeting(feed?.mode, feed?.viewer_name)}</span><h1>{timeGreeting()}, {feed?.viewer_name || 'there'}.</h1><p>Five signals, ranked for you—what changed, why it matters, and what deserves attention next.</p><div className="fy-hero-actions"><button onClick={() => setSetupOpen(true)} type="button"><Icon name="settings" size={15} /> Edit interests</button><button aria-expanded={explainOpen} onClick={() => setExplainOpen((current) => !current)} type="button"><Icon name="sparkle" size={15} /> Why these stories?</button><button disabled={refreshing} onClick={refresh} type="button"><Icon name="refresh" size={15} /> {refreshing ? 'Refreshing…' : 'Refresh mix'}</button></div>{explainOpen && <div className="fy-explain-mix" role="note">Your choices and meaningful actions influence order. Shared editorial importance, evidence quality, source diversity and useful surprise remain part of every mix. Card appearances alone are never treated as interest.</div>}</div>
-        <aside aria-label="Today’s personalized mix"><span>Today’s mix</span><strong>{feed?.total || 0}</strong><p>eligible signals</p><div><small><b>{feed?.counts?.follow_up || 0}</b> followed updates</small><small><b>{feed?.counts?.exploration || 0}</b> useful surprises</small></div></aside>
+      <section className="fy-preference-strip" aria-label="Your selected interests">
+        <div><Icon name="sparkle" size={17} /><span><strong>{feed?.viewer_name ? `${feed.viewer_name}'s feed` : 'Your feed'}</strong><small>Ranked privately from your choices and meaningful reading</small></span></div>
+        <div className="fy-preference-list">{[
+          ...(preferences?.topics || []), ...(preferences?.outcomes || []),
+        ].slice(0, 5).map((id) => {
+          const options = [...(status?.taxonomy?.topics || []), ...(status?.taxonomy?.outcomes || [])];
+          return <span key={id}>{options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' ')}</span>;
+        })}{!preferences?.topics?.length && !preferences?.outcomes?.length && <span>Balanced starter mix</span>}</div>
       </section>
       {error && <div className="fy-inline-error" role="alert">{error}</div>}
       {actionNotice && <div className="fy-feedback" role="status"><span>{actionNotice.message}</span><div>{actionNotice.action && <button onClick={actionNotice.action} type="button">{actionNotice.label}</button>}<button aria-label="Dismiss message" onClick={() => setActionNotice(null)} type="button"><Icon name="x" size={13} /></button></div></div>}
@@ -376,8 +337,8 @@ export default function ForYouScreen() {
         </section>
       )}
       {items.length ? <>
-        <SinceLastVisit items={sections.since} cardProps={cardProps} />
         <ExecutiveScan items={sections.scan} reviewed={reviewed.size} cardProps={cardProps} />
+        <SinceLastVisit items={sections.since} cardProps={cardProps} />
         <FollowedUpdates items={sections.followed} cardProps={cardProps} />
         <ExplorationRail items={sections.exploration} cardProps={cardProps} />
         {sections.more.length > 0 && <section className="fy-section"><header><span>More for you</span><h2>Continue when you have time</h2></header><div className="fy-card-grid">{sections.more.map((item, index) => <ForYouCard {...cardProps(item, index, 'more')} item={item} key={item.article_id || item.id} />)}</div></section>}
@@ -385,8 +346,7 @@ export default function ForYouScreen() {
       {feed?.cursor && <div className="fy-load-more"><button disabled={loadingMore} onClick={loadMore} type="button">{loadingMore ? 'Loading…' : 'Load more intelligence'} {!loadingMore && <Icon name="chevR" size={14} />}</button></div>}
       <div className="fy-controls"><button disabled={Boolean(controlBusy)} onClick={async () => { if (controlLocks.current.has('pause')) return; controlLocks.current.add('pause'); setControlBusy('pause'); setError(''); try { await pauseViewerPersonalization(feed?.mode !== 'paused'); await refresh(); setActionNotice({ message: feed?.mode === 'paused' ? 'Personalization resumed.' : 'Personalization paused. Shared editorial order is available.' }); } catch (nextError) { setError(nextError?.message || 'Could not update personalization.'); } finally { controlLocks.current.delete('pause'); setControlBusy(''); } }} type="button"><Icon name={feed?.mode === 'paused' ? 'play' : 'pause'} size={14} /> {controlBusy === 'pause' ? 'Updating…' : feed?.mode === 'paused' ? 'Resume personalization' : 'Pause personalization'}</button><button disabled={Boolean(controlBusy)} onClick={resetDesk} type="button"><Icon name="refresh" size={14} /> {controlBusy === 'reset' ? 'Resetting…' : 'Reset this desk'}</button><button onClick={() => navigate('/home')} type="button">Open shared Briefing</button></div>
       <InterestSetup open={setupOpen} taxonomy={status?.taxonomy} initial={preferences} onClose={() => setSetupOpen(false)} onSkip={useStarterMix} onComplete={completeSetup} />
-      <ArticleModal item={openArticle} onClose={closeDossier} onSave={toggleSave} isSaved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} onSelect={(item) => { closeDossier(); setPendingSelect(item); }} onHide={async (item) => { closeDossier(); await hide(item); }} onSourceOpen={(item) => record('source_open', item, { section: 'dossier' })} onWhyThisStory={(item) => record('why_this_story_open', item, { section: 'dossier' })} />
-      <NameModal open={Boolean(pendingSelect)} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />
+      <ArticleModal item={openArticle} onClose={closeDossier} onSave={toggleSave} isSaved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} onHide={async (item) => { closeDossier(); await hide(item); }} onSourceOpen={(item) => record('source_open', item, { section: 'dossier' })} onWhyThisStory={(item) => record('why_this_story_open', item, { section: 'dossier' })} />
     </div>
   );
 }

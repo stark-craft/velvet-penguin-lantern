@@ -173,6 +173,18 @@ def score_candidates(
     chosen_outcomes = set(preferences.get("outcomes") or []) if not paused else set()
     chosen_families = set(preferences.get("source_families") or []) if not paused else set()
     events = state.get("events") if isinstance(state.get("events"), list) and not paused else []
+    if not paused:
+        reactions = state.get("reaction_events") if isinstance(state.get("reaction_events"), dict) else {}
+        events = [*events, *[
+            {
+                "action": "interested" if value.get("reaction") == "like" else "less_like_this",
+                "article_id": key,
+                "occurred_at": value.get("updated_at"),
+                "detail": value.get("detail") if isinstance(value.get("detail"), dict) else {},
+            }
+            for key, value in reactions.items()
+            if isinstance(value, dict) and value.get("reaction") in {"like", "dislike"}
+        ]]
     positive, negative, meaningful, session_count = _event_affinities(events)
     behavior_confidence = min(1.0, meaningful / 20.0)
     served = state.get("served") if isinstance(state.get("served"), dict) else {}
