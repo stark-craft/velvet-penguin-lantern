@@ -1064,6 +1064,27 @@ html[data-theme="light"] .profile-preview-card {
   color: var(--text-secondary) !important;
 }
 
+html[data-theme="light"] .app-shell .voc-hero {
+  border-color: rgba(70, 101, 146, 0.22) !important;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(37, 99, 235, 0.12), transparent 24rem),
+    radial-gradient(circle at 12% 0%, rgba(20, 184, 166, 0.08), transparent 20rem),
+    linear-gradient(145deg, rgba(246, 250, 254, 0.96), rgba(222, 233, 246, 0.94)) !important;
+  color: #111c2f !important;
+}
+
+html[data-theme="light"] .app-shell .voc-hero .eyebrow {
+  color: #24578d !important;
+}
+
+html[data-theme="light"] .app-shell .voc-hero h1 {
+  color: #111c2f !important;
+}
+
+html[data-theme="light"] .app-shell .voc-hero p {
+  color: #52657d !important;
+}
+
 .voc-dismiss {
   display: block;
   min-height: 42px;
