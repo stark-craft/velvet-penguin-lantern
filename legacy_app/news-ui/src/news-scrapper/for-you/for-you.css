@@ -224,4 +224,32 @@ html[data-theme="light"] .fy-card-actions button.active{border-color:#15936b;bac
 .fy-executive-grid .is-executive-secondary .fy-card-actions>button:first-child{width:100%;overflow:visible;padding:7px 9px}
 .fy-executive-grid .is-executive-secondary .fy-card-actions>button:first-child span{display:inline}
 html[data-theme="light"] .fy-card-actions [data-tooltip]::after{border-color:#c5d2df;background:#14263a;color:#fff;box-shadow:0 10px 26px rgba(25,45,65,.2)}
+
+/* Light-theme readability: preserve the quiet hierarchy without allowing
+   compact metadata or section labels to fade into the pale surfaces. */
+html[data-theme="light"] .fy-kicker,
+html[data-theme="light"] .fy-section>header>span,
+html[data-theme="light"] .fy-executive>header span:first-child{
+  color:#08665f;
+}
+html[data-theme="light"] .fy-card-meta{
+  color:#435a70;
+}
+html[data-theme="light"] .fy-source-chip{
+  border-color:rgba(7,95,88,.24);
+  background:rgba(7,95,88,.08);
+  color:#075f58;
+}
+html[data-theme="light"] .fy-reviewed-pill span{
+  color:#425a70!important;
+}
+html[data-theme="light"] .fy-preference-strip small{
+  color:#4d657b;
+}
+html[data-theme="light"] .fy-hook span{
+  color:#075f58;
+}
+html[data-theme="light"] .fy-new-chip{
+  color:#744800;
+}
 @media(prefers-reduced-motion:reduce){.fy-card-actions [data-tooltip]::after{transition:none}}

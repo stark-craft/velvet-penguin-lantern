@@ -18,3 +18,20 @@
 @media (max-width: 920px) { .rio-primary-row { grid-template-columns: 1fr; height: auto; }.rio-observatory { height: 570px; }.rio-stream { height: 520px; } }
 @media (max-width: 620px) { .rio-observatory { height: 610px; border-radius: 22px; }.rio-observatory-layout { grid-template-rows: 68px 48px minmax(0,1fr) 112px; padding: 22px; }.rio-observatory-copy { max-width: 100%; }.rio-observatory-layout > footer { grid-template-columns: 1fr auto; }.rio-observatory-layout > footer > div { grid-column: 1 / -1; grid-row: 1; }.rio-lanes { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; }.rio-lanes > button { flex: 0 0 82%; scroll-snap-align: start; }.rio-provider-status > div { display: none; } }
 @media (prefers-reduced-motion: reduce) { .rio-stream-track { animation: none !important; }.rio-state > span { animation-duration: 2.5s; } }
+
+/* The Observatory hero stays cinematic in both themes. These overrides only
+   strengthen the pale-theme evidence metadata and research navigation. */
+html[data-theme="light"] .rio-stream-card small,
+html[data-theme="light"] .rio-stream > footer,
+html[data-theme="light"] .rio-lanes > button > span,
+html[data-theme="light"] .rio-lanes small,
+html[data-theme="light"] .rio-provider-status{
+  color:#4a6075;
+}
+html[data-theme="light"] .rio-stream-card b{
+  color:#344b60;
+}
+html[data-theme="light"] .rio-lanes > button > svg,
+html[data-theme="light"] .rio-provider-status .is-offline{
+  color:#455d72;
+}

@@ -30,14 +30,14 @@
 }
 
 html[data-theme="light"] .scan-studio {
-  --scan-accent: #5f67d9;
-  --scan-accent-strong: #4852c9;
+  --scan-accent: #4651bd;
+  --scan-accent-strong: #3541ad;
   --scan-cyan: #1679ad;
   --scan-mint: #167e6c;
   --scan-warm: #a56c09;
   --scan-ink: #17243a;
-  --scan-muted: #52647c;
-  --scan-faint: #6f8095;
+  --scan-muted: #3f536c;
+  --scan-faint: #4f627a;
   --scan-line: rgba(61, 82, 115, 0.16);
   --scan-line-strong: rgba(67, 81, 138, 0.28);
   --scan-panel: rgba(238, 243, 248, 0.86);
