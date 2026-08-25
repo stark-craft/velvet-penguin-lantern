@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Body, HTTPException, Query, Requ
 
 from core.profile import client_ip
 from venture_lens.catalog import GITHUB_CATEGORIES, RESEARCH_CATEGORIES
+from venture_lens.discovery import venture_discovery_service
 from venture_lens.intelligence import VentureIntelligenceService
 from venture_lens.service import venture_lens_service
 
@@ -54,6 +55,7 @@ def status():
             "refreshed_at": research.get("refreshed_at"),
             "items": len(research.get("items") or []),
         },
+        "providers": venture_discovery_service.provider_states(),
     }
 
 
@@ -106,6 +108,31 @@ def overview(background_tasks: BackgroundTasks):
     }
 
 
+@router.get("/discovery")
+def discovery(
+    background_tasks: BackgroundTasks,
+    refresh: bool = Query(False),
+):
+    """Return the last healthy multi-provider snapshot immediately.
+
+    Refreshes are isolated per provider and do not participate in the news
+    scheduler.  A caller may explicitly force a synchronous refresh for the
+    existing Venture Lens refresh action; ordinary page loads only enqueue
+    stale providers in the background.
+    """
+
+    if refresh:
+        venture_discovery_service.refresh_all(force=True)
+    else:
+        for provider in venture_discovery_service.stale_providers():
+            background_tasks.add_task(
+                venture_discovery_service.refresh_provider,
+                provider,
+                False,
+            )
+    return venture_discovery_service.discovery()
+
+
 @router.get("/intelligence")
 def intelligence(request: Request):
     return {
@@ -135,6 +162,30 @@ def paper_dossier(paper_id: str):
     payload = venture_intelligence.paper_dossier(paper_id)
     if not payload:
         raise HTTPException(status_code=404, detail="Research paper not found.")
+    return payload
+
+
+@router.get("/dossier/model/{model_id:path}")
+def model_dossier(model_id: str):
+    payload = venture_discovery_service.artifact("model", model_id)
+    if not payload:
+        raise HTTPException(status_code=404, detail="Model not found.")
+    return payload
+
+
+@router.get("/dossier/dataset/{dataset_id:path}")
+def dataset_dossier(dataset_id: str):
+    payload = venture_discovery_service.artifact("dataset", dataset_id)
+    if not payload:
+        raise HTTPException(status_code=404, detail="Dataset not found.")
+    return payload
+
+
+@router.get("/dossier/patent/{patent_id:path}")
+def patent_dossier(patent_id: str):
+    payload = venture_discovery_service.artifact("patent", patent_id)
+    if not payload:
+        raise HTTPException(status_code=404, detail="Patent not found.")
     return payload
 
 
@@ -188,5 +239,5 @@ def mark_notifications_read(request: Request):
 def refresh():
     return {
         "status": "success",
-        **venture_lens_service.refresh_all(force=True),
+        **venture_discovery_service.refresh_all(force=True),
     }

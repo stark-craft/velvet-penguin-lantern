@@ -9,7 +9,7 @@ import Bouncer from '../components/Bouncer.jsx';
 import { correctRegion, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
-import { articleKey, groupedByDatePreservingOrder, keywordOptions, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
+import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
 import '../styles/home-refinement.css';
 const emptyFilters = {
   query: '',
@@ -207,10 +207,9 @@ function TopClusterCarousel({
 <div className="absolute inset-0 z-10 bg-[linear-gradient(90deg,rgba(5,9,20,0.74)_0%,rgba(5,9,20,0.42)_48%,rgba(5,9,20,0.10)_100%),linear-gradient(0deg,rgba(5,9,20,0.78)_0%,rgba(5,9,20,0.22)_56%,rgba(0,0,0,0.02)_100%)]" />
 </button>
 <div className="pointer-events-none relative z-20 flex h-full flex-col justify-end p-4 lg:p-5 2xl:p-6">
-<div className="mb-auto flex items-center justify-between gap-4">
-<div>
-<div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">              Top Cluster Carousel            </div>            {fallbackMode && <div className="mt-2 inline-flex rounded-full border border-amber-300/25 bg-amber-400/10 px-3 py-1 text-[11px] font-semibold text-amber-100">                Single-source signal              </div>}          </div>
-<div className="pointer-events-auto flex gap-2">
+<div className="hero-carousel-header mb-auto flex items-center justify-between gap-4">
+<div className="hero-carousel-kicker text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">              Top Cluster Carousel            </div>
+<div className="hero-carousel-controls pointer-events-auto flex gap-2">
 <button className="carousel-control" onClick={() => move(-1)} type="button" aria-label="Previous slide">
 <Icon name="chevL" />
 </button>
@@ -219,8 +218,8 @@ function TopClusterCarousel({
 </button>
 </div>
 </div>
-<div className="pointer-events-auto max-w-3xl">
-<div className="mb-3 flex flex-wrap gap-2">
+<div className="hero-carousel-content pointer-events-auto max-w-3xl">
+<div className="hero-carousel-meta mb-3 flex flex-wrap gap-2">
 <span className="source-chip">              {fallbackMode ? 'Single-source signal' : 'Multi-source signal'}            </span>
 <span className="source-chip">              {active.source_count || 1} sources            </span>
 <span className="source-chip">              {active.category || 'News'}            </span>
@@ -228,17 +227,15 @@ function TopClusterCarousel({
 <span className="source-chip">              Score {scoreOf(active)}            </span>
 {followUp(active) && <span className="personal-follow-chip" title={`Related to: ${followUp(active).matched_saved_title || 'a saved signal'}`}><Icon name="bookmark" size={12} /> {followUp(active).follow_label}</span>}
 </div>
-<button className="text-left" onClick={() => onOpen(active)} type="button">
-<h2 className="line-clamp-3 text-[clamp(1.65rem,2.2vw,3.05rem)] font-semibold leading-[1.02] text-white">              {active.title}            </h2>
-<p className="mt-3 line-clamp-3 max-w-2xl text-[clamp(0.9rem,0.95vw,1.05rem)] leading-6 text-slate-300">              {active.summary}            </p>
+<button className="hero-carousel-copy text-left" onClick={() => onOpen(active)} type="button">
+<h2 className="hero-carousel-title line-clamp-3 text-[clamp(1.65rem,2.2vw,3.05rem)] font-semibold leading-[1.02] text-white">              {active.title}            </h2>
+<p className="hero-carousel-summary line-clamp-3 max-w-2xl text-[clamp(0.9rem,0.95vw,1.05rem)] text-slate-300">              {active.summary}            </p>
 </button>
-<div className="mt-4 flex flex-wrap items-center gap-3">
+<div className="hero-carousel-actions flex flex-wrap items-center gap-3">
 <button className="btn-dark-primary" onClick={() => onOpen(active)} type="button">
 <Icon name="file" size={15} />              Open Dossier            </button>
-<button className="btn-dark-secondary" disabled={!workflowReady} onClick={() => onSelect(active)} title={!workflowReady ? 'Review Queue state is still loading' : undefined} type="button">
-<Icon name="check" size={15} />              Select for Review            </button>
 </div>
-<div className="mt-4 flex gap-2">            {slides.map((slide, dotIdx) => <button key={articleKey(slide) || dotIdx} className={dotIdx === idx ? 'h-2.5 w-8 rounded-full bg-sky-200' : 'h-2.5 w-2.5 rounded-full bg-white/30 hover:bg-white/60'} onClick={() => setIdx(dotIdx)} type="button" aria-label={`Go to slide ${dotIdx + 1}`} />)}          </div>
+<div className="hero-carousel-dots mt-4 flex gap-2">            {slides.map((slide, dotIdx) => <button key={articleKey(slide) || dotIdx} className={dotIdx === idx ? 'h-2.5 w-8 rounded-full bg-sky-200' : 'h-2.5 w-2.5 rounded-full bg-white/30 hover:bg-white/60'} onClick={() => setIdx(dotIdx)} type="button" aria-label={`Go to slide ${dotIdx + 1}`} />)}          </div>
 </div>
 </div>
 </section>;
@@ -339,53 +336,32 @@ function BriefingStream({
 </button>
 </aside>;
 }
-function BriefingKeywordRibbon({
-  keywords,
-  activeKeyword,
-  total,
-  onKeyword
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const featured = useMemo(() => {
-    const top = keywords.slice(0, 6);
-    if (activeKeyword === 'all' || top.some(item => item.value === activeKeyword)) return top;
-    const active = keywords.find(item => item.value === activeKeyword);
-    return active ? [...top.slice(0, 5), active] : top;
-  }, [activeKeyword, keywords]);
-  const visibleKeywords = expanded ? keywords : featured;
-  if (!keywords.length) return null;
-  return <section className={expanded ? 'briefing-topic-ribbon is-expanded' : 'briefing-topic-ribbon'} aria-label="Matched keyword highlights">
-    <div className="briefing-topic-intro">
-      <span className="briefing-topic-mark"><Icon name="sparkle" size={15} /></span>
-      <div>
-        <span>Signal topics</span>
-        <small>{activeKeyword === 'all' ? `${keywords.length} matched across ${total} signals` : `Filtered by ${activeKeyword}`}</small>
-      </div>
+function BriefingLensRail({ lenses, activeLens, onLens }) {
+  const active = lenses.find(lens => lens.id === activeLens);
+  return <section className="briefing-lens-rail" aria-label="Intelligence lenses">
+    <div className="briefing-lens-heading">
+      <span className="briefing-lens-orbit"><Icon name="sparkle" size={14} /></span>
+      <span>
+        <strong>Intelligence lenses</strong>
+        <small>{active ? `${active.label} · ${active.count} signals` : 'Choose a lens to reshape the complete briefing'}</small>
+      </span>
     </div>
-    <div className="briefing-topic-list" id="briefing-topic-list" role="group" aria-label="Filter briefing by matched keyword">
-      {visibleKeywords.map(({ value, count: keywordCount }) => <button
-        aria-pressed={activeKeyword === value}
-        className={activeKeyword === value ? 'briefing-topic-chip is-active' : 'briefing-topic-chip'}
-        key={value}
-        onClick={() => onKeyword(activeKeyword === value ? 'all' : value)}
-        title={`Show ${keywordCount} signals matching ${value}`}
+    <div className="briefing-lens-map" role="group" aria-label="Filter the complete briefing by intelligence lens">
+      {lenses.map((lens, index) => <button
+        aria-pressed={activeLens === lens.id}
+        className={activeLens === lens.id ? 'briefing-lens-key is-active' : 'briefing-lens-key'}
+        disabled={lens.count === 0}
+        key={lens.id}
+        onClick={() => onLens(activeLens === lens.id ? 'all' : lens.id)}
+        title={lens.count ? `${lens.description}. Show ${lens.count} matching signals.` : `No ${lens.label} signals in this briefing.`}
         type="button"
       >
-        <span>{value}</span><strong>{keywordCount}</strong>
+        <span className="briefing-lens-index">0{index + 1}</span>
+        <span className="briefing-lens-label">{lens.label}</span>
+        <strong>{lens.count}</strong>
       </button>)}
     </div>
-    <button
-      aria-controls="briefing-topic-list"
-      aria-expanded={expanded}
-      aria-label={expanded ? 'Show fewer matched keywords' : `Show all ${keywords.length} matched keywords`}
-      className="briefing-topic-expand"
-      onClick={() => setExpanded(value => !value)}
-      title={expanded ? 'Show top topics' : 'Show every matched keyword'}
-      type="button"
-    >
-      <span>{expanded ? 'Top six' : 'All topics'}</span>
-      <Icon name="chevD" size={15} />
-    </button>
+    {active && <button className="briefing-lens-reset" onClick={() => onLens('all')} type="button">Reset</button>}
   </section>;
 }
 function LatestDaySignals({
@@ -575,6 +551,7 @@ export default function FeedScreen() {
   const [hiddenCount, setHiddenCount] = useState(0);
   const [savedKeys, setSavedKeys] = useState(new Set());
   const [filters, setFilters] = useState(emptyFilters);
+  const [activeLens, setActiveLens] = useState('all');
   const [personalizationMeta, setPersonalizationMeta] = useState(null);
   const [showPersonalizationNotice, setShowPersonalizationNotice] = useState(false);
   const [actionFeedback, setActionFeedback] = useState(null);
@@ -636,18 +613,24 @@ export default function FeedScreen() {
   }, [showPersonalizationNotice]);
   const selectedIds = useMemo(() => new Set(workflow.selected.map(article => article.id || article.title)), [workflow.selected]);
   const approvedIds = useMemo(() => new Set(workflow.approved.map(article => article.id || article.title)), [workflow.approved]);
-  const filteredArticles = useMemo(() => applyFilters(articles, filters, selectedIds), [articles, filters, selectedIds]);
-  const heroFeed = useMemo(() => getHeroFeed(articles), [articles]);
+  const lenses = useMemo(() => briefingLensOptions(articles), [articles]);
+  const lensArticles = useMemo(() => articles.filter(item => matchesBriefingLens(item, activeLens)), [activeLens, articles]);
+  const filteredArticles = useMemo(() => applyFilters(lensArticles, filters, selectedIds), [filters, lensArticles, selectedIds]);
+  const heroFeed = useMemo(() => getHeroFeed(lensArticles), [lensArticles]);
   const heroFeedKeys = useMemo(() => new Set(heroFeed.map(stableSignalKey).filter(Boolean)), [heroFeed]);
   const groups = useMemo(() => groupedByDatePreservingOrder(filteredArticles), [filteredArticles]);
   const selectedBatch = useMemo(() => articles.filter(item => checked[articleKey(item)]), [articles, checked]);
   const options = useMemo(() => ({
-    regions: uniqueSorted(articles.map(article => article.region)),
-    categories: uniqueSorted(articles.map(article => article.category)),
-    sources: uniqueSorted(articles.map(article => article.src || article.source)),
-    dates: uniqueSorted(articles.map(article => article.date)).reverse(),
-    keywords: keywordOptions(articles)
-  }), [articles]);
+    regions: uniqueSorted(lensArticles.map(article => article.region)),
+    categories: uniqueSorted(lensArticles.map(article => article.category)),
+    sources: uniqueSorted(lensArticles.map(article => article.src || article.source)),
+    dates: uniqueSorted(lensArticles.map(article => article.date)).reverse(),
+    keywords: keywordOptions(lensArticles)
+  }), [lensArticles]);
+  const selectLens = lens => {
+    setActiveLens(lens);
+    setFilters(emptyFilters);
+  };
   const retrySupportingState = async () => {
     const failed = Object.entries(supportingState).filter(([, value]) => value === 'error').map(([key]) => key);
     if (!failed.length) return;
@@ -950,18 +933,15 @@ export default function FeedScreen() {
 {Object.values(supportingState).includes('error') && <div className="error-banner" role="status"><span>Some personal state could not be verified. Save or Review Queue actions stay disabled where their current state is unknown.</span><button className="ml-3 underline" onClick={retrySupportingState} type="button">Retry personal state</button></div>}
 <section className="briefing-stage grid gap-4 2xl:gap-5">
 <div className="briefing-top-row briefing-hero-row grid min-h-0 gap-4 2xl:gap-5">
+<div className="briefing-hero-stack">
 <TopClusterCarousel articles={heroFeed} onOpen={openDossier} onSelect={setPendingSelect} workflowReady={supportingState.workflow === 'ready'} />
-<BriefingStream articles={articles} onOpen={openDossier} navigate={navigate} />
+<BriefingLensRail activeLens={activeLens} lenses={lenses} onLens={selectLens} />
 </div>
-<BriefingKeywordRibbon
-  activeKeyword={filters.keyword}
-  keywords={options.keywords}
-  onKeyword={(keyword) => setFilters(previous => ({ ...previous, keyword }))}
-  total={articles.length}
-/>
-<LatestDaySignals articles={articles} excludeKeys={heroFeedKeys} onOpen={openDossier} />
+<BriefingStream articles={lensArticles} onOpen={openDossier} navigate={navigate} />
+</div>
+<LatestDaySignals articles={lensArticles} excludeKeys={heroFeedKeys} onOpen={openDossier} />
 </section>
-<SearchLoadedBriefing filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={articles.length} />
+<SearchLoadedBriefing filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={lensArticles.length} />
 <section className="space-y-8">        {Object.entries(groups).map(([day, items]) => <div key={day} className="space-y-4">
 <div className="flex items-center gap-4">
 <h2 className="text-lg font-semibold text-white">                  {day}                </h2>

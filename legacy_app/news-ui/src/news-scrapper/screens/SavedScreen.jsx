@@ -168,11 +168,12 @@ function BriefingJob({ job, index, onOpen, onRetry, retrying = false }) {
   );
 }
 
-export default function SavedScreen() {
+export default function SavedScreen({ view = '', autoStart: requestedAutoStart = '' }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [tab, setTab] = useState(() => tabFromPathname(location.pathname) || initialDeskTab());
-  const [autoStart, setAutoStart] = useState(() => (location.pathname === '/saved/leadership' ? 'leadership' : ''));
+  const embedded = Boolean(view);
+  const [tab, setTab] = useState(() => view || tabFromPathname(location.pathname) || initialDeskTab());
+  const [autoStart, setAutoStart] = useState(() => requestedAutoStart || (location.pathname === '/saved/leadership' ? 'leadership' : ''));
   const [savedItems, setSavedItems] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [openArticle, setOpenArticle] = useState(null);
@@ -207,7 +208,7 @@ export default function SavedScreen() {
       .filter(Boolean),
     [jobs],
   );
-  const { contributions } = useContributions();
+  const { contributions } = useContributions(tab === 'contribute');
   const contributionDrafts = contributions.filter((record) => record.status !== CONTRIBUTION_STATUS.SUBMITTED).length;
   const contributionSubmitted = contributions.filter((record) => record.status === CONTRIBUTION_STATUS.SUBMITTED).length;
   const savedKeys = useMemo(
@@ -223,6 +224,7 @@ export default function SavedScreen() {
   );
 
   useEffect(() => {
+    if (embedded) return undefined;
     let alive = true;
     getViewerProfile()
       .then((profile) => {
@@ -232,7 +234,7 @@ export default function SavedScreen() {
       })
       .catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [embedded]);
 
   // One honest sentence about the desk, composed from live data. Ordered by
   // urgency: work in progress beats finished work beats quiet filing.
@@ -265,13 +267,18 @@ export default function SavedScreen() {
   // addresses. Mirror the address into screen state so client-side deep links
   // behave the same way as a fresh page load.
   useEffect(() => {
+    if (view) {
+      setTab(view);
+      setAutoStart(requestedAutoStart);
+      return;
+    }
     const routedTab = tabFromPathname(location.pathname);
     if (routedTab) setTab(routedTab);
     else if (location.pathname === '/saved') {
       setTab((current) => (DESK_TAB_IDS.includes(current) ? current : initialDeskTab()));
     }
     setAutoStart(location.pathname === '/saved/leadership' ? 'leadership' : '');
-  }, [location.pathname]);
+  }, [location.pathname, requestedAutoStart, view]);
 
   // The URL mirrors the desk tab so every desk surface has a stable,
   // professional address. /saved/leadership additionally opens the leadership
@@ -313,15 +320,23 @@ export default function SavedScreen() {
       do {
         refreshPending.current = false;
         try {
-          const [savedResponse, briefingResponse, personalizationResponse, recommendationResponse] = await Promise.all([
-            getViewerSaved(),
-            getViewerBriefings(),
-            getViewerPersonalization().catch(() => null),
-            getViewerPreferences().catch(() => null),
-          ]);
+          let savedResponse = null;
+          let briefingResponse = null;
+          let personalizationResponse = null;
+          let recommendationResponse = null;
+          if (tab === 'saved') {
+            [savedResponse, personalizationResponse] = await Promise.all([
+              getViewerSaved(),
+              getViewerPersonalization().catch(() => null),
+            ]);
+          } else if (tab === 'briefings') {
+            briefingResponse = await getViewerBriefings();
+          } else if (!embedded) {
+            recommendationResponse = await getViewerPreferences().catch(() => null);
+          }
           if (!mounted.current) return;
-          setSavedItems(normalizeList(savedResponse?.items || []));
-          setJobs(Array.isArray(briefingResponse?.jobs) ? briefingResponse.jobs : []);
+          if (savedResponse) setSavedItems(normalizeList(savedResponse?.items || []));
+          if (briefingResponse) setJobs(Array.isArray(briefingResponse?.jobs) ? briefingResponse.jobs : []);
           if (personalizationResponse) setPersonalization(personalizationResponse);
           if (recommendationResponse) setRecommendationPreferences(recommendationResponse);
           setError('');
@@ -341,12 +356,12 @@ export default function SavedScreen() {
     mounted.current = true;
     return () => { mounted.current = false; };
   }, []);
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [tab]);
   useEffect(() => {
-    if (!activeJobs) return undefined;
+    if (tab !== 'briefings' || !activeJobs) return undefined;
     const timer = window.setInterval(() => loadAll({ quiet: true }), 1800);
     return () => window.clearInterval(timer);
-  }, [activeJobs]);
+  }, [activeJobs, tab]);
 
   const runItemAction = async (action, item, work) => {
     const key = articleKey(item);
@@ -538,6 +553,8 @@ export default function SavedScreen() {
 
   return (
     <div className="page-stack personal-desk">
+      {!embedded && (
+      <>
       <section className="desk-hero">
         <div className="desk-hero-copy">
           <div className="desk-kicker-row">
@@ -604,11 +621,18 @@ export default function SavedScreen() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {error && <div className="error-banner" role="alert"><span>{error}</span><button className="ml-3 underline" disabled={loading} onClick={() => loadAll()} type="button">Retry desk data</button></div>}
       {notice && <div className="personal-notice" role="status">{notice}</div>}
 
-      <div aria-labelledby={`personal-desk-${tab}-tab`} id="personal-desk-panel" role="tabpanel">
+      <div
+        aria-label={embedded ? (tab === 'saved' ? 'Saved Signals' : tab === 'contribute' ? 'Contributions' : 'Private Briefings') : undefined}
+        aria-labelledby={embedded ? undefined : `personal-desk-${tab}-tab`}
+        id="personal-desk-panel"
+        role={embedded ? 'region' : 'tabpanel'}
+      >
       {tab === 'contribute' && <ContributionWorkspace authorSuggestion={authorSuggestion} autoStart={autoStart} />}
       {tab === 'briefings' && (
         <>

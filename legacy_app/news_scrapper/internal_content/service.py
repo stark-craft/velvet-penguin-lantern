@@ -330,6 +330,15 @@ def list_published() -> list[dict]:
     return records
 
 
+def get_published(record_id: str) -> dict:
+    """Return one public record only after editorial publication."""
+
+    record = storage.load_records().get(record_id)
+    if not isinstance(record, dict) or record.get("status") != "published":
+        raise LookupError(record_id)
+    return record
+
+
 # -- editorial review (privileged) ---------------------------------------
 #
 # These transitions are called by the editor-key-guarded routes, never by the

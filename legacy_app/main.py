@@ -36,7 +36,11 @@ async def serve_for_you_spa_deep_link(request, call_next):
     application. API clients (and the frontend's /viewer/for-you request) keep
     receiving JSON from the recommendation router.
     """
-    if request.url.path.rstrip("/") == "/for-you" and "text/html" in request.headers.get("accept", ""):
+    path = request.url.path.rstrip("/") or "/"
+    if (
+        (path == "/for-you" or path.startswith("/for-you/"))
+        and "text/html" in request.headers.get("accept", "")
+    ):
         return serve_root()
     return await call_next(request)
 

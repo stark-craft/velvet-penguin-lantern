@@ -15,7 +15,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, Response, Upl
 from fastapi.responses import FileResponse
 
 from news_scrapper.recommendation.identity import resolve_viewer
-from . import service, storage
+from . import access, service, storage
 from .document_parser import ContributionError
 from .schemas import DraftUpdate, NotificationRead, ReviewNote, ReviewUnlock
 
@@ -74,8 +74,15 @@ def _fail(error: Exception) -> HTTPException:
     return HTTPException(status_code=400, detail=str(error))
 
 
+@router.get("/contribute-access")
+def contribution_access(request: Request):
+    ip = access.get_client_ip(request)
+    return {"allowed": ip in access.CONTRIBUTIONS_ALLOWED_IPS, "ip": ip}
+
+
 @router.get("/mine")
 def list_mine(request: Request, response: Response):
+    access.require_contributor_ip(request)
     try:
         return {"items": service.list_for_owner(_owner(request, response))}
     except ContributionError as error:
@@ -90,6 +97,7 @@ async def import_document(
     owner_name: str = Form(default=""),
     content_type: str = Form(default=""),
 ):
+    access.require_contributor_ip(request)
     data = await document.read()
     if not data:
         raise HTTPException(status_code=400, detail="Choose a PDF or Word (.docx) document to import.")
@@ -108,6 +116,7 @@ async def import_document(
 
 @router.post("/drafts")
 def create_draft(request: Request, response: Response, payload: DraftUpdate):
+    access.require_contributor_ip(request)
     try:
         return service.create_draft(_owner(request, response), payload.model_dump())
     except ContributionError as error:
@@ -119,6 +128,16 @@ def list_published():
     """Future Samsung Internal contract. Returns only already-published records."""
 
     return {"items": service.list_published()}
+
+
+@router.get("/published/{record_id}")
+def get_published(record_id: str):
+    """Public reader contract for already-published Internal content."""
+
+    try:
+        return service.get_published(record_id)
+    except LookupError as error:
+        raise _fail(error) from error
 
 
 @router.get("/review")
@@ -186,17 +205,20 @@ def reject_one(record_id: str, request: Request, payload: ReviewNote):
 
 @router.get("/notifications")
 def list_owner_notifications(request: Request, response: Response):
+    access.require_contributor_ip(request)
     return service.list_notifications(_owner(request, response))
 
 
 @router.post("/notifications/read")
 def read_owner_notifications(request: Request, response: Response, payload: NotificationRead):
+    access.require_contributor_ip(request)
     owner = _owner(request, response)
     return service.mark_notifications_read(owner, payload.ids)
 
 
 @router.get("/{record_id}")
 def get_one(record_id: str, request: Request, response: Response):
+    access.require_contributor_ip(request)
     try:
         return service.get_owned(_owner(request, response), record_id)
     except LookupError as error:
@@ -205,6 +227,7 @@ def get_one(record_id: str, request: Request, response: Response):
 
 @router.put("/{record_id}")
 def update_one(record_id: str, request: Request, response: Response, payload: DraftUpdate):
+    access.require_contributor_ip(request)
     try:
         return service.update_draft(_owner(request, response), record_id, payload.model_dump())
     except ContributionError as error:
@@ -215,6 +238,7 @@ def update_one(record_id: str, request: Request, response: Response, payload: Dr
 
 @router.delete("/{record_id}")
 def delete_one(record_id: str, request: Request, response: Response):
+    access.require_contributor_ip(request)
     try:
         deleted = service.delete_draft(_owner(request, response), record_id)
     except ContributionError as error:
@@ -226,6 +250,7 @@ def delete_one(record_id: str, request: Request, response: Response):
 
 @router.post("/{record_id}/submit")
 def submit_one(record_id: str, request: Request, response: Response):
+    access.require_contributor_ip(request)
     try:
         return service.submit_draft(_owner(request, response), record_id)
     except ContributionError as error:
@@ -243,6 +268,7 @@ async def upload_cover(
     focal_x: float = Form(default=0.5),
     focal_y: float = Form(default=0.5),
 ):
+    access.require_contributor_ip(request)
     data = await cover.read()
     if not data:
         raise HTTPException(status_code=400, detail="Choose a JPG, PNG, or WebP image for the cover.")
@@ -265,16 +291,16 @@ def _readable_media_record(request: Request, response: Response, record_id: str)
     """Media follows the record's visibility: private while drafting, public
     once published, and always readable for its owner or a keyed editor."""
 
-    try:
-        return service.get_owned(_owner(request, response), record_id)
-    except LookupError:
-        pass
     if _editor_ok(request):
         return service.peek(record_id)
     record = service.peek(record_id)
     if record.get("status") == "published":
         return record
-    raise HTTPException(status_code=404, detail="Contribution not found.")
+    access.require_contributor_ip(request)
+    try:
+        return service.get_owned(_owner(request, response), record_id)
+    except LookupError as error:
+        raise _fail(error) from error
 
 
 @router.get("/{record_id}/cover")

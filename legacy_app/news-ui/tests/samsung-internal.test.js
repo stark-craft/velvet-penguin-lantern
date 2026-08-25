@@ -7,6 +7,7 @@ const {
   activeLeadership,
   announcementsOf,
   buildHeroSlides,
+  buildSamsungWire,
   colleagueStoriesOf,
   coverUrl,
   groupSignalsByDate,
@@ -14,6 +15,7 @@ const {
   isSamsungLocalSource,
   isSamparkSource,
   rankTrending,
+  resolveInternalImage,
   signalLinkOf,
   signalScope,
   splitByScope,
@@ -147,6 +149,36 @@ test("Cover URLs stay same-origin and cache-bust on updates", () => {
     "/internal-content/rec-1/cover?v=2026-08-05T10%3A00%3A00%2B00%3A00",
   );
   assert.equal(coverUrl({ id: "rec-2", cover: null }), "");
+  assert.equal(coverUrl({ id: "rec-3", updatedAt: "new", cover: { url: "/internal-content/rec-3/cover?v=new" } }), "/internal-content/rec-3/cover?v=new");
+});
+
+test("canonical top_image and escaped URLs render while unsafe image aliases are rejected", () => {
+  assert.equal(resolveInternalImage({ top_image: "https:\\/\\/cdn.example.com\\/story.webp" }), "https://cdn.example.com/story.webp");
+  assert.equal(resolveInternalImage({ image_url: "/internal-content/published/cover.webp" }), "/internal-content/published/cover.webp");
+  assert.equal(resolveInternalImage({ image_url: "javascript:alert(1)" }), "");
+  assert.equal(resolveInternalImage({ image_url: "https://example.com/favicon.ico" }), "");
+  assert.equal(resolveInternalImage({ image_url: "https://example.com/placeholder.png" }), "");
+});
+
+test("Samsung wire follows the 5/3/3 editorial sequence without cross-filling shortages", () => {
+  const make = (prefix, length) => Array.from({ length }, (_, index) => signal({ id: `${prefix}-${index + 1}` }));
+  const wire = buildSamsungWire({ global: make("g", 5), local: make("l", 3), inside: make("i", 3) });
+  assert.deepEqual(wire.map((item) => item.id), ["g-1", "l-1", "g-2", "i-1", "g-3", "l-2", "i-2", "g-4", "l-3", "i-3", "g-5"]);
+  assert.deepEqual(wire.map((item) => item.samsung_internal_channel), ["global", "local", "global", "inside", "global", "local", "inside", "global", "local", "inside", "global"]);
+
+  const short = buildSamsungWire({ global: make("g", 3), local: [], inside: make("i", 1) });
+  assert.deepEqual(short.map((item) => item.id), ["g-1", "g-2", "i-1", "g-3"]);
+});
+
+test("published destination has dedicated announcement and leadership readers", () => {
+  const app = read("../src/news-scrapper/App.jsx");
+  assert.match(app, /\/samsung-internal\/leadership\/:id/);
+  assert.match(app, /\/samsung-internal\/announcement\/:id/);
+  const screen = read("../src/news-scrapper/screens/SamsungInternalScreen.jsx");
+  assert.match(screen, /Samsung Intelligence Wire/);
+  assert.match(screen, /sni-wire-announcements/);
+  assert.match(screen, /<AnnouncementRail items=\{announcements\} \/>/);
+  assert.doesNotMatch(screen, /id: 'announcements'/);
 });
 
 test("Signal links prefer canonical article URLs and reject blanks", () => {
@@ -226,12 +258,13 @@ test("leadership review reuses the publishing preview instead of a generic cover
 
 test("every desk surface has its own professional URL without remounting the desk", () => {
   const app = read("../src/news-scrapper/App.jsx");
-  // One splat route keeps SavedScreen mounted across desk addresses; a forest
-  // of sibling routes would remount (and blank) the desk on every tab click.
-  assert.match(app, /path="\/saved\/\*"/);
-  assert.doesNotMatch(app, /path="\/saved\/contribute"/);
+  // One For You splat route keeps the private workspace shell mounted while
+  // legacy Saved addresses are compatibility-only redirects.
+  assert.match(app, /path="\/for-you\/\*"/);
+  assert.match(app, /path="\/saved\/\*" element=\{<LegacySavedRedirect \/>\}/);
 
-  const savedScreen = read("../src/news-scrapper/screens/SavedScreen.jsx");
-  assert.match(savedScreen, /tabFromPathname/);
-  assert.match(savedScreen, /deskPathFor/);
+  const workspace = read("../src/news-scrapper/for-you/ForYouWorkspaceScreen.jsx");
+  assert.match(workspace, /\/for-you\/saved/);
+  assert.match(workspace, /\/for-you\/contributions/);
+  assert.match(workspace, /\/for-you\/private-briefings/);
 });

@@ -380,7 +380,9 @@
       const portal = document.getElementById("sense-portal");
       const root = document.getElementById("root");
 
-      if (!isPortal) {
+      if (isSenseLanding) {
+        window.location.replace("/for-you");
+      } else if (!isPortal) {
         portal.remove();
         root.hidden = false;
         document.title = isVentureLens

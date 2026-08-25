@@ -4,8 +4,10 @@ import test from 'node:test';
 
 import {
   articleKey,
+  briefingLensOptions,
   groupedByDatePreservingOrder,
   keywordOptions,
+  matchesBriefingLens,
   matchesKeyword,
 } from '../src/news-scrapper/utils/intelligence.js';
 import {
@@ -168,18 +170,48 @@ test('briefing keyword filters count articles and match without case sensitivity
   assert.equal(matchesKeyword(articles[2], 'all'), true);
 });
 
-test('briefing keeps the premium keyword rail above latest-day signals and removes the lower duplicate', () => {
+test('briefing lenses map the unified morning and broadcast keyword packs', () => {
+  const articles = [
+    { title: 'Model launch', keywords_found: ['Artificial Intelligence'] },
+    { title: 'Display launch', keywords_found: ['OLED', 'Samsung'] },
+    { title: 'Accelerator launch', keywords_found: ['GPU', 'Nvidia'] },
+    { title: 'Factory launch', keywords_found: ['Robot'] },
+    { title: 'Platform launch', keywords_found: ['DTH', 'OTT'] },
+  ];
+
+  assert.equal(matchesBriefingLens(articles[0], 'ai'), true);
+  assert.equal(matchesBriefingLens(articles[1], 'devices'), true);
+  assert.equal(matchesBriefingLens(articles[2], 'compute'), true);
+  assert.equal(matchesBriefingLens(articles[3], 'robotics'), true);
+  assert.equal(matchesBriefingLens(articles[4], 'media'), true);
+  assert.equal(matchesBriefingLens(articles[0], 'media'), false);
+  assert.deepEqual(briefingLensOptions(articles).map(({ id, count }) => ({ id, count })), [
+    { id: 'ai', count: 1 },
+    { id: 'devices', count: 1 },
+    { id: 'compute', count: 1 },
+    { id: 'robotics', count: 1 },
+    { id: 'media', count: 1 },
+  ]);
+});
+
+test('briefing nests five mapped lenses with the carousel and applies them to every surface', () => {
   const feedSource = readFileSync(new URL('../src/news-scrapper/screens/FeedScreen.jsx', import.meta.url), 'utf8');
   const heroPosition = feedSource.lastIndexOf('<TopClusterCarousel');
-  const ribbonPosition = feedSource.lastIndexOf('<BriefingKeywordRibbon');
+  const lensPosition = feedSource.lastIndexOf('<BriefingLensRail');
+  const streamPosition = feedSource.lastIndexOf('<BriefingStream');
   const latestPosition = feedSource.lastIndexOf('<LatestDaySignals');
   const searchPosition = feedSource.lastIndexOf('<SearchLoadedBriefing');
 
-  assert.ok(heroPosition < ribbonPosition);
-  assert.ok(ribbonPosition < latestPosition);
+  assert.ok(heroPosition < lensPosition);
+  assert.ok(lensPosition < streamPosition);
+  assert.ok(streamPosition < latestPosition);
   assert.ok(latestPosition < searchPosition);
-  assert.match(feedSource, /aria-expanded=\{expanded\}/);
-  assert.match(feedSource, /keywords\.slice\(0, 6\)/);
+  assert.match(feedSource, /<div className="briefing-hero-stack">[\s\S]*<TopClusterCarousel[\s\S]*<BriefingLensRail/);
+  assert.match(feedSource, /<BriefingStream articles=\{lensArticles\}/);
+  assert.match(feedSource, /<LatestDaySignals articles=\{lensArticles\}/);
+  assert.match(feedSource, /applyFilters\(lensArticles, filters, selectedIds\)/);
+  assert.match(feedSource, /setFilters\(emptyFilters\)/);
+  assert.doesNotMatch(feedSource, /<BriefingKeywordRibbon/);
   assert.doesNotMatch(feedSource, /briefing-keyword-filter/);
 });
 

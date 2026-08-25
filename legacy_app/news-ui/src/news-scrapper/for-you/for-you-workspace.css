@@ -1,0 +1,215 @@
+.fy-workspace-shell {
+  --workspace-accent: var(--fy-accent, #86f7d3);
+  --workspace-blue: var(--fy-accent-2, #8ab7ff);
+  min-height: calc(100vh - 120px);
+}
+
+.fy-workspace-rail-wrap {
+  width: min(1560px, calc(100% - 48px));
+  margin: 20px auto 0;
+}
+
+.fy-workspace-switcher {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--workspace-columns, 4), minmax(0, 1fr));
+  min-height: 92px;
+  overflow: hidden;
+  padding: 7px;
+  border: 1px solid color-mix(in srgb, var(--line-soft, rgba(164,190,217,.18)) 86%, transparent);
+  border-radius: 25px;
+  background:
+    radial-gradient(circle at 8% -40%, rgba(134, 247, 211, .12), transparent 38%),
+    radial-gradient(circle at 95% 140%, rgba(138, 183, 255, .13), transparent 42%),
+    color-mix(in srgb, var(--surface-raised, #151c2b) 84%, transparent);
+  box-shadow: 0 20px 55px rgba(3, 8, 18, .16), inset 0 1px 0 rgba(255,255,255,.045);
+  backdrop-filter: blur(22px) saturate(120%);
+}
+
+.fy-workspace-switcher:after {
+  position: absolute;
+  right: 8%;
+  top: -84px;
+  width: 150px;
+  height: 150px;
+  border: 1px solid rgba(134,247,211,.08);
+  border-radius: 50%;
+  box-shadow: 0 0 0 34px rgba(134,247,211,.018), 0 0 0 70px rgba(138,183,255,.014);
+  content: "";
+  pointer-events: none;
+}
+
+.fy-workspace-switcher > button {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 4px;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 76px;
+  padding: 12px 15px;
+  border: 1px solid transparent;
+  border-radius: 19px;
+  background: transparent;
+  color: var(--text-secondary, #aebed1);
+  text-align: left;
+  transition: border-color .18s ease, background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+
+.fy-workspace-switcher > button + button:before {
+  position: absolute;
+  left: -4px;
+  width: 1px;
+  height: 34px;
+  background: color-mix(in srgb, var(--line-soft, rgba(164,190,217,.18)) 72%, transparent);
+  content: "";
+}
+
+.fy-workspace-switcher > button:hover {
+  border-color: rgba(134,247,211,.14);
+  background: rgba(255,255,255,.035);
+  color: var(--text-primary, #eef4ff);
+}
+
+.fy-workspace-switcher > button.is-active {
+  border-color: rgba(134,247,211,.25);
+  background: linear-gradient(135deg, rgba(134,247,211,.105), rgba(138,183,255,.075));
+  color: var(--text-primary, #eef4ff);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.055), 0 11px 28px rgba(2,10,20,.12);
+}
+
+.fy-workspace-switcher > button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--workspace-blue) 68%, transparent);
+  outline-offset: -2px;
+}
+
+.fy-workspace-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(166,196,216,.14);
+  border-radius: 50%;
+  background: rgba(255,255,255,.035);
+}
+
+.fy-workspace-switcher > button.is-active .fy-workspace-icon {
+  border-color: rgba(134,247,211,.32);
+  background: rgba(134,247,211,.11);
+  color: var(--workspace-accent);
+}
+
+.fy-workspace-copy { display: grid; min-width: 0; gap: 2px; }
+.fy-workspace-copy strong { overflow: hidden; font-size: .88rem; font-weight: 760; text-overflow: ellipsis; white-space: nowrap; }
+.fy-workspace-copy small { overflow: hidden; color: var(--text-faint, #8092a8); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
+.fy-workspace-indicator { width: 4px; height: 24px; border-radius: 99px; background: transparent; }
+.fy-workspace-switcher > button.is-active .fy-workspace-indicator { background: linear-gradient(var(--workspace-accent), var(--workspace-blue)); box-shadow: 0 0 16px rgba(134,247,211,.38); }
+
+.fy-workspace-switcher.is-loading { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 7px; }
+.fy-workspace-skeleton { min-height: 76px; border-radius: 18px; background: linear-gradient(100deg, rgba(255,255,255,.025) 20%, rgba(255,255,255,.075) 42%, rgba(255,255,255,.025) 64%); background-size: 220% 100%; animation: workspace-shimmer 1.35s ease-in-out infinite; }
+
+.fy-workspace-intro {
+  width: min(1560px, calc(100% - 48px));
+  margin: 42px auto 20px;
+  padding: 0 4px 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line-soft, rgba(164,190,217,.18)) 76%, transparent);
+}
+.fy-workspace-intro > span { color: var(--workspace-accent); font-size: .68rem; font-weight: 820; letter-spacing: .18em; text-transform: uppercase; }
+.fy-workspace-intro > div { display: flex; align-items: end; justify-content: space-between; gap: 30px; margin-top: 7px; }
+.fy-workspace-intro h1 { color: var(--text-primary, #eef4ff); font-size: clamp(1.9rem, 3vw, 3.15rem); letter-spacing: -.045em; }
+.fy-workspace-intro p { max-width: 650px; margin: 0; color: var(--text-secondary, #9eafc3); line-height: 1.55; text-align: right; }
+
+.fy-workspace-panel { min-width: 0; }
+.fy-workspace-intro + .fy-workspace-panel > .personal-desk { padding-top: 0; }
+.fy-workspace-access-state { min-height: 360px; display: grid; place-items: center; align-content: center; gap: 14px; color: var(--text-secondary, #9eafc3); }
+.fy-workspace-access-state span { width: 34px; height: 34px; border: 2px solid rgba(134,247,211,.15); border-top-color: var(--workspace-accent); border-radius: 50%; animation: workspace-spin .8s linear infinite; }
+.fy-workspace-view-loading { min-height: 220px; display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--text-secondary, #9eafc3); }
+.fy-workspace-view-loading > span { width: 8px; height: 8px; border-radius: 50%; background: var(--workspace-accent); box-shadow: 0 0 0 7px color-mix(in srgb, var(--workspace-accent) 13%, transparent); animation: workspace-pulse 1.2s ease-in-out infinite; }
+
+html[data-theme="light"] .fy-workspace-switcher {
+  border-color: rgba(45,82,108,.16);
+  background:
+    radial-gradient(circle at 8% -40%, rgba(40,147,126,.13), transparent 38%),
+    radial-gradient(circle at 95% 140%, rgba(72,111,188,.14), transparent 42%),
+    rgba(238,244,248,.82);
+  box-shadow: 0 20px 55px rgba(51,70,89,.12), inset 0 1px 0 rgba(255,255,255,.78);
+}
+html[data-theme="light"] .fy-workspace-switcher > button { color: #566a80; }
+html[data-theme="light"] .fy-workspace-switcher > button:hover { border-color: rgba(15,118,110,.18); background: rgba(255,255,255,.48); color: #173047; }
+html[data-theme="light"] .fy-workspace-switcher > button.is-active { border-color: rgba(15,118,110,.26); background: linear-gradient(135deg, rgba(222,242,237,.88), rgba(228,235,248,.9)); color: #142b40; box-shadow: 0 10px 24px rgba(49,74,94,.1), inset 0 1px 0 rgba(255,255,255,.8); }
+html[data-theme="light"] .fy-workspace-icon { border-color: rgba(45,82,108,.14); background: rgba(255,255,255,.5); }
+html[data-theme="light"] .fy-workspace-copy small { color: #687d91; }
+html[data-theme="light"] .fy-workspace-intro h1 { color: #172a3d; }
+html[data-theme="light"] .fy-workspace-intro p { color: #5c7185; }
+html[data-theme="light"] .fy-workspace-intro > span { color: #0f766e; }
+
+@keyframes workspace-shimmer { to { background-position: -120% 0; } }
+@keyframes workspace-spin { to { transform: rotate(360deg); } }
+@keyframes workspace-pulse { 50% { opacity: .35; transform: scale(.78); } }
+
+@media (max-width: 880px) {
+  .fy-workspace-rail-wrap,
+  .fy-workspace-intro { width: min(100% - 30px, 1560px); }
+  .fy-workspace-switcher { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .fy-workspace-switcher::-webkit-scrollbar { display: none; }
+  .fy-workspace-switcher > button { flex: 0 0 min(310px, 78vw); scroll-snap-align: start; }
+  .fy-workspace-switcher > button + button:before { display: none; }
+  .fy-workspace-switcher.is-loading { display: flex; }
+  .fy-workspace-skeleton { flex: 0 0 min(280px, 72vw); }
+  .fy-workspace-intro > div { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .fy-workspace-intro p { text-align: left; }
+}
+
+@media (max-width: 700px) {
+  .fy-workspace-rail-wrap,
+  .fy-workspace-intro { width: min(100% - 20px, 1560px); }
+  .fy-workspace-rail-wrap { margin-top: 12px; }
+  .fy-workspace-intro { margin-top: 32px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fy-workspace-switcher > button { transition: none; }
+  .fy-workspace-skeleton { animation: none; }
+  .fy-workspace-access-state span { animation-duration: 1.8s; }
+  .fy-workspace-view-loading > span { animation: none; }
+}
+
+/* Compact personal command strip: navigation, not a second hero. */
+.fy-workspace-rail-wrap { margin-top: 14px; }
+.fy-workspace-switcher {
+  min-height: 58px;
+  padding: 5px;
+  border-radius: 18px;
+  box-shadow: 0 14px 38px rgba(3,8,18,.13), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.fy-workspace-switcher:after { right: 7%; top: -106px; width: 136px; height: 136px; }
+.fy-workspace-switcher > button {
+  grid-template-columns: auto minmax(0,1fr) 3px;
+  gap: 9px;
+  min-height: 48px;
+  padding: 7px 11px;
+  border-radius: 13px;
+}
+.fy-workspace-switcher > button + button:before { left: -3px; height: 24px; }
+.fy-workspace-icon { width: 30px; height: 30px; }
+.fy-workspace-copy { display: flex; align-items: baseline; gap: 8px; }
+.fy-workspace-copy strong { flex: 0 0 auto; font-size: .82rem; }
+.fy-workspace-copy small:before { margin-right: 7px; content: "·"; }
+.fy-workspace-copy small { font-size: .63rem; }
+.fy-workspace-indicator { width: 3px; height: 18px; }
+.fy-workspace-skeleton { min-height: 48px; border-radius: 12px; }
+
+@media (max-width: 1200px) {
+  .fy-workspace-copy small { display: none; }
+}
+
+@media (max-width: 880px) {
+  .fy-workspace-switcher > button { flex-basis: min(210px, 58vw); }
+  .fy-workspace-skeleton { flex-basis: min(190px, 54vw); }
+}
+
+@media (max-width: 700px) {
+  .fy-workspace-rail-wrap { margin-top: 8px; }
+  .fy-workspace-switcher { border-radius: 16px; }
+}

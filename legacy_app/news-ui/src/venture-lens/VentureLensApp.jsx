@@ -22,9 +22,13 @@ import {
 } from "lucide-react";
 import {
   compareVentureSignals,
+  getDatasetDossier,
+  getModelDossier,
   getPaperDossier,
+  getPatentDossier,
   getRepositoryDossier,
   getTechnologyDossier,
+  getVentureDiscovery,
   getVentureIntelligence,
   getVentureOverview,
   markVentureNotificationsRead,
@@ -40,6 +44,9 @@ const pages = [
   ["radar", "Radar", Radar],
   ["repositories", "Repositories", Code2],
   ["research", "Research", BookOpen],
+  ["models", "Models", Sparkles],
+  ["datasets", "Datasets", Network],
+  ["patents", "Patents", Newspaper],
   ["compare", "Compare", Scale],
   ["graph", "Signal Graph", Network],
   ["watchlist", "Watchlist", Bookmark],
@@ -110,6 +117,28 @@ function PaperCard({ paper, watched, watchPending, compared, onOpen, onWatch, on
   );
 }
 
+const ARTIFACT_METRICS = {
+  model: [["downloads", "downloads"], ["likes", "likes"]],
+  dataset: [["downloads", "downloads"], ["likes", "likes"]],
+  patent: [["family_count", "family records"]],
+};
+
+function ArtifactCard({ artifact, onOpen }) {
+  const metrics = ARTIFACT_METRICS[artifact.kind] || [];
+  return (
+    <article className={`vl-artifact-card is-${artifact.kind}`} onClick={() => onOpen(artifact.kind, artifact.id)}>
+      <header><span>{artifact.kind}</span><small>{artifact.source}</small></header>
+      <h3>{artifact.title}</h3>
+      <p>{artifact.summary || `Open the ${artifact.kind} dossier for the complete provider record.`}</p>
+      <div className="vl-artifact-facts">
+        {metrics.map(([field, label]) => Number.isFinite(Number(artifact.metrics?.[field])) && <span key={field}><strong>{compactNumber.format(Number(artifact.metrics[field]))}</strong><small>{label}</small></span>)}
+        <span><strong>{artifact.momentum == null ? "Popular now" : `${artifact.momentum >= 0 ? "+" : ""}${artifact.momentum}%`}</strong><small>{artifact.momentum == null ? "first snapshot" : "momentum"}</small></span>
+      </div>
+      <footer><span>{artifact.category || "General"}</span><button onClick={(event) => { event.stopPropagation(); onOpen(artifact.kind, artifact.id); }} type="button">Open dossier <ArrowIcon /></button></footer>
+    </article>
+  );
+}
+
 function CategoryRail({ categories, active, onChange }) {
   return <div className="vl-category-rail" role="group" aria-label="Filter by topic category"><button aria-pressed={active === "all"} className={active === "all" ? "active" : ""} onClick={() => onChange("all")} type="button">All signals</button>{categories.map((category) => <button aria-pressed={active === category.id} className={active === category.id ? "active" : ""} key={category.id} onClick={() => onChange(category.id)} type="button"><i className={`is-${category.id}`} />{category.label}</button>)}</div>;
 }
@@ -134,7 +163,7 @@ function MetricBars({ metrics = {} }) {
   return <div className="vl-metric-bars">{Object.entries(metrics).map(([label, raw]) => { const value = Number(raw) || 0; return <div key={label}><header><span>{label.replaceAll("_", " ")}</span><strong>{value}</strong></header><i><b style={{ width: `${Math.max(3, Math.min(100, value))}%` }} /></i></div>; })}</div>;
 }
 
-function DossierModal({ dossier, loading, watched, onClose, onWatch, onOpenRelated }) {
+function DossierModal({ dossier, loading, watched, watchable = true, onClose, onWatch, onOpenRelated }) {
   const dialogRef = useRef(null);
   const closeRef = useRef(onClose);
   const open = Boolean(dossier || loading);
@@ -167,7 +196,7 @@ function DossierModal({ dossier, loading, watched, onClose, onWatch, onOpenRelat
   }, [open]);
   if (!open) return null;
   const title = dossier?.label || dossier?.full_name || dossier?.title || "Loading intelligence";
-  return <div className="vl-modal-scrim" onMouseDown={onClose} role="presentation"><section aria-label={`${title} dossier`} aria-modal="true" className="vl-dossier" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>{loading ? <div className="vl-dossier-loading"><i /><strong>Building dossier</strong><span>Connecting implementation and research evidence…</span></div> : <><header className="vl-dossier-head"><div><span>{dossier.kind} dossier</span><h2>{title}</h2><p>{dossier.stage || "Signal"} · Momentum {dossier.momentum_score || dossier.score || "—"}/100</p></div><div><WatchButton active={watched} onClick={onWatch} /><button aria-label="Close dossier" className="vl-close" onClick={onClose} type="button"><X size={18} /></button></div></header><div className="vl-dossier-body"><main><section><span className="vl-dossier-label">Executive assessment</span><p className="vl-dossier-lead">{dossier.assessment || dossier.summary || dossier.executive_summary}</p></section>{dossier.why_now && <section><h3>Why now</h3><p>{dossier.why_now}</p></section>}{dossier.contribution && <section><h3>Core contribution</h3><p>{dossier.contribution}</p></section>}{dossier.practical_relevance && <section><h3>Practical relevance</h3><p>{dossier.practical_relevance}</p></section>}{dossier.recommendation && <section className="vl-recommendation"><h3>Recommended posture</h3><p>{dossier.recommendation}</p></section>}{!!dossier.strengths?.length && <section><h3>Strengths</h3><ul>{dossier.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.risks?.length && <section><h3>Risks and validation points</h3><ul>{dossier.risks.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.limitations?.length && <section><h3>Limitations</h3><ul>{dossier.limitations.map((item) => <li key={item}>{item}</li>)}</ul></section>}</main><aside>{dossier.metrics && <MetricBars metrics={dossier.metrics} />}<div className="vl-dossier-facts">{Number.isFinite(dossier.stars) && <span><small>Stars</small><strong>{compactNumber.format(dossier.stars)}</strong></span>}{Number.isFinite(dossier.forks) && <span><small>Forks</small><strong>{compactNumber.format(dossier.forks)}</strong></span>}{dossier.repository_count !== undefined && <span><small>Repositories</small><strong>{dossier.repository_count}</strong></span>}{dossier.paper_count !== undefined && <span><small>Papers</small><strong>{dossier.paper_count}</strong></span>}</div>{[...(dossier.repositories || dossier.related_repositories || []), ...(dossier.papers || dossier.related_papers || [])].length > 0 && <div className="vl-related-list"><h3>Connected evidence</h3>{(dossier.repositories || dossier.related_repositories || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("repository", item.id)} type="button"><span>Repository</span><strong>{item.full_name || item.name}</strong></button>)}{(dossier.papers || dossier.related_papers || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("paper", item.id)} type="button"><span>Research</span><strong>{item.title}</strong></button>)}</div>}{(dossier.url || dossier.pdf_url) && <a className="vl-primary-link" href={dossier.url || dossier.pdf_url} rel="noreferrer" target="_blank">Open original source <ArrowIcon /></a>}</aside></div></>}</section></div>;
+  return <div className="vl-modal-scrim" onMouseDown={onClose} role="presentation"><section aria-label={`${title} dossier`} aria-modal="true" className="vl-dossier" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>{loading ? <div className="vl-dossier-loading"><i /><strong>Building dossier</strong><span>Connecting implementation and research evidence…</span></div> : <><header className="vl-dossier-head"><div><span>{dossier.kind} dossier</span><h2>{title}</h2><p>{dossier.stage || "Signal"} · Momentum {dossier.momentum_score || dossier.score || "—"}/100</p></div><div>{watchable && <WatchButton active={watched} onClick={onWatch} />}<button aria-label="Close dossier" className="vl-close" onClick={onClose} type="button"><X size={18} /></button></div></header><div className="vl-dossier-body"><main><section><span className="vl-dossier-label">Executive assessment</span><p className="vl-dossier-lead">{dossier.assessment || dossier.summary || dossier.executive_summary}</p></section>{dossier.why_now && <section><h3>Why now</h3><p>{dossier.why_now}</p></section>}{dossier.contribution && <section><h3>Core contribution</h3><p>{dossier.contribution}</p></section>}{dossier.practical_relevance && <section><h3>Practical relevance</h3><p>{dossier.practical_relevance}</p></section>}{dossier.recommendation && <section className="vl-recommendation"><h3>Recommended posture</h3><p>{dossier.recommendation}</p></section>}{!!dossier.strengths?.length && <section><h3>Strengths</h3><ul>{dossier.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.risks?.length && <section><h3>Risks and validation points</h3><ul>{dossier.risks.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.limitations?.length && <section><h3>Limitations</h3><ul>{dossier.limitations.map((item) => <li key={item}>{item}</li>)}</ul></section>}</main><aside>{dossier.metrics && <MetricBars metrics={dossier.metrics} />}<div className="vl-dossier-facts">{Number.isFinite(dossier.stars) && <span><small>Stars</small><strong>{compactNumber.format(dossier.stars)}</strong></span>}{Number.isFinite(dossier.forks) && <span><small>Forks</small><strong>{compactNumber.format(dossier.forks)}</strong></span>}{dossier.repository_count !== undefined && <span><small>Repositories</small><strong>{dossier.repository_count}</strong></span>}{dossier.paper_count !== undefined && <span><small>Papers</small><strong>{dossier.paper_count}</strong></span>}</div>{[...(dossier.repositories || dossier.related_repositories || []), ...(dossier.papers || dossier.related_papers || [])].length > 0 && <div className="vl-related-list"><h3>Connected evidence</h3>{(dossier.repositories || dossier.related_repositories || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("repository", item.id)} type="button"><span>Repository</span><strong>{item.full_name || item.name}</strong></button>)}{(dossier.papers || dossier.related_papers || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("paper", item.id)} type="button"><span>Research</span><strong>{item.title}</strong></button>)}</div>}{(dossier.url || dossier.pdf_url) && <a className="vl-primary-link" href={dossier.url || dossier.pdf_url} rel="noreferrer" target="_blank">Open original source <ArrowIcon /></a>}</aside></div></>}</section></div>;
 }
 
 function metricValue(item, definition) {
@@ -197,6 +226,7 @@ export default function VentureLensApp() {
   const page = currentPage(location.pathname);
   const [payload, setPayload] = useState(null);
   const [intelligence, setIntelligence] = useState(null);
+  const [discovery, setDiscovery] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState("");
@@ -215,19 +245,30 @@ export default function VentureLensApp() {
   const [notificationsReading, setNotificationsReading] = useState(false);
   const [pendingWatchKeys, setPendingWatchKeys] = useState(() => new Set());
   const notificationRef = useRef(null);
+  const focusedArtifactRef = useRef("");
 
   async function loadWorkspace() {
     setLoading(true); setError("");
-    const [overviewResult, intelligenceResult] = await Promise.allSettled([getVentureOverview(), getVentureIntelligence()]);
+    const [overviewResult, intelligenceResult, discoveryResult] = await Promise.allSettled([getVentureOverview(), getVentureIntelligence(), getVentureDiscovery()]);
     if (overviewResult.status === "fulfilled") setPayload(overviewResult.value);
     if (intelligenceResult.status === "fulfilled") setIntelligence(intelligenceResult.value);
-    const failures = [overviewResult, intelligenceResult].filter((result) => result.status === "rejected");
+    if (discoveryResult.status === "fulfilled") setDiscovery(discoveryResult.value);
+    const failures = [overviewResult, intelligenceResult, discoveryResult].filter((result) => result.status === "rejected");
     if (failures.length) setError(failures.map((result) => result.reason?.message || "A workspace request failed.").join(" "));
     setLoading(false);
   }
 
   useEffect(() => { loadWorkspace(); }, []);
   useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); setNotificationsOpen(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!discovery) return;
+    const identifier = new URLSearchParams(location.search).get("focus");
+    const kind = { repositories: "repository", research: "paper", models: "model", datasets: "dataset", patents: "patent" }[page];
+    const key = kind && identifier ? `${kind}:${identifier}` : "";
+    if (!key || focusedArtifactRef.current === key) return;
+    focusedArtifactRef.current = key;
+    openDossier(kind, identifier);
+  }, [discovery, location.search, page]);
   useEffect(() => { setRepoVisible(ALL_PAGE_SIZE); }, [repoCategory, repoQuery]);
   useEffect(() => { setPaperVisible(ALL_PAGE_SIZE); }, [paperCategory, paperQuery]);
   useEffect(() => { window.sessionStorage.setItem(COMPARISON_STORAGE_KEY, JSON.stringify(compareItems)); }, [compareItems]);
@@ -256,7 +297,20 @@ export default function VentureLensApp() {
   const hotPapers = useMemo(() => [...papers].sort((a, b) => String(b.published_at || "").localeCompare(String(a.published_at || ""))).slice(0, 2), [papers]);
 
   async function handleRefresh() { setSyncing(true); setError(""); try { await refreshVentureLens(); await loadWorkspace(); } catch (requestError) { setError(requestError.message); } finally { setSyncing(false); } }
-  async function openDossier(kind, id) { setDossier(null); setDossierLoading(true); try { setDossier(kind === "repository" ? await getRepositoryDossier(id) : kind === "paper" ? await getPaperDossier(id) : await getTechnologyDossier(id)); } catch (requestError) { setError(requestError.message); } finally { setDossierLoading(false); } }
+  async function openDossier(kind, id) {
+    const loaders = {
+      repository: getRepositoryDossier,
+      paper: getPaperDossier,
+      technology: getTechnologyDossier,
+      model: getModelDossier,
+      dataset: getDatasetDossier,
+      patent: getPatentDossier,
+    };
+    setDossier(null); setDossierLoading(true);
+    try { setDossier(await (loaders[kind] || getTechnologyDossier)(id)); }
+    catch (requestError) { setError(requestError.message); }
+    finally { setDossierLoading(false); }
+  }
   async function toggleWatch(kind, id, label) {
     const key = referenceKey(kind, id);
     if (pendingWatchKeys.has(key)) return;
@@ -290,6 +344,8 @@ export default function VentureLensApp() {
 
   const repoCards = (items) => items.map((repository) => { const key = referenceKey("repository", repository.id); return <RepoCard compared={comparedKeys.has(key)} key={`${repository.category}-${repository.id}`} onCompare={() => toggleCompare("repository", repository.id, repository.full_name || repository.name)} onOpen={openDossier} onWatch={() => toggleWatch("repository", repository.id, repository.full_name || repository.name)} repository={repository} watched={watchedKeys.has(key)} watchPending={pendingWatchKeys.has(key)} />; });
   const paperCards = (items) => items.map((paper) => { const key = referenceKey("paper", paper.id); return <PaperCard compared={comparedKeys.has(key)} key={`${paper.category}-${paper.id}`} onCompare={() => toggleCompare("paper", paper.id, paper.title)} onOpen={openDossier} onWatch={() => toggleWatch("paper", paper.id, paper.title)} paper={paper} watched={watchedKeys.has(key)} watchPending={pendingWatchKeys.has(key)} />; });
+  const artifactCards = (items) => items.map((artifact) => <ArtifactCard artifact={artifact} key={`${artifact.kind}-${artifact.id}`} onOpen={openDossier} />);
+  const visiblePages = pages.filter(([id]) => id !== "patents" || discovery?.providers?.epo?.available !== false);
 
   return (
     <div className="venture-lens">
@@ -300,7 +356,7 @@ export default function VentureLensApp() {
           <div><span>Sense.AI Research</span><strong>Venture Lens</strong><small>Evidence-led technology decision intelligence</small></div>
         </div>
         <nav aria-label="Research workspaces" className="vl-nav">
-          {pages.map(([id, label, PageIcon]) => <button aria-current={page === id ? "page" : undefined} className={page === id ? "active" : ""} key={id} onClick={() => navigate(routeFor(id))} title={label} type="button"><PageIcon aria-hidden="true" size={15} /><span>{label}</span></button>)}
+          {visiblePages.map(([id, label, PageIcon]) => <button aria-current={page === id ? "page" : undefined} className={page === id ? "active" : ""} key={id} onClick={() => navigate(routeFor(id))} title={label} type="button"><PageIcon aria-hidden="true" size={15} /><span>{label}</span></button>)}
         </nav>
         <div className="vl-top-actions">
           <div className="vl-notification-wrap" ref={notificationRef}>
@@ -364,7 +420,7 @@ export default function VentureLensApp() {
 
         <div hidden={initialLoading || fatalError}>
 
-        {page === "overview" && <><section className="vl-hero"><div className="vl-hero-copy"><div className="vl-eyebrow"><Sparkles size={14} /> Technology decision intelligence</div><h1>Find the technologies worth <em>your attention.</em></h1><p>Venture Lens connects open-source adoption, current research and implementation evidence—then gives every task its own focused workspace.</p><div className="vl-hero-actions"><button onClick={() => navigate("/venturelens/radar")} type="button">Explore the radar <ArrowIcon /></button><button onClick={() => navigate("/venturelens/repositories")} type="button">Browse repositories</button></div></div><aside className="vl-radar-card"><div className="vl-radar-visual" aria-hidden="true"><i className="ring one" /><i className="ring two" /><i className="ring three" /><i className="sweep" /><b className="ping p1" /><b className="ping p2" /><b className="ping p3" /><span>LIVE<br />LENS</span></div><div className="vl-radar-copy"><span>Signal coverage</span><strong>{repositories.length + papers.length} opportunities indexed</strong><small>{payload?.github?.status === "live" || payload?.research?.status === "live" ? "Connected to live public sources" : "Cached decision workspace"}</small></div></aside></section><section className="vl-metrics"><article><span>Repositories</span><strong>{repositories.length}</strong><small>{githubCategories.length} technology lenses</small></article><article><span>Research papers</span><strong>{papers.length}</strong><small>{researchCategories.length} research lenses</small></article><article><span>Technology radar</span><strong>{intelligence?.radar?.length || 0}</strong><small>scored decision signals</small></article><article><span>Data status</span><strong>{loading ? "Loading" : "Ready"}</strong><small>{syncLabel(payload?.github?.refreshed_at || payload?.research?.refreshed_at)}</small></article></section><section className="vl-section vl-hot-section"><SectionHead number="NOW" title="Hot signals" copy="A small live preview—not the entire workspace. Open a dedicated page when you want to explore deeply." /><div className="vl-hot-layout"><div><header><Code2 size={18} /><span>Trending implementations</span><button onClick={() => navigate("/venturelens/repositories")} type="button">View all <ArrowIcon /></button></header><div className="vl-repo-grid">{repoCards(hotRepositories)}{!hotRepositories.length && <EmptyWorkspace>No repository signals are available.</EmptyWorkspace>}</div></div><div><header><BookOpen size={18} /><span>Fresh research</span><button onClick={() => navigate("/venturelens/research")} type="button">View all <ArrowIcon /></button></header><div className="vl-paper-grid">{paperCards(hotPapers)}{!hotPapers.length && <EmptyWorkspace>No research signals are available.</EmptyWorkspace>}</div></div></div></section><section className="vl-section vl-workspace-links"><SectionHead number="MAP" title="Choose a workspace" copy="Every capability has a separate page, a clear purpose and its own interaction model." /><div>{pages.slice(1).map(([id, label, Icon]) => <button key={id} onClick={() => navigate(routeFor(id))} type="button"><Icon size={20} /><strong>{label}</strong><span>Open workspace</span><ArrowIcon /></button>)}</div></section></>}
+        {page === "overview" && <><section className="vl-hero"><div className="vl-hero-copy"><div className="vl-eyebrow"><Sparkles size={14} /> Technology decision intelligence</div><h1>Find the technologies worth <em>your attention.</em></h1><p>Venture Lens connects open-source adoption, current research and implementation evidence—then gives every task its own focused workspace.</p><div className="vl-hero-actions"><button onClick={() => navigate("/venturelens/radar")} type="button">Explore the radar <ArrowIcon /></button><button onClick={() => navigate("/venturelens/repositories")} type="button">Browse repositories</button></div></div><aside className="vl-radar-card"><div className="vl-radar-visual" aria-hidden="true"><i className="ring one" /><i className="ring two" /><i className="ring three" /><i className="sweep" /><b className="ping p1" /><b className="ping p2" /><b className="ping p3" /><span>LIVE<br />LENS</span></div><div className="vl-radar-copy"><span>Signal coverage</span><strong>{repositories.length + papers.length} opportunities indexed</strong><small>{payload?.github?.status === "live" || payload?.research?.status === "live" ? "Connected to live public sources" : "Cached decision workspace"}</small></div></aside></section><section className="vl-metrics"><article><span>Repositories</span><strong>{repositories.length}</strong><small>{githubCategories.length} technology lenses</small></article><article><span>Research papers</span><strong>{papers.length}</strong><small>{researchCategories.length} research lenses</small></article><article><span>Technology radar</span><strong>{intelligence?.radar?.length || 0}</strong><small>scored decision signals</small></article><article><span>Data status</span><strong>{loading ? "Loading" : "Ready"}</strong><small>{syncLabel(payload?.github?.refreshed_at || payload?.research?.refreshed_at)}</small></article></section><section className="vl-section vl-hot-section"><SectionHead number="NOW" title="Hot signals" copy="A small live preview—not the entire workspace. Open a dedicated page when you want to explore deeply." /><div className="vl-hot-layout"><div><header><Code2 size={18} /><span>Trending implementations</span><button onClick={() => navigate("/venturelens/repositories")} type="button">View all <ArrowIcon /></button></header><div className="vl-repo-grid">{repoCards(hotRepositories)}{!hotRepositories.length && <EmptyWorkspace>No repository signals are available.</EmptyWorkspace>}</div></div><div><header><BookOpen size={18} /><span>Fresh research</span><button onClick={() => navigate("/venturelens/research")} type="button">View all <ArrowIcon /></button></header><div className="vl-paper-grid">{paperCards(hotPapers)}{!hotPapers.length && <EmptyWorkspace>No research signals are available.</EmptyWorkspace>}</div></div></div></section><section className="vl-section vl-workspace-links"><SectionHead number="MAP" title="Choose a workspace" copy="Every capability has a separate page, a clear purpose and its own interaction model." /><div>{visiblePages.slice(1).map(([id, label, Icon]) => <button key={id} onClick={() => navigate(routeFor(id))} type="button"><Icon size={20} /><strong>{label}</strong><span>Open workspace</span><ArrowIcon /></button>)}</div></section></>}
 
         {page === "radar" && <section className="vl-section vl-page-section"><SectionHead number="01" title="Technology radar" copy="Ranked technology themes with implementation and research evidence kept together." />{intelligence?.radar?.length ? <div className="vl-radar-layout"><div className="vl-radar-axis"><span>Adopt</span><span>Evaluate</span><span>Explore</span><span>Watch</span><b>Technology<br />momentum</b></div><div className="vl-radar-signals">{intelligence.radar.map((item) => { const key = referenceKey("technology", item.id); return <article className={`stage-${String(item.stage).toLowerCase()}`} key={item.id}><button onClick={() => openDossier("technology", item.id)} type="button"><span>{item.score}</span><strong>{item.label}</strong><small>{item.repository_count} repos · {item.paper_count} papers</small><em>{item.stage}</em></button><div className="vl-radar-tools"><WatchButton active={watchedKeys.has(key)} disabled={pendingWatchKeys.has(key)} onClick={() => toggleWatch("technology", item.id, item.label)} /><CompareButton active={comparedKeys.has(key)} onClick={() => toggleCompare("technology", item.id, item.label)} /></div></article>; })}</div></div> : <EmptyWorkspace>No technology signals are available yet. Sync live data to build the radar.</EmptyWorkspace>}</section>}
 
@@ -372,7 +428,13 @@ export default function VentureLensApp() {
 
         {page === "research" && <section className="vl-section vl-page-section"><SectionHead number="03" title="Research stream" copy="Current papers grouped by decision-useful themes, with ten results available in every category." action={<label className="vl-inline-search"><Search aria-hidden="true" size={14} /><input aria-label="Search research papers" onChange={(event) => setPaperQuery(event.target.value)} placeholder="Search papers or authors" value={paperQuery} />{paperQuery && <button aria-label="Clear research search" onClick={() => setPaperQuery("")} type="button"><X aria-hidden="true" size={13} /></button>}</label>} /><CategoryRail active={paperCategory} categories={researchCategories} onChange={setPaperCategory} /><div className="vl-coverage-note"><CheckCircle2 aria-hidden="true" size={15} /><span>{paperCategory === "all" ? `${researchCategories.length} categories` : "Category view"} · showing {Math.min(filteredPapers.length, paperCategory === "all" ? paperVisible : 10)} of {filteredPapers.length} matching papers</span></div><div className="vl-paper-grid">{paperCards(filteredPapers.slice(0, paperCategory === "all" ? paperVisible : 10))}</div>{!loading && !filteredPapers.length && <EmptyWorkspace>No papers match this search and category. Clear a filter to widen the research stream.</EmptyWorkspace>}{paperCategory === "all" && paperVisible < filteredPapers.length && <button className="vl-load-more" onClick={() => setPaperVisible((count) => count + ALL_PAGE_SIZE)} type="button">Show {Math.min(ALL_PAGE_SIZE, filteredPapers.length - paperVisible)} more papers</button>}</section>}
 
-        {page === "compare" && <section className="vl-section vl-page-section"><SectionHead number="04" title="Compare workbench" copy="Compare two to four signals of the same type. Cross-type comparisons are blocked because stars, citations and technology momentum are not equivalent measures." /><div className="vl-compare-guidance"><GitCompareArrows size={20} /><div><strong>{compareItems.length ? `${compareItems[0].kind} comparison active` : "Choose one comparison type"}</strong><span>Select from Radar, Repositories or Research. Once the first signal is selected, only that same signal type can be added.</span></div>{compareItems.length > 0 && <button onClick={() => { setCompareItems([]); setComparison(null); }} type="button">Clear selection</button>}</div><div className="vl-compare-workbench"><div className="vl-compare-selection">{compareItems.length ? compareItems.map((item, index) => <article key={referenceKey(item.kind, item.id)}><span>0{index + 1} · {item.kind}</span><strong>{item.label}</strong><button onClick={() => toggleCompare(item.kind, item.id, item.label)} type="button">Remove</button></article>) : <div className="vl-compare-empty"><GitCompareArrows size={25} /><strong>No signals selected yet.</strong><span>Use the compare icon on cards or radar signals, then return here.</span></div>}</div><button className="vl-compare-run" disabled={compareItems.length < 2 || comparing} onClick={runComparison} type="button">{comparing ? "Building matrix…" : `Compare ${compareItems.length || "selected"} ${compareItems[0]?.kind || "signals"}`}</button></div><ComparisonResult onClose={() => setComparison(null)} result={comparison} /></section>}
+        {page === "models" && <section className="vl-section vl-page-section"><SectionHead number="04" title="Model intelligence" copy="Released model systems ranked only against other models using Hub adoption and recency evidence." /><div className="vl-provider-rule">Model downloads and likes are never compared with repository stars or paper citations.</div><div className="vl-artifact-grid">{artifactCards(discovery?.lanes?.models || [])}</div>{!loading && !discovery?.lanes?.models?.length && <EmptyWorkspace>No model records are cached yet. Sync live data to populate this lane.</EmptyWorkspace>}</section>}
+
+        {page === "datasets" && <section className="vl-section vl-page-section"><SectionHead number="05" title="Dataset intelligence" copy="Training and evaluation assets with provider-native adoption evidence and provenance links." /><div className="vl-provider-rule">Dataset popularity remains within its own metric family so the comparison stays meaningful.</div><div className="vl-artifact-grid">{artifactCards(discovery?.lanes?.datasets || [])}</div>{!loading && !discovery?.lanes?.datasets?.length && <EmptyWorkspace>No dataset records are cached yet. Sync live data to populate this lane.</EmptyWorkspace>}</section>}
+
+        {page === "patents" && <section className="vl-section vl-page-section"><SectionHead number="06" title="Patent intelligence" copy="Protected invention records available when EPO OPS credentials are configured." /><div className="vl-provider-rule">Patent family evidence is presented independently from adoption and scholarly impact metrics.</div><div className="vl-artifact-grid">{artifactCards(discovery?.lanes?.patents || [])}</div>{!loading && !discovery?.lanes?.patents?.length && <EmptyWorkspace>EPO patent discovery is not configured or has no retained records.</EmptyWorkspace>}</section>}
+
+        {page === "compare" && <section className="vl-section vl-page-section"><SectionHead number="07" title="Compare workbench" copy="Compare two to four signals of the same type. Cross-type comparisons are blocked because stars, citations and technology momentum are not equivalent measures." /><div className="vl-compare-guidance"><GitCompareArrows size={20} /><div><strong>{compareItems.length ? `${compareItems[0].kind} comparison active` : "Choose one comparison type"}</strong><span>Select from Radar, Repositories or Research. Once the first signal is selected, only that same signal type can be added.</span></div>{compareItems.length > 0 && <button onClick={() => { setCompareItems([]); setComparison(null); }} type="button">Clear selection</button>}</div><div className="vl-compare-workbench"><div className="vl-compare-selection">{compareItems.length ? compareItems.map((item, index) => <article key={referenceKey(item.kind, item.id)}><span>0{index + 1} · {item.kind}</span><strong>{item.label}</strong><button onClick={() => toggleCompare(item.kind, item.id, item.label)} type="button">Remove</button></article>) : <div className="vl-compare-empty"><GitCompareArrows size={25} /><strong>No signals selected yet.</strong><span>Use the compare icon on cards or radar signals, then return here.</span></div>}</div><button className="vl-compare-run" disabled={compareItems.length < 2 || comparing} onClick={runComparison} type="button">{comparing ? "Building matrix…" : `Compare ${compareItems.length || "selected"} ${compareItems[0]?.kind || "signals"}`}</button></div><ComparisonResult onClose={() => setComparison(null)} result={comparison} /></section>}
 
         {page === "graph" && <section className="vl-section vl-page-section"><SectionHead number="05" title="Research-to-repository graph" copy="A navigable evidence map linking technology themes to influential papers and implementations." /><RelationshipGraph graph={intelligence?.graph} onOpen={openDossier} /></section>}
 
@@ -384,7 +446,7 @@ export default function VentureLensApp() {
 
       {compareItems.length > 0 && page !== "compare" && <aside aria-live="polite" className="vl-compare-tray"><div><GitCompareArrows aria-hidden="true" size={17} /><span><strong>{compareItems.length} {compareItems[0].kind}{compareItems.length === 1 ? "" : "s"}</strong> selected for comparison</span></div><button onClick={() => navigate("/venturelens/compare")} type="button">Open compare</button><button aria-label="Clear comparison selection" onClick={() => { setCompareItems([]); setComparison(null); }} type="button"><X aria-hidden="true" size={15} /></button></aside>}
       <footer className="vl-footer"><button className="vl-brand" onClick={() => navigate("/venturelens")} type="button"><span className="vl-brand-mark"><i /><i /><i /></span><span><strong>Sense.AI</strong><small>Decision intelligence</small></span></button><p>Public-source signals. Cached responsibly. Built for internal exploration.</p><span>Designed & engineered by Vineet Singh</span></footer>
-      <DossierModal dossier={dossier} loading={dossierLoading} onClose={() => { setDossier(null); setDossierLoading(false); }} onOpenRelated={openDossier} onWatch={() => dossier && toggleWatch(dossier.kind, dossier.id, dossier.label || dossier.full_name || dossier.title)} watched={dossierWatched} />
+      <DossierModal dossier={dossier} loading={dossierLoading} onClose={() => { setDossier(null); setDossierLoading(false); }} onOpenRelated={openDossier} onWatch={() => dossier && toggleWatch(dossier.kind, dossier.id, dossier.label || dossier.full_name || dossier.title)} watchable={["repository", "paper", "technology"].includes(dossier?.kind)} watched={dossierWatched} />
     </div>
   );
 }

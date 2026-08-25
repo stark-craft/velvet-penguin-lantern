@@ -13,13 +13,19 @@ export function notifyContributionsChanged() {
 
 // Shared contribution index backed by the internal-content API. The backend is
 // authoritative; this hook never caches beyond the current render cycle.
-export default function useContributions() {
+export default function useContributions(enabled = true) {
   const [contributions, setContributions] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
   const alive = useRef(true);
 
   useEffect(() => {
+    if (!enabled) {
+      setContributions([]);
+      setError('');
+      setLoaded(false);
+      return undefined;
+    }
     alive.current = true;
     const refresh = () => {
       getMyContributions().then((records) => {
@@ -40,7 +46,7 @@ export default function useContributions() {
       alive.current = false;
       window.removeEventListener(CONTRIBUTIONS_CHANGED_EVENT, handleChange);
     };
-  }, []);
+  }, [enabled]);
 
   return { contributions, loaded, error };
 }

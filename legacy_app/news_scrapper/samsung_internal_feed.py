@@ -137,8 +137,8 @@ def _rank_key(article: dict) -> tuple:
         int(article.get("source_count") or len(source_names(article)) or 1),
         _keyword_count(article),
         float(article.get("importance_score") or 0),
-        date_ordinal,
         bool(_text(article.get("image_url") or article.get("top_image"))),
+        date_ordinal,
     )
 
 

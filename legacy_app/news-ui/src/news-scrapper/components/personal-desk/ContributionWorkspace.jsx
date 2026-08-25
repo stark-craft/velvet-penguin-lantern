@@ -70,7 +70,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     return () => { alive.current = false; };
   }, []);
 
-  // A deep link such as /saved/leadership opens the composer directly, once.
+  // The leadership deep link opens the composer directly, once.
   useEffect(() => {
     if (!autoStart) {
       autoStartConsumed.current = false;
@@ -139,7 +139,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
       title: 'Vision of the quarter',
       author: authorSuggestion,
     }));
-    navigate('/saved/leadership', { replace: true });
+    navigate('/for-you/contributions/leadership', { replace: true });
   };
 
   const startAnnouncement = () => {
@@ -259,7 +259,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
   };
 
   const backToList = () => {
-    // Prevent the still-current /saved/leadership address from reopening the
+    // Prevent the still-current leadership address from reopening the
     // composer during the same batched navigation render.
     autoStartConsumed.current = true;
     if (editing) setRecoveredDraft(createContribution(editing));
@@ -267,7 +267,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     setViewing(null);
     setError('');
     setNotice('');
-    navigate('/saved/contribute', { replace: true });
+    navigate('/for-you/contributions', { replace: true });
   };
 
   const resumeRecoveredDraft = () => {

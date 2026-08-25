@@ -46,31 +46,58 @@ would not share the in-memory JSON locks.
 - `venture_lens/` owns GitHub discovery, arXiv research discovery, caching, and
   Venture Lens endpoints.
 - `model_weights/` is the shared local-model location and is excluded from Git.
-- `news_scrapper/runtime/bouncer_model.pkl` and
-  `news_scrapper/runtime/bouncer_model_broadcast.pkl` are the authoritative
-  trained bouncer models for the Default and Broadcast profiles. Startup and
-  retraining use these same paths; root-level pickle files are legacy copies
-  and are not loaded.
+- `news_scrapper/runtime/bouncer_model.pkl` is the authoritative trained
+  bouncer model for the unified corpus. Startup and retraining use this same
+  path; root-level and broadcast-specific pickle files are rollback copies and
+  are not loaded.
 
-## Profile routing guarantee
+## Unified corpus and viewer personalization
 
-NewsScrapper profile selection remains backend-authoritative:
+NewsScrapper uses one shared intelligence corpus:
 
-1. FastAPI resolves the real client IP.
-2. Forwarding headers are accepted only from IPs in `TRUSTED_PROXY_IPS`.
-3. The resolved IP is compared with `BROADCAST_SPECIAL_IPS` from the root
-   `.env`.
-4. Matching users receive `broadcast`; all other users receive `default`.
-5. IP hashing happens later for analytics and never controls profile routing.
-6. An explicit profile override is honored only for
-   `PROFILE_SETTINGS_ALLOWED_IPS`.
+1. One `sites.json` supplies technology and broadcast sources.
+2. One four-hour scheduler creates the shared Briefing.
+3. Broadcast is content metadata and a filter, not a separate IP-routed
+   product profile.
+4. For You privately ranks that shared corpus for the signed viewer.
+5. Saved, Hide, interests, and reading events stay viewer-specific; only the
+   explicit Not Interested action trains the shared Gatekeeper/Bouncer.
 
-Changing the broadcast list requires restarting FastAPI.
+The client-IP resolver is still shared by protected capabilities. Forwarding
+headers are accepted only when the immediate peer is in `TRUSTED_PROXY_IPS`.
+
+## For You private workspace
+
+`/for-you/*` is one React workspace shell beneath the main navigation. It
+lazy-loads only the active view:
+
+```text
+/for-you                              personalized desk (default)
+/for-you/saved                        private saved signals
+/for-you/contributions                IP-authorized contribution desk
+/for-you/contributions/leadership     leadership composer
+/for-you/private-briefings            private URL-import briefings
+```
+
+The old `/saved/*` addresses remain redirects, so bookmarks keep working.
+FastAPI serves the production SPA shell for every `/for-you/*` deep link while
+the JSON `GET /for-you` recommendation API keeps its existing content type.
+
+Contribution visibility is a capability, not a new identity system:
+
+- `GET /internal-content/contribute-access` returns the normalized client IP
+  and whether it is in `CONTRIBUTIONS_ALLOWED_IPS`.
+- The allowlist defaults to loopback only when absent and fails closed in the
+  browser if the capability request fails.
+- Contributor-owned drafts, imports, media, notifications, and submissions
+  require both an allowed IP and the existing signed viewer ownership check.
+- Published Samsung Internal content remains public to ordinary viewers.
+- Existing editor-key review operations remain independent of the contributor
+  IP allowlist.
 
 ## Scheduler reliability
 
-- The combined scheduler processes `default` first and `broadcast` second every
-  four hours.
+- One scheduler processes the unified source corpus every four hours.
 - A tick that arrives during another scheduled run is retained and executed
   after the active run finishes.
 - A run blocked by a manual crawl is retried instead of discarded.
@@ -91,7 +118,7 @@ machine reboot.
 
 ## Feedback training queue
 
-Every interested/not-interested vote is written atomically to the profile's
+Every interested/not-interested vote is written atomically to the unified
 training JSON before the API responds. Retraining runs on one dedicated worker:
 
 1. The first vote queues a model rebuild.
@@ -99,7 +126,7 @@ training JSON before the API responds. Retraining runs on one dedicated worker:
    profile dirty.
 3. When the current rebuild completes, one follow-up rebuild consumes the whole
    latest dataset.
-4. Default and broadcast votes remain in separate datasets and model files.
+4. The resulting model remains the one authoritative unified bouncer model.
 
 This deliberately coalesces redundant rebuild requests without discarding any
 training examples.
@@ -128,19 +155,33 @@ training examples.
 Routes:
 
 ```text
-/             Sense.AI portal
-/home         NewsScrapper
-/venturelens  Venture Lens
+/                  redirects to the private For You landing experience
+/for-you/*         private viewer workspace
+/home              deterministic shared Briefing
+/research          Research orientation
+/venturelens/*     Venture Lens workspaces
+/samsung-internal  published Samsung Internal content
+/samsung-internal/leadership/:id   published leadership reader
+/samsung-internal/announcement/:id published announcement reader
 ```
 
 ## Venture Lens data behavior
 
-- GitHub data comes from the GitHub public repository-search API.
-- Research data comes from the public arXiv Atom API.
-- A root `.env` `GITHUB_TOKEN` is optional and raises GitHub rate limits.
-- Cached results are stored under `venture_lens/runtime/`.
-- A curated starter snapshot keeps the interface usable before the first live
-  synchronization or during a provider outage.
+- `/research` is the premium discovery gateway; detailed work remains under
+  `/venturelens/*`.
+- `GET /venture-lens/discovery` normalizes repositories, papers, models,
+  datasets, patents, technology synthesis, and optional social momentum into a
+  single typed artifact contract.
+- GitHub and arXiv retain their existing starter snapshots. OpenAlex enriches
+  scholarly evidence, and Hugging Face supplies public model/dataset records.
+  EPO OPS and X remain hidden until their credentials are configured.
+- Each provider has its own TTL and last-success cache under
+  `venture_lens/runtime/`. A failed or rate-limited provider never erases a
+  healthy cache and never blocks the other providers.
+- Provider metrics are ranked only within the same artifact type. Momentum is
+  shown only after two real snapshots exist.
+- Venture discovery refresh is independent of the one four-hour NewsScrapper
+  scheduler.
 - Provider failures do not prevent NewsScrapper or FastAPI from starting.
 
 ## JSON safety

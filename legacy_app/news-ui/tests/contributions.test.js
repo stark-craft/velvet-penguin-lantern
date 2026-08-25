@@ -43,6 +43,14 @@ const announcementSource = readFileSync(
   new URL('../src/news-scrapper/screens/InternalPublishingScreen.jsx', import.meta.url),
   'utf8',
 );
+const workspaceShellSource = readFileSync(
+  new URL('../src/news-scrapper/for-you/ForYouWorkspaceScreen.jsx', import.meta.url),
+  'utf8',
+);
+const indexSource = readFileSync(
+  new URL('../index.html', import.meta.url),
+  'utf8',
+);
 
 test('contribution records normalize into the documented shape with safe defaults', () => {
   const record = createContribution({
@@ -171,35 +179,39 @@ test('extracted text becomes an editable draft without inventing a summary', () 
   assert.equal(detectTitle(longFirstLine, 'doc.docx').length <= CONTRIBUTION_LIMITS.TITLE_MAX, true);
 });
 
-test('the desk orders three workspaces with Saved Signals first and persists the choice', () => {
-  const orderMatch = savedSource.match(/const DESK_TABS = \[[\s\S]*?\];/)?.[0] || '';
-  const order = ['saved', 'contribute', 'briefings'].map((id) => orderMatch.includes(`id: '${id}'`));
-  assert.deepEqual(order, [true, true, true]);
-  assert.match(orderMatch, /Saved Signals[\s\S]*Contribute[\s\S]*My Briefing/);
-  assert.match(savedSource, /return DESK_TAB_IDS\.includes\(stored\) \? stored : DEFAULT_DESK_TAB;/);
-  assert.match(savedSource, /tabFromPathname\(location\.pathname\) \|\| initialDeskTab\(\)/);
-  assert.doesNotMatch(savedSource, /tabFromPathname\(location\.pathname\) \|\| initialDeskTab\)/);
-  assert.match(savedSource, /sessionStorage\.setItem\('personal-desk-tab', tab\)/);
-  assert.match(savedSource, /ArrowLeft/);
-  assert.match(savedSource, /ArrowRight/);
-  assert.match(savedSource, /DESK_TAB_IDS\[\(index \+ direction \+ DESK_TAB_IDS\.length\) % DESK_TAB_IDS\.length\]/);
-  assert.match(savedSource, /\{tab === 'saved' && \(/);
-  assert.match(savedSource, /\{tab === 'contribute' && <ContributionWorkspace/);
-  assert.match(savedSource, /\{tab === 'briefings' && \(/);
+test('For You owns the ordered private workspaces and hides Contributions by capability', () => {
+  const orderMatch = workspaceShellSource.match(/const tabs = useMemo\(\(\) => \[[\s\S]*?\], \[contributionAllowed, firstName\]\);/)?.[0] || '';
+  assert.match(orderMatch, /Saved Signals[\s\S]*Contributions[\s\S]*Private Briefings/);
+  assert.match(workspaceShellSource, /label: firstName \? `\$\{firstName\}'s Desk` : 'Your Desk'/);
+  assert.match(workspaceShellSource, /contributionAccess\?\.allowed/);
+  assert.match(workspaceShellSource, /role="tablist"/);
+  assert.match(workspaceShellSource, /ArrowLeft/);
+  assert.match(workspaceShellSource, /ArrowRight/);
+  assert.match(workspaceShellSource, /Home/);
+  assert.match(workspaceShellSource, /End/);
+  assert.match(workspaceShellSource, /<ForYouScreen/);
+  assert.match(workspaceShellSource, /<SavedScreen[^>]*view="saved"/);
+  assert.match(workspaceShellSource, /<SavedScreen[\s\S]{0,260}view="contribute"/);
+  assert.match(workspaceShellSource, /<SavedScreen[^>]*view="briefings"/);
 });
 
-test('one splat route owns every personal desk address', () => {
-  assert.match(appSource, /path="\/saved\/\*" element=\{<SavedScreen \/>\}/);
-  assert.doesNotMatch(appSource, /path="\/saved" element=\{<SavedScreen \/>\}/);
-  assert.match(savedSource, /setAutoStart\(location\.pathname === '\/saved\/leadership' \? 'leadership' : ''\)/);
+test('one For You splat route owns the workspace and legacy Saved routes redirect', () => {
+  assert.match(indexSource, /isSenseLanding[\s\S]*window\.location\.replace\("\/for-you"\)/);
+  assert.match(appSource, /path="\/for-you\/\*"/);
+  assert.match(appSource, /path="\/saved\/\*" element=\{<LegacySavedRedirect \/>\}/);
+  assert.match(appSource, /\/saved\/contribute[\s\S]*\/for-you\/contributions/);
+  assert.match(appSource, /\/saved\/leadership[\s\S]*\/for-you\/contributions\/leadership/);
+  assert.match(appSource, /\/saved\/briefings[\s\S]*\/for-you\/private-briefings/);
+  assert.match(workspaceShellSource, /endsWith\('\/leadership'\)/);
 });
 
-test('the desk summary emphasizes saved items, drafts, and submitted contributions', () => {
-  const snapshot = savedSource.match(/personal-desk-snapshot[\s\S]*?<\/div>/)?.[0] || '';
-  assert.match(snapshot, /<small>saved<\/small>/);
-  assert.match(snapshot, /<small>drafts<\/small>/);
-  assert.match(snapshot, /<small>submitted<\/small>/);
-  assert.doesNotMatch(snapshot, /<small>briefings<\/small>/);
+test('secondary workspace views use compact introductions instead of a duplicate desk hero', () => {
+  assert.match(workspaceShellSource, /fy-workspace-intro/);
+  assert.match(workspaceShellSource, /Private signal library/);
+  assert.match(workspaceShellSource, /Private publishing desk/);
+  assert.match(workspaceShellSource, /Private link studio/);
+  assert.match(savedSource, /const embedded = Boolean\(view\)/);
+  assert.match(savedSource, /\{!embedded && \(/);
 });
 
 test('a stale recovered draft id heals by creating fresh instead of failing', () => {
@@ -213,7 +225,7 @@ test('leadership messages are a third contribution path feeding the same pipelin
   assert.match(modelSource, /leadership: 'Leadership message'/);
   assert.match(workspaceSource, /startLeadership/);
   assert.match(workspaceSource, /onClick=\{startLeadership\}/);
-  assert.match(workspaceSource, /navigate\('\/saved\/leadership', \{ replace: true \}\)/);
+  assert.match(workspaceSource, /navigate\('\/for-you\/contributions\/leadership', \{ replace: true \}\)/);
   assert.match(workspaceSource, /Vision of the quarter/);
   assert.match(apiSource, /content_type: draft\.contentType \|\| ''/);
 });
@@ -236,7 +248,7 @@ test('browser session recovery never skips the contribution landing page', () =>
 
 test('the announcement studio returns explicitly to contributions', () => {
   assert.match(announcementSource, /Back to contributions/);
-  assert.match(announcementSource, /navigate\('\/saved\/contribute'\)/);
+  assert.match(announcementSource, /navigate\('\/for-you\/contributions'\)/);
 });
 
 test('contribution persistence is API-backed on same-origin internal-content endpoints', () => {

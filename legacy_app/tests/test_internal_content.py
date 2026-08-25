@@ -18,6 +18,7 @@ from pypdf import PdfReader, PdfWriter
 
 import main as composition
 from news_scrapper.internal_content import document_parser, image_processor
+from news_scrapper.internal_content import access as internal_access
 from news_scrapper.internal_content import storage as internal_storage
 from tests.asgi_harness import request as asgi_request
 
@@ -178,6 +179,9 @@ class InternalContentTests(unittest.TestCase):
             patcher = patch.object(internal_storage, attribute, target)
             patcher.start()
             self.addCleanup(patcher.stop)
+        access_patcher = patch.object(internal_access, "CONTRIBUTIONS_ALLOWED_IPS", {"10.0.0.25"})
+        access_patcher.start()
+        self.addCleanup(access_patcher.stop)
 
     # -- drafts -----------------------------------------------------------
 
@@ -511,6 +515,12 @@ class InternalContentTests(unittest.TestCase):
         feed = outsider.request("GET", "/internal-content/published").json()["items"]
         self.assertTrue(any(item["id"] == record["id"] for item in feed))
 
+        public_reader = outsider.request(
+            "GET", f"/internal-content/published/{record['id']}"
+        )
+        self.assertEqual(public_reader.status_code, 200)
+        self.assertEqual(public_reader.json()["id"], record["id"])
+
         visible = outsider.request("GET", f"/internal-content/{record['id']}/cover")
         self.assertEqual(visible.status_code, 200)
 
@@ -527,6 +537,18 @@ class InternalContentTests(unittest.TestCase):
             json_body={"ids": [inbox["items"][0]["id"]]},
         )
         self.assertEqual(marked.json()["unread"], 0)
+
+    def test_public_reader_rejects_drafts_and_missing_records(self):
+        owner = ApiClient()
+        draft = self.create_draft(owner, title="Private draft", body="This remains private.")
+        self.assertEqual(
+            owner.request("GET", f"/internal-content/published/{draft['id']}").status_code,
+            404,
+        )
+        self.assertEqual(
+            owner.request("GET", "/internal-content/published/does-not-exist").status_code,
+            404,
+        )
 
     def test_request_changes_lets_the_author_revise_and_resubmit(self):
         owner = ApiClient()

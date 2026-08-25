@@ -18,7 +18,6 @@ const mainNav = [
   { to: "/for-you", label: "For You", labelKo: "추천", icon: "sparkle", forYouOnly: true },
   { to: "/home", label: "Briefing", labelKo: "브리핑", icon: "home" },
   { to: "/scan", label: "Scan", labelKo: "스캔", icon: "search" },
-  { to: "/saved", label: "Saved", labelKo: "나의 데스크", icon: "bookmark" },
   { to: "/research", label: "Research", labelKo: "리서치", icon: "note", matches: ["/research", "/venturelens"] },
   { to: "/samsung-internal", label: "Samsung Internal", labelKo: "삼성 내부", icon: "layers" },
 ];
@@ -37,8 +36,6 @@ const baseSettingsNav = [
   },
   { to: "/scheduler", label: "Scheduler", labelKo: "스케줄러", icon: "clock" },
   { to: "/voc", label: "Voice of Customer", labelKo: "고객 의견", icon: "note" },
-  { to: "/saved/contribute", label: "Contribute Desk", labelKo: "기여", icon: "note" },
-  { to: "/internal-publishing", label: "Announcements", labelKo: "공지", icon: "megaphone" },
 ];
 
 const protectedSettingsNav = [
@@ -210,14 +207,7 @@ function initialsFor(name) {
   ).toUpperCase();
 }
 
-function personalDeskLabel(name, language) {
-  const first = String(name || "").trim().split(/\s+/)[0];
-  if (language === "ko") return `${first || "나"}의 데스크`;
-  return first ? `${first}'s Desk` : "For Me";
-}
-
-function navLabel(item, language, viewer) {
-  if (item.to === "/saved") return personalDeskLabel(viewer?.display_name, language);
+function navLabel(item, language) {
   return language === "ko" ? item.labelKo : item.label;
 }
 
@@ -387,6 +377,7 @@ export default function TopBar({
   translationState,
   forYouEnabled = false,
   profileMode = "legacy",
+  contributionAllowed = false,
 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -590,7 +581,7 @@ export default function TopBar({
         <div className="header-actions premium-header-actions">
           <ThemeToggle language={language} theme={theme} onToggle={onToggleTheme} />
 
-          <NotificationBell />
+          {contributionAllowed && <NotificationBell />}
 
           <div className="premium-settings-control" ref={settingsControlRef}>
             <button

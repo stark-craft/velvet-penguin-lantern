@@ -64,7 +64,7 @@ export default function NotificationBell() {
       try { await markInternalNotificationsRead([entry.id]); } catch { /* optimistic */ }
     }
     setOpen(false);
-    navigate(entry.kind === 'published' ? '/samsung-internal' : '/saved');
+    navigate(entry.kind === 'published' ? '/samsung-internal' : '/for-you/contributions');
   };
 
   return (

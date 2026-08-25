@@ -82,6 +82,85 @@ export function articleKeywords(item) {
     });
 }
 
+export const BRIEFING_LENSES = Object.freeze([
+  {
+    id: 'ai',
+    label: 'AI',
+    description: 'Models, agents and applied intelligence',
+    terms: [
+      'ai', 'ai agents', 'ai models', 'anthropic', 'artificial intelligence',
+      'chatgpt', 'claude', 'gemini', 'generative ai', 'grok', 'llm',
+      'machine learning', 'openai',
+    ],
+  },
+  {
+    id: 'devices',
+    label: 'Devices',
+    description: 'Displays, televisions and connected products',
+    terms: [
+      'display', 'display tech', 'form factor', 'led', 'lg', 'mobile',
+      'new product', 'oled', 'qned', 'samsung', 'smart home', 'smartphone',
+      'sony', 'tcl', 'television', 'tv',
+    ],
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    description: 'Silicon, accelerators and infrastructure',
+    terms: [
+      'chip', 'chipset', 'cpu', 'foundry', 'gpu', 'hardware & semiconductors',
+      'hbm', 'memory', 'npu', 'nvidia', 'processor', 'semiconductor', 'silicon',
+      'tpu',
+    ],
+  },
+  {
+    id: 'robotics',
+    label: 'Robotics',
+    description: 'Robots, autonomy and industrial automation',
+    terms: [
+      'automation', 'autonomous', 'drone', 'humanoid', 'robot', 'robotics',
+      'robotics & automation',
+    ],
+  },
+  {
+    id: 'media',
+    label: 'Media',
+    description: 'Distribution, streaming and regulation',
+    terms: [
+      '5g broadcast', 'broadcast', 'broadcast regulation', 'cable tv',
+      'conditional access system', 'connected tv', 'd2m', 'digital rights management',
+      'digital terrestrial transmission', 'dth', 'dtt', 'dvb c', 'dvb c2',
+      'dvb i', 'dvb s', 'dvb s2', 'dvb t', 'dvb t2', 'fast', 'hbb tv',
+      'iptv', 'jio', 'linear ad insertion', 'linear ads', 'media', 'mib',
+      'ott', 'set top box', 'streaming', 'trai', 'tuner',
+    ],
+  },
+]);
+
+function normalizedLensValues(item) {
+  return [
+    ...articleKeywords(item),
+    item?.category,
+  ]
+    .map(value => String(value || '').trim().toLocaleLowerCase())
+    .filter(Boolean);
+}
+
+export function matchesBriefingLens(item, lensId) {
+  if (!lensId || lensId === 'all') return true;
+  const lens = BRIEFING_LENSES.find(candidate => candidate.id === lensId);
+  if (!lens) return true;
+  const terms = new Set(lens.terms);
+  return normalizedLensValues(item).some(value => terms.has(value));
+}
+
+export function briefingLensOptions(items) {
+  return BRIEFING_LENSES.map(lens => ({
+    ...lens,
+    count: (items || []).filter(item => matchesBriefingLens(item, lens.id)).length,
+  }));
+}
+
 export function keywordOptions(items) {
   const counts = new Map();
   (items || []).forEach(item => {

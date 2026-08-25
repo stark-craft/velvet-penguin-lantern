@@ -2,6 +2,9 @@ import { apiRequest } from "../shared/api/client.js";
 
 export const getVentureOverview = () => apiRequest("/venture-lens/overview");
 
+export const getVentureDiscovery = (refresh = false) =>
+  apiRequest(`/venture-lens/discovery${refresh ? "?refresh=true" : ""}`);
+
 export const refreshVentureLens = () =>
   apiRequest("/venture-lens/refresh", { method: "POST" });
 
@@ -16,6 +19,17 @@ export const getRepositoryDossier = (id) =>
 
 export const getPaperDossier = (id) =>
   apiRequest(`/venture-lens/dossier/paper/${encodeURIComponent(id)}`);
+
+const pathIdentifier = (id) => String(id || "").split("/").map(encodeURIComponent).join("/");
+
+export const getModelDossier = (id) =>
+  apiRequest(`/venture-lens/dossier/model/${pathIdentifier(id)}`);
+
+export const getDatasetDossier = (id) =>
+  apiRequest(`/venture-lens/dossier/dataset/${pathIdentifier(id)}`);
+
+export const getPatentDossier = (id) =>
+  apiRequest(`/venture-lens/dossier/patent/${pathIdentifier(id)}`);
 
 export const compareVentureSignals = (items) =>
   apiRequest("/venture-lens/compare", {

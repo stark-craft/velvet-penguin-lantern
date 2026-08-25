@@ -19,15 +19,15 @@ import TrendsScreen from "./screens/TrendsScreen.jsx";
 import VocScreen from "./screens/VocScreen.jsx";
 import AnalyticsScreen from "./screens/AnalyticsScreen.jsx";
 import GatekeeperReviewScreen from "./screens/GatekeeperReviewScreen.jsx";
-import SavedScreen from "./screens/SavedScreen.jsx";
-import ForYouScreen from "./for-you/ForYouScreen.jsx";
+import ForYouWorkspaceScreen from "./for-you/ForYouWorkspaceScreen.jsx";
 import ResearchScreen from "./screens/ResearchScreen.jsx";
 import SamsungInternalScreen from "./screens/SamsungInternalScreen.jsx";
+import SamsungInternalReaderScreen from "./screens/SamsungInternalReaderScreen.jsx";
 import InternalPublishingScreen from "./screens/InternalPublishingScreen.jsx";
 import VentureLensApp from "../venture-lens/VentureLensApp.jsx";
 import UserProfileModal from "./components/UserProfileModal.jsx";
 import Icon from "./components/Icon.jsx";
-import { getRecommendationStatus, getViewerProfile } from "./api.js";
+import { getContributionAccess, getRecommendationStatus, getViewerProfile } from "./api.js";
 import { useLanguage } from "./translation/LanguageProvider.jsx";
 import "./styles/personalization.css";
 const SENSE_ATMOSPHERE_VIDEO =
@@ -73,6 +73,26 @@ function ProductAtmosphere({ live }) {
     </div>
   );
 }
+
+function LegacySavedRedirect() {
+  const { pathname } = useLocation();
+  const target = pathname === "/saved/contribute"
+    ? "/for-you/contributions"
+    : pathname === "/saved/leadership"
+      ? "/for-you/contributions/leadership"
+      : pathname === "/saved/briefings"
+        ? "/for-you/private-briefings"
+        : "/for-you/saved";
+  return <Navigate to={target} replace />;
+}
+
+function ContributionOnly({ access, children }) {
+  if (access === null) {
+    return <div className="fy-state"><span className="fy-loader" /><p>Checking private publishing access…</p></div>;
+  }
+  return access?.allowed ? children : <Navigate to="/for-you" replace />;
+}
+
 export default function App() {
   const { pathname } = useLocation();
   useTracking(pathname);
@@ -90,6 +110,7 @@ export default function App() {
   const [profileRequired, setProfileRequired] = useState(false);
   const [viewerRevision, setViewerRevision] = useState(0);
   const [recommendationStatus, setRecommendationStatus] = useState(null);
+  const [contributionAccess, setContributionAccess] = useState(null);
   const [manualScan, setManualScan] = useState({
     query: "",
     from: "",
@@ -151,6 +172,19 @@ export default function App() {
           profile_mode: "unified",
           legacy_profile_routing: false,
         });
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    getContributionAccess()
+      .then((result) => {
+        if (!cancelled) setContributionAccess({ allowed: Boolean(result?.allowed), ip: result?.ip || "" });
+      })
+      .catch((error) => {
+        console.warn("[Contributions] Capability check failed closed:", error);
+        if (!cancelled) setContributionAccess({ allowed: false, ip: "" });
       });
     return () => { cancelled = true; };
   }, []);
@@ -342,7 +376,7 @@ export default function App() {
         <a className="news-skip-link" href="#news-main-content">
           Skip to main content
         </a>{" "}
-        <ProductAtmosphere live={pathname === "/home" || pathname === "/for-you"} />{" "}
+        <ProductAtmosphere live={pathname === "/home" || pathname.startsWith("/for-you")} />{" "}
         <TopBar
           manualScan={manualScan}
           theme={theme}
@@ -358,6 +392,7 @@ export default function App() {
           }}
           forYouEnabled={Boolean(recommendationStatus?.enabled)}
           profileMode={recommendationStatus?.profile_mode || "unified"}
+          contributionAllowed={Boolean(contributionAccess?.allowed)}
         />{" "}
         <main
           className="design-main mx-auto w-full"
@@ -371,7 +406,10 @@ export default function App() {
             <Route path="/" element={recommendationStatus === null
               ? <div className="fy-state"><span className="fy-loader" /><p>Preparing TechScout…</p></div>
               : <Navigate to={defaultLanding} replace />} />{" "}
-            <Route path="/for-you" element={<ForYouScreen />} />{" "}
+            <Route
+              path="/for-you/*"
+              element={<ForYouWorkspaceScreen contributionAccess={contributionAccess} viewer={viewer} />}
+            />{" "}
             <Route path="/home" element={<FeedScreen />} />{" "}
             <Route
               path="/scan"
@@ -386,10 +424,15 @@ export default function App() {
             />{" "}
             <Route path="/selected" element={<SelectedScreen />} />{" "}
             <Route path="/approved" element={<ApprovedScreen />} />{" "}
-            <Route path="/saved/*" element={<SavedScreen />} />{" "}
+            <Route path="/saved/*" element={<LegacySavedRedirect />} />{" "}
             <Route path="/research" element={<ResearchScreen />} />{" "}
-            <Route path="/samsung-internal" element={<SamsungInternalScreen />} />{" "}
-            <Route path="/internal-publishing" element={<InternalPublishingScreen />} />{" "}
+            <Route path="/samsung-internal" element={<SamsungInternalScreen contributionAllowed={Boolean(contributionAccess?.allowed)} />} />{" "}
+            <Route path="/samsung-internal/leadership/:id" element={<SamsungInternalReaderScreen kind="leadership" />} />{" "}
+            <Route path="/samsung-internal/announcement/:id" element={<SamsungInternalReaderScreen kind="announcement" />} />{" "}
+            <Route
+              path="/internal-publishing"
+              element={<ContributionOnly access={contributionAccess}><InternalPublishingScreen /></ContributionOnly>}
+            />{" "}
             <Route path="/venturelens/*" element={<VentureLensApp />} />{" "}
             <Route path="/rejected" element={<RejectedScreen />} />{" "}
             <Route path="/sources" element={<SourcesScreen />} />{" "}

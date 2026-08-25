@@ -146,8 +146,56 @@ export function colleagueStoriesOf(publishedRecords) {
 }
 
 export function coverUrl(record) {
-  if (!record?.cover || !record?.id) return '';
-  return `/internal-content/${record.id}/cover?v=${encodeURIComponent(record.updated_at || '')}`;
+  if (!record?.cover) return '';
+  if (typeof record.cover?.url === 'string' && record.cover.url.trim()) {
+    return record.cover.url.trim();
+  }
+  if (!record?.id) return '';
+  return `/internal-content/${record.id}/cover?v=${encodeURIComponent(record.updatedAt || record.updated_at || '')}`;
+}
+
+function decodedImageValue(value) {
+  let candidate = textOf(value).trim().replace(/\\\//g, '/');
+  if (!candidate) return '';
+  try {
+    candidate = decodeURIComponent(candidate);
+  } catch {
+    // A normal URL may contain a literal percent sign. Keep it unchanged.
+  }
+  return candidate;
+}
+
+export function resolveInternalImage(item) {
+  if (!item || typeof item !== 'object') return '';
+  const candidates = [
+    item.image_url, item.top_image, item.imageUrl, item.image,
+    item.thumbnail_url, item.thumbnail, item.og_image,
+    item.article_image_url, item.web_search_image_url,
+    item.image_metadata?.image_url, item.image_metadata?.url,
+    item.media?.image_url, item.media?.url,
+    item.images?.[0]?.image_url, item.images?.[0]?.url, item.images?.[0],
+  ];
+  for (const value of candidates) {
+    const candidate = decodedImageValue(value);
+    if (!candidate || candidate === '#') continue;
+    if (/favicon|placeholder|default[-_]?image|spacer\.gif|blank\.gif/i.test(candidate)) continue;
+    if (/^(?:https?:\/\/|\/[^/]|\/\/)/i.test(candidate)) return candidate;
+  }
+  return '';
+}
+
+const WIRE_SEQUENCE = [
+  ['global', 0], ['local', 0], ['global', 1], ['inside', 0],
+  ['global', 2], ['local', 1], ['inside', 1], ['global', 3],
+  ['local', 2], ['inside', 2], ['global', 4],
+];
+
+export function buildSamsungWire({ global = [], local = [], inside = [] } = {}) {
+  const groups = { global, local, inside };
+  return WIRE_SEQUENCE.flatMap(([channel, index]) => {
+    const item = groups[channel]?.[index];
+    return item ? [{ ...item, samsung_internal_channel: channel }] : [];
+  });
 }
 
 // The hero always leads with the leadership message when one is live, then

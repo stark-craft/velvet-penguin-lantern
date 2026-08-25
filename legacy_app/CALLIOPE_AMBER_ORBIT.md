@@ -573,6 +573,7 @@ Review any `*.incoming` files before starting the service.
    - `GATEKEEPER_KEY`
    - `NEWSSCRAPPER_IP_HASH_SECRET`
    - all allowed-IP lists
+   - `CONTRIBUTIONS_ALLOWED_IPS`
    - `TEAM_IP_MAP`
    - Samsung Web Search client/token
    - Samsung Chat client/token
@@ -601,20 +602,48 @@ Copy the printed 64-character value after
 Production keys must contain at least six characters. The old four-digit
 development PIN is intentionally rejected in production.
 
-### Broadcast-profile routing
+### Contributions workspace access
 
-Put real client IP addresses after `BROADCAST_SPECIAL_IPS=`, separated by
-commas:
+Put the real client IP addresses that may create Samsung Internal content after
+`CONTRIBUTIONS_ALLOWED_IPS=`, separated by commas:
 
 ```env
-BROADCAST_SPECIAL_IPS=192.0.2.10,192.0.2.11
+CONTRIBUTIONS_ALLOWED_IPS=127.0.0.1,::1,192.0.2.10,192.0.2.11
 ```
 
-Restart the backend after changing `.env`; environment settings are read at
-process start. The user then refreshes the browser.
+Keep `127.0.0.1,::1` if the same PC is also used for local testing. Restart the
+backend after changing `.env`, then refresh the browser. An allowed user sees
+**Contributions** inside For You. Other users see only the personal desk, Saved
+Signals, and Private Briefings. A direct contribution URL is rejected by both
+the browser and backend.
 
 If a reverse proxy is used, put only that proxy's IP in `TRUSTED_PROXY_IPS`.
 Never trust every address. Without a proxy, leave loopback values only.
+
+Broadcast is now a content vertical in the unified corpus, not an IP-routed
+profile. Do not reintroduce separate Default/Broadcast scheduler runs or replace
+the active `sites.json` with a legacy broadcast file.
+
+### Optional Research Intelligence providers
+
+Research and Venture Lens work without extra credentials by retaining their
+GitHub/arXiv starter cache and using public OpenAlex and Hugging Face access.
+The following `.env` values are optional:
+
+```env
+GITHUB_TOKEN=
+OPENALEX_API_KEY=
+HUGGINGFACE_TOKEN=
+EPO_OPS_CLIENT_ID=
+EPO_OPS_CLIENT_SECRET=
+X_BEARER_TOKEN=
+```
+
+Leave EPO and X blank when your organization has not provisioned them. Their
+lanes disappear cleanly; the application does not render fake zero-valued
+cards. Never paste these tokens into the frontend. After changing any value,
+restart Uvicorn and refresh the browser. Venture Lens keeps an independent
+last-success cache and does not add another NewsScrapper scheduler.
 
 ## 6. Install the five local AI models
 

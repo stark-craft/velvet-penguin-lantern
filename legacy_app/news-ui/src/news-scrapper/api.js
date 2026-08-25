@@ -513,6 +513,8 @@ export const exportWord  = (items, filename='digest.docx') => exportBinary('/exp
 // The backend owns parsing, cover normalization, and persistence. These
 // wrappers stay same-origin in dev (Vite proxy), portable builds, and Linux.
 
+export const getContributionAccess = () => jsonFetch('/internal-content/contribute-access');
+
 const toBackendDraftFields = (draft) => ({
   title: draft.title || '',
   summary: draft.summary || '',
@@ -576,6 +578,9 @@ export const getPublishedInternalContent = async () => {
   const response = await jsonFetch('/internal-content/published');
   return (response?.items || []).map(fromBackendRecord);
 };
+
+export const getPublishedInternalRecord = async (id) =>
+  fromBackendRecord(await jsonFetch(`/internal-content/published/${encodeURIComponent(id)}`));
 
 export const importContributionDocument = async (file, ownerName = '', contentType = '') => {
   const form = new FormData();

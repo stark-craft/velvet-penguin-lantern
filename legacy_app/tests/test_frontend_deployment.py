@@ -58,10 +58,28 @@ class FrontendDeploymentTests(unittest.TestCase):
                 patch.object(application, "VIEWER_SAVED_FILE", str(saved_file)),
                 patch.object(application, "PRIVATE_VIEWER_CLAIMS", claims),
             ):
-                spa = asgi_request(
+                workspace_spa = asgi_request(
                     composition.app,
                     "GET",
-                    "/saved",
+                    "/for-you/contributions",
+                    headers={"accept": "text/html"},
+                )
+                legacy_spa = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/saved/leadership",
+                    headers={"accept": "text/html"},
+                )
+                leadership_reader = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/samsung-internal/leadership/published-id",
+                    headers={"accept": "text/html"},
+                )
+                research_workspace = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/venturelens/models",
                     headers={"accept": "text/html"},
                 )
                 api = asgi_request(
@@ -70,9 +88,15 @@ class FrontendDeploymentTests(unittest.TestCase):
                     "/viewer/saved",
                     headers={"accept": "application/json"},
                 )
-            self.assertEqual(spa.status_code, 200)
-            self.assertIn("desk", spa.text)
-            self.assertIn("no-cache", spa.headers.get("cache-control", ""))
+            self.assertEqual(workspace_spa.status_code, 200)
+            self.assertIn("desk", workspace_spa.text)
+            self.assertIn("no-cache", workspace_spa.headers.get("cache-control", ""))
+            self.assertEqual(legacy_spa.status_code, 200)
+            self.assertIn("desk", legacy_spa.text)
+            self.assertEqual(leadership_reader.status_code, 200)
+            self.assertIn("desk", leadership_reader.text)
+            self.assertEqual(research_workspace.status_code, 200)
+            self.assertIn("desk", research_workspace.text)
             self.assertEqual(api.status_code, 200)
             self.assertEqual(api.json()["scope"], "current_viewer_only")
 
