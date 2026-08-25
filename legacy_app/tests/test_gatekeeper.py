@@ -10,10 +10,12 @@ from starlette.requests import Request
 from news_scrapper import application
 
 
-def request_from(ip="10.0.0.25", key=""):
+def request_from(ip="10.0.0.25", key="", forwarded_for=""):
     headers = []
     if key:
         headers.append((b"x-gatekeeper-key", key.encode("latin1")))
+    if forwarded_for:
+        headers.append((b"x-forwarded-for", forwarded_for.encode("latin1")))
     return Request(
         {
             "type": "http",
@@ -30,6 +32,25 @@ def request_from(ip="10.0.0.25", key=""):
 
 
 class GatekeeperTests(unittest.TestCase):
+    def test_global_removal_requires_allowed_resolved_ip(self):
+        with (
+            patch.object(application, "GATEKEEPER_ALLOWED_IPS", {"10.0.0.25"}),
+            patch.object(application, "TRUSTED_PROXY_IPS", {"10.0.0.10"}),
+        ):
+            self.assertEqual(
+                application.require_gatekeeper_ip_access(request_from()),
+                "10.0.0.25",
+            )
+            with self.assertRaises(HTTPException) as unauthorized:
+                application.require_gatekeeper_ip_access(request_from("10.0.0.30"))
+            with self.assertRaises(HTTPException) as forged:
+                application.require_gatekeeper_ip_access(
+                    request_from("10.0.0.30", forwarded_for="10.0.0.25")
+                )
+
+        self.assertEqual(unauthorized.exception.status_code, 403)
+        self.assertEqual(forged.exception.status_code, 403)
+
     def test_gatekeeper_requires_both_allowed_ip_and_key(self):
         with (
             patch.object(application, "GATEKEEPER_ALLOWED_IPS", {"10.0.0.25"}),

@@ -1,0 +1,20 @@
+.reaction-controls{display:inline-flex;align-items:center;gap:6px}
+.reaction-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:34px;height:34px;padding:0 9px;border:1px solid rgba(150,171,201,.24);border-radius:10px;background:rgba(255,255,255,.045);color:#b8c6d8;box-shadow:inset 0 1px 0 rgba(255,255,255,.04);transition:border-color .16s ease,background .16s ease,color .16s ease,transform .16s ease,box-shadow .16s ease}
+.reaction-button:hover{transform:translateY(-1px);border-color:rgba(138,183,255,.42);background:rgba(138,183,255,.09);color:#eef5ff}
+.reaction-button.is-like{border-color:rgba(49,211,150,.3);background:rgba(42,192,137,.07);color:#73ddb6}
+.reaction-button.is-dislike{border-color:rgba(251,113,133,.3);background:rgba(244,63,94,.07);color:#f59aaa}
+.reaction-button.is-like:hover{border-color:rgba(49,211,150,.58);background:rgba(42,192,137,.14);color:#baffdf}
+.reaction-button.is-dislike:hover{border-color:rgba(251,113,133,.58);background:rgba(244,63,94,.14);color:#ffd1d8}
+.reaction-button.is-like.is-active{border-color:rgba(49,211,150,.72);background:linear-gradient(135deg,rgba(42,192,137,.32),rgba(34,197,94,.17));color:#baffdf;box-shadow:0 0 0 2px rgba(42,192,137,.11)}
+.reaction-button.is-dislike.is-active{border-color:rgba(251,113,133,.72);background:linear-gradient(135deg,rgba(244,63,94,.31),rgba(239,68,68,.16));color:#ffd7dd;box-shadow:0 0 0 2px rgba(244,63,94,.11)}
+.reaction-button:disabled{cursor:not-allowed;opacity:.48;transform:none}
+.reaction-button svg{width:15px;height:15px;flex:0 0 auto}.reaction-button span{font-size:.68rem;font-weight:800;font-variant-numeric:tabular-nums}
+html[data-theme="light"] .reaction-button{box-shadow:0 1px 2px rgba(15,23,42,.06)}
+html[data-theme="light"] .reaction-button.is-like{border-color:#8bcdb4;background:#f0fbf6;color:#0f8158}
+html[data-theme="light"] .reaction-button.is-dislike{border-color:#efb0bb;background:#fff5f6;color:#bc3951}
+html[data-theme="light"] .reaction-button.is-like:hover{border-color:#2b9f72;background:#e4f8ee;color:#087348}
+html[data-theme="light"] .reaction-button.is-dislike:hover{border-color:#d85d72;background:#ffecef;color:#a9233b}
+html[data-theme="light"] .reaction-button.is-like.is-active{border-color:#16a36e;background:#dcfce7;color:#087348;box-shadow:0 0 0 2px rgba(22,163,110,.1)}
+html[data-theme="light"] .reaction-button.is-dislike.is-active{border-color:#e05268;background:#fff0f2;color:#b4233c;box-shadow:0 0 0 2px rgba(224,82,104,.1)}
+.article-kill-switch{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid rgba(251,113,133,.3);border-radius:10px;background:rgba(244,63,94,.08);color:#ffc4ce;font-size:.72rem;font-weight:750}.article-kill-switch:hover{border-color:rgba(251,113,133,.6);background:rgba(244,63,94,.16);color:#fff}
+html[data-theme="light"] .article-kill-switch{border-color:#e29aa7;background:#fff1f3;color:#a61d35}html[data-theme="light"] .article-kill-switch:hover{border-color:#cf5067;background:#ffe4e9;color:#86152a}

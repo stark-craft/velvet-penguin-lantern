@@ -69,7 +69,7 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
         {!approved && !hidden && onVote && (
           <div className="dossier-feedback rounded-xl border border-white/10 bg-white/[0.035] p-3">
             <span className="mb-3 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Relevance Feedback</span>
-            <Bouncer onVote={(value) => onVote(item, value)} />
+            <Bouncer reactions={item?.reactions} onVote={(value) => onVote(item, value)} />
           </div>
         )}
       </div>

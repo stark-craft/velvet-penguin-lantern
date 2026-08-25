@@ -738,6 +738,14 @@ html[data-theme="light"] .personal-desk .cw-field :where(input, textarea) {
   color: #18283c !important;
 }
 
+html[data-theme="light"] .cw-workspace{color:#14263a}
+html[data-theme="light"] .cw-list-section{border-color:#b9cad9;background:linear-gradient(145deg,#f8fbfd,#e9f1f7);color:#14263a}
+html[data-theme="light"] .cw-item{border-color:#bdccda;background:#f7fafc;color:#14263a;box-shadow:0 4px 14px rgba(31,54,78,.07)}
+html[data-theme="light"] .cw-item-kind{color:#0b6d63}
+html[data-theme="light"] .cw-item-copy strong{color:#14263a}
+html[data-theme="light"] .cw-item-copy small{color:#536b82}
+html[data-theme="light"] .cw-status-pill{border-color:#aebfd0;background:#e8eff6;color:#334e68}
+
 /* Responsive */
 
 @media (max-width: 1060px) {

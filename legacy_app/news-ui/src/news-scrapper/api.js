@@ -238,6 +238,11 @@ export const setViewerReaction = (article, reaction) =>
     method: 'PUT',
     body: JSON.stringify({ article, reaction }),
   });
+export function getViewerReactions(articleIds = []) {
+  const params = new URLSearchParams();
+  articleIds.slice(0, 100).filter(Boolean).forEach((id) => params.append('article_id', String(id)));
+  return jsonFetch(`/viewer/reactions?${params.toString()}`);
+}
 export const getFollowingThreads = () => jsonFetch('/viewer/following');
 
 // ---------- Workflow ----------

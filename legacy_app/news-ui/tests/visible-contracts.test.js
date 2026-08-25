@@ -277,15 +277,31 @@ test('For You cards are direct-open, followable and reaction-counted without wor
   const screenSource = readFileSync(new URL('../src/news-scrapper/for-you/ForYouScreen.jsx', import.meta.url), 'utf8');
   const cssSource = readFileSync(new URL('../src/news-scrapper/for-you/for-you.css', import.meta.url), 'utf8');
   assert.match(cardSource, /fy-card-open-layer/);
-  assert.match(cardSource, /Following' : 'Follow'/);
+  assert.match(cardSource, /Unfollow this story' : 'Follow this story privately'/);
+  assert.doesNotMatch(cardSource, />\s*Follow\s*</);
   assert.match(cardSource, /reactions\.like_count/);
   assert.match(cardSource, /reactions\.dislike_count/);
-  assert.match(cardSource, /title="Like" type="button"/);
-  assert.match(cardSource, /title="Dislike" type="button"/);
+  assert.match(cardSource, /<Bouncer[\s\S]*reactions=\{reactions\}/);
   assert.doesNotMatch(cardSource, /Select for Review|RecommendationReason|Why this story/);
   assert.doesNotMatch(screenSource, /selectWorkflow|trainVote/);
-  assert.match(cssSource, /\.fy-executive\s*>\s*\.fy-card-grid\s*\{[\s\S]*grid-template-columns:\s*repeat\(5/);
+  assert.match(cssSource, /\.fy-executive-grid\{[\s\S]*grid-template-columns:minmax\(0,1\.6fr\)/);
+  assert.match(cssSource, /\.is-executive-hero\{grid-row:1\/3\}/);
   assert.match(cssSource, /\.fy-card-body\{z-index:auto\}/);
+});
+
+test('Briefing reactions share the private counted endpoint and global removal is an IP-gated kill switch', () => {
+  const feedSource = readFileSync(new URL('../src/news-scrapper/screens/FeedScreen.jsx', import.meta.url), 'utf8');
+  const bouncerSource = readFileSync(new URL('../src/news-scrapper/components/Bouncer.jsx', import.meta.url), 'utf8');
+  const voteFlow = feedSource.match(/const onVote = async[\s\S]*?\n  \};/)?.[0] || '';
+  assert.match(voteFlow, /setViewerReaction/);
+  assert.doesNotMatch(voteFlow, /rejectArticle|setArticles|trainVote/);
+  assert.match(feedSource, /getGatekeeperAccess/);
+  assert.match(feedSource, /canKill && <button className="article-kill-switch/);
+  assert.match(feedSource, /const killArticle = async[\s\S]*rejectArticle/);
+  assert.match(bouncerSource, /Like this story/);
+  assert.match(bouncerSource, /Dislike this story/);
+  assert.match(bouncerSource, /likes > 0/);
+  assert.match(bouncerSource, /dislikes > 0/);
 });
 
 test('reaction and following APIs stay same-origin and reactions do not append stale events', () => {

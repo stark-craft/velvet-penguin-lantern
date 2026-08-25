@@ -21,7 +21,7 @@ import './for-you.css';
 
 const migrationDismissKey = 'for-you-migration-dismissed';
 
-export default function ForYouScreen() {
+export default function ForYouScreen({ onWorkspaceMeta }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState(null);
@@ -48,6 +48,14 @@ export default function ForYouScreen() {
     status?.event_flush_seconds || 15,
     status?.event_batch_size || 10,
   );
+
+  useEffect(() => {
+    const options = [...(status?.taxonomy?.topics || []), ...(status?.taxonomy?.outcomes || [])];
+    const labels = [...(preferences?.topics || []), ...(preferences?.outcomes || [])]
+      .slice(0, 5)
+      .map((id) => options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' '));
+    onWorkspaceMeta?.({ labels: labels.length ? labels : ['Balanced mix'] });
+  }, [onWorkspaceMeta, preferences, status]);
 
   const loadFeed = useCallback(async () => {
     const result = await getForYou({ limit: 40 });
@@ -319,15 +327,6 @@ export default function ForYouScreen() {
 
   return (
     <div className="fy-page">
-      <section className="fy-preference-strip" aria-label="Your selected interests">
-        <div><Icon name="sparkle" size={17} /><span><strong>{feed?.viewer_name ? `${feed.viewer_name}'s feed` : 'Your feed'}</strong><small>Ranked privately from your choices and meaningful reading</small></span></div>
-        <div className="fy-preference-list">{[
-          ...(preferences?.topics || []), ...(preferences?.outcomes || []),
-        ].slice(0, 5).map((id) => {
-          const options = [...(status?.taxonomy?.topics || []), ...(status?.taxonomy?.outcomes || [])];
-          return <span key={id}>{options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' ')}</span>;
-        })}{!preferences?.topics?.length && !preferences?.outcomes?.length && <span>Balanced starter mix</span>}</div>
-      </section>
       {error && <div className="fy-inline-error" role="alert">{error}</div>}
       {actionNotice && <div className="fy-feedback" role="status"><span>{actionNotice.message}</span><div>{actionNotice.action && <button onClick={actionNotice.action} type="button">{actionNotice.label}</button>}<button aria-label="Dismiss message" onClick={() => setActionNotice(null)} type="button"><Icon name="x" size={13} /></button></div></div>}
       {status?.migration_offer?.available && (

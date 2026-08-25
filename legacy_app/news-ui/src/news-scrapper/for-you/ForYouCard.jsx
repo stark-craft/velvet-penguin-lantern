@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import Icon from '../components/Icon.jsx';
+import Bouncer from '../components/Bouncer.jsx';
 import { SignalVisual } from '../components/ArticleCard.jsx';
 
 export default function ForYouCard({
@@ -14,6 +15,7 @@ export default function ForYouCard({
   onImpression,
   busyAction = '',
   compact = false,
+  executiveVariant = '',
 }) {
   const ref = useRef(null);
   const timer = useRef(null);
@@ -58,7 +60,7 @@ export default function ForYouCard({
 
   const reactions = item.reactions || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
   return (
-    <article aria-busy={Boolean(busyAction)} className={`fy-card${compact ? ' is-compact' : ''}`} ref={ref}>
+    <article aria-busy={Boolean(busyAction)} className={`fy-card${compact ? ' is-compact' : ''}${executiveVariant ? ` is-executive-${executiveVariant}` : ''}`} ref={ref}>
       <button aria-label={`Open dossier for ${item.title}`} className="fy-card-open-layer" onClick={() => onOpen(item)} type="button" />
       <div className="fy-card-visual"><SignalVisual item={item} label={false} /></div>
       <div className="fy-card-body">
@@ -76,9 +78,8 @@ export default function ForYouCard({
         )}
         <div className="fy-card-footer">
           <div className="fy-card-actions">
-            <button aria-label={saved ? `Stop following ${item.title}` : `Follow ${item.title}`} className={saved ? 'active' : ''} disabled={Boolean(busyAction)} onClick={() => onSave(item)} title={saved ? 'Unfollow this story' : 'Follow this story privately'} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={15} /> {busyAction === 'save' ? 'Updating…' : saved ? 'Following' : 'Follow'}</button>
-            <button aria-label={`Like ${item.title}`} className={reactions.viewer_reaction === 'like' ? 'active' : ''} disabled={Boolean(busyAction)} onClick={() => onReact(item, 'like')} title="Like" type="button"><Icon name="thumbsUp" size={15} /><span>{reactions.like_count}</span></button>
-            <button aria-label={`Dislike ${item.title}`} className={reactions.viewer_reaction === 'dislike' ? 'active is-dislike' : ''} disabled={Boolean(busyAction)} onClick={() => onReact(item, 'dislike')} title="Dislike" type="button"><Icon name="thumbsDown" size={15} /><span>{reactions.dislike_count}</span></button>
+            <button aria-label={saved ? `Stop following ${item.title}` : `Follow ${item.title}`} className={saved ? 'active' : ''} disabled={Boolean(busyAction)} onClick={() => onSave(item)} title={busyAction === 'save' ? 'Updating follow state' : saved ? 'Unfollow this story' : 'Follow this story privately'} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={15} /></button>
+            <Bouncer disabled={Boolean(busyAction)} dislikeCount={reactions.dislike_count} likeCount={reactions.like_count} reactions={reactions} onVote={(value) => onReact(item, value)} />
             <button aria-label={`Hide ${item.title} only from your feed`} disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button"><Icon name="eye" size={15} /></button>
           </div>
         </div>

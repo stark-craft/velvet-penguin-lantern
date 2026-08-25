@@ -440,3 +440,26 @@ Read AGENTS.md and every Markdown file under
 project handoff, then verify all claims against git status and live code before
 working. Work only in legacy_app and preserve unrelated changes.
 ```
+
+## 2026-08-25 reaction and For You desktop pass
+
+- For You, Briefing, Scan cards, and dossiers now share the same counted
+  `Bouncer` reaction control and `/viewer/reactions` contract.
+- A reaction is one reversible vote per viewer/article. Like and dislike never
+  remove the story from any feed. Zero counts stay visually quiet.
+- Mature multi-viewer consensus is processed once during the four-hour
+  scheduler cycle. The default gate is five votes with a 70% winning ratio;
+  one aggregate training row per article is written and one coalesced Bouncer
+  retrain is queued. Per-click model training is intentionally forbidden.
+- Shared removal is a separate `Remove globally` kill switch. The UI is exposed
+  only to Gatekeeper-allowlisted IPs, and the POST endpoint enforces the same
+  trusted-proxy-safe IP check server-side. It is not the dislike action.
+- The For You desktop lead is a compact `Today's executive pulse`: one lead
+  story plus four secondary stories in an asymmetric grid, with a progress
+  ring, icon-only actions, a compact topic-aware workspace command rail, and
+  downward-scroll auto-collapse.
+- Following, Create, Private Briefing, and Contributions have explicit light
+  theme contrast. The Following empty state owns its layout CSS so its lazy
+  route cannot lose centering or spacing.
+- The explicit product request for this pass was desktop QA only; no mobile
+  acceptance claim was made.

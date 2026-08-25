@@ -7,7 +7,7 @@ import DateRangePicker from '../components/DateRangePicker.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
-import { correctRegion, getSites, getViewerHidden, hideArticleForViewer, rejectArticle, selectWorkflow, trainVote } from '../api.js';
+import { correctRegion, getSites, getViewerHidden, hideArticleForViewer, selectWorkflow, setViewerReaction } from '../api.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
 import './scan-redesign.css';
@@ -677,20 +677,10 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
     setActionError('');
     setActionNotice('');
     try {
-      if (v === 'down') {
-        await rejectArticle(item);
-        setCards((c) => c.filter((x) => articleKey(x) !== articleKey(item)));
-      } else if (v === 'up') {
-        await trainVote(
-          item.keywords_found || item.keywords || query,
-          item.master_summary || item.summary || item.title,
-          'interested',
-          item.title
-        );
-      }
-      setVotes((previous) => ({ ...previous, [articleKey(item)]: v }));
-      trackAction(v === 'down' ? 'vote_not_interested' : 'vote_interested', articleActivityDetail(item, 'scan'));
-      setActionNotice(v === 'down' ? 'Feedback saved and the signal was removed from these results.' : 'Interested feedback saved.');
+      const response = await setViewerReaction(item, v || 'neutral');
+      setVotes((previous) => ({ ...previous, [articleKey(item)]: { like_count: response.like_count, dislike_count: response.dislike_count, viewer_reaction: response.viewer_reaction } }));
+      trackAction(v === 'dislike' ? 'vote_not_interested' : v === 'like' ? 'vote_interested' : 'vote_neutral', articleActivityDetail(item, 'scan'));
+      setActionNotice(v === 'neutral' ? 'Reaction removed. The result stays visible.' : `Your ${v} was counted. The result stays visible.`);
     } catch (error) {
       setActionError(error?.message || 'Could not save this feedback. Nothing was changed; try again.');
     } finally {

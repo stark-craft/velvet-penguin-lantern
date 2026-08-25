@@ -6,7 +6,7 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import Bouncer from '../components/Bouncer.jsx';
-import { correctRegion, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, trainVote } from '../api.js';
+import { correctRegion, getGatekeeperAccess, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerReactions, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, setViewerReaction } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
@@ -496,7 +496,9 @@ function ImageFeedCard({
   onSave,
   busyAction = '',
   workflowReady = true,
-  savedReady = true
+  savedReady = true,
+  canKill = false,
+  onKill,
 }) {
   const score = scoreOf(item);
   const selected = isSelected || item.selected_by;
@@ -522,12 +524,12 @@ function ImageFeedCard({
 </button>
 <div className="feed-card-actions mt-4">
 <div className="flex flex-wrap items-center gap-2">
-<button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" disabled={Boolean(busyAction) || !workflowReady} onClick={() => onSelect(item)} title={!workflowReady ? 'Review Queue state is unavailable' : undefined} type="button">                  Select for Review                </button>}              <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button">                {busyAction === 'hide' ? 'Hiding…' : 'Hide'}              </button>
+<button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" disabled={Boolean(busyAction) || !workflowReady} onClick={() => onSelect(item)} title={!workflowReady ? 'Review Queue state is unavailable' : undefined} type="button">                  Select for Review                </button>}              <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button">                {busyAction === 'hide' ? 'Hiding…' : 'Hide'}              </button>{canKill && <button className="article-kill-switch h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onKill(item)} title="Remove this article from the shared briefing for everyone" type="button"><Icon name="trash" size={14} /> {busyAction === 'kill' ? 'Removing…' : 'Remove globally'}</button>}
 <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction) || !savedReady} onClick={() => onSave(item)} title={!savedReady ? 'Following state is unavailable' : isSaved ? 'Unfollow this story' : 'Follow this story'} type="button">
 <Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {busyAction === 'save' ? 'Updating…' : isSaved ? 'Following' : 'Follow'}
 </button>
 </div>
-<Bouncer disabled={Boolean(busyAction)} vote={vote} onVote={value => onVote(item, value)} />
+<Bouncer disabled={Boolean(busyAction)} reactions={vote} onVote={value => onVote(item, value)} />
 </div>
 </div>
 </div>
@@ -539,6 +541,7 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [votes, setVotes] = useState({});
+  const [canKill, setCanKill] = useState(false);
   const [openArticle, setOpen] = useState(null);
   const [pendingSelect, setPendingSelect] = useState(null);
   const [batchSelect, setBatchSelect] = useState(null);
@@ -574,6 +577,11 @@ export default function FeedScreen() {
         const normalizedItems = normalizeList(data?.result || data?.results || data?.articles || data || []);
         const items = normalizeArticleImages(normalizedItems);
         setArticles(items);
+        getViewerReactions(items.map((item) => item.article_id || item.id).filter(Boolean)).then((reactionData) => {
+          if (cancelled) return;
+          const snapshots = reactionData?.reactions || {};
+          setVotes(Object.fromEntries(items.map((item) => [articleKey(item), snapshots[item.article_id || item.id] || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' }])));
+        }).catch(() => {});
         setPersonalizationMeta(data?.personalization || null);
         setShowPersonalizationNotice(Boolean(data?.personalization?.applied));
         trackAction('briefing_view', { screen: 'briefing', item_count: items.length });
@@ -602,6 +610,7 @@ export default function FeedScreen() {
       setSavedKeys(new Set(normalizeList(result?.items || []).map(articleKey)));
       setSupportingState((current) => ({ ...current, saved: 'ready' }));
     }).catch(() => setSupportingState((current) => ({ ...current, saved: 'error' })));
+    getGatekeeperAccess().then((result) => setCanKill(Boolean(result?.allowed))).catch(() => setCanKill(false));
     return () => {
       cancelled = true;
     };
@@ -673,31 +682,32 @@ export default function FeedScreen() {
     }
   };
   const onVote = async (item, voteValue) => {
-    if (!voteValue) {
-      setVotes((previous) => ({ ...previous, [item.id]: null }));
-      return;
-    }
-    const previousVote = votes[item.id];
+    const key = articleKey(item);
+    const previousVote = votes[key] || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
     const detail = articleActivityDetail(item, 'feed');
     return runArticleAction('vote', item, async () => {
-      setVotes(previous => ({
-        ...previous,
-        [item.id]: voteValue
-      }));
       try {
-      if (voteValue === 'down') {
-        await rejectArticle(item);
-        trackAction('vote_not_interested', detail);
-        setArticles(currentArticles => currentArticles.filter(article => article.id !== item.id));
-      } else if (voteValue === 'up') {
-        await trainVote(item.keywords_found || item.keywords || [], item.master_summary || item.summary || item.title, 'interested', item.title);
-        await trackAction('vote_interested', detail);
-        await refreshPersonalizedOrder();
-      }
-      setActionFeedback({ type: 'success', message: voteValue === 'down' ? 'Marked not relevant and removed from the shared briefing.' : 'Marked useful. Your feedback was recorded.' });
+      const response = await setViewerReaction(item, voteValue || 'neutral');
+      const snapshot = { like_count: response.like_count, dislike_count: response.dislike_count, viewer_reaction: response.viewer_reaction };
+      setVotes((previous) => ({ ...previous, [key]: snapshot }));
+      setOpen((current) => current && articleKey(current) === key ? { ...current, reactions: snapshot } : current);
+      await trackAction(voteValue === 'dislike' ? 'vote_not_interested' : voteValue === 'like' ? 'vote_interested' : 'vote_neutral', detail);
+      setActionFeedback({ type: 'success', message: voteValue === 'neutral' ? 'Reaction removed. The story stays in the briefing.' : `Your ${voteValue} was counted. The story stays in the briefing.` });
       } catch (error) {
-        setVotes((previous) => ({ ...previous, [item.id]: previousVote }));
+        setVotes((previous) => ({ ...previous, [key]: previousVote }));
         setActionFeedback({ type: 'error', message: error?.message || 'Feedback could not be recorded. Please try again.' });
+      }
+    });
+  };
+  const killArticle = async (item) => {
+    if (!canKill || !window.confirm(`Remove “${item.title}” from the shared briefing for every viewer?`)) return;
+    return runArticleAction('kill', item, async () => {
+      try {
+        await rejectArticle({ ...item, rejected_by: 'authorized kill switch' });
+        setArticles((current) => current.filter((article) => articleKey(article) !== articleKey(item)));
+        setActionFeedback({ type: 'success', message: 'Article removed globally and queued for shared Gatekeeper learning.' });
+      } catch (error) {
+        setActionFeedback({ type: 'error', message: error?.message || 'The article could not be removed globally.' });
       }
     });
   };
@@ -751,7 +761,7 @@ export default function FeedScreen() {
     trackAction('article_click', articleActivityDetail(item, 'feed'));
     trackAction('dossier_open', { ...articleActivityDetail(item, 'feed'), dossier_title: item.title })
       .then(refreshPersonalizedOrder);
-    setOpen(item);
+    setOpen({ ...item, reactions: votes[articleKey(item)] });
   };
   const closeDossier = () => {
     const item = openArticle;
@@ -948,7 +958,7 @@ export default function FeedScreen() {
 <div className="h-px flex-1 bg-white/10" />
 <span className="text-sm text-slate-500">                  {items.length} signals                </span>
 </div>
-<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard busyAction={busyActions[articleKey(item)] || ''} key={item.id} item={item} vote={votes[item.id]} onVote={onVote} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={onCheck} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} savedReady={supportingState.saved === 'ready'} workflowReady={supportingState.workflow === 'ready'} />)}              </div>
+<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard busyAction={busyActions[articleKey(item)] || ''} canKill={canKill} key={item.id} item={item} vote={votes[articleKey(item)]} onVote={onVote} onKill={killArticle} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={onCheck} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} savedReady={supportingState.saved === 'ready'} workflowReady={supportingState.workflow === 'ready'} />)}              </div>
 </div>)}        {filteredArticles.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
 <h2 className="text-xl font-semibold text-white">              No loaded briefing signals match these filters            </h2>
 <p className="mt-2 text-slate-400">              Try clearing search, changing date, or widening signal filters.            </p>

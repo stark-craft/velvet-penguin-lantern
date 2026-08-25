@@ -1,34 +1,38 @@
 import React from 'react';
 import Icon from './Icon.jsx';
+import '../styles/reactions.css';
 
-export default function Bouncer({ vote, onVote, disabled = false }) {
+export default function Bouncer({ vote, reactions, likeCount, dislikeCount, onVote, disabled = false }) {
+  const snapshot = reactions || (vote && typeof vote === 'object' ? vote : null);
+  const current = snapshot?.viewer_reaction || (vote === 'up' ? 'like' : vote === 'down' ? 'dislike' : 'neutral');
+  const likes = Number(likeCount ?? snapshot?.like_count ?? 0);
+  const dislikes = Number(dislikeCount ?? snapshot?.dislike_count ?? 0);
+  const choose = (reaction) => onVote(current === reaction ? 'neutral' : reaction);
   return (
-    <div className="bouncer" onClick={(e) => e.stopPropagation()}>
+    <div aria-label="Story reactions" className="reaction-controls" onClick={(e) => e.stopPropagation()}>
       <button
-        aria-pressed={vote === 'up'}
-        className={'b up' + (vote === 'up' ? ' on' : '')}
+        aria-pressed={current === 'like'}
+        className={'reaction-button is-like' + (current === 'like' ? ' is-active' : '')}
         disabled={disabled}
-        onClick={() => onVote(vote === 'up' ? null : 'up')}
-        title="Interested — trains the bouncer"
-        aria-label="Interested — trains the bouncer"
-        data-tooltip="Interested"
+        onClick={() => choose('like')}
+        title="Like this story"
+        aria-label={`Like this story${likes ? `, ${likes} likes` : ''}`}
         type="button"
       >
         <Icon name="thumbsUp" />
-        <span>Useful</span>
+        {likes > 0 && <span>{likes}</span>}
       </button>
       <button
-        aria-pressed={vote === 'down'}
-        className={'b down' + (vote === 'down' ? ' on' : '')}
+        aria-pressed={current === 'dislike'}
+        className={'reaction-button is-dislike' + (current === 'dislike' ? ' is-active' : '')}
         disabled={disabled}
-        onClick={() => onVote(vote === 'down' ? null : 'down')}
-        title="Not interested — removes for everyone and trains the bouncer"
-        aria-label="Not interested — removes for everyone and trains the bouncer"
-        data-tooltip="Not interested"
+        onClick={() => choose('dislike')}
+        title="Dislike this story"
+        aria-label={`Dislike this story${dislikes ? `, ${dislikes} dislikes` : ''}`}
         type="button"
       >
         <Icon name="thumbsDown" />
-        <span>Not relevant</span>
+        {dislikes > 0 && <span>{dislikes}</span>}
       </button>
     </div>
   );

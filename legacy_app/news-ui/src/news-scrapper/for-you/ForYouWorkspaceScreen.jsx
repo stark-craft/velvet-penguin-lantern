@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import './for-you-workspace.css';
@@ -29,6 +29,9 @@ export default function ForYouWorkspaceScreen({ contributionAccess }) {
   const location = useLocation();
   const navigate = useNavigate();
   const refs = useRef([]);
+  const lastScroll = useRef(0);
+  const [feedMeta, setFeedMeta] = useState({ labels: [] });
+  const [railHidden, setRailHidden] = useState(false);
   const section = sectionFromPath(location.pathname);
   const allowed = Boolean(contributionAccess?.allowed);
   const accessLoading = contributionAccess === null;
@@ -43,11 +46,22 @@ export default function ForYouWorkspaceScreen({ contributionAccess }) {
     if (!allowed && !accessLoading && location.pathname.includes('/create/contributions')) navigate('/for-you/create', { replace: true });
   }, [accessLoading, allowed, location.pathname, navigate]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      const current = window.scrollY;
+      setRailHidden(current > 150 && current > lastScroll.current + 5);
+      if (current < lastScroll.current - 5 || current < 80) setRailHidden(false);
+      lastScroll.current = current;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   if (redirect) return <Navigate to={redirect} replace />;
 
   return (
     <div className="fy-workspace-shell">
-      <div className="fy-workspace-rail-wrap">
+      <div className={`fy-workspace-rail-wrap${railHidden ? ' is-hidden' : ''}`}>
         <div aria-label="For You workspace" className="fy-workspace-switcher" role="tablist">
           <div className="fy-workspace-tabs">
             {tabs.map((tab, index) => <button
@@ -68,12 +82,13 @@ export default function ForYouWorkspaceScreen({ contributionAccess }) {
               type="button"
             ><Icon name={tab.icon} size={15} /> {tab.label}</button>)}
           </div>
+          {section === 'feed' && <div className="fy-command-topics" aria-label="Selected interests">{feedMeta.labels.slice(0, 3).map((label) => <span key={label}>{label}</span>)}</div>}
           <button className="fy-tune-action" onClick={() => navigate('/for-you?edit=interests')} type="button"><Icon name="settings" size={15} /> Tune interests</button>
         </div>
       </div>
       <section className="fy-workspace-panel" role="tabpanel">
         <Suspense fallback={<WorkspaceFallback />}>
-          {section === 'feed' && <ForYouScreen />}
+          {section === 'feed' && <ForYouScreen onWorkspaceMeta={setFeedMeta} />}
           {section === 'following' && <FollowingScreen />}
           {section === 'create' && <CreateScreen contributionAllowed={allowed} />}
         </Suspense>

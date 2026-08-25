@@ -5131,10 +5131,16 @@ async def submit_voc_feedback(request: Request):
 GATEKEEPER_QUEUE_FILE = os.path.join(ROOT_DIR, "gatekeeper_restore_queue.json")
 
 
-def require_gatekeeper_access(request: Request):
+def require_gatekeeper_ip_access(request: Request):
+    """Authorize destructive shared-feed actions by resolved client IP only."""
     ip = get_client_ip(request)
     if ip not in GATEKEEPER_ALLOWED_IPS:
-        raise HTTPException(status_code=403, detail="Gatekeeper Review is not enabled for this network.")
+        raise HTTPException(status_code=403, detail="Global article removal is not enabled for this network.")
+    return ip
+
+
+def require_gatekeeper_access(request: Request):
+    ip = require_gatekeeper_ip_access(request)
     provided = request.headers.get("x-gatekeeper-key", "")
     if not provided or not secrets.compare_digest(str(provided), str(GATEKEEPER_KEY)):
         raise HTTPException(status_code=403, detail="Invalid Gatekeeper key.")
@@ -5393,6 +5399,7 @@ def save_training_data(request: Request, data: VotePayload, background_tasks: Ba
 # ==========================================
 @app.post("/not-interested")
 def add_not_interested(request: Request, background_tasks: BackgroundTasks, payload: dict = Body(...)):
+    authorized_ip = require_gatekeeper_ip_access(request)
     profile = get_active_profile_name(request)
     title = str(payload.get("title", "")).strip()
     if not title:
@@ -5428,7 +5435,8 @@ def add_not_interested(request: Request, background_tasks: BackgroundTasks, payl
         "entities": payload.get("entities", {}),
         "profile": profile,
         "rejected_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "rejected_by": payload.get("rejected_by", "unknown"),
+        "rejected_by": payload.get("rejected_by", "authorized kill switch"),
+        "rejected_by_ip": authorized_ip,
     }
     store_before = []
     store_changed = False

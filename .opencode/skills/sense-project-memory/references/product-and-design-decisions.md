@@ -210,3 +210,32 @@ For any visual change, inspect at least:
 - Windows-sensitive wrapping/height behavior;
 - no horizontal overflow;
 - production build, not only Vite HMR.
+
+## Reaction semantics and destructive moderation
+
+- `Like` and `Dislike` are reversible viewer reactions with shared aggregate
+  counts. They use the same control, colors, endpoint, and persistence model on
+  every surface.
+- A reaction never hides, rejects, or removes an article. This keeps the UI
+  predictable and prevents a personal click from mutating another viewer's
+  feed.
+- Bouncer learning uses stable batch consensus, not arithmetic from a single
+  click and not synchronous training. Consensus must meet both the configured
+  minimum-vote and winning-ratio gates.
+- Private `Hide` remains a separate per-viewer action.
+- Global removal is a visibly destructive Gatekeeper-IP-only kill switch in
+  Briefing. Its backend authorization cannot trust forwarded headers from an
+  untrusted peer.
+
+## For You desktop composition
+
+- The default view should reveal meaningful stories immediately instead of
+  spending the first viewport on a large salutation or vanity metrics.
+- The current desktop lead uses one hero plus four secondary stories so all
+  five executive signals are visible together.
+- Feed, Following, Create, interests, and preference topics share one compact
+  local command rail; it collapses while scrolling down and returns when the
+  reader moves upward.
+- Story cards are direct-open. Separate Open, Select, and Why-this-story
+  controls are excluded from this surface. Follow, Like, Dislike, and private
+  Hide are icon-led actions with accessible labels.
