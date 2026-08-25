@@ -66,6 +66,10 @@ export function articleKey(item) {
   return item?.canonical_link || item?.link || item?.url || item?.id || item?.title || '';
 }
 
+export function reactionIdentity(item) {
+  return item?.article_id || item?.article_key || articleKey(item);
+}
+
 export function articleKeywords(item) {
   const values = [
     ...(Array.isArray(item?.keywords) ? item.keywords : []),

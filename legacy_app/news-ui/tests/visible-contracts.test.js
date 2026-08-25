@@ -263,12 +263,14 @@ test('hook and recommendation explanation survive frontend normalization', () =>
 
 test('reaction counts and semantic follow metadata survive frontend normalization', () => {
   const normalized = normalizeArticle({
+    article_id: 'stable-article-id',
     title: 'A followed update',
     link: 'https://example.test/followed',
     reactions: { like_count: 12, dislike_count: 3, viewer_reaction: 'like' },
     follow_match: { score: 0.82, method: 'semantic' },
   });
   assert.deepEqual(normalized.reactions, { like_count: 12, dislike_count: 3, viewer_reaction: 'like' });
+  assert.equal(normalized.article_id, 'stable-article-id');
   assert.deepEqual(normalized.follow_match, { score: 0.82, method: 'semantic' });
 });
 
@@ -278,7 +280,9 @@ test('For You cards are direct-open, followable and reaction-counted without wor
   const cssSource = readFileSync(new URL('../src/news-scrapper/for-you/for-you.css', import.meta.url), 'utf8');
   assert.match(cardSource, /fy-card-open-layer/);
   assert.match(cardSource, /Unfollow this story' : 'Follow this story privately'/);
-  assert.doesNotMatch(cardSource, />\s*Follow\s*</);
+  assert.match(cardSource, /<span>\{saved \? 'Following' : 'Follow'\}<\/span>/);
+  assert.match(cardSource, /data-tooltip=\{saved \? 'Stop following this story'/);
+  assert.match(cardSource, /data-tooltip="Hide this article only from your private feed"/);
   assert.match(cardSource, /reactions\.like_count/);
   assert.match(cardSource, /reactions\.dislike_count/);
   assert.match(cardSource, /<Bouncer[\s\S]*reactions=\{reactions\}/);
@@ -308,6 +312,8 @@ test('reaction and following APIs stay same-origin and reactions do not append s
   const apiSource = readFileSync(new URL('../src/news-scrapper/api.js', import.meta.url), 'utf8');
   const screenSource = readFileSync(new URL('../src/news-scrapper/for-you/ForYouScreen.jsx', import.meta.url), 'utf8');
   assert.match(apiSource, /jsonFetch\('\/viewer\/reactions'/);
+  assert.match(apiSource, /jsonFetch\('\/viewer\/reactions\/query'/);
+  assert.match(apiSource, /index \+= 200/);
   assert.match(apiSource, /jsonFetch\('\/viewer\/following'\)/);
   const reactionFlow = screenSource.match(/const react = async[\s\S]*?\n  \}\);/)?.[0] || '';
   assert.match(reactionFlow, /setViewerReaction/);

@@ -209,3 +209,19 @@ html[data-theme="light"] .fy-preference-strip{border-color:rgba(45,82,108,.15);b
 html[data-theme="light"] .fy-reviewed-pill{border-color:#c8d5e2;background:#fff;color:#536b82}html[data-theme="light"] .fy-reviewed-pill strong{color:#14263a}
 html[data-theme="light"] .fy-migration-offer{border-color:#a9c1d3;background:linear-gradient(135deg,#f8fbfd,#e7f0f7);color:#14263a}html[data-theme="light"] .fy-migration-offer strong{color:#14263a}html[data-theme="light"] .fy-migration-offer small{color:#526b82}
 html[data-theme="light"] .fy-card-actions button.active{border-color:#15936b;background:#dcf8ec;color:#086347}
+
+/* Card controls form a stable two-level action dock. Following is explicit;
+   reactions and private hide remain a compact icon row below it. */
+.fy-card-actions{display:grid!important;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px!important}
+.fy-card-actions>.fy-follow-action{grid-column:1/-1;width:100%;min-width:0;justify-content:center!important}
+.fy-card-actions>.fy-follow-action span{display:inline;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fy-card-actions>.reaction-controls{grid-column:1;justify-self:start}
+.fy-card-actions>.fy-hide-action{grid-column:2;justify-self:end}
+.fy-card-actions [data-tooltip]{position:relative;overflow:visible}
+.fy-card-actions [data-tooltip]::after{position:absolute;z-index:30;left:50%;bottom:calc(100% + 8px);max-width:220px;padding:7px 9px;border:1px solid rgba(158,180,211,.2);border-radius:9px;background:#0c1422;color:#f2f7ff;box-shadow:0 10px 30px rgba(0,0,0,.3);content:attr(data-tooltip);font-size:.66rem;font-weight:650;line-height:1.25;opacity:0;pointer-events:none;transform:translate(-50%,4px);transition:opacity .14s ease,transform .14s ease;white-space:nowrap}
+.fy-card-actions [data-tooltip]:hover::after,.fy-card-actions [data-tooltip]:focus-visible::after{opacity:1;transform:translate(-50%,0)}
+.fy-executive-grid .is-executive-secondary .fy-card-footer{margin-top:auto;padding-top:11px}
+.fy-executive-grid .is-executive-secondary .fy-card-actions>button:first-child{width:100%;overflow:visible;padding:7px 9px}
+.fy-executive-grid .is-executive-secondary .fy-card-actions>button:first-child span{display:inline}
+html[data-theme="light"] .fy-card-actions [data-tooltip]::after{border-color:#c5d2df;background:#14263a;color:#fff;box-shadow:0 10px 26px rgba(25,45,65,.2)}
+@media(prefers-reduced-motion:reduce){.fy-card-actions [data-tooltip]::after{transition:none}}

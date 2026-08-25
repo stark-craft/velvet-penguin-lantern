@@ -238,10 +238,21 @@ export const setViewerReaction = (article, reaction) =>
     method: 'PUT',
     body: JSON.stringify({ article, reaction }),
   });
-export function getViewerReactions(articleIds = []) {
-  const params = new URLSearchParams();
-  articleIds.slice(0, 100).filter(Boolean).forEach((id) => params.append('article_id', String(id)));
-  return jsonFetch(`/viewer/reactions?${params.toString()}`);
+export async function getViewerReactions(articleIds = []) {
+  const unique = [...new Set(articleIds.filter(Boolean).map(String))];
+  if (!unique.length) return { status: 'success', reactions: {} };
+  const batches = [];
+  for (let index = 0; index < unique.length; index += 200) {
+    batches.push(jsonFetch('/viewer/reactions/query', {
+      method: 'POST',
+      body: JSON.stringify({ article_ids: unique.slice(index, index + 200) }),
+    }));
+  }
+  const responses = await Promise.all(batches);
+  return {
+    status: 'success',
+    reactions: Object.assign({}, ...responses.map((response) => response?.reactions || {})),
+  };
 }
 export const getFollowingThreads = () => jsonFetch('/viewer/following');
 

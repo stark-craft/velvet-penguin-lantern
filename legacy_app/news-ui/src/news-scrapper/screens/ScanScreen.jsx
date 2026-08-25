@@ -7,9 +7,9 @@ import DateRangePicker from '../components/DateRangePicker.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
-import { correctRegion, getSites, getViewerHidden, hideArticleForViewer, selectWorkflow, setViewerReaction } from '../api.js';
+import { correctRegion, getSites, getViewerHidden, getViewerReactions, hideArticleForViewer, selectWorkflow, setViewerReaction } from '../api.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
-import { articleKey, cardVariant, groupedByDate, scoreOf } from '../utils/intelligence.js';
+import { articleKey, cardVariant, groupedByDate, reactionIdentity, scoreOf } from '../utils/intelligence.js';
 import './scan-redesign.css';
 
 const fmt = (date) => {
@@ -575,6 +575,43 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const dateRangeRef = useRef(null);
   const sourcesRef = useRef(null);
   const searchRef = useRef(null);
+
+  const reactionSignature = useMemo(() => cards.map(reactionIdentity).filter(Boolean).join('|'), [cards]);
+  useEffect(() => {
+    if (!reactionSignature) return undefined;
+    let cancelled = false;
+    const identities = reactionSignature.split('|');
+    const sync = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const result = await getViewerReactions(identities);
+        if (cancelled) return;
+        const snapshots = result?.reactions || {};
+        setVotes((current) => {
+          const next = { ...current };
+          cards.forEach((item) => {
+            const snapshot = snapshots[reactionIdentity(item)];
+            if (snapshot) next[articleKey(item)] = snapshot;
+          });
+          return next;
+        });
+        setOpen((current) => current && snapshots[reactionIdentity(current)] ? { ...current, reactions: snapshots[reactionIdentity(current)] } : current);
+      } catch {
+        // Search results remain usable while shared counts retry in background.
+      }
+    };
+    sync();
+    const timer = window.setInterval(sync, 12000);
+    const onVisibility = () => { if (document.visibilityState === 'visible') sync(); };
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [cards, reactionSignature]);
 
   useEffect(() => {
     let active = true;

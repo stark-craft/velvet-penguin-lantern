@@ -239,3 +239,17 @@ For any visual change, inspect at least:
 - Story cards are direct-open. Separate Open, Select, and Why-this-story
   controls are excluded from this surface. Follow, Like, Dislike, and private
   Hide are icon-led actions with accessible labels.
+- The compact workspace rail uses the same restrained glass-and-thread visual
+  language as the primary navigation without copying it. Keep the rail close
+  to the navbar, preserve a visible active state, and use a distinct studio
+  icon for Create.
+- Executive secondary cards keep their action dock pinned to the card bottom:
+  Follow occupies a labelled full-width row, while Like, Dislike, and Hide sit
+  below it. Every action has a hover/focus tooltip.
+- Create begins with one compact studio command bar. Private Briefing and
+  Contributions are the command bar's tabs; do not reintroduce a separate
+  oversized Create heading or explanatory hero.
+- Article reaction identity is global, not route-specific. Preserve the
+  canonical server `article_id` when normalizing records; when a legacy record
+  has only an article key/link, resolve it through the batched reaction-query
+  endpoint so For You, Briefing, Scan, and dossiers show the same totals.

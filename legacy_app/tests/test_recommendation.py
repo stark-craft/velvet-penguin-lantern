@@ -2,6 +2,7 @@ import datetime as dt
 import json
 import tempfile
 import unittest
+import importlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
@@ -19,6 +20,8 @@ from news_scrapper.recommendation.following import build_following_threads
 from news_scrapper.recommendation.scoring import score_candidates
 from news_scrapper.recommendation.service import RecommendationService, allocate_exclusive_sections
 from news_scrapper.source_catalog import build_shadow_briefing, build_unified_catalog
+
+recommendation_router = importlib.import_module("news_scrapper.recommendation.router")
 
 
 def article(index, **changes):
@@ -54,6 +57,20 @@ class RecommendationTests(unittest.TestCase):
             self.assertEqual(snapshot["viewer_reaction"], "like")
             neutral = repository.set("viewer-a", target, "neutral")
             self.assertEqual((neutral["like_count"], neutral["dislike_count"]), (1, 0))
+
+    def test_reaction_queries_resolve_shared_article_references_to_global_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            repository = ReactionRepository(Path(directory) / "reactions.json")
+            target = article(9)
+            canonical = candidate_article_id(target)
+            repository.set("viewer-a", {**target, "article_id": canonical}, "like")
+            repository.set("viewer-b", {**target, "article_id": canonical}, "dislike")
+            with patch.object(recommendation_router, "REACTIONS", repository):
+                snapshots = recommendation_router._reaction_snapshots("viewer-a", [target["link"]])
+            self.assertEqual(snapshots[target["link"]]["like_count"], 1)
+            self.assertEqual(snapshots[target["link"]]["dislike_count"], 1)
+            self.assertEqual(snapshots[target["link"]]["viewer_reaction"], "like")
+            self.assertEqual(snapshots[canonical], snapshots[target["link"]])
 
     def test_reaction_consensus_is_thresholded_and_idempotent(self):
         with tempfile.TemporaryDirectory() as directory:

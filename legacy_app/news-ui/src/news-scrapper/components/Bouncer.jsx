@@ -14,6 +14,7 @@ export default function Bouncer({ vote, reactions, likeCount, dislikeCount, onVo
         aria-pressed={current === 'like'}
         className={'reaction-button is-like' + (current === 'like' ? ' is-active' : '')}
         disabled={disabled}
+        data-tooltip={likes ? `Like this story · ${likes} total` : 'Like this story'}
         onClick={() => choose('like')}
         title="Like this story"
         aria-label={`Like this story${likes ? `, ${likes} likes` : ''}`}
@@ -26,6 +27,7 @@ export default function Bouncer({ vote, reactions, likeCount, dislikeCount, onVo
         aria-pressed={current === 'dislike'}
         className={'reaction-button is-dislike' + (current === 'dislike' ? ' is-active' : '')}
         disabled={disabled}
+        data-tooltip={dislikes ? `Dislike this story · ${dislikes} total` : 'Dislike this story'}
         onClick={() => choose('dislike')}
         title="Dislike this story"
         aria-label={`Dislike this story${dislikes ? `, ${dislikes} dislikes` : ''}`}

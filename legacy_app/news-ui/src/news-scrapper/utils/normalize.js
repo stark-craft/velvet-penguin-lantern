@@ -171,6 +171,8 @@ export function normalizeArticle(raw, idx = 0) {
 
   return {
     id:            raw.id || raw.title || ('a' + idx),
+    article_id:    raw.article_id || '',
+    article_key:   raw.article_key || '',
     title,
     summary,
     summary_lead: summaryLead || summary,

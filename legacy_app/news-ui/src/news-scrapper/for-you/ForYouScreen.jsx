@@ -4,11 +4,11 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import Icon from '../components/Icon.jsx';
 import {
   completeViewerPreferences, confirmViewerMigration, getForYou, getRecommendationStatus, getViewerPreferences,
-  getViewerSaved, hideArticleForViewer, pauseViewerPersonalization,
+  getViewerReactions, getViewerSaved, hideArticleForViewer, pauseViewerPersonalization,
   removeSavedArticle, saveArticleForLater, setViewerReaction,
   resetRecommendationProfile,
 } from '../api.js';
-import { articleKey } from '../utils/intelligence.js';
+import { articleKey, reactionIdentity } from '../utils/intelligence.js';
 import { normalizeList } from '../utils/normalize.js';
 import ExecutiveScan from './ExecutiveScan.jsx';
 import ExplorationRail from './ExplorationRail.jsx';
@@ -91,6 +91,42 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
   }, [loadAttempt, loadFeed]);
 
   useEffect(() => () => { flush({ keepalive: true }); }, [flush]);
+
+  const reactionSignature = useMemo(
+    () => items.map(reactionIdentity).filter(Boolean).join('|'),
+    [items],
+  );
+  useEffect(() => {
+    if (!reactionSignature) return undefined;
+    let cancelled = false;
+    const identities = reactionSignature.split('|');
+    const sync = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const result = await getViewerReactions(identities);
+        if (cancelled) return;
+        const snapshots = result?.reactions || {};
+        const apply = (candidate) => {
+          const identity = reactionIdentity(candidate);
+          return snapshots[identity] ? { ...candidate, reactions: snapshots[identity] } : candidate;
+        };
+        setItems((current) => current.map(apply));
+        setOpenArticle((current) => current ? apply(current) : current);
+      } catch {
+        // The last known counts stay usable while a background refresh retries.
+      }
+    };
+    const timer = window.setInterval(sync, 12000);
+    const onVisibility = () => { if (document.visibilityState === 'visible') sync(); };
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [reactionSignature]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

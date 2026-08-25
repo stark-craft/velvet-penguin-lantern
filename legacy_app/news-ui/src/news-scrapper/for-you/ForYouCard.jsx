@@ -78,9 +78,9 @@ export default function ForYouCard({
         )}
         <div className="fy-card-footer">
           <div className="fy-card-actions">
-            <button aria-label={saved ? `Stop following ${item.title}` : `Follow ${item.title}`} className={saved ? 'active' : ''} disabled={Boolean(busyAction)} onClick={() => onSave(item)} title={busyAction === 'save' ? 'Updating follow state' : saved ? 'Unfollow this story' : 'Follow this story privately'} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={15} /></button>
+            <button aria-label={saved ? `Stop following ${item.title}` : `Follow ${item.title}`} className={`fy-follow-action${saved ? ' active' : ''}`} data-tooltip={saved ? 'Stop following this story' : 'Follow this story for closely related updates'} disabled={Boolean(busyAction)} onClick={() => onSave(item)} title={busyAction === 'save' ? 'Updating follow state' : saved ? 'Unfollow this story' : 'Follow this story privately'} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={15} /><span>{saved ? 'Following' : 'Follow'}</span></button>
             <Bouncer disabled={Boolean(busyAction)} dislikeCount={reactions.dislike_count} likeCount={reactions.like_count} reactions={reactions} onVote={(value) => onReact(item, value)} />
-            <button aria-label={`Hide ${item.title} only from your feed`} disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button"><Icon name="eye" size={15} /></button>
+            <button aria-label={`Hide ${item.title} only from your feed`} className="fy-hide-action" data-tooltip="Hide this article only from your private feed" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button"><Icon name="eye" size={15} /></button>
           </div>
         </div>
       </div>

@@ -48,3 +48,32 @@ html[data-theme="light"] .fy-thread-anchor>p,html[data-theme="light"] .fy-thread
 html[data-theme="light"] .fy-following-page>.fy-empty-state{border-color:#9eb5c9!important;background:radial-gradient(circle at 50% 28%,rgba(33,125,115,.13),transparent 38%),linear-gradient(145deg,#f8fbfd,#e5eef6)!important;box-shadow:0 16px 42px rgba(37,59,82,.1)}
 html[data-theme="light"] .fy-following-page>.fy-empty-state svg{color:#126b63}
 @media(prefers-reduced-motion:reduce){.fy-workspace-rail-wrap{transition:none}}
+
+/* Premium personal command rail: a compact chromatic glass instrument that
+   visually belongs beside the global navigation without copying it. */
+.fy-workspace-rail-wrap{width:min(1560px,calc(100% - 48px));margin:5px auto 0}
+.fy-workspace-switcher{position:relative;isolation:isolate;min-height:52px;padding:5px 7px;border-color:rgba(156,180,218,.2);border-radius:19px;background:radial-gradient(circle at 16% -80%,rgba(134,247,211,.18),transparent 44%),radial-gradient(circle at 78% 180%,rgba(138,183,255,.16),transparent 42%),rgba(16,21,36,.82);box-shadow:0 12px 38px rgba(2,7,18,.22),inset 0 1px 0 rgba(255,255,255,.07);backdrop-filter:blur(26px) saturate(135%)}
+.fy-workspace-switcher::before{position:absolute;z-index:-1;inset:0;border-radius:inherit;background:linear-gradient(90deg,rgba(134,247,211,.12),transparent 30%,transparent 70%,rgba(138,183,255,.1));content:"";pointer-events:none}
+.fy-workspace-switcher::after{position:absolute;left:22px;right:22px;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,var(--workspace-accent),var(--workspace-blue),transparent);content:"";opacity:.62;pointer-events:none}
+.fy-workspace-tabs{gap:5px;padding:3px;border:1px solid rgba(164,190,217,.11);border-radius:14px;background:rgba(4,9,20,.2)}
+.fy-workspace-tabs>button{min-height:38px;border-radius:11px;padding:0 15px}
+.fy-workspace-tabs>button svg{padding:3px;border-radius:7px;box-sizing:content-box;background:rgba(255,255,255,.035)}
+.fy-workspace-tabs>button.is-active{border-color:rgba(150,210,216,.3);background:linear-gradient(135deg,rgba(134,247,211,.16),rgba(138,183,255,.12));box-shadow:0 8px 24px rgba(4,10,25,.22),inset 0 1px 0 rgba(255,255,255,.09)}
+.fy-workspace-tabs>button.is-active svg{background:linear-gradient(135deg,rgba(134,247,211,.2),rgba(138,183,255,.18));color:#dffff5}
+.fy-tune-action{min-height:38px;border-radius:12px;background:rgba(138,183,255,.07)}
+
+.fy-create-page{padding-top:15px}
+.fy-create-command{display:flex;align-items:center;gap:18px;margin:0 0 18px;padding:7px;border:1px solid var(--fy-border,rgba(164,190,217,.16));border-radius:18px;background:linear-gradient(135deg,rgba(134,247,211,.055),rgba(138,183,255,.04)),rgba(18,24,39,.64);box-shadow:0 14px 38px rgba(3,8,18,.1)}
+.fy-create-command-mark{display:flex;align-items:center;gap:9px;padding:0 11px;color:var(--workspace-accent);font-size:.66rem;font-weight:850;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.fy-create-command-mark svg{padding:7px;border:1px solid rgba(134,247,211,.2);border-radius:10px;box-sizing:content-box;background:rgba(134,247,211,.07)}
+.fy-create-command .fy-create-switcher{display:grid;grid-template-columns:repeat(2,minmax(210px,1fr));flex:1;width:auto;margin:0;gap:7px}
+.fy-create-command .fy-create-switcher button{min-height:54px;padding:8px 13px;border-radius:12px}
+.fy-create-command .fy-create-switcher button.is-active{box-shadow:inset 3px 0 0 var(--workspace-accent),0 8px 22px rgba(3,9,20,.12)}
+html[data-theme="light"] .fy-workspace-switcher{border-color:#b9cad9;background:radial-gradient(circle at 16% -80%,rgba(42,153,129,.16),transparent 44%),radial-gradient(circle at 78% 180%,rgba(72,115,196,.13),transparent 42%),rgba(242,247,250,.92);box-shadow:0 12px 34px rgba(40,60,82,.12),inset 0 1px 0 #fff}
+html[data-theme="light"] .fy-workspace-tabs{border-color:#c8d5e1;background:rgba(255,255,255,.58)}
+html[data-theme="light"] .fy-workspace-tabs>button svg{background:#eef4f8}
+html[data-theme="light"] .fy-workspace-tabs>button.is-active{border-color:#8fb6b4;background:linear-gradient(135deg,#dff2ed,#e4ebf8);box-shadow:0 7px 20px rgba(36,60,85,.12),inset 0 1px 0 #fff}
+html[data-theme="light"] .fy-workspace-tabs>button.is-active svg{background:linear-gradient(135deg,#cae9e0,#d8e4f7);color:#135d5a}
+html[data-theme="light"] .fy-create-command{border-color:#b8c9d8;background:linear-gradient(135deg,#edf6f3,#e9eff8);box-shadow:0 12px 32px rgba(35,58,79,.1)}
+html[data-theme="light"] .fy-create-command-mark{color:#0b6d63}
+html[data-theme="light"] .fy-create-command-mark svg{border-color:#a9cec5;background:#ddf1eb}

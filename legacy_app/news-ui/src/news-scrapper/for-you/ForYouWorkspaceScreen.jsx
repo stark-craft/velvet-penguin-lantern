@@ -39,7 +39,7 @@ export default function ForYouWorkspaceScreen({ contributionAccess }) {
   const tabs = [
     { id: 'feed', label: 'Your Feed', icon: 'sparkle', to: '/for-you' },
     { id: 'following', label: 'Following', icon: 'bookmark', to: '/for-you/following' },
-    { id: 'create', label: 'Create', icon: 'note', to: '/for-you/create' },
+    { id: 'create', label: 'Create', icon: 'studio', to: '/for-you/create' },
   ];
 
   useEffect(() => {

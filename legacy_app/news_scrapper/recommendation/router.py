@@ -410,8 +410,41 @@ def recommendation_events(payload: RecommendationEventBatch, request: Request, r
 @router.get("/viewer/reactions")
 def read_reactions(request: Request, response: Response, article_id: list[str] = Query(default=[])):
     key, _, _ = _resolve(request, response)
-    identifiers = [str(value)[:128] for value in article_id[:100] if str(value).strip()]
-    return {"status": "success", "reactions": REACTIONS.snapshots(key, identifiers)}
+    return {"status": "success", "reactions": _reaction_snapshots(key, article_id[:100])}
+
+
+def _reaction_snapshots(viewer_key: str, values: list[object]) -> dict[str, dict]:
+    """Resolve either canonical reaction ids or stable article references.
+
+    Shared Briefing records predate the recommendation service and do not all
+    carry ``article_id`` yet.  Returning each snapshot under both the supplied
+    reference and its canonical id keeps every rendering surface on one global
+    count without asking the browser to reproduce the server's hash function.
+    """
+    aliases: list[tuple[str, str]] = []
+    for value in values:
+        supplied = str(value or "").strip()[:2000]
+        if not supplied:
+            continue
+        lowered = supplied.casefold()
+        canonical = lowered if len(lowered) == 24 and all(char in "0123456789abcdef" for char in lowered) else article_id({"article_key": supplied})
+        if canonical:
+            aliases.append((supplied, canonical))
+    canonical_snapshots = REACTIONS.snapshots(viewer_key, list(dict.fromkeys(canonical for _, canonical in aliases)))
+    result: dict[str, dict] = {}
+    for supplied, canonical in aliases:
+        snapshot = canonical_snapshots.get(canonical, {"like_count": 0, "dislike_count": 0, "viewer_reaction": "neutral"})
+        result[supplied] = snapshot
+        result[canonical] = snapshot
+    return result
+
+
+@router.post("/viewer/reactions/query")
+def query_reactions(request: Request, response: Response, payload: dict = Body(default={})):
+    key, _, _ = _resolve(request, response)
+    values = payload.get("article_ids") if isinstance(payload, dict) else []
+    values = values if isinstance(values, list) else []
+    return {"status": "success", "reactions": _reaction_snapshots(key, values[:500])}
 
 
 @router.put("/viewer/reactions")

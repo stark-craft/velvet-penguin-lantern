@@ -209,9 +209,10 @@ test('one For You splat route owns the workspace and legacy Saved routes redirec
   assert.match(createScreenSource, /endsWith\('\/leadership'\)/);
 });
 
-test('secondary workspace views use compact introductions instead of a duplicate desk hero', () => {
-  assert.match(createScreenSource, /fy-compact-intro/);
-  assert.match(createScreenSource, /Bring your own intelligence/);
+test('Create uses a compact studio switcher instead of a duplicate desk hero', () => {
+  assert.match(createScreenSource, /fy-create-command/);
+  assert.match(createScreenSource, /Creation studio/);
+  assert.doesNotMatch(createScreenSource, /Turn links into a private briefing, or prepare/);
   assert.match(createScreenSource, /Private Briefing/);
   assert.match(createScreenSource, /Contributions/);
   assert.match(savedSource, /const embedded = Boolean\(view\)/);

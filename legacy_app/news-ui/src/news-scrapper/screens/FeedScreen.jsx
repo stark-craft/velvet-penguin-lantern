@@ -9,7 +9,7 @@ import Bouncer from '../components/Bouncer.jsx';
 import { correctRegion, getGatekeeperAccess, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerReactions, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, setViewerReaction } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
-import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, matchesKeyword, publishedTime, scoreOf } from '../utils/intelligence.js';
+import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, matchesKeyword, publishedTime, reactionIdentity, scoreOf } from '../utils/intelligence.js';
 import '../styles/home-refinement.css';
 const emptyFilters = {
   query: '',
@@ -577,10 +577,10 @@ export default function FeedScreen() {
         const normalizedItems = normalizeList(data?.result || data?.results || data?.articles || data || []);
         const items = normalizeArticleImages(normalizedItems);
         setArticles(items);
-        getViewerReactions(items.map((item) => item.article_id || item.id).filter(Boolean)).then((reactionData) => {
+        getViewerReactions(items.map(reactionIdentity).filter(Boolean)).then((reactionData) => {
           if (cancelled) return;
           const snapshots = reactionData?.reactions || {};
-          setVotes(Object.fromEntries(items.map((item) => [articleKey(item), snapshots[item.article_id || item.id] || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' }])));
+          setVotes(Object.fromEntries(items.map((item) => [articleKey(item), snapshots[reactionIdentity(item)] || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' }])));
         }).catch(() => {});
         setPersonalizationMeta(data?.personalization || null);
         setShowPersonalizationNotice(Boolean(data?.personalization?.applied));
@@ -615,6 +615,41 @@ export default function FeedScreen() {
       cancelled = true;
     };
   }, [loadAttempt]);
+  const reactionSignature = useMemo(() => articles.map(reactionIdentity).filter(Boolean).join('|'), [articles]);
+  useEffect(() => {
+    if (!reactionSignature) return undefined;
+    let cancelled = false;
+    const identities = reactionSignature.split('|');
+    const sync = async () => {
+      if (document.visibilityState !== 'visible') return;
+      try {
+        const result = await getViewerReactions(identities);
+        if (cancelled) return;
+        const snapshots = result?.reactions || {};
+        setVotes((current) => {
+          const next = { ...current };
+          articles.forEach((item) => {
+            const snapshot = snapshots[reactionIdentity(item)];
+            if (snapshot) next[articleKey(item)] = snapshot;
+          });
+          return next;
+        });
+        setOpen((current) => current && snapshots[reactionIdentity(current)] ? { ...current, reactions: snapshots[reactionIdentity(current)] } : current);
+      } catch {
+        // Keep the current briefing interactive if a count refresh is delayed.
+      }
+    };
+    const timer = window.setInterval(sync, 12000);
+    const onVisibility = () => { if (document.visibilityState === 'visible') sync(); };
+    window.addEventListener('focus', sync);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', sync);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [articles, reactionSignature]);
   useEffect(() => {
     if (!showPersonalizationNotice) return undefined;
     const timer = window.setTimeout(() => setShowPersonalizationNotice(false), 6500);

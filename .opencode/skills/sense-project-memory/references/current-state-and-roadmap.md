@@ -463,3 +463,20 @@ working. Work only in legacy_app and preserve unrelated changes.
   route cannot lose centering or spacing.
 - The explicit product request for this pass was desktop QA only; no mobile
   acceptance claim was made.
+- Reaction hydration now uses `POST /viewer/reactions/query` in bounded batches
+  instead of silently querying only the first 100 visible records. The backend
+  accepts canonical reaction IDs and legacy stable article references, mapping
+  both aliases to one global article snapshot.
+- Feed normalization preserves `article_id` and `article_key`. For You,
+  Briefing, and Scan refresh visible reaction snapshots every 12 seconds and
+  on focus/visibility return, so a vote from another viewer or route converges
+  without a hard refresh.
+- The For You rail was tightened into a premium translucent command surface.
+  Executive secondary cards now pin a labelled Follow row above a separate
+  Like/Dislike/Hide row with accessible tooltips. Create uses a distinct studio
+  icon and opens directly into a compact Private Briefing/Contributions command
+  bar rather than an oversized introduction.
+- Verification for this follow-up: 91 frontend tests, 189 backend tests, the
+  production frontend build, and desktop browser QA on For You and Create in
+  both light and dark themes. Mobile QA was intentionally omitted per the
+  explicit user instruction for this pass.

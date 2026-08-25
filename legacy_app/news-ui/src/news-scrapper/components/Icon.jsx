@@ -23,6 +23,7 @@ const PATHS = {
   menu:      <><path d="M4 6h16M4 12h16M4 18h16"/></>,
   sparkle:   <><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></>,
   note:      <><path d="M4 4h16v14l-4 4H4z"/><path d="M16 22v-6h6"/></>,
+  studio:    <><path d="M5 5h9l5 5v9H5z"/><path d="M14 5v5h5"/><path d="M9 14h6M12 11v6"/><path d="M3 8V3h5"/></>,
   archive:   <><rect x="3" y="4" width="18" height="4"/><path d="M5 8v12h14V8M10 12h4"/></>,
   bookmark:  <><path d="M6 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18l-6-4-6 4z"/></>,
   duplicate: <><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></>,
