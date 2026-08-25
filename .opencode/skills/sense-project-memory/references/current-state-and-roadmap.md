@@ -365,10 +365,12 @@ explicit product decision.
 
 ### Research and Venture Lens
 
-A new Research orientation screen and shared-shell integration exist. Venture
-Lens has dedicated overview/repository/research/radar/compare/watchlist and
-notification behavior, but the user has explicitly rejected the current visual
-design. Preserve backend functionality while redesigning later.
+The Research Observatory is the premium gateway and Venture Lens remains the
+detailed evidence workspace. Venture Lens now uses the same TechScout
+plum/slate surfaces, typography, theme tokens and floating-navigation rhythm as
+the rest of Sense.AI. Its overview is an operational evidence index rather than
+a second marketing hero. Dedicated repository, paper, model, dataset, radar,
+graph, comparison, watchlist, brief and dossier behavior remains intact.
 
 ### Samsung Internal
 
@@ -392,9 +394,10 @@ Unless the user changes priority, continue in this order:
    - redesign hero, leadership, external, internal and portal sections;
    - validate empty/loading/error states and both themes.
 3. **Redesign Venture Lens**
-   - preserve separate task-oriented pages and live provider behavior;
-   - replace the rejected visual language;
-   - verify real metrics, type-safe comparison and provider fallbacks.
+   - completed on 2026-08-26; preserve the shared Research command-center
+     treatment and separate task-oriented pages;
+   - continue verifying real metrics, type-safe comparison and provider
+     fallbacks when those data contracts change.
 4. **Only after explicit approval, productionize Internal Publishing**
    - backend persistence and access roles;
    - secure upload/content validation;
@@ -480,3 +483,18 @@ working. Work only in legacy_app and preserve unrelated changes.
   production frontend build, and desktop browser QA on For You and Create in
   both light and dark themes. Mobile QA was intentionally omitted per the
   explicit user instruction for this pass.
+
+## 2026-08-26 Research command-center pass
+
+- Venture Lens no longer presents a separate green microsite inside Research.
+  It inherits the active TechScout page, surface, line, text and profile tokens,
+  with blue/cyan used only as a restrained research accent.
+- The Venture Lens overview is now a compact decision desk with a live evidence
+  index, provider status, current coverage and direct task actions. The old
+  oversized promotional radar hero was removed.
+- The inner workspace switcher, section hierarchy, repository/paper cards,
+  model/dataset artifacts, radar, graph, compare, watchlist, briefs, dossier,
+  notifications and footer now share one coherent visual system in both themes.
+- The Research Observatory gateway and every backend provider/data contract
+  remain unchanged. This was deliberately a presentation and navigation pass,
+  not a discovery-pipeline rewrite.

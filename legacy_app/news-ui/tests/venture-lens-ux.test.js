@@ -32,3 +32,11 @@ test("Venture Lens navigation, filters and dossier expose accessible interaction
   assert.match(styleSource, /@media \(max-width: 1320px\)/);
   assert.match(styleSource, /flex-direction: column/);
 });
+
+test("Venture Lens uses the shared TechScout research command-center treatment", () => {
+  assert.match(appSource, /className="vl-hero vl-command-hero"/);
+  assert.match(appSource, /className="vl-live-index"/);
+  assert.match(styleSource, /TechScout Research command center/);
+  assert.match(styleSource, /var\(--surface-raised/);
+  assert.match(styleSource, /html\[data-theme="light"\] \.venture-lens/);
+});
