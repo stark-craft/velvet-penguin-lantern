@@ -3,14 +3,15 @@
 Snapshot date: **2026-08-25**. Always verify this snapshot with `git status`,
 `git log`, live code, and tests before acting.
 
-## 2026-08-25: Samsung Internal and Research command centers (uncommitted)
+## 2026-08-25: Samsung Internal, Research, and compact For You release
 
-- `/samsung-internal` is now a premium command center: a dedicated animated
-  announcement rail, fixed-zone five-slide Samsung Focus carousel, distinct
-  bottom-to-top Samsung Intelligence Wire, and three lower archive channels
-  (Global, Local, Inside). Announcements no longer duplicate into the wire or
-  lower tabs. The wire uses the exact 5/3/3 editorial interleave and skips
-  unavailable channels honestly.
+- `/samsung-internal` is now a premium command center: a fixed-zone five-slide
+  Samsung Focus carousel, a thin animated notice ticker contained within the
+  Samsung Intelligence Wire, its distinct bottom-to-top article stream, and
+  three lower archive channels
+  (Global, Local, Inside). Announcements have no competing page-wide rail and
+  do not duplicate in the vertical article flow or lower tabs. The wire uses
+  the exact 5/3/3 editorial interleave and skips unavailable channels honestly.
 - Published-only reader routes now exist for leadership and announcements:
   `/samsung-internal/leadership/:id` and
   `/samsung-internal/announcement/:id`. They preserve Samsung Internal scroll
@@ -30,12 +31,16 @@ Snapshot date: **2026-08-25**. Always verify this snapshot with `git status`,
   real momentum deltas, and starter-snapshot labelling are implemented.
 - Venture Lens gained model, dataset, and patent workspaces and dossier APIs;
   model/dataset/patent dossiers do not expose unsupported watch actions.
-- Verified after the final accessibility pass: frontend 87/87, backend 183/183,
-  production build (1,906 modules), live light/dark and 760px QA, stable carousel
-  zones, inert animation clones, real retained Samsung images, and FastAPI-served
-  Research/leadership/announcement deep links.
+- The default For You desk now uses a 58px personal-workspace command strip and
+  a compact command-deck greeting. The friendly greeting, interest controls,
+  mix explanation, refresh action, and counters remain, while the first
+  recommendation section is visible in the initial desktop viewport.
+- Released in commit `bd4aa55`. Verified after the final accessibility pass:
+  frontend 87/87, backend 183/183, production build (1,906 modules), live
+  light/dark and 700px QA, keyboard workspace navigation, no page overflow or
+  broken Samsung images, and Vite/FastAPI production deep links.
 
-## 2026-08-24: For You and User's Desk merge (uncommitted)
+## 2026-08-24: For You and User's Desk merge
 
 - `/for-you/*` is now the single private workspace shell. Its premium,
   keyboard-accessible command strip contains the viewer-named Desk, Saved
