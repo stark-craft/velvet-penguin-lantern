@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../components/Icon.jsx';
-import { getStatus } from '../api.js';
+import { getSchedulerStatus, runSchedulerNow } from '../api.js';
 
-export default function SchedulerScreen() {
+export default function SchedulerScreen({ canControl = false }) {
   const [status, setStatus] = useState(null);
   const [err, setErr] = useState(null);
   const [lastUpdated, setLastUpdated] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [runningNow, setRunningNow] = useState(false);
+  const [notice, setNotice] = useState('');
   const mountedRef = useRef(true);
   const requestInFlightRef = useRef(false);
 
@@ -15,7 +17,7 @@ export default function SchedulerScreen() {
     requestInFlightRef.current = true;
     if (!quiet && mountedRef.current) setRefreshing(true);
     try {
-      const nextStatus = await getStatus();
+      const nextStatus = await getSchedulerStatus();
       if (!mountedRef.current) return;
       setStatus(nextStatus);
       setErr(null);
@@ -34,7 +36,7 @@ export default function SchedulerScreen() {
     const tick = () => {
       if (document.visibilityState === 'visible') refreshStatus({ quiet: true });
     };
-    const intervalId = window.setInterval(tick, 10_000);
+    const intervalId = window.setInterval(tick, 30_000);
     document.addEventListener('visibilitychange', tick);
     return () => {
       mountedRef.current = false;
@@ -42,6 +44,22 @@ export default function SchedulerScreen() {
       document.removeEventListener('visibilitychange', tick);
     };
   }, [refreshStatus]);
+
+  const runNow = async () => {
+    if (!canControl || runningNow) return;
+    setRunningNow(true);
+    setErr(null);
+    setNotice('');
+    try {
+      const result = await runSchedulerNow();
+      setNotice(result?.message || 'A scheduler run was accepted. Status will refresh automatically.');
+      await refreshStatus({ quiet: true });
+    } catch (error) {
+      setErr(error?.message || 'The scheduler run could not be started.');
+    } finally {
+      setRunningNow(false);
+    }
+  };
 
   const activeJobs = Number(status?.active_manual_jobs ?? status?.active_jobs?.length ?? 0);
   const capacityValue = status?.capacity_remaining;
@@ -60,7 +78,7 @@ export default function SchedulerScreen() {
     { label: 'Scheduler mode', value: status?.mode || (loading ? 'checking' : 'unavailable'), tone: isActive ? 'warn' : status ? 'ok' : 'warn' },
     { label: 'Manual capacity', value: capacity === null ? 'Not reported' : `${capacity} slots`, tone: capacity > 0 ? 'ok' : 'warn' },
     { label: 'Bouncer threshold', value: String(threshold), tone: threshold === 'Not reported' ? 'warn' : 'ok' },
-    { label: 'Polling interval', value: '10s', tone: 'ok' },
+    { label: 'Polling interval', value: '30s while visible', tone: 'ok' },
   ], [status, err, loading, isActive, capacity, threshold]);
 
   return (
@@ -77,6 +95,7 @@ export default function SchedulerScreen() {
             <button className="btn-dark-secondary" disabled={refreshing} onClick={() => refreshStatus()} type="button">
               <Icon name="refresh" size={15} /> {refreshing ? 'Checking…' : 'Check now'}
             </button>
+            {canControl && <button className="btn-dark-primary" disabled={runningNow || isActive} onClick={runNow} type="button"><Icon name="sparkle" size={15} /> {runningNow ? 'Starting…' : 'Run now'}</button>}
           </div>
         </div>
       </section>
@@ -89,6 +108,7 @@ export default function SchedulerScreen() {
           </button>
         </section>
       )}
+      {notice && <div className="personal-notice" role="status">{notice}</div>}
 
       <section className="workspace-metrics scheduler-metrics grid gap-4 md:grid-cols-4">
         <div className="signal-stat"><span>Scheduler State</span><strong>{systemState}</strong></div>

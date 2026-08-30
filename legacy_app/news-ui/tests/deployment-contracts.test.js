@@ -28,6 +28,11 @@ test('viewer APIs are same-origin in both Vite and the portable build', () => {
   assert.doesNotMatch(apiSource, /VITE_API_BASE/);
   assert.doesNotMatch(apiSource, /https?:\/\/127\.0\.0\.1:8000/);
   assert.match(viteSource, /'\/viewer'/);
+  assert.match(viteSource, /'\/access-control'/);
+  assert.match(viteSource, /'\/scheduler'/);
+  assert.match(viteSource, /\['\/voc', '\/scheduler'\]\.includes\(p\)/);
+  assert.match(viteSource, /acceptsHtml/);
+  assert.match(viteSource, /return '\/index\.html'/);
   assert.match(sharedApiSource, /const API_BASE = "";/);
   assert.doesNotMatch(sharedApiSource, /VITE_API_BASE/);
   assert.doesNotMatch(vocSource, /VITE_API_BASE_URL/);

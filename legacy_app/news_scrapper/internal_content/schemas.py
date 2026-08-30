@@ -21,6 +21,8 @@ class DraftUpdate(BaseModel):
     author: str = Field(default="", max_length=400)
     owner_name: str = Field(default="", max_length=200)
     content_type: str = Field(default="", max_length=40)
+    publish_at: str | None = Field(default=None, max_length=80)
+    expires_at: str | None = Field(default=None, max_length=80)
     focal_x: float | None = Field(default=None, ge=0.0, le=1.0)
     focal_y: float | None = Field(default=None, ge=0.0, le=1.0)
 

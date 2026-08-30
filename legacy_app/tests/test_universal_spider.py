@@ -211,6 +211,50 @@ class UniversalSpiderTests(unittest.TestCase):
             self.assertEqual(request.meta["source_id"], "nvidia-ai-feed")
             self.assertEqual(request.meta["source_family"], "primary")
 
+    def test_source_lookback_can_widen_scheduler_range_for_low_frequency_feed(self):
+        spider = NewsSpider(
+            keyword="Samsung",
+            from_date="2026-08-29",
+            to_date="2026-08-29",
+        )
+        xml = """<?xml version="1.0"?><rss><channel><item>
+        <title>Samsung India expands its national technology program</title>
+        <link>https://news.samsung.com/in/technology-program</link>
+        <pubDate>Thu, 27 Aug 2026 10:00:00 GMT</pubDate>
+        </item></channel></rss>"""
+        response = make_response(
+            XmlResponse,
+            "https://news.samsung.com/in/feed/rss",
+            xml,
+            {
+                "site_name": "Samsung India Newsroom",
+                "configured_url": "https://news.samsung.com/in/feed/rss",
+                "source_home": "https://news.samsung.com/",
+                "lookback_days": 7,
+            },
+            b"application/rss+xml",
+        )
+
+        requests = list(spider.parse_feed(response))
+
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0].meta["seed_date"].date().isoformat(), "2026-08-27")
+        self.assertEqual(requests[0].meta["lookback_days"], 7)
+
+    def test_source_lookback_does_not_change_other_sources(self):
+        spider = NewsSpider(
+            keyword="Samsung",
+            from_date="2026-08-29",
+            to_date="2026-08-29",
+        )
+        self.assertFalse(spider.is_in_range(spider.parse_filter_date("2026-08-27")))
+        self.assertTrue(
+            spider.is_in_range(
+                spider.parse_filter_date("2026-08-27"),
+                {"lookback_days": 7},
+            )
+        )
+
     def test_allow_deep_scan_false_prevents_archive_expansion(self):
         spider = NewsSpider(keyword="broadcast")
         html = """<html><body><main><h1>Broadcast archive 15 August 2026</h1>

@@ -110,6 +110,11 @@ class SamsungProductionPipelineTests(unittest.TestCase):
                 patch.object(
                     application, "enrich_article_with_web_search", failed
                 ),
+                patch.object(
+                    application,
+                    "targeted_local_extract_article",
+                    side_effect=RuntimeError("local extraction unavailable"),
+                ),
             ):
                 result = application.enrich_raw_articles(
                     [{
@@ -120,7 +125,7 @@ class SamsungProductionPipelineTests(unittest.TestCase):
                 )
         self.assertEqual(result, [])
 
-    def test_runtime_web_search_failure_requests_full_scrapy_retry(self):
+    def test_runtime_web_search_failure_recovers_only_that_article(self):
         def failed(item, keywords=None):
             return {
                 **item,
@@ -140,16 +145,72 @@ class SamsungProductionPipelineTests(unittest.TestCase):
                     "enrich_article_with_web_search",
                     failed,
                 ),
+                patch.object(
+                    application,
+                    "targeted_local_extract_article",
+                    side_effect=lambda item, reason: {
+                        **item,
+                        "full_contents": "Locally recovered article text. " * 20,
+                        "enrichment_status": "local_fallback",
+                    },
+                ),
             ):
-                with self.assertRaises(application.WebSearchRuntimeFailure):
-                    application.enrich_raw_articles(
-                        [{
-                            "title": "Candidate",
-                            "link": "https://example.test/story",
-                        }],
+                result = application.enrich_raw_articles(
+                    [{
+                        "title": "Candidate",
+                        "link": "https://example.test/story",
+                    }],
+                    "AI",
+                    raise_on_service_failure=True,
+                )
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["enrichment_status"], "local_fallback")
+
+    def test_web_search_budget_never_discards_overflow(self):
+        for candidate_count in (50, 100, 101, 250):
+            with self.subTest(candidate_count=candidate_count), tempfile.TemporaryDirectory() as directory:
+                cache = JsonStore(Path(directory) / "web.json", dict)
+                source = [
+                    {
+                        "title": f"Candidate {index}",
+                        "link": f"https://example.test/{index}",
+                    }
+                    for index in range(candidate_count)
+                ]
+
+                def web(item, keywords=None):
+                    return {
+                        **item,
+                        "full_contents": "AI article text. " * 20,
+                        "enrichment_status": "success",
+                    }
+
+                with (
+                    patch.object(application, "WEB_SEARCH_CACHE", cache),
+                    patch.object(application, "WEB_SEARCH_MAX_ENRICH_PER_RUN", 100),
+                    patch.object(application, "WEB_SEARCH_REQUIRE_KEYWORD_MATCH", False),
+                    patch.object(application, "enrich_article_with_web_search", side_effect=web),
+                    patch.object(
+                        application,
+                        "targeted_local_extract_article",
+                        side_effect=lambda item, reason: {
+                            **item,
+                            "full_contents": "Locally extracted overflow text. " * 12,
+                            "enrichment_status": "local_fallback",
+                            "enrichment_fallback_reason": reason,
+                        },
+                    ) as targeted,
+                ):
+                    result = application.enrich_raw_articles(
+                        source,
                         "AI",
-                        raise_on_service_failure=True,
+                        use_web_search=True,
                     )
+                self.assertEqual(len(result), candidate_count)
+                self.assertEqual(targeted.call_count, max(0, candidate_count - 100))
+                accounting = application.LAST_PIPELINE_ACCOUNTING[application.DEFAULT_PROFILE]
+                self.assertEqual(accounting["accounted"], candidate_count)
+                self.assertEqual(accounting["web_search_overflow"], max(0, candidate_count - 100))
 
     def test_chat_success_is_cached_by_cluster_content(self):
         calls = []
@@ -318,7 +379,7 @@ class SamsungProductionPipelineTests(unittest.TestCase):
         self.assertEqual(result["summary_format"], "lead_and_bullets")
         self.assertEqual(result["summarized_by"], "local_bart")
 
-    def test_scheduler_restarts_full_scrapy_if_web_search_dies_after_preflight(self):
+    def test_scheduler_never_restarts_discovery_after_item_level_fallback(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             sites = root / "sites.json"
@@ -377,16 +438,21 @@ class SamsungProductionPipelineTests(unittest.TestCase):
                 )
                 return SimpleNamespace(returncode=0)
 
-            def enrich_or_fail(
+            def enrich_with_fallback(
                 items,
                 keywords,
                 profile,
                 use_web_search,
                 **kwargs,
             ):
-                if use_web_search:
-                    raise application.WebSearchRuntimeFailure("API down")
-                return items
+                return [
+                    {
+                        **item,
+                        "full_contents": "Targeted local extraction retained this candidate.",
+                        "enrichment_status": "local_fallback",
+                    }
+                    for item in items
+                ]
 
             with (
                 patch.object(application, "ROOT_DIR", str(root)),
@@ -412,7 +478,7 @@ class SamsungProductionPipelineTests(unittest.TestCase):
                 patch.object(
                     application,
                     "enrich_raw_articles",
-                    side_effect=enrich_or_fail,
+                    side_effect=enrich_with_fallback,
                 ),
                 patch.object(
                     application,
@@ -431,9 +497,8 @@ class SamsungProductionPipelineTests(unittest.TestCase):
                 )
 
             self.assertTrue(result)
-            self.assertEqual(len(crawl_commands), 2)
+            self.assertEqual(len(crawl_commands), 1)
             self.assertIn("discovery_only=true", crawl_commands[0])
-            self.assertIn("discovery_only=false", crawl_commands[1])
             self.assertEqual(len(list(history.glob("briefing_*.json"))), 1)
 
 

@@ -20,6 +20,8 @@ from pypdf import PdfReader
 logger = logging.getLogger(__name__)
 
 DOCUMENT_MAX_BYTES = 25 * 1024 * 1024
+DOCX_MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
+DOCX_MAX_ARCHIVE_MEMBERS = 5000
 PDF_MAX_PAGES = 100
 EXTRACT_MAX_CHARS = 200_000
 MIN_READABLE_CHARS = 40
@@ -77,7 +79,12 @@ def _signature_matches(kind: str, data: bytes) -> bool:
             return False
         try:
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                names = archive.namelist()
+                members = archive.infolist()
+                names = [member.filename for member in members]
+                if len(members) > DOCX_MAX_ARCHIVE_MEMBERS:
+                    return False
+                if sum(max(0, member.file_size) for member in members) > DOCX_MAX_UNCOMPRESSED_BYTES:
+                    return False
             return any(name.startswith("word/") for name in names)
         except zipfile.BadZipFile:
             return False

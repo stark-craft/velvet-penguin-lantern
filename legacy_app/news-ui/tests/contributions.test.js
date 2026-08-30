@@ -186,7 +186,8 @@ test('extracted text becomes an editable draft without inventing a summary', () 
 test('For You owns a compact Feed, Following and Create workspace', () => {
   const orderMatch = workspaceShellSource.match(/const tabs = \[[\s\S]*?\];/)?.[0] || '';
   assert.match(orderMatch, /Your Feed[\s\S]*Following[\s\S]*Create/);
-  assert.match(workspaceShellSource, /Tune interests/);
+  assert.match(workspaceShellSource, /greetingForHour/);
+  assert.match(workspaceShellSource, /Edit the topics used to rank your feed/);
   assert.match(workspaceShellSource, /role="tablist"/);
   assert.match(workspaceShellSource, /ArrowLeft/);
   assert.match(workspaceShellSource, /ArrowRight/);
@@ -197,6 +198,17 @@ test('For You owns a compact Feed, Following and Create workspace', () => {
   assert.match(workspaceShellSource, /<CreateScreen contributionAllowed=\{allowed\}/);
   assert.match(createScreenSource, /Private Briefing[\s\S]*Contributions/);
   assert.match(createScreenSource, /contributionAllowed &&/);
+});
+
+test('every owned contribution exposes a labelled permanent delete action', () => {
+  assert.match(workspaceSource, /deleteContributionRecord/);
+  assert.match(workspaceSource, /Permanently delete/);
+  assert.match(workspaceSource, /cw-delete-button/);
+  assert.match(workspaceSource, /'Delete'/);
+  assert.doesNotMatch(
+    workspaceSource,
+    /record\.status !== CONTRIBUTION_STATUS\.SUBMITTED[\s\S]{0,300}removeContribution/,
+  );
 });
 
 test('one For You splat route owns the workspace and legacy Saved routes redirect', () => {

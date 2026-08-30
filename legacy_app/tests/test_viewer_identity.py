@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -64,6 +65,14 @@ class ViewerIdentityTests(unittest.TestCase):
             ),
             patch.object(main, "BROADCAST_SPECIAL_IPS", set()),
             patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", set()),
+            patch.dict(
+                os.environ,
+                {
+                    "REVIEW_NEWS_ALLOWED_IPS": "10.0.0.25",
+                    "APPROVED_BRIEFING_ALLOWED_IPS": "10.0.0.25",
+                },
+                clear=False,
+            ),
         ]
         for active_patch in self.patches:
             active_patch.start()
@@ -127,7 +136,7 @@ class ViewerIdentityTests(unittest.TestCase):
         workflow = main.get_workflow(request)
 
         self.assertEqual(response["display_name"], "Navigator")
-        self.assertEqual(response["ip"], "10.0.0.25")
+        self.assertTrue(response["principal"])
         self.assertEqual(workflow["selected"][0]["selected_by"], "Navigator")
         self.assertEqual(workflow["approved"][0]["approved_by"], "Navigator")
 

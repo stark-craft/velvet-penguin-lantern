@@ -88,6 +88,24 @@ class FrontendDeploymentTests(unittest.TestCase):
                     "/venturelens/models",
                     headers={"accept": "text/html"},
                 )
+                voc_spa = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/voc",
+                    headers={"accept": "text/html"},
+                )
+                scheduler_spa = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/scheduler",
+                    headers={"accept": "text/html"},
+                )
+                scheduler_api_miss = asgi_request(
+                    composition.app,
+                    "GET",
+                    "/scheduler/not-a-real-endpoint",
+                    headers={"accept": "text/html"},
+                )
                 api = asgi_request(
                     composition.app,
                     "GET",
@@ -105,6 +123,11 @@ class FrontendDeploymentTests(unittest.TestCase):
             self.assertIn("desk", leadership_reader.text)
             self.assertEqual(research_workspace.status_code, 200)
             self.assertIn("desk", research_workspace.text)
+            self.assertEqual(voc_spa.status_code, 200)
+            self.assertIn("desk", voc_spa.text)
+            self.assertEqual(scheduler_spa.status_code, 200)
+            self.assertIn("desk", scheduler_spa.text)
+            self.assertEqual(scheduler_api_miss.status_code, 404)
             self.assertEqual(api.status_code, 200)
             self.assertEqual(api.json()["scope"], "current_viewer_only")
 

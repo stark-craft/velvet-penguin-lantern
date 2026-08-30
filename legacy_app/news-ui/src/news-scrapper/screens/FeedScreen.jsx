@@ -6,7 +6,8 @@ import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import Bouncer from '../components/Bouncer.jsx';
-import { correctRegion, getGatekeeperAccess, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerReactions, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, setViewerReaction } from '../api.js';
+import ContinuousSignalStream from '../components/ContinuousSignalStream.jsx';
+import { correctRegion, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerReactions, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, setViewerReaction } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, matchesKeyword, publishedTime, reactionIdentity, scoreOf } from '../utils/intelligence.js';
@@ -201,7 +202,7 @@ function TopClusterCarousel({
   const move = delta => {
     setIdx(current => (current + delta + slides.length) % slides.length);
   };
-  return <section className="hero-cluster-panel cockpit-top-card group relative overflow-hidden rounded-[22px] border border-sky-300/20 bg-[#101827] shadow-glow" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+  return <section className="hero-cluster-panel cockpit-top-card group relative overflow-hidden rounded-[22px] border border-sky-300/20 bg-[#101827] shadow-glow">
 <button aria-label={`Open dossier for ${active.title}`} className="absolute inset-0 z-0 text-left" onClick={() => onOpen(active)} type="button">
 <SignalVisual item={active} className="visual-layer z-0" label={false} />
 <div className="absolute inset-0 z-10 bg-[linear-gradient(90deg,rgba(5,9,20,0.74)_0%,rgba(5,9,20,0.42)_48%,rgba(5,9,20,0.10)_100%),linear-gradient(0deg,rgba(5,9,20,0.78)_0%,rgba(5,9,20,0.22)_56%,rgba(0,0,0,0.02)_100%)]" />
@@ -216,6 +217,7 @@ function TopClusterCarousel({
 <button className="carousel-control" onClick={() => move(1)} type="button" aria-label="Next slide">
 <Icon name="chevR" />
 </button>
+<button aria-pressed={paused} className="carousel-control" onClick={() => setPaused((value) => !value)} type="button" aria-label={paused ? 'Resume carousel' : 'Pause carousel'}><Icon name={paused ? 'play' : 'pause'} /></button>
 </div>
 </div>
 <div className="hero-carousel-content pointer-events-auto max-w-3xl">
@@ -323,18 +325,31 @@ function BriefingStream({
   navigate
 }) {
   const stream = sortByDate(articles).slice(0, 10);
-  return <aside className="briefing-stream-panel cockpit-top-card flex flex-col overflow-hidden rounded-[22px] border border-white/10 bg-[#101827]/90 p-4 shadow-cockpit 2xl:p-5">
-<div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">
-<Icon name="archive" size={14} />        Briefing Stream      </div>
-<div className="briefing-stream-mask mt-4 min-h-0 flex-1 overflow-hidden">
-<div className="briefing-stream-track space-y-2">          {[...stream, ...stream].map((item, index) => <button aria-hidden={index >= stream.length ? 'true' : undefined} tabIndex={index >= stream.length ? -1 : 0} key={`${articleKey(item)}-${index}`} className="block w-full rounded-2xl border border-white/10 bg-white/[0.035] p-3 text-left transition hover:border-sky-300/25 hover:bg-white/[0.06]" onClick={() => onOpen(item)} type="button">
-<div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">                {item.date || 'Latest'} · Score {scoreOf(item)}              </div>
-<div className="mt-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-100">                {item.title}              </div>
-</button>)}        </div>
-</div>
-<button className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-sky-200 hover:text-white" onClick={() => navigate('/history')} type="button">        Open Briefing Archive        <Icon name="chevR" size={14} />
-</button>
-</aside>;
+  return <aside aria-label="Briefing Stream" className="briefing-stream-panel briefing-wire">
+    <header>
+      <h2>Live briefing</h2>
+      <i aria-hidden="true" />
+    </header>
+    <div className="briefing-wire-window">
+      <ContinuousSignalStream ariaLabel="Briefing Stream" className="briefing-continuous-stream" duration={38} items={stream} renderItem={(item, index, duplicate) => <button
+        aria-hidden={duplicate ? 'true' : undefined}
+        className="briefing-wire-card"
+        key={`${articleKey(item)}-${index}`}
+        onClick={() => onOpen(item)}
+        tabIndex={duplicate ? -1 : 0}
+        type="button"
+      >
+        <span>{item.category || 'Executive signal'}</span>
+        <strong>{item.title}</strong>
+        <small>{item.src || item.source || 'Briefing desk'} · {item.date || 'Latest'}</small>
+        <b>Score {scoreOf(item)}</b>
+      </button>} />
+    </div>
+    <footer>
+      <button onClick={() => navigate('/history')} type="button">Open Briefing Archive <Icon name="chevR" size={14} /></button>
+      <span>Shared executive baseline</span>
+    </footer>
+  </aside>;
 }
 function BriefingLensRail({ lenses, activeLens, onLens }) {
   const active = lenses.find(lens => lens.id === activeLens);
@@ -393,16 +408,16 @@ function LatestDaySignals({
     }
     const timer = setInterval(() => {
       setStart(position => (position + 1) % items.length);
-    }, 30000);
+    }, 7000);
     return () => clearInterval(timer);
-  }, [canMove, items.length, paused]);
+  }, [canMove, items.length, paused, start]);
   if (!items.length) {
     return null;
   }
   const move = delta => {
     setStart(position => (position + delta + items.length) % items.length);
   };
-  return <section className="latest-day-stage rounded-[22px] border border-white/10 bg-[#101827]/80 p-4 shadow-cockpit 2xl:p-5" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+  return <section className="latest-day-stage rounded-[22px] border border-white/10 bg-[#101827]/80 p-4 shadow-cockpit 2xl:p-5">
 <div className="mb-3 flex items-center justify-between gap-4">
 <div>
 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">            Latest Day Signals          </div>
@@ -413,6 +428,9 @@ function LatestDaySignals({
 </button>
 <button className="carousel-control" onClick={() => move(1)} type="button" aria-label="Next signals">
 <Icon name="chevR" />
+</button>
+<button aria-pressed={paused} className="carousel-control" onClick={() => setPaused((value) => !value)} type="button" aria-label={paused ? 'Resume automatic signals' : 'Pause automatic signals'}>
+<Icon name={paused ? 'play' : 'pause'} />
 </button>
 </div>}      </div>
 <div className="latest-day-grid grid auto-cols-[minmax(160px,1fr)] grid-flow-col gap-3 overflow-x-auto pb-1 md:grid-flow-row md:grid-cols-5 md:overflow-visible md:pb-0">        {visible.map(item => <button key={articleKey(item)} className="latest-signal-card group relative overflow-hidden rounded-2xl border border-white/10 bg-[#101827] text-left transition hover:border-sky-300/25" onClick={() => onOpen(item)} type="button">
@@ -447,18 +465,12 @@ function SearchLoadedBriefing({
   return <section className="loaded-briefing-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5 shadow-cockpit">
 <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
 <div>
-<div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">            Search Loaded Briefing          </div>
+<div className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">            Filter Briefing          </div>
 <div className="mt-1 text-sm text-slate-500">            {count} of {total} signals visible          </div>
 </div>
 <button className="btn-dark-secondary h-9" onClick={reset} type="button">          Reset filters        </button>
 </div>
-<div className="grid gap-3 lg:grid-cols-[1.45fr_repeat(7,minmax(0,1fr))]">
-<input className="dark-input" value={filters.query} onChange={event => update('query', event.target.value)} placeholder="Search loaded briefing..." />
-<select className="dark-input" value={filters.scope} onChange={event => update('scope', event.target.value)} aria-label="Intelligence scope">
-<option value="all">            All Intelligence          </option>
-<option value="technology">            Technology          </option>
-<option value="broadcast">            Broadcast &amp; Media          </option>
-</select>
+<div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
 <select className="dark-input" value={filters.region} onChange={event => update('region', event.target.value)}>
 <option value="all">            All Regions          </option>          {options.regions.map(region => <option key={region} value={region}>              {region}            </option>)}        </select>
 <select className="dark-input" value={filters.category} onChange={event => update('category', event.target.value)}>
@@ -467,18 +479,7 @@ function SearchLoadedBriefing({
 <option value="all">            All Sources          </option>          {options.sources.map(source => <option key={source} value={source}>              {source}            </option>)}        </select>
 <select className="dark-input" value={filters.date} onChange={event => update('date', event.target.value)}>
 <option value="all">            All Dates          </option>          {options.dates.map(date => <option key={date} value={date}>              {date}            </option>)}        </select>
-<select className="dark-input" value={filters.signal} onChange={event => update('signal', event.target.value)}>
-<option value="all">            All Signals          </option>
-<option value="high">            High Signal          </option>
-<option value="normal">            Below High          </option>
-</select>
-<select className="dark-input" value={filters.image} onChange={event => update('image', event.target.value)}>
-<option value="all">            Any Image          </option>
-<option value="with">            With Images          </option>
-<option value="without">            No Image          </option>
-</select>
 </div>
-<div className="mt-3 flex flex-wrap gap-2">        {[['all', 'All status'], ['selected', 'Selected'], ['unselected', 'Unselected']].map(([value, label]) => <button key={value} className={filters.selected === value ? 'rounded-full border border-sky-300/25 bg-sky-400/12 px-4 py-2 text-sm font-medium text-sky-100' : 'rounded-full border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-medium text-slate-400'} onClick={() => update('selected', value)} type="button">            {label}          </button>)}      </div>
 </section>;
 }
 function ImageFeedCard({
@@ -499,6 +500,7 @@ function ImageFeedCard({
   savedReady = true,
   canKill = false,
   onKill,
+  reviewAllowed = false,
 }) {
   const score = scoreOf(item);
   const selected = isSelected || item.selected_by;
@@ -512,7 +514,7 @@ function ImageFeedCard({
 <div className="absolute inset-0 z-10 bg-[linear-gradient(0deg,rgba(5,9,20,0.84)_0%,rgba(5,9,20,0.48)_42%,rgba(5,9,20,0.12)_76%,rgba(0,0,0,0.02)_100%)]" />
 <div className="absolute inset-x-0 bottom-0 z-10 h-3/4 bg-gradient-to-t from-[#050914]/92 via-[#050914]/54 to-transparent" />
 <div className="relative z-20 flex h-full flex-col p-4">
-<div className="flex items-start justify-between gap-3">          {onCheck && <input type="checkbox" checked={checked} onChange={event => onCheck(item, event.target.checked)} className="signal-checkbox mt-1" aria-label={`Select ${item.title}`} />}          <div className="ml-auto flex flex-wrap justify-end gap-2">            {followUp(item) && <span className="personal-follow-chip" title={`Related to: ${followUp(item).matched_saved_title || 'a saved signal'}`}><Icon name="bookmark" size={11} /> {followUp(item).follow_label}</span>}            {item.is_fresh && <span className="signal-chip selected">                New              </span>}            {isApproved && <span className="signal-chip">                Approved              </span>}            {selected && <span className="signal-chip">                Selected              </span>}            {!selected && !isApproved && !item.is_fresh && isHigh && <span className="signal-chip selected">                  High Signal                </span>}          </div>
+<div className="flex items-start justify-between gap-3">          {reviewAllowed && onCheck && <input type="checkbox" checked={checked} onChange={event => onCheck(item, event.target.checked)} className="signal-checkbox mt-1" aria-label={`Select ${item.title}`} />}          <div className="ml-auto flex flex-wrap justify-end gap-2">            {followUp(item) && <span className="personal-follow-chip" title={`Related to: ${followUp(item).matched_saved_title || 'a saved signal'}`}><Icon name="bookmark" size={11} /> {followUp(item).follow_label}</span>}            {item.is_fresh && <span className="signal-chip selected">                New              </span>}            {reviewAllowed && isApproved && <span className="signal-chip">                Approved              </span>}            {reviewAllowed && selected && <span className="signal-chip">                Selected              </span>}            {!selected && !isApproved && !item.is_fresh && isHigh && <span className="signal-chip selected">                  High Signal                </span>}          </div>
 </div>
 <div className="feed-card-copy mt-auto rounded-2xl border border-white/10 bg-[#050914]/55 p-3 backdrop-blur-sm">
 <button className="block w-full text-left" onClick={() => onOpen(item)} type="button">
@@ -524,7 +526,7 @@ function ImageFeedCard({
 </button>
 <div className="feed-card-actions mt-4">
 <div className="flex flex-wrap items-center gap-2">
-<button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" disabled={Boolean(busyAction) || !workflowReady} onClick={() => onSelect(item)} title={!workflowReady ? 'Review Queue state is unavailable' : undefined} type="button">                  Select for Review                </button>}              <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button">                {busyAction === 'hide' ? 'Hiding…' : 'Hide'}              </button>{canKill && <button className="article-kill-switch h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onKill(item)} title="Remove this article from the shared briefing for everyone" type="button"><Icon name="trash" size={14} /> {busyAction === 'kill' ? 'Removing…' : 'Remove globally'}</button>}
+<button className="btn-dark-secondary h-9 px-3" onClick={() => onOpen(item)} type="button">                Open Dossier              </button>              {reviewAllowed && (isApproved ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Approved                </span> : selected ? <span className="btn-dark-secondary h-9 px-3 text-sky-100">                  Selected                </span> : <button className="btn-dark-primary h-9 px-3" disabled={Boolean(busyAction) || !workflowReady} onClick={() => onSelect(item)} title={!workflowReady ? 'Review Queue state is unavailable' : undefined} type="button">                  Select for Review                </button>)}              <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button">                {busyAction === 'hide' ? 'Hiding…' : 'Hide'}              </button>{canKill && <button className="article-kill-switch h-9 px-3" disabled={Boolean(busyAction)} onClick={() => onKill(item)} title="Remove this article from the shared briefing for everyone" type="button"><Icon name="trash" size={14} /> {busyAction === 'kill' ? 'Removing…' : 'Remove globally'}</button>}
 <button className="btn-dark-secondary h-9 px-3" disabled={Boolean(busyAction) || !savedReady} onClick={() => onSave(item)} title={!savedReady ? 'Following state is unavailable' : isSaved ? 'Unfollow this story' : 'Follow this story'} type="button">
 <Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {busyAction === 'save' ? 'Updating…' : isSaved ? 'Following' : 'Follow'}
 </button>
@@ -535,13 +537,16 @@ function ImageFeedCard({
 </div>
 </article>;
 }
-export default function FeedScreen() {
+export default function FeedScreen({ capabilities = [] }) {
+  const capabilitySet = useMemo(() => new Set(capabilities), [capabilities]);
+  const reviewAllowed = capabilitySet.has('review.news.submit');
+  const workflowVisible = reviewAllowed || capabilitySet.has('review.news.view') || capabilitySet.has('review.news.approve') || capabilitySet.has('approved.view');
   const navigate = useNavigate();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [votes, setVotes] = useState({});
-  const [canKill, setCanKill] = useState(false);
+  const canKill = capabilitySet.has('gatekeeper.review');
   const [openArticle, setOpen] = useState(null);
   const [pendingSelect, setPendingSelect] = useState(null);
   const [batchSelect, setBatchSelect] = useState(null);
@@ -561,13 +566,13 @@ export default function FeedScreen() {
   const [busyActions, setBusyActions] = useState({});
   const [batchBusy, setBatchBusy] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [supportingState, setSupportingState] = useState({ workflow: 'loading', saved: 'loading', hidden: 'loading' });
+  const [supportingState, setSupportingState] = useState({ workflow: workflowVisible ? 'loading' : 'hidden', saved: 'loading', hidden: 'loading' });
   const actionLocks = useRef(new Set());
   const dossierOpenedAt = useRef(0);
   const dossierActiveMs = useRef(0);
   useEffect(() => {
     let cancelled = false;
-    setSupportingState({ workflow: 'loading', saved: 'loading', hidden: 'loading' });
+    setSupportingState({ workflow: workflowVisible ? 'loading' : 'hidden', saved: 'loading', hidden: 'loading' });
     (async () => {
       try {
         const data = await getSharedBriefing().catch(() => getLatestBriefing());
@@ -595,7 +600,7 @@ export default function FeedScreen() {
         }
       }
     })();
-    getWorkflow().then(result => {
+    if (workflowVisible) getWorkflow().then(result => {
       setWorkflow({
         selected: normalizeList(result?.selected || []),
         approved: normalizeList(result?.approved || [])
@@ -610,11 +615,10 @@ export default function FeedScreen() {
       setSavedKeys(new Set(normalizeList(result?.items || []).map(articleKey)));
       setSupportingState((current) => ({ ...current, saved: 'ready' }));
     }).catch(() => setSupportingState((current) => ({ ...current, saved: 'error' })));
-    getGatekeeperAccess().then((result) => setCanKill(Boolean(result?.allowed))).catch(() => setCanKill(false));
     return () => {
       cancelled = true;
     };
-  }, [loadAttempt]);
+  }, [loadAttempt, workflowVisible]);
   const reactionSignature = useMemo(() => articles.map(reactionIdentity).filter(Boolean).join('|'), [articles]);
   useEffect(() => {
     if (!reactionSignature) return undefined;
@@ -639,13 +643,11 @@ export default function FeedScreen() {
         // Keep the current briefing interactive if a count refresh is delayed.
       }
     };
-    const timer = window.setInterval(sync, 12000);
     const onVisibility = () => { if (document.visibilityState === 'visible') sync(); };
     window.addEventListener('focus', sync);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
       window.removeEventListener('focus', sync);
       document.removeEventListener('visibilitychange', onVisibility);
     };
@@ -680,7 +682,7 @@ export default function FeedScreen() {
     if (!failed.length) return;
     setSupportingState((current) => ({ ...current, ...Object.fromEntries(failed.map((key) => [key, 'loading'])) }));
     const tasks = [];
-    if (failed.includes('workflow')) tasks.push(getWorkflow().then((result) => {
+    if (workflowVisible && failed.includes('workflow')) tasks.push(getWorkflow().then((result) => {
       setWorkflow({ selected: normalizeList(result?.selected || []), approved: normalizeList(result?.approved || []) });
       setSupportingState((current) => ({ ...current, workflow: 'ready' }));
     }).catch(() => setSupportingState((current) => ({ ...current, workflow: 'error' }))));
@@ -979,7 +981,7 @@ export default function FeedScreen() {
 <section className="briefing-stage grid gap-4 2xl:gap-5">
 <div className="briefing-top-row briefing-hero-row grid min-h-0 gap-4 2xl:gap-5">
 <div className="briefing-hero-stack">
-<TopClusterCarousel articles={heroFeed} onOpen={openDossier} onSelect={setPendingSelect} workflowReady={supportingState.workflow === 'ready'} />
+<TopClusterCarousel articles={heroFeed} onOpen={openDossier} />
 <BriefingLensRail activeLens={activeLens} lenses={lenses} onLens={selectLens} />
 </div>
 <BriefingStream articles={lensArticles} onOpen={openDossier} navigate={navigate} />
@@ -993,10 +995,10 @@ export default function FeedScreen() {
 <div className="h-px flex-1 bg-white/10" />
 <span className="text-sm text-slate-500">                  {items.length} signals                </span>
 </div>
-<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard busyAction={busyActions[articleKey(item)] || ''} canKill={canKill} key={item.id} item={item} vote={votes[articleKey(item)]} onVote={onVote} onKill={killArticle} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={onCheck} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} savedReady={supportingState.saved === 'ready'} workflowReady={supportingState.workflow === 'ready'} />)}              </div>
+<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard busyAction={busyActions[articleKey(item)] || ''} canKill={canKill} key={item.id} item={item} vote={votes[articleKey(item)]} onVote={onVote} onKill={killArticle} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={reviewAllowed ? onCheck : undefined} reviewAllowed={reviewAllowed} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} savedReady={supportingState.saved === 'ready'} workflowReady={supportingState.workflow === 'ready'} />)}              </div>
 </div>)}        {filteredArticles.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
 <h2 className="text-xl font-semibold text-white">              No loaded briefing signals match these filters            </h2>
-<p className="mt-2 text-slate-400">              Try clearing search, changing date, or widening signal filters.            </p>
+<p className="mt-2 text-slate-400">              Try changing region, date, source, or category.            </p>
 </div>}      </section>
 <button className="hidden-review-link inline-flex w-full max-w-xl items-center justify-between gap-4 rounded-[20px] border border-white/10 bg-white/[0.035] p-4 text-left transition hover:border-sky-300/25 hover:bg-white/[0.055] sm:w-auto sm:min-w-[420px]" onClick={() => navigate('/rejected')} type="button">
 <span>
@@ -1005,10 +1007,10 @@ export default function FeedScreen() {
 </span>
 <span className="btn-dark-secondary h-9">          Open Hidden Review        </span>
 </button>
-<ArticleModal item={openArticle} onClose={closeDossier} onSelect={selectFromDossier} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={onVote} onCorrectRegion={onCorrectRegion} onSourceOpen={(item) => trackAction('source_open', articleActivityDetail(item, 'dossier'))} onWhyThisStory={(item) => trackAction('why_this_story_open', articleActivityDetail(item, 'dossier'))} />
-<NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />
-<NameModal open={!!batchSelect} article={batchSelect} title={`Send ${selectedBatch.length} articles to Review Queue`} description="Enter your name." confirmLabel="Send to Review Queue" onClose={() => setBatchSelect(null)} onConfirm={confirmBatch} />
-<DraftExportModal items={selectedBatch} open={draftExportOpen} source="briefing" onClose={() => setDraftExportOpen(false)} />      {selectedBatch.length > 0 && <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+<ArticleModal item={openArticle} onClose={closeDossier} onSelect={reviewAllowed ? selectFromDossier : undefined} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={onVote} onCorrectRegion={capabilitySet.has('region.correct') ? onCorrectRegion : undefined} onSourceOpen={(item) => trackAction('source_open', articleActivityDetail(item, 'dossier'))} onWhyThisStory={(item) => trackAction('why_this_story_open', articleActivityDetail(item, 'dossier'))} />
+{reviewAllowed && <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />}
+{reviewAllowed && <NameModal open={!!batchSelect} article={batchSelect} title={`Send ${selectedBatch.length} articles to Review Queue`} description="Enter your name." confirmLabel="Send to Review Queue" onClose={() => setBatchSelect(null)} onConfirm={confirmBatch} />}
+<DraftExportModal items={selectedBatch} open={draftExportOpen} source="briefing" onClose={() => setDraftExportOpen(false)} />      {reviewAllowed && selectedBatch.length > 0 && <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
 <div className="batch-action-bar flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
 <strong>              {selectedBatch.length} selected            </strong>
 <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={() => setChecked({})} type="button">              Clear            </button>

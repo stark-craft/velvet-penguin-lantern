@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
+import ContinuousSignalStream from '../components/ContinuousSignalStream.jsx';
 import { getVentureDiscovery } from '../../venture-lens/api.js';
 import '../styles/research-observatory.css';
 
@@ -87,13 +88,10 @@ function ObservatoryCarousel({ artifacts }) {
 
 function EvidenceStream({ artifacts }) {
   const navigate = useNavigate();
-  const { paused, reduced, setPaused } = useStreamMotion();
-  const entries = reduced ? artifacts : [...artifacts, ...artifacts];
   return (
-    <aside aria-label="Evidence Stream" className={`rio-stream${paused ? ' is-paused' : ''}${reduced ? ' is-static' : ''}`}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }} onFocus={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <header><div><span>Evidence Stream</span><h2>Signals with momentum</h2></div><i aria-hidden="true" /></header>
-      <div className="rio-stream-window"><div className="rio-stream-track">{entries.map((artifact, index) => { const duplicate = !reduced && index >= artifacts.length; const content = <><span>{TYPE_LABELS[artifact.kind] || artifact.kind}</span><strong>{artifact.title}</strong><small>{artifact.source}</small><b>{displayMetric(artifact)}</b></>; return duplicate ? <div aria-hidden="true" className={`rio-stream-card is-${artifact.kind}`} key={`${artifact.kind}-${artifact.id}-${index}`}>{content}</div> : <button className={`rio-stream-card is-${artifact.kind}`} key={`${artifact.kind}-${artifact.id}-${index}`} onClick={() => navigate(routeFor(artifact))} type="button">{content}</button>; })}</div></div>
+    <aside aria-label="Evidence Stream" className="rio-stream">
+      <header><h2>Evidence stream</h2><i aria-hidden="true" /></header>
+      <div className="rio-stream-window"><ContinuousSignalStream ariaLabel="Research Evidence Stream" className="rio-continuous-stream" duration={46} items={artifacts} renderItem={(artifact, index, duplicate) => { const content = <><span>{TYPE_LABELS[artifact.kind] || artifact.kind}</span><strong>{artifact.title}</strong><small>{artifact.source}</small><b>{displayMetric(artifact)}</b></>; return duplicate ? <div aria-hidden="true" className={`rio-stream-card is-${artifact.kind}`} key={`${artifact.kind}-${artifact.id}-${index}`}>{content}</div> : <button className={`rio-stream-card is-${artifact.kind}`} key={`${artifact.kind}-${artifact.id}-${index}`} onClick={() => navigate(routeFor(artifact))} type="button">{content}</button>; }} /></div>
       <footer>Metrics are compared only within the same artifact type.</footer>
     </aside>
   );

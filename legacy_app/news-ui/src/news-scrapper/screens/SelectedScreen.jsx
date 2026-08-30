@@ -26,7 +26,12 @@ function initialReviewDeskView() {
   return REVIEW_DESK_VIEWS.includes(stored) ? stored : 'news';
 }
 
-export default function SelectedScreen() {
+export default function SelectedScreen({ capabilities = [] }) {
+  const capabilitySet = useMemo(() => new Set(capabilities), [capabilities]);
+  const newsAllowed = capabilitySet.has('review.news.view');
+  const contributionsAllowed = capabilitySet.has('review.contributions.view');
+  const canApprove = capabilitySet.has('review.news.approve');
+  const canSubmit = capabilitySet.has('review.news.submit');
   const [items, setItems] = useState([]);
   const [loading, setLoad] = useState(true);
   const [openArticle, setOpen] = useState(null);
@@ -35,9 +40,13 @@ export default function SelectedScreen() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busyActions, setBusyActions] = useState({});
-  const [deskView, setDeskView] = useState(initialReviewDeskView);
+  const [deskView, setDeskView] = useState(() => contributionsAllowed && !newsAllowed ? 'contributions' : initialReviewDeskView());
   const actionLocks = useRef(new Set());
 
+  useEffect(() => {
+    if (deskView === 'news' && !newsAllowed && contributionsAllowed) setDeskView('contributions');
+    if (deskView === 'contributions' && !contributionsAllowed && newsAllowed) setDeskView('news');
+  }, [contributionsAllowed, deskView, newsAllowed]);
   useEffect(() => { window.sessionStorage.setItem('review-desk-tab', deskView); }, [deskView]);
 
   const refresh = async () => {
@@ -54,7 +63,7 @@ export default function SelectedScreen() {
     }
   };
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { if (newsAllowed) refresh(); else setLoad(false); }, [newsAllowed]);
 
   const highSignals = items.filter((a) => scoreOf(a) >= 80).length;
   const topSelector = topValue(items, (item) => item.selected_by);
@@ -143,9 +152,9 @@ export default function SelectedScreen() {
 
       <div className="review-desk-tabs" role="tablist" aria-label="Review surfaces">
         {[
-          { id: 'news', label: 'News signals' },
-          { id: 'contributions', label: 'Contributions' },
-        ].map((view) => (
+          newsAllowed ? { id: 'news', label: 'News signals' } : null,
+          contributionsAllowed ? { id: 'contributions', label: 'Contributions' } : null,
+        ].filter(Boolean).map((view) => (
           <button
             aria-selected={deskView === view.id}
             className={deskView === view.id ? 'active' : ''}
@@ -216,6 +225,8 @@ export default function SelectedScreen() {
               onOpen={openDossier}
               onApprove={onApprove}
               onRemove={onRemove}
+              canApprove={canApprove}
+              canRemove={canSubmit}
             />
           ))}
         </section>
@@ -224,11 +235,11 @@ export default function SelectedScreen() {
       <ArticleModal
         item={openArticle}
         onClose={() => setOpen(null)}
-        onApprove={onApprove}
-        onRemove={onRemove}
-        onCorrectRegion={onCorrectRegion}
+        onApprove={canApprove ? onApprove : undefined}
+        onRemove={canSubmit ? onRemove : undefined}
+        onCorrectRegion={capabilitySet.has('region.correct') ? onCorrectRegion : undefined}
       />
-      <DirectorKeyModal open={!!pending} article={pending} onClose={() => setPending(null)} onConfirm={confirmApprove} />
+      {canApprove && <DirectorKeyModal open={!!pending} article={pending} onClose={() => setPending(null)} onConfirm={confirmApprove} />}
         </>
       )}
     </div>

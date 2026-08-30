@@ -215,12 +215,15 @@ test('briefing nests five mapped lenses with the carousel and applies them to ev
   assert.doesNotMatch(feedSource, /briefing-keyword-filter/);
 });
 
-test('the unified Briefing exposes an explicit technology and broadcast scope filter', () => {
+test('the unified Briefing keeps scope metadata but presents only the four useful archive filters', () => {
   const feedSource = readFileSync(new URL('../src/news-scrapper/screens/FeedScreen.jsx', import.meta.url), 'utf8');
   assert.match(feedSource, /scope:\s*'all'/);
-  assert.match(feedSource, /All Intelligence/);
-  assert.match(feedSource, /Broadcast &amp; Media/);
   assert.match(feedSource, /articleScopes\(item\)\.has\(filters\.scope\)/);
+  assert.match(feedSource, /All Regions/);
+  assert.match(feedSource, /All Categories/);
+  assert.match(feedSource, /All Sources/);
+  assert.match(feedSource, /All Dates/);
+  assert.doesNotMatch(feedSource, /All Intelligence|Broadcast &amp; Media/);
 });
 
 test('critical navigation and dossier controls have immediate Korean labels', () => {
@@ -299,7 +302,7 @@ test('Briefing reactions share the private counted endpoint and global removal i
   const voteFlow = feedSource.match(/const onVote = async[\s\S]*?\n  \};/)?.[0] || '';
   assert.match(voteFlow, /setViewerReaction/);
   assert.doesNotMatch(voteFlow, /rejectArticle|setArticles|trainVote/);
-  assert.match(feedSource, /getGatekeeperAccess/);
+  assert.match(feedSource, /capabilitySet\.has\('gatekeeper\.review'\)/);
   assert.match(feedSource, /canKill && <button className="article-kill-switch/);
   assert.match(feedSource, /const killArticle = async[\s\S]*rejectArticle/);
   assert.match(bouncerSource, /Like this story/);

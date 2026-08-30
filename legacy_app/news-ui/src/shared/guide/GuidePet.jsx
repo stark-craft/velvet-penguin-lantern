@@ -3,6 +3,21 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { useGuidePet } from "./GuidePetContext.jsx";
 
+const GUIDE_VERSION = "2026.08-production";
+const GUIDE_PROGRESS_KEY = "sense-guide-route-progress-v2";
+
+function readCompletedRoutes() {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const value = JSON.parse(window.localStorage.getItem(GUIDE_PROGRESS_KEY) || "{}");
+    return value?.version === GUIDE_VERSION && Array.isArray(value?.routes)
+      ? new Set(value.routes.map(String))
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
 const NEWS_TOURS = {
   "/for-you": [
     {
@@ -67,7 +82,7 @@ const NEWS_TOURS = {
   "/scan": [
     {
       title: "Search without crawling",
-      body: "Scan searches the intelligence files already extracted by scheduled runs. Results update as you type and no internet crawler is started.",
+      body: "Scan searches intelligence already extracted by scheduled runs. Enter a query, then submit it explicitly; no internet crawler is started.",
       selector: ".scan-query-deck, .scan-command-center",
     },
     {
@@ -105,6 +120,30 @@ const NEWS_TOURS = {
       title: "Load only what you need",
       body: "The archive mounts a safe first group of cards. Use Show more to continue without freezing lower-powered Windows machines.",
       selector: ".archive-v2-results, .archive-v2-groups",
+    },
+  ],
+  "/research": [
+    {
+      title: "Research Observatory",
+      body: "Featured papers, repositories, models, datasets and patents are normalized into one evidence-first discovery surface.",
+      selector: ".rio-observatory, .research-screen",
+    },
+    {
+      title: "Open the evidence, not another news card",
+      body: "The evidence stream and compact lanes lead into Venture Lens dossiers while preserving the same TechScout visual system.",
+      selector: ".rio-stream, .rio-lanes",
+    },
+  ],
+  "/samsung-internal": [
+    {
+      title: "Samsung Focus",
+      body: "Leadership messages and the strongest Samsung signals share a fixed, stable carousel with complete readers where available.",
+      selector: ".samsung-focus, .samsung-internal-focus",
+    },
+    {
+      title: "Samsung Intelligence Wire",
+      body: "Global, Local and Inside Samsung records advance in a shared motion system that pauses only when you choose.",
+      selector: ".samsung-intelligence-wire, .continuous-signal-stream",
     },
   ],
   "/rejected": [
@@ -291,6 +330,7 @@ export default function GuidePet() {
   const [stepIndex, setStepIndex] = useState(0);
   const [quietRoute, setQuietRoute] = useState("");
   const [emerging, setEmerging] = useState(false);
+  const [completedRoutes, setCompletedRoutes] = useState(readCompletedRoutes);
   const guideRootRef = useRef(null);
   const highlightRef = useRef(null);
   const pointerPathRef = useRef(null);
@@ -298,6 +338,7 @@ export default function GuidePet() {
   const targetFrameRef = useRef(0);
   const scrollSettleRef = useRef(0);
   const manualStepLockRef = useRef(0);
+  const handledRequestRef = useRef(0);
 
   const isVenture = pathname === "/venturelens" || pathname.startsWith("/venturelens/");
   const ventureSection = VENTURE_ROUTE_SECTIONS[pathname] || "Overview";
@@ -312,12 +353,52 @@ export default function GuidePet() {
   }, [isVenture, pathname, ventureSection]);
 
   const step = steps[Math.min(stepIndex, steps.length - 1)] || steps[0];
-  const visible = enabled && quietRoute !== routeKey;
+  const visible = enabled && quietRoute !== routeKey && !completedRoutes.has(routeKey);
+
+  const persistCompletedRoutes = (next) => {
+    setCompletedRoutes(next);
+    try {
+      window.localStorage.setItem(GUIDE_PROGRESS_KEY, JSON.stringify({
+        version: GUIDE_VERSION,
+        routes: [...next].sort(),
+      }));
+    } catch {
+      // In-memory completion still prevents repeated interruptions.
+    }
+  };
+
+  const completeRoute = () => {
+    const next = new Set(completedRoutes);
+    next.add(routeKey);
+    persistCompletedRoutes(next);
+    setQuietRoute(routeKey);
+  };
+
+  const reopenRoute = () => {
+    const next = new Set(completedRoutes);
+    next.delete(routeKey);
+    persistCompletedRoutes(next);
+    setQuietRoute("");
+  };
 
   useLayoutEffect(() => {
     manualStepLockRef.current = 0;
     setStepIndex(0);
     setQuietRoute("");
+    if (requestId > 0 && handledRequestRef.current !== requestId) {
+      handledRequestRef.current = requestId;
+      setCompletedRoutes((current) => {
+        if (!current.has(routeKey)) return current;
+        const next = new Set(current);
+        next.delete(routeKey);
+        try {
+          window.localStorage.setItem(GUIDE_PROGRESS_KEY, JSON.stringify({ version: GUIDE_VERSION, routes: [...next].sort() }));
+        } catch {
+          // Keep the explicit request active for this visit.
+        }
+        return next;
+      });
+    }
   }, [requestId, routeKey]);
 
   useEffect(() => {
@@ -447,7 +528,7 @@ export default function GuidePet() {
   useEffect(() => {
     if (!visible) return undefined;
     const onKeyDown = (event) => {
-      if (event.key === "Escape") setQuietRoute(routeKey);
+      if (event.key === "Escape") completeRoute();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -464,7 +545,11 @@ export default function GuidePet() {
   };
 
   const advance = () => {
-    revealStep((stepIndex + 1) % steps.length);
+    if (stepIndex >= steps.length - 1) {
+      completeRoute();
+      return;
+    }
+    revealStep(stepIndex + 1);
   };
 
   const retreat = () => {
@@ -500,7 +585,7 @@ export default function GuidePet() {
         type="button"
         aria-label={visible ? "Hide Scout guide on this page" : "Open Scout guide"}
         aria-expanded={visible}
-        onClick={() => setQuietRoute(visible ? routeKey : "")}
+        onClick={() => visible ? completeRoute() : reopenRoute()}
       >
         <Scoutling talking={visible} />
       </button>
@@ -508,7 +593,7 @@ export default function GuidePet() {
         <aside className="sense-guide-bubble" aria-label="Scout guide" aria-live="polite">
           <div className="sense-guide-bubble-head">
             <span>SCOUT · {stepIndex + 1}/{steps.length}</span>
-            <button type="button" onClick={() => setQuietRoute(routeKey)} aria-label="Quiet Scout on this page">×</button>
+            <button type="button" onClick={completeRoute} aria-label="Complete Scout guide on this page">×</button>
           </div>
           <div className="sense-guide-copy" key={`${routeKey}:${stepIndex}`}>
             <strong>{step.title}</strong>
@@ -516,7 +601,7 @@ export default function GuidePet() {
           </div>
           <div className="sense-guide-actions">
             {steps.length > 1 && <button type="button" onClick={retreat}>Back</button>}
-            {steps.length > 1 && <button className="is-primary" type="button" onClick={advance}>Next</button>}
+            <button className="is-primary" type="button" onClick={advance}>{stepIndex >= steps.length - 1 ? "Done" : "Next"}</button>
             <button type="button" onClick={() => setEnabled(false)}>Turn off</button>
           </div>
         </aside>

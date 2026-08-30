@@ -1,12 +1,21 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import "@fontsource-variable/geist/wght.css";
 import ErrorBoundary from "./shared/components/ErrorBoundary.jsx";
-import GuidePet from "./shared/guide/GuidePet.jsx";
-import { GuidePetProvider } from "./shared/guide/GuidePetContext.jsx";
-import "./shared/guide/guide-pet.css";
+import { GuidePetProvider, useGuidePet } from "./shared/guide/GuidePetContext.jsx";
 import { LanguageProvider } from "./news-scrapper/translation/LanguageProvider.jsx";
+
+const GuidePet = lazy(() => Promise.all([
+  import("./shared/guide/GuidePet.jsx"),
+  import("./shared/guide/guide-pet.css"),
+]).then(([module]) => module));
+
+function OptionalGuide() {
+  const { enabled } = useGuidePet();
+  if (!enabled) return null;
+  return <Suspense fallback={null}><GuidePet /></Suspense>;
+}
 
 async function launch() {
   // Keep one visual shell across NewsScrapper, Research and Venture Lens.
@@ -23,7 +32,7 @@ async function launch() {
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <GuidePetProvider>
           <App />
-          <GuidePet />
+          <OptionalGuide />
         </GuidePetProvider>
       </BrowserRouter>
     </LanguageProvider>

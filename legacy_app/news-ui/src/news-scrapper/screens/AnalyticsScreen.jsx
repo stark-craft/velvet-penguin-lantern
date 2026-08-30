@@ -157,6 +157,12 @@ export default function AnalyticsScreen() {
     }
   };
 
+  useEffect(() => {
+    if (access?.allowed && !data) {
+      unlock({ preventDefault() {} });
+    }
+  }, [access?.allowed]);
+
   if (!access) {
     return (
       <div className="analytics-page">
@@ -191,7 +197,7 @@ export default function AnalyticsScreen() {
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Director Analytics</div>
             <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">Usage command view</h1>
             <p className="mt-3 max-w-3xl text-slate-400">
-              IP allowlist plus analytics key protection for engagement, feedback, and briefing usage.
+              Capability-protected aggregate engagement, feedback, and briefing usage.
             </p>
           </div>
           {access && (
@@ -215,28 +221,7 @@ export default function AnalyticsScreen() {
 
       {error && data && <div className="rounded-2xl border border-red-300/20 bg-red-950/20 p-4 text-sm text-red-200" role="alert">{error}</div>}
 
-      {!data && (
-        <form className="workspace-panel analytics-access-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5" onSubmit={unlock}>
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Analytics key
-            </span>
-            <input
-              className="dark-input w-full"
-              autoComplete="current-password"
-              aria-invalid={Boolean(error)}
-              onChange={(event) => setKey(event.target.value)}
-              placeholder="Enter analytics access key"
-              type="password"
-              value={key}
-            />
-          </label>
-          {error && <div className="mt-3 text-sm text-red-200" role="alert">{error}</div>}
-          <button className="btn-dark-primary mt-4 justify-center" disabled={busy || !key.trim()} type="submit">
-            <Icon name="shield" /> {busy ? 'Verifying...' : 'Unlock Analytics'}
-          </button>
-        </form>
-      )}
+      {!data && <section className="workspace-empty analytics-access-loading rounded-[24px] p-8 text-center" role={error ? 'alert' : 'status'}><Icon name={error ? 'warning' : 'refresh'} size={24} /><h2 className="mt-3 text-xl font-semibold text-white">{error ? 'Analytics could not load' : 'Loading protected analytics'}</h2><p className="mt-2 text-slate-400">{error || 'Your capability session is being verified.'}</p>{error && <button className="btn-dark-secondary mt-4" onClick={unlock} type="button"><Icon name="refresh" size={14} /> Try again</button>}</section>}
 
       {data && (
         <>

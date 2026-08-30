@@ -620,6 +620,23 @@ the browser and backend.
 If a reverse proxy is used, put only that proxy's IP in `TRUSTED_PROXY_IPS`.
 Never trust every address. Without a proxy, leave loopback values only.
 
+### Capability-based administration
+
+Deployment allowlists bootstrap the first trusted operators. After startup, an
+operator with `access.manage` can use **Settings > Access Management** to grant
+the minimum capabilities required by each signed viewer. These runtime grants
+are written atomically to:
+
+```text
+C:\App_Portable\news_scrapper\runtime\access_control.json
+```
+
+They apply immediately and never rewrite `.env`. Keep this file with the other
+runtime state during upgrades, but do not publish it to Git. Privilege changes
+are recorded in the adjacent access audit log. Browser code never receives or
+stores the deployment keys after a capability session is unlocked; the server
+uses an HttpOnly signed cookie.
+
 Broadcast is now a content vertical in the unified corpus, not an IP-routed
 profile. Do not reintroduce separate Default/Broadcast scheduler runs or replace
 the active `sites.json` with a legacy broadcast file.
@@ -772,15 +789,16 @@ network. Press `Ctrl+C` in the server window to stop it.
 ## 9. What happens from scheduler to feed
 
 1. FastAPI starts and reads `.env`.
-2. Runtime folders and profile-specific history folders are created.
+2. Runtime folders and the unified briefing history folder are created.
 3. Existing legacy JSON state is copied into the new runtime location only
    when the destination does not already exist.
-4. Scheduler calculates the next due time from the newest default and broadcast
-   briefing. Missing/stale data triggers a run shortly after startup.
+4. The single scheduler owner calculates the next due time from the newest
+   unified briefing. Missing or stale data triggers one run shortly after
+   startup.
 5. Samsung Web Search and Chat are tested before crawling.
-6. Scrapy reads the profile's own sites and keywords:
-   - default: `news_scrapper\config\sites.json`
-   - broadcast: `news_scrapper\config\sites_broadcast.json`
+6. Scrapy reads the one active source catalog and keyword taxonomy from
+   `news_scrapper\config\sites.json`; broadcast is metadata within this corpus,
+   not another scheduler profile.
 7. Scrapy handles RSS feeds and ordinary HTML listing/article pages.
 8. If Web Search is healthy, Scrapy discovers matching URLs and Web Search
    supplies exact-reference article data. Python rejects different-domain or
@@ -793,15 +811,17 @@ network. Press `Ctrl+C` in the server window to stop it.
     inflate a cluster.
 12. Chat creates final structured intelligence when healthy. BART/FLAN-T5 are
     used when Chat is unavailable.
-13. The final JSON is written atomically into the correct profile history.
-14. `/latest-briefing` chooses profile by verified client IP, applies that
-    viewer's private hidden list, and returns the feed.
+13. The final JSON is written atomically into the unified briefing history.
+14. `/latest-briefing` applies the signed viewer's private hidden state and
+    returns the same deterministic shared baseline to every authorized client.
 15. The frontend requests `/profile` and `/latest-briefing` from the same
     backend origin and renders the response.
 
-The default profile runs first, then broadcast. A failed profile is retained in
-status and retried. A scheduled tick that occurs during a long/manual run is
-queued instead of silently discarded.
+There is exactly one scheduler run and one mutable JSON/model state owner. A
+failed run retains the previous healthy briefing and is retried. A scheduled
+tick that occurs during a long/manual run is queued instead of silently
+discarded. Do not configure more than one Uvicorn worker while this storage
+model is active.
 
 ## 10. Verify the deployment
 
@@ -816,7 +836,7 @@ Invoke-RestMethod http://127.0.0.1:8000/latest-briefing | ConvertTo-Json -Depth 
 Check:
 
 - `/status` reports the scheduler and next run.
-- `/profile` reports the expected default or broadcast profile.
+- `/profile` reports the signed viewer identity and unified product profile.
 - `/latest-briefing` reports `success` with `result`, or `empty` before the
   first successful run.
 - The terminal clearly reports Samsung preflight PASS/FAIL and selected

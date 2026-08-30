@@ -1003,6 +1003,14 @@ html[data-theme="light"] .premium-venture-copy small {
   background: rgba(var(--profile-accent-rgb), 0.065);
 }
 
+.premium-settings-primary + .premium-language-panel {
+  margin: 0 0 14px;
+}
+
+.premium-settings-columns + .premium-guide-panel {
+  margin: 14px 0 0;
+}
+
 .premium-language-status {
   display: flex;
   min-width: 0;

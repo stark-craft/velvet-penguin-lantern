@@ -137,7 +137,7 @@ function mergeSourceCollections(configured, inferred) {
   return [...configured, ...inferred.filter((source) => !configuredNames.has(sourceName(source).trim().toLowerCase()))];
 }
 
-function SourcePicker({ sites, selected, onApply, loading = false, loadError = '' }) {
+function SourcePicker({ sites, selected, onApply, loading = false, loadError = '', canManageSources = false }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -269,7 +269,7 @@ function SourcePicker({ sites, selected, onApply, loading = false, loadError = '
                 </div>
               </div>
               <div className="scan-source-picker-head-actions">
-                <button
+                {canManageSources && <button
                   className="source-picker-manage"
                   onClick={() => {
                     setOpen(false);
@@ -278,7 +278,7 @@ function SourcePicker({ sites, selected, onApply, loading = false, loadError = '
                   type="button"
                 >
                   Manage sources <Icon name="external" size={14} />
-                </button>
+                </button>}
                 <button className="scan-modal-close" onClick={closePicker} type="button" aria-label="Close source picker">
                   <Icon name="x" size={17} />
                 </button>
@@ -533,7 +533,11 @@ function ScanActivityPanel({ running, logs, hasBatch }) {
   );
 }
 
-export default function ScanScreen({ manualScan, setManualScan, startManualScan, stopManualScan }) {
+export default function ScanScreen({ manualScan, setManualScan, startManualScan, stopManualScan, capabilities = [] }) {
+  const capabilitySet = useMemo(() => new Set(capabilities), [capabilities]);
+  const canViewSources = capabilitySet.has('sources.view') || capabilitySet.has('sources.manage');
+  const canManageSources = capabilitySet.has('sources.manage');
+  const canSubmitReview = capabilitySet.has('review.news.submit');
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const initialQ = params.get('q') || '';
@@ -567,7 +571,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const [draftExportOpen, setDraftExportOpen] = useState(false);
   const [hiddenCount, setHiddenCount] = useState(0);
   const [resultFilter, setResultFilter] = useState('All');
-  const [tourStep, setTourStep] = useState(null);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [actionBusy, setActionBusy] = useState('');
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
@@ -601,13 +606,11 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       }
     };
     sync();
-    const timer = window.setInterval(sync, 12000);
     const onVisibility = () => { if (document.visibilityState === 'visible') sync(); };
     window.addEventListener('focus', sync);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
       window.removeEventListener('focus', sync);
       document.removeEventListener('visibilitychange', onVisibility);
     };
@@ -615,8 +618,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
   useEffect(() => {
     let active = true;
-    setSitesLoading(true);
-    getSites()
+    setSitesLoading(canViewSources);
+    if (canViewSources) getSites()
       .then((response) => {
         if (!active) return;
         const loadedSites = normalizeSiteCollection(response);
@@ -631,43 +634,10 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       .finally(() => {
         if (active) setSitesLoading(false);
       });
+    else setSitesLoading(false);
     getViewerHidden().then((d) => setHiddenCount(Number(d?.count ?? d?.items?.length ?? 0))).catch(() => {});
     return () => { active = false; };
-  }, []);
-
-  useEffect(() => {
-    const keywords = query.trim();
-    if (!keywords) {
-      if (running) stopManualScan();
-      setManualScan({
-        started: false,
-        running: false,
-        cards: [],
-        checked: {},
-        status: 'Start typing to search the local archive.'
-      });
-      return undefined;
-    }
-    const timer = window.setTimeout(() => {
-      startManualScan({ query, from, to, pickedSites });
-    }, 220);
-    return () => window.clearTimeout(timer);
-  }, [query, from, to, pickedSites.join('|')]);
-
-  const dismissTour = () => {
-    window.localStorage.setItem(DEEP_SCAN_TOUR_KEY, 'true');
-    setTourStep(null);
-  };
-
-  const openTour = (step) => setTourStep(step);
-
-  const nextTourStep = () => {
-    if (tourStep >= DEEP_SCAN_TOUR_STEPS.length - 1) {
-      dismissTour();
-    } else {
-      setTourStep((current) => current + 1);
-    }
-  };
+  }, [canViewSources]);
 
   const selectedBatch = useMemo(
     () => cards.filter((item) => checked[articleKey(item)]),
@@ -677,6 +647,9 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
     () => cards.filter((item) => matchesResultLens(item, resultFilter)),
     [cards, resultFilter],
   );
+  useEffect(() => setPage(1), [cards, resultFilter]);
+  const pageCount = Math.max(1, Math.ceil(visibleCards.length / PAGE_SIZE));
+  const pagedCards = useMemo(() => visibleCards.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [page, visibleCards]);
   const resultLensCounts = useMemo(() => Object.fromEntries(
     RESULT_LENSES.map(({ label }) => [label, cards.filter((item) => matchesResultLens(item, label)).length]),
   ), [cards]);
@@ -684,7 +657,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
     () => mergeSourceCollections(sites, archiveSourcesFromCards(cards)),
     [sites, cards],
   );
-  const groups = useMemo(() => groupedByDate(visibleCards), [visibleCards]);
+  const groups = useMemo(() => groupedByDate(pagedCards), [pagedCards]);
   const highSignals = cards.filter((a) => scoreOf(a) >= 80).length;
   const scanSourceLabel = pickedSites.length ? `${pickedSites.length} selected` : 'All stored';
   const scanFailed = !running && logs[logs.length - 1]?.level === 'error';
@@ -840,13 +813,8 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
         <header className="scan-command-header">
           <div className="scan-command-copy">
-            <div className="scan-kicker-line">
-              <span className="scan-kicker"><Icon name="archive" size={14} /> Local Intelligence Scan</span>
-              <button className="scan-guide-launch" onClick={() => openTour(0)} type="button">
-                <span>How Scan works</span><Icon name="chevR" size={14} />
-              </button>
-            </div>
-            <h1 id="scan-command-title">Search what the newsroom already knows.</h1>
+            <div className="scan-kicker-line"><span className="scan-kicker"><Icon name="archive" size={14} /> Local Intelligence Scan</span></div>
+            <h1 id="scan-command-title">What are you investigating?</h1>
             <p>
               Type a company, product, market, or phrase. Scan reads the extracted intelligence archive in real time—without waking the crawler or touching the public web.
             </p>
@@ -884,7 +852,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               <span>01 · Query</span>
               <strong>Search extracted news</strong>
             </div>
-            <span className="scan-live-hint"><span className={running ? 'scan-beacon active' : 'scan-beacon'} aria-hidden="true" /> Results update as you type</span>
+            <span className="scan-live-hint"><span className={running ? 'scan-beacon active' : 'scan-beacon'} aria-hidden="true" /> Search runs only when requested</span>
           </div>
 
           <div className="scan-query-primary scan-query-row">
@@ -908,15 +876,6 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
               <kbd>Enter</kbd>
             </label>
             <div className="scan-search-action" ref={searchRef}>
-              <button
-                className="scan-field-help scan-search-help"
-                title="Search local extracted briefing files only. This never starts the crawler."
-                aria-label="Explain local Scan"
-                onClick={() => openTour(3)}
-                type="button"
-              >
-                ?
-              </button>
               {running ? (
                 <button className="scan-run scan-run-primary stop" onClick={stop} type="button">
                   <Icon name="stop" /><span>Stop search</span><small>Cancel safely</small>
@@ -948,7 +907,6 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                 from={from}
                 to={to}
                 helpText="Local Scan starts with today. Choose a broader range to search older extracted briefing files."
-                onHelp={() => openTour(1)}
                 onChange={({ from: nextFrom, to: nextTo }) => {
                   setFrom(nextFrom);
                   setTo(nextTo);
@@ -959,15 +917,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
             <div className="scan-scope-cell" ref={sourcesRef}>
               <div className="scan-field-label">
                 <span>Source scope</span>
-                <button
-                  className="scan-field-help"
-                  title="Filters stored articles by their extracted source. It does not contact these publications."
-                  aria-label="Help: source scope"
-                  onClick={() => openTour(2)}
-                  type="button"
-                >
-                  ?
-                </button>
+                <span className="scan-field-help" title="Filters stored articles by source metadata. Publishers are never contacted." aria-hidden="true">?</span>
               </div>
               <SourcePicker
                 sites={availableSites}
@@ -975,6 +925,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                 onApply={setPicked}
                 loading={sitesLoading}
                 loadError={sitesError}
+                canManageSources={canManageSources}
               />
               <span className="scan-scope-caption">Filtering metadata, never contacting a publisher</span>
             </div>
@@ -1017,15 +968,6 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
             </button>
           )}
         </div>
-      )}
-
-      {tourStep !== null && (
-        <ScanTour
-          step={tourStep}
-          targetRef={[queryRef, dateRangeRef, sourcesRef, searchRef][tourStep]}
-          onNext={nextTourStep}
-          onDismiss={dismissTour}
-        />
       )}
 
       <section className="scan-results-workspace" aria-busy={running || Boolean(actionBusy)} aria-labelledby="scan-results-title">
@@ -1100,10 +1042,10 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
                       variant={cardVariant(item)}
                       vote={votes[articleKey(item)]}
                       onVote={onVote}
-                      onSelect={setPendingSelect}
+                      onSelect={canSubmitReview ? setPendingSelect : undefined}
                       onOpen={openDossier}
                       onHide={hideArticle}
-                      onCheck={onCheck}
+                      onCheck={canSubmitReview ? onCheck : undefined}
                       checked={!!checked[articleKey(item)]}
                       isSelected={!!item.selected_by}
                     />
@@ -1158,6 +1100,14 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
           )}
         </div>
 
+        {visibleCards.length > PAGE_SIZE && (
+          <nav className="scan-pagination" aria-label="Scan result pages">
+            <button disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} type="button"><Icon name="chevL" size={14} /> Previous</button>
+            <span>Page <strong>{page}</strong> of {pageCount} · {visibleCards.length} matches</span>
+            <button disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))} type="button">Next <Icon name="chevR" size={14} /></button>
+          </nav>
+        )}
+
         {hiddenCount > 0 && (
           <footer className="scan-hidden-footer">
             <button className="hidden-review-link scan-hidden-signals" onClick={() => navigate('/rejected')} type="button">
@@ -1174,13 +1124,13 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
       <ArticleModal
         item={openArticle}
         onClose={() => setOpen(null)}
-        onSelect={selectFromDossier}
+        onSelect={canSubmitReview ? selectFromDossier : undefined}
         onHide={hideFromDossier}
         onVote={onVote}
-        onCorrectRegion={onCorrectRegion}
+        onCorrectRegion={capabilitySet.has('region.correct') ? onCorrectRegion : undefined}
       />
-      <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />
-      <NameModal
+      {canSubmitReview && <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />}
+      {canSubmitReview && <NameModal
         open={!!batchSelect}
         article={batchSelect}
         title={`Send ${selectedBatch.length} articles to Review Queue`}
@@ -1188,7 +1138,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         confirmLabel="Send to Review Queue"
         onClose={() => setBatchSelect(null)}
         onConfirm={confirmBatch}
-      />
+      />}
       <DraftExportModal
         items={selectedBatch}
         open={draftExportOpen}
@@ -1196,7 +1146,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         onClose={() => setDraftExportOpen(false)}
       />
 
-      {selectedBatch.length > 0 && (
+      {canSubmitReview && selectedBatch.length > 0 && (
         <div className="scan-batch-dock" role="region" aria-label="Selected scan results">
           <div className="batch-action-bar scan-batch-bar">
             <div className="scan-batch-count"><span>{selectedBatch.length}</span><strong>signal{selectedBatch.length === 1 ? '' : 's'} selected</strong></div>

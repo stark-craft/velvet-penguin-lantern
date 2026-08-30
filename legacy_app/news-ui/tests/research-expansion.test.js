@@ -62,8 +62,8 @@ test("Samsung Internal nests a compact announcement rail in the wire and keeps t
   assert.match(samsung, /DateGroupedSignals/);
   assert.match(samsung, /Sampark stream/);
   assert.match(samsung, /sni-wire-announcements/);
-  assert.match(samsung, /function IntelligenceWire\(\{ announcements = \[\], items \}\)/);
-  assert.match(samsung, /<AnnouncementRail items=\{announcements\} \/>/);
+  assert.match(samsung, /function IntelligenceWire\(\{[\s\S]*announcements = \[\][\s\S]*items[\s\S]*onRemoveAnnouncement[\s\S]*\}\)/);
+  assert.match(samsung, /<AnnouncementRail[\s\S]*items=\{announcements\}[\s\S]*onRemove=\{onRemoveAnnouncement\}/);
   assert.match(samsung, /Samsung Intelligence Wire/);
   assert.doesNotMatch(samsung, /id: 'announcements'/);
 });

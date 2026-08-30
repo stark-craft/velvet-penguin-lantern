@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../Icon.jsx';
 import {
   CONTRIBUTION_CONTENT_TYPES,
-  CONTRIBUTION_STATUS,
   contentTypeLabel,
   createContribution,
   statusLabel,
@@ -11,7 +10,7 @@ import {
 import { validateDocumentFile } from '../../internal/documentParser.js';
 import {
   createContributionDraft,
-  deleteContributionDraft,
+  deleteContributionRecord,
   importContributionDocument,
   submitContributionDraft,
   updateContributionDraft,
@@ -25,6 +24,7 @@ import useContributions, { notifyContributionsChanged } from './useContributions
 const SESSION_KEY = 'personal-desk-contribute-session-v1';
 const IMPORT_STEPS = ['Validating document', 'Uploading', 'Extracting text', 'Creating editable draft', 'Ready'];
 const DOC_ACCEPT = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const EDITABLE_CONTRIBUTION_STATUSES = new Set(['draft', 'ready', 'needs_changes', 'withdrawn']);
 
 function CoverThumb({ cover }) {
   const src = useCoverPreviewSrc(cover);
@@ -61,6 +61,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState('');
   const docInputRef = useRef(null);
   const alive = useRef(true);
   const sessionTimer = useRef(0);
@@ -241,20 +242,29 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     }
   };
 
-  const removeDraft = async (record) => {
-    const confirmed = window.confirm(`Delete the draft “${record.title || 'Untitled'}”? This cannot be undone.`);
+  const removeContribution = async (record) => {
+    if (!record?.id || deletingId) return;
+    const title = record.title?.trim() || 'Untitled contribution';
+    const publicWarning = record.status === 'published'
+      ? ' It will disappear from Samsung Internal immediately.'
+      : '';
+    const confirmed = window.confirm(`Permanently delete “${title}”?${publicWarning} This cannot be undone.`);
     if (!confirmed) return;
+    setDeletingId(record.id);
+    setError('');
     try {
-      await deleteContributionDraft(record.id);
+      await deleteContributionRecord(record.id);
       if (viewing?.id === record.id) setViewing(null);
       if (editing?.id === record.id) {
         setEditing(null);
         window.sessionStorage.removeItem(SESSION_KEY);
       }
       notifyContributionsChanged();
-      setNotice('Draft deleted.');
+      setNotice(`${contentTypeLabel(record.contentType)} deleted permanently.`);
     } catch (deleteError) {
       setError(deleteError?.message || 'This record could not be deleted.');
+    } finally {
+      if (alive.current) setDeletingId('');
     }
   };
 
@@ -284,8 +294,8 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     try { window.sessionStorage.removeItem(SESSION_KEY); } catch { /* no-op */ }
   };
 
-  const draftsCount = contributions.filter((record) => record.status !== CONTRIBUTION_STATUS.SUBMITTED).length;
-  const submittedCount = contributions.filter((record) => record.status === CONTRIBUTION_STATUS.SUBMITTED).length;
+  const draftsCount = contributions.filter((record) => EDITABLE_CONTRIBUTION_STATUSES.has(record.status)).length;
+  const submittedCount = contributions.length - draftsCount;
 
   if (importState) {
     return (
@@ -296,6 +306,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
   }
 
   if (viewing) {
+    const viewingIsEditable = EDITABLE_CONTRIBUTION_STATUSES.has(viewing.status);
     return (
       <div className="cw-workspace">
         <div className="cw-editor-head">
@@ -304,15 +315,20 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
           </button>
           <span className={`cw-status-pill is-${viewing.status}`}>{statusLabel(viewing.status)}</span>
         </div>
-        {viewing.status !== CONTRIBUTION_STATUS.SUBMITTED && (
-          <button
-            className="btn-dark-primary"
-            onClick={() => { setEditing(createContribution(viewing)); setViewing(null); }}
-            type="button"
-          >
-            <Icon name="note" size={14} /> Continue editing
+        <div className="cw-record-actions">
+          {viewingIsEditable && (
+            <button
+              className="btn-dark-primary"
+              onClick={() => { setEditing(createContribution(viewing)); setViewing(null); }}
+              type="button"
+            >
+              <Icon name="note" size={14} /> Continue editing
+            </button>
+          )}
+          <button className="cw-delete-button" disabled={deletingId === viewing.id} onClick={() => removeContribution(viewing)} type="button">
+            <Icon name="trash" size={15} /> {deletingId === viewing.id ? 'Deleting…' : 'Delete contribution'}
           </button>
-        )}
+        </div>
         <ContributionPreview contribution={viewing} />
       </div>
     );
@@ -399,7 +415,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
 
       <section aria-label="Your contributions" className="cw-list-section">
         <header className="personal-section-head">
-          <div><span className="eyebrow">{draftsCount} drafts · {submittedCount} submitted</span><h2>Your contributions</h2></div>
+          <div><span className="eyebrow">{draftsCount} working · {submittedCount} sent or published</span><h2>Your contributions</h2></div>
         </header>
         {!loaded ? (
           <p className="cw-empty-hint">Loading your contributions…</p>
@@ -422,7 +438,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
                 </div>
                 <span className={`cw-status-pill is-${record.status}`}>{statusLabel(record.status)}</span>
                 <div className="cw-item-actions">
-                  {record.status === CONTRIBUTION_STATUS.SUBMITTED ? (
+                  {!EDITABLE_CONTRIBUTION_STATUSES.has(record.status) ? (
                     <button className="btn-dark-secondary" onClick={() => { setViewing(record); setNotice(''); setError(''); }} type="button">
                       View
                     </button>
@@ -431,11 +447,9 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
                       Continue editing
                     </button>
                   )}
-                  {record.status !== CONTRIBUTION_STATUS.SUBMITTED && (
-                    <button aria-label={`Delete draft ${record.title || 'Untitled'}`} className="cw-icon-button" onClick={() => removeDraft(record)} type="button">
-                      <Icon name="trash" size={15} />
-                    </button>
-                  )}
+                  <button className="cw-delete-button" disabled={deletingId === record.id} onClick={() => removeContribution(record)} type="button">
+                    <Icon name="trash" size={15} /> <span>{deletingId === record.id ? 'Deleting…' : 'Delete'}</span>
+                  </button>
                 </div>
               </li>
             ))}

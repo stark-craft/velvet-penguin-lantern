@@ -1,33 +1,15 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import TopBar from "./components/TopBar.jsx";
 import DesignViewport from "./components/DesignViewport.jsx";
-import VocFeedback from "./components/VocFeedback.jsx";
 import { useTracking } from "./utils/tracking.js";
 import { searchExtractedIntelligence } from "./api.js";
 import { normalizeList } from "./utils/normalize.js";
 import { trackAction } from "./utils/tracking.js";
-import FeedScreen from "./screens/FeedScreen.jsx";
-import ScanScreen from "./screens/ScanScreen.jsx";
-import SelectedScreen from "./screens/SelectedScreen.jsx";
-import ApprovedScreen from "./screens/ApprovedScreen.jsx";
-import RejectedScreen from "./screens/RejectedScreen.jsx";
-import SourcesScreen from "./screens/SourcesScreen.jsx";
-import SchedulerScreen from "./screens/SchedulerScreen.jsx";
-import HistoryScreen from "./screens/HistoryScreen.jsx";
-import TrendsScreen from "./screens/TrendsScreen.jsx";
-import VocScreen from "./screens/VocScreen.jsx";
-import AnalyticsScreen from "./screens/AnalyticsScreen.jsx";
-import GatekeeperReviewScreen from "./screens/GatekeeperReviewScreen.jsx";
 import ForYouWorkspaceScreen from "./for-you/ForYouWorkspaceScreen.jsx";
-import ResearchScreen from "./screens/ResearchScreen.jsx";
-import SamsungInternalScreen from "./screens/SamsungInternalScreen.jsx";
-import SamsungInternalReaderScreen from "./screens/SamsungInternalReaderScreen.jsx";
-import InternalPublishingScreen from "./screens/InternalPublishingScreen.jsx";
-import VentureLensApp from "../venture-lens/VentureLensApp.jsx";
 import UserProfileModal from "./components/UserProfileModal.jsx";
 import Icon from "./components/Icon.jsx";
-import { getContributionAccess, getRecommendationStatus, getViewerProfile } from "./api.js";
+import { getAccessCapabilities, getRecommendationStatus, getViewerProfile } from "./api.js";
 import { useLanguage } from "./translation/LanguageProvider.jsx";
 import "./styles/personalization.css";
 const SENSE_ATMOSPHERE_VIDEO =
@@ -35,6 +17,25 @@ const SENSE_ATMOSPHERE_VIDEO =
 const THEME_STORAGE_KEY = "news-theme";
 const PROFILE_SWITCHER_ENABLED = import.meta.env.DEV
   && String(import.meta.env.VITE_ENABLE_PROFILE_SWITCHER || "").toLowerCase() === "true";
+
+const FeedScreen = lazy(() => import("./screens/FeedScreen.jsx"));
+const ScanScreen = lazy(() => import("./screens/ScanScreen.jsx"));
+const SelectedScreen = lazy(() => import("./screens/SelectedScreen.jsx"));
+const ApprovedScreen = lazy(() => import("./screens/ApprovedScreen.jsx"));
+const RejectedScreen = lazy(() => import("./screens/RejectedScreen.jsx"));
+const SourcesScreen = lazy(() => import("./screens/SourcesScreen.jsx"));
+const SchedulerScreen = lazy(() => import("./screens/SchedulerScreen.jsx"));
+const HistoryScreen = lazy(() => import("./screens/HistoryScreen.jsx"));
+const TrendsScreen = lazy(() => import("./screens/TrendsScreen.jsx"));
+const VocScreen = lazy(() => import("./screens/VocScreen.jsx"));
+const AnalyticsScreen = lazy(() => import("./screens/AnalyticsScreen.jsx"));
+const GatekeeperReviewScreen = lazy(() => import("./screens/GatekeeperCapabilityScreen.jsx"));
+const ResearchScreen = lazy(() => import("./screens/ResearchScreen.jsx"));
+const SamsungInternalScreen = lazy(() => import("./screens/SamsungInternalScreen.jsx"));
+const SamsungInternalReaderScreen = lazy(() => import("./screens/SamsungInternalReaderScreen.jsx"));
+const InternalPublishingScreen = lazy(() => import("./screens/InternalPublishingScreen.jsx"));
+const AccessManagementScreen = lazy(() => import("./screens/AccessManagementScreen.jsx"));
+const VentureLensApp = lazy(() => import("../venture-lens/VentureLensApp.jsx"));
 
 function readStoredTheme() {
   if (typeof window === "undefined") return "dark";
@@ -51,19 +52,44 @@ function readStoredProfile() {
 }
 
 function ProductAtmosphere({ live }) {
+  const videoRef = useRef(null);
+  const [shouldPlay, setShouldPlay] = useState(false);
+  useEffect(() => {
+    if (!live || typeof window === "undefined") {
+      setShouldPlay(false);
+      return undefined;
+    }
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    const saveData = Boolean(navigator.connection?.saveData);
+    if (reduced || saveData) {
+      setShouldPlay(false);
+      return undefined;
+    }
+    const sync = () => setShouldPlay(document.visibilityState === "visible");
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    return () => document.removeEventListener("visibilitychange", sync);
+  }, [live]);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (shouldPlay) video.play().catch(() => {}); else video.pause();
+  }, [shouldPlay]);
   return (
     <div
       className={live ? "product-atmosphere is-live" : "product-atmosphere"}
       aria-hidden="true"
     >
       {" "}
-      {live && (
+      {live && shouldPlay && (
         <video
           className="product-atmosphere-video"
           muted
           playsInline
           autoPlay
           loop
+          preload="metadata"
+          ref={videoRef}
         >
           {" "}
           <source src={SENSE_ATMOSPHERE_VIDEO} type="video/mp4" />{" "}
@@ -93,6 +119,25 @@ function ContributionOnly({ access, children }) {
   return access?.allowed ? children : <Navigate to="/for-you" replace />;
 }
 
+function RouteLoading() {
+  return <div className="fy-state" role="status"><span className="fy-loader" /><p>Opening workspace…</p></div>;
+}
+
+function CapabilityOnly({ capabilities, any = [], all = [], children }) {
+  if (capabilities === null) return <RouteLoading />;
+  const values = new Set(capabilities);
+  const allowed = (any.length === 0 || any.some((capability) => values.has(capability)))
+    && all.every((capability) => values.has(capability));
+  if (allowed) return children;
+  return (
+    <section className="workflow-empty restricted-workspace" role="status">
+      <Icon name="shield" size={26} />
+      <h2>You don’t have access to this workspace.</h2>
+      <p>Your briefing and personal workspaces are unchanged. Ask an access administrator if this tool is part of your role.</p>
+    </section>
+  );
+}
+
 export default function App() {
   const { pathname } = useLocation();
   useTracking(pathname);
@@ -110,7 +155,7 @@ export default function App() {
   const [profileRequired, setProfileRequired] = useState(false);
   const [viewerRevision, setViewerRevision] = useState(0);
   const [recommendationStatus, setRecommendationStatus] = useState(null);
-  const [contributionAccess, setContributionAccess] = useState(null);
+  const [capabilityState, setCapabilityState] = useState(null);
   const [manualScan, setManualScan] = useState({
     query: "",
     from: "",
@@ -178,13 +223,16 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    getContributionAccess()
+    getAccessCapabilities()
       .then((result) => {
-        if (!cancelled) setContributionAccess({ allowed: Boolean(result?.allowed), ip: result?.ip || "" });
+        if (!cancelled) setCapabilityState({
+          capabilities: Array.isArray(result?.capabilities) ? result.capabilities : [],
+          principal: result?.principal || "",
+        });
       })
       .catch((error) => {
-        console.warn("[Contributions] Capability check failed closed:", error);
-        if (!cancelled) setContributionAccess({ allowed: false, ip: "" });
+        console.warn("[Access] Capability check failed closed:", error);
+        if (!cancelled) setCapabilityState({ capabilities: [], principal: "" });
       });
     return () => { cancelled = true; };
   }, []);
@@ -364,6 +412,11 @@ export default function App() {
   const defaultLanding = recommendationStatus?.enabled && recommendationStatus?.default_landing
     ? "/for-you"
     : "/home";
+  const capabilities = capabilityState?.capabilities ?? null;
+  const hasCapability = (capability) => Boolean(capabilities?.includes(capability));
+  const contributionAccess = capabilities === null
+    ? null
+    : { allowed: hasCapability("contributions.create"), ip: "" };
   return (
     <DesignViewport>
       {" "}
@@ -393,6 +446,7 @@ export default function App() {
           forYouEnabled={Boolean(recommendationStatus?.enabled)}
           profileMode={recommendationStatus?.profile_mode || "unified"}
           contributionAllowed={Boolean(contributionAccess?.allowed)}
+          capabilities={capabilities}
         />{" "}
         <main
           className="design-main mx-auto w-full"
@@ -401,7 +455,7 @@ export default function App() {
           tabIndex={-1}
         >
           {" "}
-          <Routes key={viewerRevision}>
+          <Suspense fallback={<RouteLoading />}><Routes key={viewerRevision}>
             {" "}
             <Route path="/" element={recommendationStatus === null
               ? <div className="fy-state"><span className="fy-loader" /><p>Preparing TechScout…</p></div>
@@ -410,7 +464,7 @@ export default function App() {
               path="/for-you/*"
               element={<ForYouWorkspaceScreen contributionAccess={contributionAccess} viewer={viewer} />}
             />{" "}
-            <Route path="/home" element={<FeedScreen />} />{" "}
+            <Route path="/home" element={<FeedScreen capabilities={capabilities || []} />} />{" "}
             <Route
               path="/scan"
               element={
@@ -419,14 +473,15 @@ export default function App() {
                   setManualScan={patchManualScan}
                   startManualScan={startManualScan}
                   stopManualScan={stopManualScan}
+                  capabilities={capabilities || []}
                 />
               }
             />{" "}
-            <Route path="/selected" element={<SelectedScreen />} />{" "}
-            <Route path="/approved" element={<ApprovedScreen />} />{" "}
+            <Route path="/selected" element={<CapabilityOnly capabilities={capabilities} any={["review.news.view", "review.contributions.view"]}><SelectedScreen capabilities={capabilities || []} /></CapabilityOnly>} />{" "}
+            <Route path="/approved" element={<CapabilityOnly capabilities={capabilities} any={["approved.view", "review.news.approve"]}><ApprovedScreen /></CapabilityOnly>} />{" "}
             <Route path="/saved/*" element={<LegacySavedRedirect />} />{" "}
             <Route path="/research" element={<ResearchScreen />} />{" "}
-            <Route path="/samsung-internal" element={<SamsungInternalScreen contributionAllowed={Boolean(contributionAccess?.allowed)} />} />{" "}
+            <Route path="/samsung-internal" element={<SamsungInternalScreen canManageAnnouncements={hasCapability("review.contributions.publish")} contributionAllowed={Boolean(contributionAccess?.allowed)} />} />{" "}
             <Route path="/samsung-internal/leadership/:id" element={<SamsungInternalReaderScreen kind="leadership" />} />{" "}
             <Route path="/samsung-internal/announcement/:id" element={<SamsungInternalReaderScreen kind="announcement" />} />{" "}
             <Route
@@ -435,23 +490,23 @@ export default function App() {
             />{" "}
             <Route path="/venturelens/*" element={<VentureLensApp />} />{" "}
             <Route path="/rejected" element={<RejectedScreen />} />{" "}
-            <Route path="/sources" element={<SourcesScreen />} />{" "}
-            <Route path="/manage-sources" element={<SourcesScreen />} />{" "}
-            <Route path="/scheduler" element={<SchedulerScreen />} />{" "}
-            <Route path="/history" element={<HistoryScreen />} />{" "}
+            <Route path="/sources" element={<CapabilityOnly capabilities={capabilities} any={["sources.view", "sources.manage"]}><SourcesScreen canManage={hasCapability("sources.manage")} /></CapabilityOnly>} />{" "}
+            <Route path="/manage-sources" element={<Navigate to="/sources" replace />} />{" "}
+            <Route path="/scheduler" element={<CapabilityOnly capabilities={capabilities} any={["scheduler.view", "scheduler.control"]}><SchedulerScreen canControl={hasCapability("scheduler.control")} /></CapabilityOnly>} />{" "}
+            <Route path="/history" element={<HistoryScreen reviewAllowed={hasCapability("review.news.submit")} />} />{" "}
             {PROFILE_SWITCHER_ENABLED && <Route path="/trends" element={<TrendsScreen />} />}{" "}
             <Route path="/voc" element={<VocScreen />} />{" "}
-            <Route path="/director-analytics" element={<AnalyticsScreen />} />{" "}
+            <Route path="/director-analytics" element={<CapabilityOnly capabilities={capabilities} any={["analytics.view"]}><AnalyticsScreen /></CapabilityOnly>} />{" "}
             <Route
               path="/gatekeeper-review"
-              element={<GatekeeperReviewScreen />}
+              element={<CapabilityOnly capabilities={capabilities} any={["gatekeeper.review"]}><GatekeeperReviewScreen /></CapabilityOnly>}
             />{" "}
+            <Route path="/access-management" element={<CapabilityOnly capabilities={capabilities} any={["access.manage"]}><AccessManagementScreen /></CapabilityOnly>} />{" "}
             <Route path="*" element={recommendationStatus === null
               ? <div className="fy-state"><span className="fy-loader" /><p>Preparing TechScout…</p></div>
               : <Navigate to={defaultLanding} replace />} />{" "}
-          </Routes>{" "}
+          </Routes></Suspense>{" "}
         </main>{" "}
-        <VocFeedback />{" "}
         {viewerError && (
           <aside className="shell-service-notice" role="alert">
             <span aria-hidden="true"><Icon name="warning" size={17} /></span>

@@ -166,6 +166,24 @@ export default function UserProfileModal({ open, firstVisit = false, viewer, onC
   const [greeting, note] = greetingFor(new Date(), language);
   const displayName = name.trim() || ui.explorer;
 
+  if (firstVisit) {
+    return (
+      <div className="modal-overlay profile-overlay profile-first-use-overlay" data-no-translate>
+        <form aria-describedby="viewer-profile-description" aria-labelledby="viewer-profile-title" aria-modal="true" className="profile-first-use-card" onSubmit={save} ref={dialogRef} role="dialog" tabIndex={-1}>
+          <span className="profile-first-use-mark" aria-hidden="true"><Icon name="sparkle" size={21} /></span>
+          <small>Welcome to TechScout</small>
+          <h2 id="viewer-profile-title">What should we call you?</h2>
+          <p id="viewer-profile-description">Add a display name to personalize your private intelligence desk.</p>
+          <label><span>{ui.displayName}</span><input autoComplete="nickname" autoFocus maxLength={80} onChange={(event) => { setName(event.target.value); setError(''); }} placeholder={ui.namePlaceholder} value={name} /></label>
+          <label><span>{ui.email} <em>{ui.optional}</em></span><input autoComplete="email" onChange={(event) => setEmail(event.target.value)} placeholder={ui.emailPlaceholder} type="email" value={email} /></label>
+          {error && <div className="profile-error premium-profile-error" role="alert"><Icon name="warning" size={16} />{error}</div>}
+          <button className="profile-save premium-profile-save" disabled={saving} type="submit"><span>{saving ? ui.saving : 'Continue'}</span><Icon name="chevR" size={17} /></button>
+          <p className="profile-first-use-note"><Icon name="shield" size={13} /> Your profile and reading signals stay private to this browser.</p>
+        </form>
+      </div>
+    );
+  }
+
   return (
     <div
       className="modal-overlay profile-overlay premium-profile-overlay"

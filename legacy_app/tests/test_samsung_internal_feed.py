@@ -90,6 +90,27 @@ class SamsungInternalFeedTests(unittest.TestCase):
             self.assertEqual(len(feed["global"]), 1)
             self.assertEqual(feed["global"][0]["id"], "new")
 
+    def test_projection_cache_hits_until_archive_signature_changes(self):
+        with tempfile.TemporaryDirectory() as root:
+            archive = self.write_archive(root, "2026-08-23", "080000", [
+                {"id": "first", "title": "Samsung first projection", "link": "https://x/first", "source": "A"},
+            ])
+
+            first = build_samsung_internal_feed([archive])
+            cached = build_samsung_internal_feed([archive])
+
+            self.assertFalse(first["projection_cache"]["hit"])
+            self.assertTrue(cached["projection_cache"]["hit"])
+            self.assertEqual(cached["global"][0]["id"], "first")
+
+            archive.write_text(json.dumps([
+                {"id": "second", "title": "Samsung replacement projection with a longer payload", "link": "https://x/second", "source": "A"},
+            ]), encoding="utf-8")
+            refreshed = build_samsung_internal_feed([archive])
+
+            self.assertFalse(refreshed["projection_cache"]["hit"])
+            self.assertEqual(refreshed["global"][0]["id"], "second")
+
 
 if __name__ == "__main__":
     unittest.main()

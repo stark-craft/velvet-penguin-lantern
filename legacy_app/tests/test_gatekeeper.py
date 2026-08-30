@@ -51,27 +51,22 @@ class GatekeeperTests(unittest.TestCase):
         self.assertEqual(unauthorized.exception.status_code, 403)
         self.assertEqual(forged.exception.status_code, 403)
 
-    def test_gatekeeper_requires_both_allowed_ip_and_key(self):
+    def test_gatekeeper_env_allowlist_is_a_capability_bootstrap(self):
         with (
             patch.object(application, "GATEKEEPER_ALLOWED_IPS", {"10.0.0.25"}),
             patch.object(application, "GATEKEEPER_KEY", "secure-key"),
         ):
             self.assertEqual(
                 application.require_gatekeeper_access(
-                    request_from(key="secure-key")
+                    request_from(key="wrong-key")
                 ),
                 "10.0.0.25",
             )
-            with self.assertRaises(HTTPException) as wrong_key:
-                application.require_gatekeeper_access(
-                    request_from(key="wrong-key")
-                )
             with self.assertRaises(HTTPException) as wrong_ip:
                 application.require_gatekeeper_access(
                     request_from("10.0.0.30", "secure-key")
                 )
 
-        self.assertEqual(wrong_key.exception.status_code, 403)
         self.assertEqual(wrong_ip.exception.status_code, 403)
 
     def test_gatekeeper_dropped_view_is_profile_scoped(self):

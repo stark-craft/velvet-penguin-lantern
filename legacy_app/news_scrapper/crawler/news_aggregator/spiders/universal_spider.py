@@ -26,7 +26,7 @@ model stages happen later in `semantic_clustering.py` after raw JSON exists.
 import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlsplit, urlunsplit
 
 import scrapy
@@ -298,9 +298,13 @@ class NewsSpider(scrapy.Spider):
             "source_family": site.get("source_family") or "",
             "keyword_pack": site.get("keyword_pack") or "",
             "allow_deep_scan": bool(site.get("allow_deep_scan", False)),
+            # Low-frequency first-party publishers can request a slightly
+            # wider catch-up window without widening the unified crawl for
+            # every source. A value of 1 preserves the scheduler's range.
+            "lookback_days": site.get("lookback_days"),
         }
 
-    def is_in_range(self, date_obj):
+    def is_in_range(self, date_obj, source_context=None):
         """Return True when an article date is inside the selected date range."""
 
         # Unknown dates are allowed because many feeds omit dates or publishers
@@ -311,8 +315,19 @@ class NewsSpider(scrapy.Spider):
         # Accept either date or datetime values.
         local_date = date_obj.date() if isinstance(date_obj, datetime) else date_obj
 
-        # Drop anything older than the start date.
-        if self.start_date and local_date < self.start_date:
+        effective_start_date = self.start_date
+        try:
+            lookback_days = int((source_context or {}).get("lookback_days") or 0)
+        except (TypeError, ValueError):
+            lookback_days = 0
+        if lookback_days > 1:
+            range_end = self.end_date or datetime.now().date()
+            source_start_date = range_end - timedelta(days=lookback_days - 1)
+            if effective_start_date is None or source_start_date < effective_start_date:
+                effective_start_date = source_start_date
+
+        # Drop anything older than the effective source range.
+        if effective_start_date and local_date < effective_start_date:
             return False
 
         # Drop anything newer than the end date.
@@ -461,7 +476,7 @@ class NewsSpider(scrapy.Spider):
             )
 
             # Date filtering happens early to avoid requesting old article pages.
-            if published and not self.is_in_range(published):
+            if published and not self.is_in_range(published, response.meta):
                 continue
 
             seed_snippet = self.clean_text(
@@ -580,6 +595,7 @@ class NewsSpider(scrapy.Spider):
                 response.url,
                 5,
                 configured_url=response.meta.get("configured_url"),
+                source_context=response.meta,
             )
             if score >= 4:
                 candidate_urls.add(normalized)
@@ -619,6 +635,7 @@ class NewsSpider(scrapy.Spider):
                     response.url,
                     context_score,
                     configured_url=response.meta.get("configured_url"),
+                    source_context=response.meta,
                 )
 
                 # A minimum score of 4 means at least one strong signal exists,
@@ -681,6 +698,7 @@ class NewsSpider(scrapy.Spider):
         listing_url,
         context_score,
         configured_url=None,
+        source_context=None,
     ):
         """Return a confidence score that a discovered link is a real story."""
 
@@ -711,7 +729,7 @@ class NewsSpider(scrapy.Spider):
         # queueing them. Some homepages expose months of daily archive links;
         # downloading all of those makes a one-day scan unnecessarily huge.
         url_date = self.date_from_url(path)
-        if url_date and not self.is_in_range(url_date):
+        if url_date and not self.is_in_range(url_date, source_context):
             return -1
 
         # Empty/home URLs and non-HTML assets are not articles.
@@ -835,7 +853,16 @@ class NewsSpider(scrapy.Spider):
                 "source_home": source_home or self.source_home(configured_url or normalized),
                 **{
                     key: source_context[key]
-                    for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack", "allow_deep_scan")
+                    for key in (
+                        "source_id",
+                        "vertical",
+                        "verticals",
+                        "audiences",
+                        "source_family",
+                        "keyword_pack",
+                        "allow_deep_scan",
+                        "lookback_days",
+                    )
                     if source_context and key in source_context
                 },
             },
@@ -979,7 +1006,7 @@ class NewsSpider(scrapy.Spider):
 
         # Date filter is applied again after article extraction because website
         # fallback does not know article dates before opening the article page.
-        if publish_date and not self.is_in_range(publish_date):
+        if publish_date and not self.is_in_range(publish_date, response.meta):
             return
 
         # Keyword filtering is the final crawler-level relevance check. The

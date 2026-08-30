@@ -25,7 +25,13 @@ function WorkspaceFallback() {
   return <div className="fy-workspace-view-loading" role="status"><span /><p>Opening your private workspace…</p></div>;
 }
 
-export default function ForYouWorkspaceScreen({ contributionAccess }) {
+function greetingForHour(hour) {
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+export default function ForYouWorkspaceScreen({ contributionAccess, viewer }) {
   const location = useLocation();
   const navigate = useNavigate();
   const refs = useRef([]);
@@ -36,6 +42,9 @@ export default function ForYouWorkspaceScreen({ contributionAccess }) {
   const allowed = Boolean(contributionAccess?.allowed);
   const accessLoading = contributionAccess === null;
   const redirect = legacyTarget(location.pathname);
+  const firstName = String(viewer?.display_name || viewer?.name || '').trim().split(/\s+/)[0] || 'there';
+  const salutation = greetingForHour(new Date().getHours());
+  const greeting = `${salutation}, ${firstName}`;
   const tabs = [
     { id: 'feed', label: 'Your Feed', icon: 'sparkle', to: '/for-you' },
     { id: 'following', label: 'Following', icon: 'bookmark', to: '/for-you/following' },
@@ -62,8 +71,15 @@ export default function ForYouWorkspaceScreen({ contributionAccess }) {
   return (
     <div className="fy-workspace-shell">
       <div className={`fy-workspace-rail-wrap${railHidden ? ' is-hidden' : ''}`}>
-        <div aria-label="For You workspace" className="fy-workspace-switcher" role="tablist">
-          <div className="fy-workspace-tabs">
+        <nav aria-label="For You workspace" className="fy-workspace-switcher">
+          <div className="fy-command-identity" title={greeting}>
+            <span aria-hidden="true" className="fy-command-orbit"><i /><i /></span>
+            <span aria-label={greeting} className="fy-command-greeting">
+              <small>{salutation}</small>
+              <strong>{firstName}</strong>
+            </span>
+          </div>
+          <div aria-label="Personal workspace views" className="fy-workspace-tabs" role="tablist">
             {tabs.map((tab, index) => <button
               aria-selected={section === tab.id}
               className={section === tab.id ? 'is-active' : ''}
@@ -80,11 +96,29 @@ export default function ForYouWorkspaceScreen({ contributionAccess }) {
               role="tab"
               tabIndex={section === tab.id ? 0 : -1}
               type="button"
-            ><Icon name={tab.icon} size={15} /> {tab.label}</button>)}
+            >
+              <span aria-hidden="true" className="fy-workspace-index">{String(index + 1).padStart(2, '0')}</span>
+              <Icon name={tab.icon} size={15} />
+              <span>{tab.label}</span>
+            </button>)}
           </div>
-          {section === 'feed' && <div className="fy-command-topics" aria-label="Selected interests">{feedMeta.labels.slice(0, 3).map((label) => <span key={label}>{label}</span>)}</div>}
-          <button className="fy-tune-action" onClick={() => navigate('/for-you?edit=interests')} type="button"><Icon name="settings" size={15} /> Tune interests</button>
-        </div>
+          <div className="fy-workspace-context">
+            {section === 'feed' && <div className="fy-interest-disclosure">
+              <button aria-describedby="fy-interest-popover" className="fy-interest-summary" type="button">
+                <Icon name="radar" size={13} />
+                {feedMeta.labels.length ? `${feedMeta.labels.length} interests` : 'Personal feed'}
+              </button>
+              <div className="fy-interest-popover" id="fy-interest-popover" role="tooltip">
+                <span>Your private interests</span>
+                <div>
+                  {(feedMeta.labels.length ? feedMeta.labels : ['Complete your interests to personalize this feed']).map((label) => <b key={label}>{label}</b>)}
+                </div>
+                <small>These signals shape ranking only for your desk.</small>
+              </div>
+            </div>}
+            <button className="fy-tune-action" onClick={() => navigate('/for-you?edit=interests')} title="Edit the topics used to rank your feed" type="button"><Icon name="settings" size={15} /><span>Tune interests</span><Icon name="chevR" size={13} /></button>
+          </div>
+        </nav>
       </div>
       <section className="fy-workspace-panel" role="tabpanel">
         <Suspense fallback={<WorkspaceFallback />}>

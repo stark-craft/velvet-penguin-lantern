@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import { SignalVisual } from '../components/ArticleCard.jsx';
-import { getPublishedInternalContent, getSamsungInternalFeed, getSharedBriefing, getLatestBriefing } from '../api.js';
+import ContinuousSignalStream from '../components/ContinuousSignalStream.jsx';
+import { archiveInternalContent, getPublishedInternalContent, getSamsungInternalFeed, getSharedBriefing, getLatestBriefing } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import {
   activeLeadership, announcementsOf, buildHeroSlides, buildSamsungWire,
@@ -68,32 +69,44 @@ function rememberInternalPosition() {
   window.sessionStorage.setItem('samsung-internal-scroll-y', String(window.scrollY || 0));
 }
 
-function AnnouncementRail({ items }) {
+function AnnouncementRail({ items, busyId = '', onRemove }) {
   const navigate = useNavigate();
   const { paused, reduced, setPaused } = useMotionPause();
   if (!items.length) return null;
-  const entries = reduced ? items : [...items, ...items];
+  const staticMode = reduced || Boolean(onRemove);
+  const entries = staticMode ? items : [...items, ...items];
   return (
     <section
       aria-label="Company announcements"
-      className={`sni-wire-announcements${paused ? ' is-paused' : ''}${reduced ? ' is-static' : ''}`}
+      className={`sni-wire-announcements${paused ? ' is-paused' : ''}${staticMode ? ' is-static' : ''}${onRemove ? ' is-manageable' : ''}`}
       onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}
       onFocus={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
     >
       <div className="sni-announcement-label"><Icon name="megaphone" size={13} /><span>Notices</span></div>
       <div className="sni-announcement-window"><div className="sni-announcement-track">
         {entries.map((record, index) => {
-          const duplicate = !reduced && index >= items.length;
+          const duplicate = !staticMode && index >= items.length;
           const content = <><span>{record.category || 'Announcement'}</span><strong>{record.title || 'Company announcement'}</strong><time>{formatDate(record.publishedAt)}</time></>;
-          if (duplicate) return <div aria-hidden="true" className="sni-announcement-item" key={`${record.id}-${index}`}>{content}</div>;
-          return <button
-            aria-label={`Read announcement: ${record.title || 'Company announcement'}`}
-            className="sni-announcement-item" key={`${record.id}-${index}`}
-            onClick={() => {
-              rememberInternalPosition();
-              navigate(`/samsung-internal/announcement/${encodeURIComponent(record.id)}`);
-            }} type="button"
-          >{content}</button>;
+          if (duplicate) return <div aria-hidden="true" className="sni-announcement-entry" key={`${record.id}-${index}`}><div className="sni-announcement-item">{content}</div></div>;
+          return <div className="sni-announcement-entry" key={`${record.id}-${index}`}>
+            <button
+              aria-label={`Read announcement: ${record.title || 'Company announcement'}`}
+              className="sni-announcement-item"
+              onClick={() => {
+                rememberInternalPosition();
+                navigate(`/samsung-internal/announcement/${encodeURIComponent(record.id)}`);
+              }} type="button"
+            >{content}</button>
+            {onRemove && <button
+              aria-busy={busyId === record.id}
+              aria-label={`Remove announcement: ${record.title || 'Company announcement'}`}
+              className="sni-announcement-remove"
+              disabled={Boolean(busyId)}
+              onClick={() => onRemove(record)}
+              title="Remove this announcement from Samsung Internal"
+              type="button"
+            ><Icon name="trash" size={12} /><span>Remove</span></button>}
+          </div>;
         })}
       </div></div>
     </section>
@@ -184,15 +197,12 @@ function WireCard({ item, duplicate = false }) {
   );
 }
 
-function IntelligenceWire({ announcements = [], items }) {
-  const { paused, reduced, setPaused } = useMotionPause();
-  const entries = reduced ? items : [...items, ...items];
+function IntelligenceWire({ announcementBusy = '', announcements = [], items, onRemoveAnnouncement }) {
   return (
-    <aside aria-label="Samsung Intelligence Wire" className={`sni-wire${paused ? ' is-paused' : ''}${reduced ? ' is-static' : ''}`}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }} onFocus={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-      <header><div><span>Live intelligence</span><h2>Samsung Intelligence Wire</h2></div><i aria-hidden="true" /></header>
-      <AnnouncementRail items={announcements} />
-      {items.length ? <div className="sni-wire-window"><div className="sni-wire-track">{entries.map((item, index) => <WireCard duplicate={!reduced && index >= items.length} item={item} key={`${item.id || item.link || item.title}-${index}`} />)}</div></div>
+    <aside aria-label="Samsung Intelligence Wire" className="sni-wire">
+      <header><h2>Live intelligence</h2><i aria-hidden="true" /></header>
+      <AnnouncementRail busyId={announcementBusy} items={announcements} onRemove={onRemoveAnnouncement} />
+      {items.length ? <div className="sni-wire-window"><ContinuousSignalStream ariaLabel="Samsung Intelligence Wire" className="sni-continuous-wire" duration={42} items={items} renderItem={(item, index, duplicate) => <WireCard duplicate={duplicate} item={item} key={`${item.id || item.link || item.title}-${index}`} />} /></div>
         : <div className="sni-wire-empty"><Icon name="inbox" size={22} /><p>The wire will populate after the unified archive contains Samsung signals.</p></div>}
       <footer><span>Global</span><span>Local</span><span>Inside</span></footer>
     </aside>
@@ -237,7 +247,7 @@ function normalizeChannel(items, channel) {
   return normalizeList(items || []).map((item) => ({ ...item, image_url: resolveInternalImage(item), samsung_internal_channel: channel }));
 }
 
-export default function SamsungInternalScreen({ contributionAllowed = false }) {
+export default function SamsungInternalScreen({ canManageAnnouncements = false, contributionAllowed = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [channels, setChannels] = useState({ global: [], local: [], inside: [] });
@@ -246,6 +256,8 @@ export default function SamsungInternalScreen({ contributionAllowed = false }) {
   const [error, setError] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [tab, setTab] = useState('global');
+  const [announcementBusy, setAnnouncementBusy] = useState('');
+  const [announcementFeedback, setAnnouncementFeedback] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -281,6 +293,22 @@ export default function SamsungInternalScreen({ contributionAllowed = false }) {
   }, [channels, published]);
 
   const counts = { global: model.global.length, local: model.local.length, internal: model.inside.length + model.stories.length };
+  const removeAnnouncement = canManageAnnouncements ? async (record) => {
+    if (announcementBusy) return;
+    const confirmed = window.confirm(`Remove “${record.title || 'this announcement'}” from Samsung Internal? It will be archived, not permanently deleted.`);
+    if (!confirmed) return;
+    setAnnouncementBusy(record.id);
+    setAnnouncementFeedback(null);
+    try {
+      await archiveInternalContent(record.id);
+      setPublished((current) => current.filter((item) => item.id !== record.id));
+      setAnnouncementFeedback({ kind: 'success', message: 'Announcement removed from the live wire and safely archived.' });
+    } catch (archiveError) {
+      setAnnouncementFeedback({ kind: 'error', message: archiveError?.message || 'The announcement could not be removed.' });
+    } finally {
+      setAnnouncementBusy('');
+    }
+  } : null;
   const contributorAction = contributionAllowed ? <button className="btn-dark-secondary" onClick={() => navigate('/for-you/create/contributions')} type="button"><Icon name="plus" size={14} /> Open contributions</button> : null;
   const renderTab = () => {
     if (tab === 'global') return model.global.length ? <DateGroupedSignals items={model.global.slice(0, 100)} /> : <EmptyPanel copy="The next unified archive run may bring fresh Samsung coverage." title="Nothing on the global wire yet" />;
@@ -292,7 +320,8 @@ export default function SamsungInternalScreen({ contributionAllowed = false }) {
   if (loading) return <div className="samsung-internal-page"><div aria-live="polite" className="sni-state" role="status"><span className="sni-loader" /><h1>Opening Samsung Internal…</h1><p>Aligning leadership, company notices and the Samsung intelligence wire.</p></div></div>;
   if (error) return <div className="samsung-internal-page"><div className="sni-state sni-state-error" role="alert"><Icon name="warning" size={20} /><h1>Samsung Internal could not load</h1><p>{error}</p><button className="btn-dark-secondary" onClick={() => setLoadAttempt((value) => value + 1)} type="button"><Icon name="refresh" size={14} /> Try again</button></div></div>;
   return <div className="samsung-internal-page">
-    <section className="sni-primary-row">{model.slides.length ? <FocusCarousel slides={model.slides} /> : <EmptyPanel copy="The unified archive has no Samsung signals yet." title="Samsung Focus is preparing" />}<IntelligenceWire announcements={model.announcements} items={model.wire} /></section>
+    {announcementFeedback && <p className={`sni-management-feedback is-${announcementFeedback.kind}`} role={announcementFeedback.kind === 'error' ? 'alert' : 'status'}>{announcementFeedback.message}</p>}
+    <section className="sni-primary-row">{model.slides.length ? <FocusCarousel slides={model.slides} /> : <EmptyPanel copy="The unified archive has no Samsung signals yet." title="Samsung Focus is preparing" />}<IntelligenceWire announcementBusy={announcementBusy} announcements={model.announcements} items={model.wire} onRemoveAnnouncement={removeAnnouncement} /></section>
     {!model.leadership && <p className="sni-note" role="note">A published leadership message will take the first Samsung Focus position automatically.</p>}
     <nav aria-label="Samsung Internal archive channels" className="sni-tabs" role="tablist">{CHANNELS.map((entry) => <button aria-selected={tab === entry.id} className={`sni-tab${tab === entry.id ? ' is-active' : ''}`} key={entry.id} onClick={() => setTab(entry.id)} role="tab" type="button"><Icon name={entry.icon} size={15} /><span>{entry.label}</span><small>{counts[entry.id]}</small></button>)}</nav>
     <section aria-label={`${CHANNELS.find((entry) => entry.id === tab)?.label} archive`} className="sni-panel" role="tabpanel">{renderTab()}</section>

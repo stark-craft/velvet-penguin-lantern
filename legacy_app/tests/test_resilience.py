@@ -163,6 +163,11 @@ class ConcurrentJsonStoreTests(unittest.TestCase):
                 patch.object(main, "TRUSTED_PROXY_IPS", {"127.0.0.1"}),
                 patch.object(main, "BROADCAST_SPECIAL_IPS", {"192.0.2.10"}),
                 patch.object(main, "PROFILE_SETTINGS_ALLOWED_IPS", set()),
+                patch.dict(
+                    os.environ,
+                    {"REVIEW_NEWS_ALLOWED_IPS": "10.0.0.25,192.0.2.10"},
+                    clear=False,
+                ),
             )
             for active_patch in patches:
                 active_patch.start()

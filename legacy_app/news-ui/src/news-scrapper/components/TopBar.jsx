@@ -7,11 +7,7 @@ import ThemeToggle from "./ThemeToggle.jsx";
 import NotificationBell from "./NotificationBell.jsx";
 import useModalFocus from "./modals/useModalFocus.js";
 import { NEWS_SCRAPPER_NAV_STYLE } from "./navigationStyle.js";
-import {
-  getAnalyticsAccess,
-  getGatekeeperAccess,
-  getProfile,
-} from "../api.js";
+import { getProfile } from "../api.js";
 import "./premium-navigation.css";
 
 const mainNav = [
@@ -23,36 +19,39 @@ const mainNav = [
 ];
 
 const baseSettingsNav = [
-  { to: "/selected", label: "Review Queue", labelKo: "검토 대기열", icon: "check2" },
-  { to: "/approved", label: "Approved Briefing", labelKo: "승인된 브리핑", icon: "star" },
+  { to: "/for-you/following", label: "Following", labelKo: "팔로잉", icon: "bookmark" },
   { to: "/history", label: "Briefing Archive", labelKo: "브리핑 아카이브", icon: "archive" },
   { to: "/rejected", label: "Hidden Signals", labelKo: "숨긴 시그널", icon: "eye" },
+  { to: "/voc", label: "Team & Feedback", labelKo: "팀 및 피드백", icon: "note" },
+];
+
+const protectedSettingsNav = [
+  { to: "/selected", label: "Review Center", labelKo: "검토 센터", icon: "check2", any: ["review.news.view", "review.contributions.view"] },
+  { to: "/approved", label: "Approved Briefing", labelKo: "승인된 브리핑", icon: "star", any: ["approved.view", "review.news.approve"] },
   {
     to: "/sources",
     label: "Source Control",
     labelKo: "소스 관리",
     icon: "rss",
     matches: ["/sources", "/manage-sources"],
+    any: ["sources.view", "sources.manage"],
   },
-  { to: "/scheduler", label: "Scheduler", labelKo: "스케줄러", icon: "clock" },
-  { to: "/voc", label: "Voice of Customer", labelKo: "고객 의견", icon: "note" },
-];
-
-const protectedSettingsNav = [
+  { to: "/scheduler", label: "Scheduler", labelKo: "스케줄러", icon: "clock", any: ["scheduler.view", "scheduler.control"] },
   {
     to: "/gatekeeper-review",
     label: "Gatekeeper Review",
     labelKo: "게이트키퍼 검토",
     icon: "shield",
-    access: "gatekeeper",
+    any: ["gatekeeper.review"],
   },
   {
     to: "/director-analytics",
     label: "Analytics",
     labelKo: "분석",
     icon: "layers",
-    access: "analytics",
+    any: ["analytics.view"],
   },
+  { to: "/access-management", label: "Access Management", labelKo: "접근 관리", icon: "key", any: ["access.manage"] },
 ];
 
 const copy = {
@@ -191,11 +190,6 @@ function routeMatches(pathname, item) {
   return candidates.some(
     (candidate) => pathname === candidate || pathname.startsWith(`${candidate}/`),
   );
-}
-
-function isLocalDevHost() {
-  if (typeof window === "undefined") return false;
-  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 }
 
 function initialsFor(name) {
@@ -378,6 +372,7 @@ export default function TopBar({
   forYouEnabled = false,
   profileMode = "legacy",
   contributionAllowed = false,
+  capabilities = null,
 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -392,8 +387,6 @@ export default function TopBar({
       ? "default"
       : localStorage.getItem("news-profile") || "default",
   );
-  const [analyticsAllowed, setAnalyticsAllowed] = useState(isLocalDevHost());
-  const [gatekeeperAllowed, setGatekeeperAllowed] = useState(isLocalDevHost());
   const ui = language === "ko" ? copy.ko : copy.en;
   const visibleMainNav = mainNav.filter((item) => !item.forYouOnly || forYouEnabled);
 
@@ -485,38 +478,11 @@ export default function TopBar({
     setSettingsOpen(false);
   }, [pathname]);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function checkPrivateAccess() {
-      const [analyticsResult, gatekeeperResult] = await Promise.allSettled([
-        getAnalyticsAccess(),
-        getGatekeeperAccess(),
-      ]);
-      if (cancelled) return;
-      const localDevelopment = isLocalDevHost();
-      setAnalyticsAllowed(
-        analyticsResult.status === "fulfilled"
-          ? Boolean(analyticsResult.value?.allowed) || localDevelopment
-          : localDevelopment,
-      );
-      setGatekeeperAllowed(
-        gatekeeperResult.status === "fulfilled"
-          ? Boolean(gatekeeperResult.value?.allowed) || localDevelopment
-          : localDevelopment,
-      );
-    }
-    checkPrivateAccess();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const isBroadcast = profileMode !== "unified" && profile === "broadcast";
-  const privilegedNav = protectedSettingsNav.filter((item) => {
-    if (item.access === "gatekeeper") return gatekeeperAllowed;
-    if (item.access === "analytics") return analyticsAllowed;
-    return false;
-  });
+  const capabilitySet = new Set(capabilities || []);
+  const privilegedNav = protectedSettingsNav.filter((item) =>
+    (item.any || []).some((capability) => capabilitySet.has(capability)),
+  );
   const activeSettingsItem = [...baseSettingsNav, ...protectedSettingsNav].find(
     (item) => routeMatches(pathname, item),
   );
@@ -664,49 +630,39 @@ export default function TopBar({
                   </div>
                 </section>
 
-                <NavLink className="premium-venture-card" onClick={closeSettings} to="/research" title={ui.openVenture}>
-                  <span className="premium-venture-icon" aria-hidden="true">
-                    <Icon name="sparkle" size={19} />
-                  </span>
-                  <span className="premium-venture-copy">
-                    <small>{ui.ventureEyebrow}</small>
-                    <strong>{ui.ventureTitle}</strong>
-                    <span>{ui.ventureNote}</span>
-                  </span>
-                  <Icon className="premium-venture-arrow" name="external" size={17} />
-                </NavLink>
-
-                <section className="premium-guide-panel" aria-labelledby="premium-guide-heading">
-                  <span className="premium-guide-avatar" aria-hidden="true">
-                    <Icon name="sparkle" size={18} />
-                  </span>
-                  <div className="premium-guide-copy">
-                    <small>{ui.guideEyebrow}</small>
-                    <strong id="premium-guide-heading">{ui.guideTitle}</strong>
-                    <span>{ui.guideNote}</span>
+                <section className="premium-language-panel" aria-labelledby="premium-language-heading">
+                  <div className="premium-language-status">
+                    <span id="premium-language-heading">{ui.language}</span>
+                    <small>{ui.currentInterface}</small>
+                    <strong>{language === "ko" ? "한국어" : "English"}</strong>
                   </div>
-                  <div className="premium-guide-controls">
+                  <div className="premium-language-switch" aria-label={ui.language} role="group">
                     <button
-                      aria-checked={guideEnabled}
-                      aria-label={guideEnabled ? ui.guideEnabled : ui.guideDisabled}
-                      className={guideEnabled ? "premium-guide-switch is-on" : "premium-guide-switch"}
-                      onClick={() => setGuideEnabled(!guideEnabled)}
-                      role="switch"
+                      aria-pressed={language === "en"}
+                      className={language === "en" ? "active" : ""}
+                      onClick={() => selectLanguage("en")}
                       type="button"
                     >
-                      <span aria-hidden="true" />
+                      <span aria-hidden="true">EN</span>
+                      {ui.english}
                     </button>
                     <button
-                      className="premium-guide-launch"
-                      onClick={() => {
-                        closeSettings();
-                        requestGuide();
-                      }}
+                      aria-pressed={language === "ko"}
+                      className={language === "ko" ? "active" : ""}
+                      onClick={() => selectLanguage("ko")}
                       type="button"
                     >
-                      {ui.guideLaunch}
+                      <span aria-hidden="true">한</span>
+                      {ui.korean}
                     </button>
                   </div>
+                  <p className={translationState?.error ? "is-error" : ""} aria-live="polite">
+                    {translationState?.pending
+                      ? ui.translating
+                      : translationState?.error
+                        ? ui.translationError
+                        : ui.translationReady}
+                  </p>
                 </section>
 
                 <div className="premium-settings-columns">
@@ -745,39 +701,37 @@ export default function TopBar({
                   )}
                 </div>
 
-                <section className="premium-language-panel" aria-labelledby="premium-language-heading">
-                  <div className="premium-language-status">
-                    <span id="premium-language-heading">{ui.language}</span>
-                    <small>{ui.currentInterface}</small>
-                    <strong>{language === "ko" ? "한국어" : "English"}</strong>
+                <section className="premium-guide-panel" aria-labelledby="premium-guide-heading">
+                  <span className="premium-guide-avatar" aria-hidden="true">
+                    <Icon name="sparkle" size={18} />
+                  </span>
+                  <div className="premium-guide-copy">
+                    <small>{ui.guideEyebrow}</small>
+                    <strong id="premium-guide-heading">{ui.guideTitle}</strong>
+                    <span>{ui.guideNote}</span>
                   </div>
-                  <div className="premium-language-switch" aria-label={ui.language} role="group">
+                  <div className="premium-guide-controls">
                     <button
-                      aria-pressed={language === "en"}
-                      className={language === "en" ? "active" : ""}
-                      onClick={() => selectLanguage("en")}
+                      aria-checked={guideEnabled}
+                      aria-label={guideEnabled ? ui.guideEnabled : ui.guideDisabled}
+                      className={guideEnabled ? "premium-guide-switch is-on" : "premium-guide-switch"}
+                      onClick={() => setGuideEnabled(!guideEnabled)}
+                      role="switch"
                       type="button"
                     >
-                      <span aria-hidden="true">EN</span>
-                      {ui.english}
+                      <span aria-hidden="true" />
                     </button>
                     <button
-                      aria-pressed={language === "ko"}
-                      className={language === "ko" ? "active" : ""}
-                      onClick={() => selectLanguage("ko")}
+                      className="premium-guide-launch"
+                      onClick={() => {
+                        closeSettings();
+                        requestGuide();
+                      }}
                       type="button"
                     >
-                      <span aria-hidden="true">한</span>
-                      {ui.korean}
+                      {ui.guideLaunch}
                     </button>
                   </div>
-                  <p className={translationState?.error ? "is-error" : ""} aria-live="polite">
-                    {translationState?.pending
-                      ? ui.translating
-                      : translationState?.error
-                        ? ui.translationError
-                        : ui.translationReady}
-                  </p>
                 </section>
               </div>
             )}

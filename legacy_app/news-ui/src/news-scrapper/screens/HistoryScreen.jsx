@@ -106,7 +106,7 @@ function ArchiveMetric({ icon, label, value, detail }) {
   );
 }
 
-function ArchiveStoryCard({ item, checked, inWorkflow, busy, onCheck, onOpen, onImport }) {
+function ArchiveStoryCard({ item, checked, inWorkflow, busy, onCheck, onOpen, onImport, reviewAllowed = false }) {
   const score = scoreOf(item);
   const parsedSourceCount = Number(item.source_count || 1);
   const sourceCount = Number.isFinite(parsedSourceCount) && parsedSourceCount > 0 ? parsedSourceCount : 1;
@@ -117,7 +117,7 @@ function ArchiveStoryCard({ item, checked, inWorkflow, busy, onCheck, onOpen, on
       <div className="archive-v2-story-visual">
         <SignalVisual item={item} className="archive-v2-story-image" label={false} />
         <div className="archive-v2-story-shade" aria-hidden="true" />
-        <label className="archive-v2-story-check">
+        {reviewAllowed && <label className="archive-v2-story-check">
           <input
             checked={checked}
             disabled={busy}
@@ -126,7 +126,7 @@ function ArchiveStoryCard({ item, checked, inWorkflow, busy, onCheck, onOpen, on
           />
           <span><Icon name="check" size={14} /></span>
           <b>{checked ? 'Selected' : 'Select'}</b>
-        </label>
+        </label>}
         <span className={`archive-v2-score ${score >= 80 ? 'is-high' : ''}`}>Signal {score}</span>
       </div>
 
@@ -160,13 +160,13 @@ function ArchiveStoryCard({ item, checked, inWorkflow, busy, onCheck, onOpen, on
           <button className="archive-v2-icon-button" onClick={() => onOpen(item)} type="button" aria-label={`Open dossier for ${item.title}`}>
             <Icon name="file" size={16} />
           </button>
-          {inWorkflow ? (
+          {reviewAllowed && (inWorkflow ? (
             <span className="archive-v2-workflow-state"><Icon name="check2" size={15} /> In review</span>
           ) : (
             <button className="archive-v2-import-one" disabled={busy} onClick={() => onImport(item)} type="button">
               <Icon name="upload" size={15} /> {busy ? 'Working…' : 'Add to review'}
             </button>
-          )}
+          ))}
         </div>
       </footer>
     </article>
@@ -248,7 +248,7 @@ function ArchiveRunStrip({ runs, activeRunLabel, onOpenRun, disabled }) {
   );
 }
 
-export default function HistoryScreen() {
+export default function HistoryScreen({ reviewAllowed = false }) {
   const [from, setFrom] = useState(dateAddDays(TODAY, -6));
   const [to, setTo] = useState(TODAY);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -317,6 +317,7 @@ export default function HistoryScreen() {
   };
 
   const loadWorkflowState = async () => {
+    if (!reviewAllowed) return;
     setWorkflowWarning('');
     try {
       const result = await getWorkflow();
@@ -331,8 +332,8 @@ export default function HistoryScreen() {
 
   useEffect(() => {
     loadArchiveRange();
-    loadWorkflowState();
-  }, []);
+    if (reviewAllowed) loadWorkflowState();
+  }, [reviewAllowed]);
 
   const setPreset = (days) => {
     const nextFrom = dateAddDays(TODAY, -(days - 1));
@@ -455,14 +456,10 @@ export default function HistoryScreen() {
 
   return (
     <main className="archive-v2-page">
-      <section className="archive-v2-hero" aria-labelledby="archive-page-title">
+      <section className="archive-v2-hero is-compact" aria-labelledby="archive-page-title">
         <div className="archive-v2-hero-copy">
           <span className="archive-v2-kicker"><Icon name="archive" size={15} /> Briefing archive</span>
-          <h1 id="archive-page-title">The intelligence memory.</h1>
-          <p>
-            Return to any retained briefing, trace how a signal evolved, and move the strongest
-            stories back into today&apos;s review queue.
-          </p>
+          <h1 id="archive-page-title">Briefing Archive</h1>
           <div className="archive-v2-hero-tags" aria-label="Current archive scope">
             <span><Icon name="calendar" size={14} /> {friendlyDate(from)} — {friendlyDate(to)}</span>
             <span><Icon name="layers" size={14} /> {activeRunLabel || 'Combined range'}</span>
@@ -475,7 +472,7 @@ export default function HistoryScreen() {
             <Icon name="history" size={18} />
           </div>
           <strong>{String(loadedMetrics.total).padStart(2, '0')}</strong>
-          <p>signals currently in your workspace</p>
+          <p>retained signals in this range</p>
           <div className="archive-v2-index-foot">
             <span><b>{loadedMetrics.sources}</b> sources</span>
             <span><b>{runs.length}</b> editions</span>
@@ -595,56 +592,8 @@ export default function HistoryScreen() {
               </select>
             </label>
 
-            <label>
-              <span>Signal type</span>
-              <select value={filters.signal} onChange={(event) => updateFilter('signal', event.target.value)}>
-                <option value="all">Every signal</option>
-                <option value="high">High signal</option>
-                <option value="clustered">Multi-source</option>
-                <option value="single">Single-source</option>
-                <option value="fresh">Fresh</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Coverage</span>
-              <select value={filters.image} onChange={(event) => updateFilter('image', event.target.value)}>
-                <option value="all">Any image</option>
-                <option value="with">With image</option>
-                <option value="without">No image</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Order</span>
-              <select value={filters.sort} onChange={(event) => updateFilter('sort', event.target.value)}>
-                <option value="date_desc">Newest first</option>
-                <option value="score_desc">Highest score</option>
-                <option value="sources_desc">Most sources</option>
-                <option value="title_asc">Title A–Z</option>
-              </select>
-            </label>
           </div>
         </div>
-
-        {keywords.length > 0 && (
-          <div className="archive-v2-keywords">
-            <span>Popular in this range</span>
-            <div>
-              {keywords.map((keyword) => (
-                <button
-                  key={keyword}
-                  className={filters.text === keyword ? 'is-active' : ''}
-                  onClick={() => updateFilter('text', filters.text === keyword ? '' : keyword)}
-                  type="button"
-                  aria-pressed={filters.text === keyword}
-                >
-                  {keyword}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </form>
 
       <ArchiveRunStrip
@@ -667,7 +616,7 @@ export default function HistoryScreen() {
           </div>
 
           <div className="archive-v2-bulk-actions" aria-label="Archive bulk actions">
-            <button
+            {reviewAllowed && <button
               className="archive-v2-secondary-button"
               disabled={!filteredArticles.length || loading}
               onClick={toggleVisible}
@@ -675,15 +624,15 @@ export default function HistoryScreen() {
             >
               <Icon name="check" size={15} />
               {allVisibleChecked ? 'Clear rendered' : renderedArticles.length > 100 ? 'Select first 100' : 'Select rendered'}
-            </button>
-            <button
+            </button>}
+            {reviewAllowed && <button
               className="archive-v2-secondary-button"
               disabled={!checkedArticles.length || importing}
               onClick={() => setDraftExportOpen(true)}
               type="button"
             >
               <Icon name="download" size={15} /> Export selected
-            </button>
+            </button>}
             <button
               className="archive-v2-primary-button"
               disabled={!checkedArticles.length || importing}
@@ -709,7 +658,7 @@ export default function HistoryScreen() {
           </div>
         )}
 
-        {workflowWarning && (
+        {reviewAllowed && workflowWarning && (
           <div className="archive-v2-notice is-warning" role="status">
             <Icon name="warning" size={18} />
             <span>Review Queue markers are temporarily unavailable. {workflowWarning}</span>
@@ -776,6 +725,7 @@ export default function HistoryScreen() {
                       })}
                       onOpen={openArchiveArticle}
                       onImport={(article) => importArticles([article])}
+                      reviewAllowed={reviewAllowed}
                     />
                   ))}
                 </div>
@@ -805,7 +755,7 @@ export default function HistoryScreen() {
         item={openArticle}
         onClose={() => setOpenArticle(null)}
         onCorrectRegion={onCorrectRegion}
-        onSelect={(item) => importArticles([item])}
+        onSelect={reviewAllowed ? (item) => importArticles([item]) : undefined}
       />
       <DraftExportModal
         items={checkedArticles}

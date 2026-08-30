@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from fastapi.responses import FileResponse
 
 from news_scrapper.application import app, abs_frontend_path
+from news_scrapper.access_control.router import router as access_control_router
 from news_scrapper.internal_content.router import router as internal_content_router
 from news_scrapper.recommendation import router as recommendation_router
 from news_scrapper.translation import router as translation_router
@@ -26,19 +27,25 @@ app.include_router(venture_lens_router)
 app.include_router(translation_router)
 app.include_router(recommendation_router)
 app.include_router(internal_content_router)
+app.include_router(access_control_router)
+
+
+SPA_API_COLLISION_ROUTES = {"/for-you", "/voc", "/scheduler"}
 
 
 @app.middleware("http")
-async def serve_for_you_spa_deep_link(request, call_next):
-    """Disambiguate the browser route from the compatibility JSON endpoint.
+async def serve_spa_api_collision_deep_links(request, call_next):
+    """Disambiguate browser routes from same-prefix JSON endpoints.
 
     Browser navigation advertises ``text/html`` and must receive the React
     application. API clients (and the frontend's /viewer/for-you request) keep
     receiving JSON from the recommendation router.
     """
     path = request.url.path.rstrip("/") or "/"
+    is_spa_collision = path in SPA_API_COLLISION_ROUTES or path.startswith("/for-you/")
     if (
-        (path == "/for-you" or path.startswith("/for-you/"))
+        request.method in {"GET", "HEAD"}
+        and is_spa_collision
         and "text/html" in request.headers.get("accept", "")
     ):
         return serve_root()
@@ -49,6 +56,7 @@ API_ROUTES = {
     "crawl",
     "train",
     "status",
+    "scheduler",
     "briefing",
     "export-excel",
     "export-ppt",
@@ -71,6 +79,7 @@ API_ROUTES = {
     "translation",
     "for-you",
     "internal-content",
+    "access-control",
     "assets",
 }
 

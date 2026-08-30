@@ -27,10 +27,18 @@ MIN_SUBMIT_BODY_CHARS = 20
 FIELD_MAX = {"category": 200, "team": 400, "author": 400, "owner_name": 200}
 CONTENT_TYPES = ("story", "document_import", "leadership", "announcement")
 
-STATUSES = ("draft", "ready", "submitted", "published", "needs_changes", "archived")
+STATUSES = (
+    "draft",
+    "ready",
+    "submitted",
+    "published",
+    "needs_changes",
+    "withdrawn",
+    "archived",
+)
 # needs_changes is editable so the author can revise and resubmit after a
 # reviewer requests changes.
-EDITABLE_STATUSES = ("draft", "ready", "needs_changes")
+EDITABLE_STATUSES = ("draft", "ready", "needs_changes", "withdrawn")
 REVIEW_NOTE_MAX = 2000
 
 
@@ -41,6 +49,35 @@ def utc_now() -> str:
 def _clean(value: object, limit: int | None = None) -> str:
     text = str(value or "").strip()
     return text[:limit] if limit else text
+
+
+def _optional_timestamp(value: object) -> str | None:
+    text = _clean(value, 80)
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ContributionError("Use a valid ISO date and time.") from error
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+def _is_effectively_published(record: dict, now: datetime | None = None) -> bool:
+    if record.get("status") != "published" or record.get("archived_at"):
+        return False
+    current = now or datetime.now(timezone.utc)
+    publish_at = record.get("publish_at")
+    expires_at = record.get("expires_at")
+    try:
+        if publish_at and datetime.fromisoformat(str(publish_at).replace("Z", "+00:00")) > current:
+            return False
+        if expires_at and datetime.fromisoformat(str(expires_at).replace("Z", "+00:00")) <= current:
+            return False
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
 def _require_owned(items: dict[str, dict], record_id: str, owner_id: str) -> dict:
@@ -69,6 +106,10 @@ def _base_record(owner_id: str, content_type: str, fields: dict) -> dict:
         "updated_at": now,
         "submitted_at": None,
         "published_at": None,
+        "publish_at": _optional_timestamp(fields.get("publish_at")),
+        "expires_at": _optional_timestamp(fields.get("expires_at")),
+        "archived_at": None,
+        "withdrawn_at": None,
     }
 
 
@@ -173,6 +214,8 @@ def update_draft(owner_id: str, record_id: str, fields: dict) -> dict:
             "category": _clean(fields.get("category"), FIELD_MAX["category"]),
             "team": _clean(fields.get("team"), FIELD_MAX["team"]),
             "author": _clean(fields.get("author"), FIELD_MAX["author"]),
+            "publish_at": _optional_timestamp(fields.get("publish_at")),
+            "expires_at": _optional_timestamp(fields.get("expires_at")),
             "updated_at": utc_now(),
         })
         if fields.get("owner_name"):
@@ -272,22 +315,26 @@ def submit_draft(owner_id: str, record_id: str) -> dict:
         record["status"] = "submitted"
         record["submitted_at"] = utc_now()
         record["updated_at"] = utc_now()
+        record["withdrawn_at"] = None
         items[record_id] = record
         storage.write_records(items)
         return record
 
 
-def delete_draft(owner_id: str, record_id: str) -> bool:
+def delete_owned_record(owner_id: str, record_id: str) -> bool:
+    """Permanently delete any contribution owned by the authenticated viewer.
+
+    Contributor IP access is enforced by the route and ownership is enforced
+    again here. Published records are intentionally included: an author who
+    deletes one withdraws it from the public Samsung Internal feed at once.
+    """
+
     with storage.mutation_lock:
         items = storage.load_records()
         try:
             record = _require_owned(items, record_id, owner_id)
         except KeyError as error:
             raise LookupError(record_id) from error
-        if record["status"] == "submitted":
-            raise ContributionError(
-                "Submitted contributions are kept for the review trail and cannot be deleted."
-            )
         retired_files: list[tuple[str, Path]] = []
         cover = record.get("cover")
         source = record.get("source_document")
@@ -297,6 +344,18 @@ def delete_draft(owner_id: str, record_id: str) -> bool:
             retired_files.append(("original", storage.ORIGINALS_DIR / source["file"]))
         del items[record_id]
         storage.write_records(items)
+
+        # Decisions about a now-deleted record should not leave a dead link in
+        # the contributor's private notification inbox.
+        owners = storage.load_notifications()
+        inbox = owners.get(owner_id, [])
+        filtered_inbox = [
+            entry for entry in inbox
+            if not isinstance(entry, dict) or str(entry.get("record_id")) != record_id
+        ]
+        if len(filtered_inbox) != len(inbox):
+            owners[owner_id] = filtered_inbox
+            storage.write_notifications(owners)
 
     for kind, path in retired_files:
         storage.remove_quietly(path)
@@ -324,7 +383,7 @@ def list_published() -> list[dict]:
 
     records = [
         record for record in storage.load_records().values()
-        if record.get("status") == "published"
+        if _is_effectively_published(record)
     ]
     records.sort(key=lambda item: str(item.get("published_at") or ""), reverse=True)
     return records
@@ -334,7 +393,7 @@ def get_published(record_id: str) -> dict:
     """Return one public record only after editorial publication."""
 
     record = storage.load_records().get(record_id)
-    if not isinstance(record, dict) or record.get("status") != "published":
+    if not isinstance(record, dict) or not _is_effectively_published(record):
         raise LookupError(record_id)
     return record
 
@@ -392,6 +451,9 @@ def _decide_submitted(record_id: str, next_status: str, note: str) -> dict:
         record["review_note"] = _clean(note, REVIEW_NOTE_MAX)
         record["reviewed_at"] = now
         record["updated_at"] = now
+        if next_status == "archived":
+            record["previous_status"] = "submitted"
+            record["archived_at"] = now
         items[record_id] = record
         storage.write_records(items)
     kind_by_status = {
@@ -425,6 +487,8 @@ def publish_record(record_id: str) -> dict:
         now = utc_now()
         record["status"] = "published"
         record["published_at"] = now
+        record["archived_at"] = None
+        record["previous_status"] = "submitted"
         record["reviewed_at"] = now
         record["updated_at"] = now
         # Leadership messages are a channel of one: publishing a new vision
@@ -455,6 +519,80 @@ def request_changes(record_id: str, note: str) -> dict:
 
 def reject_record(record_id: str, note: str) -> dict:
     return _decide_submitted(record_id, "archived", note)
+
+
+def withdraw_submission(owner_id: str, record_id: str) -> dict:
+    """Withdraw a submitted item without erasing its review history."""
+
+    with storage.mutation_lock:
+        items = storage.load_records()
+        try:
+            record = _require_owned(items, record_id, owner_id)
+        except KeyError as error:
+            raise LookupError(record_id) from error
+        if record.get("status") == "withdrawn":
+            return record
+        if record.get("status") != "submitted":
+            raise ContributionError("Only submitted content can be withdrawn.")
+        now = utc_now()
+        record["previous_status"] = "submitted"
+        record["status"] = "withdrawn"
+        record["withdrawn_at"] = now
+        record["updated_at"] = now
+        items[record_id] = record
+        storage.write_records(items)
+        return record
+
+
+def archive_record(record_id: str) -> dict:
+    with storage.mutation_lock:
+        items = storage.load_records()
+        record = _review_record(items, record_id)
+        if record.get("status") == "archived":
+            return record
+        now = utc_now()
+        record["previous_status"] = record.get("status")
+        record["status"] = "archived"
+        record["archived_at"] = now
+        record["updated_at"] = now
+        items[record_id] = record
+        storage.write_records(items)
+        return record
+
+
+def restore_record(record_id: str) -> dict:
+    with storage.mutation_lock:
+        items = storage.load_records()
+        record = _review_record(items, record_id)
+        if record.get("status") != "archived":
+            raise ContributionError("Only archived content can be restored.")
+        previous = record.get("previous_status")
+        record["status"] = "published" if previous == "published" else "submitted"
+        record["archived_at"] = None
+        record["updated_at"] = utc_now()
+        items[record_id] = record
+        storage.write_records(items)
+        return record
+
+
+def permanently_delete(record_id: str) -> bool:
+    """Super-admin-only destructive path; the route enforces access.manage."""
+
+    with storage.mutation_lock:
+        items = storage.load_records()
+        record = _review_record(items, record_id)
+        files: list[Path] = []
+        cover = record.get("cover")
+        source = record.get("source_document")
+        if isinstance(cover, dict) and cover.get("file"):
+            files.append(storage.COVERS_DIR / Path(str(cover["file"])).name)
+        if isinstance(source, dict) and source.get("file"):
+            files.append(storage.ORIGINALS_DIR / Path(str(source["file"])).name)
+        del items[record_id]
+        storage.write_records(items)
+    for path in files:
+        storage.remove_quietly(path)
+    return True
 
 
 # -- author notifications --------------------------------------------------

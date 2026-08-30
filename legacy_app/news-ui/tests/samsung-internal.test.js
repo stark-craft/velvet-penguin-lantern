@@ -177,7 +177,7 @@ test("published destination has dedicated announcement and leadership readers", 
   const screen = read("../src/news-scrapper/screens/SamsungInternalScreen.jsx");
   assert.match(screen, /Samsung Intelligence Wire/);
   assert.match(screen, /sni-wire-announcements/);
-  assert.match(screen, /<AnnouncementRail items=\{announcements\} \/>/);
+  assert.match(screen, /<AnnouncementRail[\s\S]*items=\{announcements\}[\s\S]*onRemove=\{onRemoveAnnouncement\}/);
   assert.doesNotMatch(screen, /id: 'announcements'/);
 });
 
@@ -189,6 +189,7 @@ test("Signal links prefer canonical article URLs and reject blanks", () => {
 
 test("Announcement path exists end to end in the contribute desk contracts", () => {
   const model = read("../src/news-scrapper/internal/contributionModel.js");
+  const screen = read("../src/news-scrapper/screens/SamsungInternalScreen.jsx");
   assert.match(model, /ANNOUNCEMENT: 'announcement'/);
   assert.match(model, /announcement: 'Announcement'/);
 
@@ -202,6 +203,8 @@ test("Announcement path exists end to end in the contribute desk contracts", () 
   const api = read("../src/news-scrapper/api.js");
   assert.match(api, /'leadership', 'announcement'/);
   assert.match(api, /publishedAt: record\.published_at/);
+  assert.match(api, /archiveInternalContent[\s\S]*\/archive/);
+  assert.match(screen, /Remove this announcement from Samsung Internal/);
 
   const desk = read("../src/news-scrapper/components/ContributionReviewDesk.jsx");
   assert.match(desk, /announcements = list\.filter/);

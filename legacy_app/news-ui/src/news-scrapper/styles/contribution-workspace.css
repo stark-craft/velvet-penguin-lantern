@@ -344,6 +344,45 @@
 
 .cw-icon-button:hover { color: #fca5a5; border-color: rgba(248, 113, 113, 0.4); }
 
+.cw-delete-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 0 0.72rem;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 10px;
+  background: rgba(248, 113, 113, 0.07);
+  color: #fca5a5;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.cw-delete-button:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.58);
+  background: rgba(248, 113, 113, 0.14);
+  color: #fecaca;
+}
+
+.cw-delete-button:disabled { cursor: wait; opacity: 0.62; }
+.cw-delete-button:focus-visible { outline: 3px solid rgba(248, 113, 113, 0.28); outline-offset: 2px; }
+.cw-record-actions { display: flex; align-items: center; gap: 0.65rem; margin: 0 0 1rem; }
+
+html[data-theme="light"] .cw-delete-button {
+  border-color: rgba(185, 28, 28, 0.32);
+  background: rgba(220, 38, 38, 0.06);
+  color: #991b1b;
+}
+
+html[data-theme="light"] .cw-delete-button:hover:not(:disabled) {
+  border-color: rgba(185, 28, 28, 0.55);
+  background: rgba(220, 38, 38, 0.12);
+  color: #7f1d1d;
+}
+
 /* Editor */
 
 .cw-editor {

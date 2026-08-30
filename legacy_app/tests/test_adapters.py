@@ -228,8 +228,11 @@ class AdapterContractTests(unittest.TestCase):
         response = Mock()
         response.url = "https://publisher.example/story"
         response.content = b'<html><head><meta property="og:image" content="/image.jpg"></head></html>'
+        response.status_code = 200
+        response.headers = {"content-type": "text/html"}
+        response.iter_content.return_value = [response.content]
         response.raise_for_status.return_value = None
-        with patch.object(article_metadata, "tls_verify", return_value=True), patch.object(article_metadata.requests, "get", return_value=response) as get:
+        with patch.object(article_metadata, "assert_public_http_url", side_effect=lambda value: value), patch.object(article_metadata, "tls_verify", return_value=True), patch.object(article_metadata.requests, "get", return_value=response) as get:
             item = article_metadata.enrich_article_image_metadata({"link": response.url})
         self.assertEqual(item["top_image"], "https://publisher.example/image.jpg")
         self.assertIs(get.call_args.kwargs["verify"], True)

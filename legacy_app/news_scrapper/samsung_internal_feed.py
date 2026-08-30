@@ -12,8 +12,15 @@ import datetime as dt
 import json
 import os
 import re
+import threading
+from copy import deepcopy
 from pathlib import Path
 from typing import Iterable
+
+
+PROJECTION_CLASSIFIER_VERSION = "samsung-channels-v2"
+_PROJECTION_CACHE: dict[tuple, dict] = {}
+_PROJECTION_CACHE_LOCK = threading.Lock()
 
 
 SAMSUNG_LOCAL_SOURCE = re.compile(r"\bsamsung[\s_-]+(?:local|india)\b", re.I)
@@ -186,6 +193,18 @@ def _rank_deduplicate(records: Iterable[dict], limit: int) -> list[dict]:
     return sorted(best.values(), key=_rank_key, reverse=True)[:limit]
 
 
+def _projection_signature(paths: Iterable[str | os.PathLike[str]], limit: int) -> tuple:
+    files = []
+    for raw_path in paths:
+        path = Path(raw_path)
+        try:
+            stat = path.stat()
+            files.append((str(path.resolve()), stat.st_mtime_ns, stat.st_size))
+        except OSError:
+            files.append((str(path), 0, 0))
+    return (PROJECTION_CLASSIFIER_VERSION, int(limit), tuple(sorted(files)))
+
+
 def build_samsung_internal_feed(
     archive_files: Iterable[str | os.PathLike[str]],
     *,
@@ -200,7 +219,19 @@ def build_samsung_internal_feed(
     """
 
     safe_limit = max(1, min(int(limit), 100))
-    records, metadata = _read_archives(archive_files)
+    archive_paths = list(archive_files)
+    signature = _projection_signature(archive_paths, safe_limit)
+    with _PROJECTION_CACHE_LOCK:
+        cached = _PROJECTION_CACHE.get(signature)
+        if cached is not None:
+            result = deepcopy(cached)
+            result["projection_cache"] = {
+                "hit": True,
+                "classifier_version": PROJECTION_CLASSIFIER_VERSION,
+            }
+            return result
+
+    records, metadata = _read_archives(archive_paths)
     global_records: list[dict] = []
     local_records: list[dict] = []
     sampark_records: list[dict] = []
@@ -219,7 +250,7 @@ def build_samsung_internal_feed(
     global_ranked = _rank_deduplicate(global_records, safe_limit)
     local_ranked = _rank_deduplicate(local_records, safe_limit)
     sampark_ranked = _rank_deduplicate(sampark_records, safe_limit)
-    return {
+    result = {
         "status": "success",
         "source": "unified_retained_briefings",
         "limit_per_channel": safe_limit,
@@ -232,4 +263,12 @@ def build_samsung_internal_feed(
             "sampark": len(sampark_ranked),
         },
         "archive": metadata,
+        "projection_cache": {
+            "hit": False,
+            "classifier_version": PROJECTION_CLASSIFIER_VERSION,
+        },
     }
+    with _PROJECTION_CACHE_LOCK:
+        _PROJECTION_CACHE.clear()
+        _PROJECTION_CACHE[signature] = deepcopy(result)
+    return result

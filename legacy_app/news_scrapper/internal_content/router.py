@@ -7,7 +7,6 @@ viewers' drafts are indistinguishable from missing records (404).
 
 from __future__ import annotations
 
-import hashlib
 import os
 import secrets
 
@@ -15,8 +14,12 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, Response, Upl
 from fastapi.responses import FileResponse
 
 from news_scrapper.recommendation.identity import resolve_viewer
+from news_scrapper.access_control import service as access_service
+from core.request_limits import REQUEST_LIMITER
 from . import access, service, storage
 from .document_parser import ContributionError
+from .document_parser import DOCUMENT_MAX_BYTES
+from .image_processor import COVER_MAX_BYTES
 from .schemas import DraftUpdate, NotificationRead, ReviewNote, ReviewUnlock
 
 router = APIRouter(prefix="/internal-content", tags=["Internal Content"])
@@ -31,41 +34,60 @@ def _editor_key_expected() -> str:
     # Mirrors application.py's privileged-key chain: explicit editor key first,
     # then the Gatekeeper/Director settings, then the shared development
     # default. Production mode refuses short keys at startup.
-    return (
+    configured = (
         os.environ.get("INTERNAL_EDITOR_KEY")
         or os.environ.get("GATEKEEPER_KEY")
         or os.environ.get("DIRECTOR_KEY")
-        or "1357"
     )
+    if configured:
+        return configured
+    environment = os.environ.get("NEWSSCRAPPER_ENV", "development").strip().lower()
+    return "1357" if environment not in {"production", "prod"} else ""
 
 
 # The unlock cookie stores only a digest of the expected key. It is HttpOnly,
 # so page JavaScript (and therefore the inspector's storage pane) never sees
 # the key or its session marker.
-EDITOR_COOKIE = "internal_editor_session"
-EDITOR_COOKIE_MAX_AGE = 60 * 60 * 6
-
-
-def _editor_session_token() -> str:
-    return hashlib.sha256(_editor_key_expected().encode("utf-8")).hexdigest()
+EDITOR_COOKIE = access_service.PRIVILEGED_COOKIE
 
 
 def _editor_ok(request: Request) -> bool:
-    header_key = request.headers.get("x-editor-key", "")
-    if header_key and secrets.compare_digest(header_key, _editor_key_expected()):
+    if access_service.has_capability(request, "review.contributions.view"):
         return True
-    cookie = request.cookies.get(EDITOR_COOKIE, "")
-    if not cookie:
-        return False
-    try:
-        return secrets.compare_digest(cookie, _editor_session_token())
-    except Exception:
-        return False
+    header_key = request.headers.get("x-editor-key", "")
+    expected = _editor_key_expected()
+    if expected and header_key and secrets.compare_digest(header_key, expected):
+        return True
+    return False
 
 
 def _require_editor(request: Request) -> None:
     if not _editor_ok(request):
-        raise HTTPException(status_code=401, detail="A valid editor key is required.")
+        raise HTTPException(status_code=403, detail="Contribution review access is required.")
+
+
+def _require_publisher(request: Request) -> None:
+    if access_service.has_capability(request, "review.contributions.publish"):
+        return
+    expected = _editor_key_expected()
+    header_key = request.headers.get("x-editor-key", "")
+    if not expected or not header_key or not secrets.compare_digest(header_key, expected):
+        raise HTTPException(status_code=403, detail="Contribution publishing access is required.")
+
+
+async def _read_upload_limited(upload: UploadFile, maximum: int, label: str) -> bytes:
+    chunks = bytearray()
+    while True:
+        chunk = await upload.read(min(1024 * 1024, maximum + 1 - len(chunks)))
+        if not chunk:
+            break
+        chunks.extend(chunk)
+        if len(chunks) > maximum:
+            raise HTTPException(
+                status_code=413,
+                detail=f"The {label} is larger than the permitted upload limit.",
+            )
+    return bytes(chunks)
 
 
 def _fail(error: Exception) -> HTTPException:
@@ -77,7 +99,7 @@ def _fail(error: Exception) -> HTTPException:
 @router.get("/contribute-access")
 def contribution_access(request: Request):
     ip = access.get_client_ip(request)
-    return {"allowed": ip in access.CONTRIBUTIONS_ALLOWED_IPS, "ip": ip}
+    return {"allowed": access.is_contributor_ip(request), "ip": ip}
 
 
 @router.get("/mine")
@@ -98,7 +120,10 @@ async def import_document(
     content_type: str = Form(default=""),
 ):
     access.require_contributor_ip(request)
-    data = await document.read()
+    REQUEST_LIMITER.check(
+        "contribution.import", access.get_client_ip(request), limit=20, window_seconds=60 * 60
+    )
+    data = await _read_upload_limited(document, DOCUMENT_MAX_BYTES, "document")
     if not data:
         raise HTTPException(status_code=400, detail="Choose a PDF or Word (.docx) document to import.")
     try:
@@ -150,29 +175,31 @@ def review_queue(request: Request):
 
 @router.post("/review/unlock")
 def unlock_review(request: Request, response: Response, payload: ReviewUnlock):
+    REQUEST_LIMITER.check(
+        "privileged.unlock", access.get_client_ip(request), limit=10, window_seconds=15 * 60
+    )
     provided = str(payload.key or "")
-    if not provided or not secrets.compare_digest(provided, _editor_key_expected()):
-        raise HTTPException(status_code=401, detail="That key was not accepted.")
-    response.set_cookie(
-        key=EDITOR_COOKIE,
-        value=_editor_session_token(),
-        httponly=True,
-        samesite="strict",
-        max_age=EDITOR_COOKIE_MAX_AGE,
-        path="/internal-content",
+    expected = _editor_key_expected()
+    if not expected or not provided or not secrets.compare_digest(provided, expected):
+        raise HTTPException(status_code=403, detail="That key was not accepted.")
+    access_service.create_privileged_session(
+        request,
+        response,
+        {"review.contributions.view", "review.contributions.publish"},
+        role="editor",
     )
     return {"unlocked": True}
 
 
 @router.post("/review/lock")
-def lock_review(response: Response):
-    response.delete_cookie(key=EDITOR_COOKIE, path="/internal-content")
+def lock_review(request: Request, response: Response):
+    access_service.revoke_privileged_session(request, response)
     return {"unlocked": False}
 
 
 @router.post("/{record_id}/publish")
 def publish_one(record_id: str, request: Request):
-    _require_editor(request)
+    _require_publisher(request)
     try:
         return service.publish_record(record_id)
     except ContributionError as error:
@@ -183,7 +210,7 @@ def publish_one(record_id: str, request: Request):
 
 @router.post("/{record_id}/changes")
 def request_changes_one(record_id: str, request: Request, payload: ReviewNote):
-    _require_editor(request)
+    _require_publisher(request)
     try:
         return service.request_changes(record_id, payload.note)
     except ContributionError as error:
@@ -194,7 +221,7 @@ def request_changes_one(record_id: str, request: Request, payload: ReviewNote):
 
 @router.post("/{record_id}/reject")
 def reject_one(record_id: str, request: Request, payload: ReviewNote):
-    _require_editor(request)
+    _require_publisher(request)
     try:
         return service.reject_record(record_id, payload.note)
     except ContributionError as error:
@@ -240,12 +267,50 @@ def update_one(record_id: str, request: Request, response: Response, payload: Dr
 def delete_one(record_id: str, request: Request, response: Response):
     access.require_contributor_ip(request)
     try:
-        deleted = service.delete_draft(_owner(request, response), record_id)
+        deleted = service.delete_owned_record(_owner(request, response), record_id)
     except ContributionError as error:
         raise _fail(error) from error
     except LookupError as error:
         raise _fail(error) from error
     return {"deleted": deleted}
+
+
+@router.post("/{record_id}/withdraw")
+def withdraw_one(record_id: str, request: Request, response: Response):
+    access.require_contributor_ip(request)
+    try:
+        return service.withdraw_submission(_owner(request, response), record_id)
+    except ContributionError as error:
+        raise _fail(error) from error
+    except LookupError as error:
+        raise _fail(error) from error
+
+
+@router.post("/{record_id}/archive")
+def archive_one(record_id: str, request: Request):
+    _require_publisher(request)
+    try:
+        return service.archive_record(record_id)
+    except (ContributionError, LookupError) as error:
+        raise _fail(error) from error
+
+
+@router.post("/{record_id}/restore")
+def restore_one(record_id: str, request: Request):
+    _require_publisher(request)
+    try:
+        return service.restore_record(record_id)
+    except (ContributionError, LookupError) as error:
+        raise _fail(error) from error
+
+
+@router.delete("/{record_id}/permanent")
+def permanent_delete_one(record_id: str, request: Request):
+    access_service.require_capability(request, "access.manage")
+    try:
+        return {"deleted": service.permanently_delete(record_id)}
+    except LookupError as error:
+        raise _fail(error) from error
 
 
 @router.post("/{record_id}/submit")
@@ -269,7 +334,10 @@ async def upload_cover(
     focal_y: float = Form(default=0.5),
 ):
     access.require_contributor_ip(request)
-    data = await cover.read()
+    REQUEST_LIMITER.check(
+        "contribution.cover", access.get_client_ip(request), limit=30, window_seconds=60 * 60
+    )
+    data = await _read_upload_limited(cover, COVER_MAX_BYTES, "cover image")
     if not data:
         raise HTTPException(status_code=400, detail="Choose a JPG, PNG, or WebP image for the cover.")
     try:

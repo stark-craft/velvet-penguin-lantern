@@ -464,8 +464,11 @@ class InternalContentTests(unittest.TestCase):
         })
         self.assertEqual(edit_attempt.status_code, 400)
         delete_attempt = owner.request("DELETE", f"/internal-content/{submitted['id']}")
-        self.assertEqual(delete_attempt.status_code, 400)
-        self.assertIn("review trail", delete_attempt.json()["detail"])
+        self.assertEqual(delete_attempt.status_code, 200)
+        self.assertEqual(
+            owner.request("GET", f"/internal-content/{submitted['id']}").status_code,
+            404,
+        )
 
     # -- editorial review (privileged) -------------------------------------
 
@@ -483,9 +486,9 @@ class InternalContentTests(unittest.TestCase):
         record = self._submit_story(owner)
 
         missing = owner.request("GET", "/internal-content/review")
-        self.assertEqual(missing.status_code, 401)
+        self.assertEqual(missing.status_code, 403)
         wrong = owner.request("GET", "/internal-content/review", headers={"x-editor-key": "wrong-key"})
-        self.assertEqual(wrong.status_code, 401)
+        self.assertEqual(wrong.status_code, 403)
 
         with patch.dict(os.environ, {"INTERNAL_EDITOR_KEY": self.EDITOR_KEY}):
             listing = owner.request(
@@ -537,6 +540,97 @@ class InternalContentTests(unittest.TestCase):
             json_body={"ids": [inbox["items"][0]["id"]]},
         )
         self.assertEqual(marked.json()["unread"], 0)
+
+    def test_author_can_permanently_delete_published_contribution(self):
+        owner = ApiClient()
+        record = self._submit_story(owner, title="Remove published story")
+        with patch.dict(os.environ, {"INTERNAL_EDITOR_KEY": self.EDITOR_KEY}):
+            published = owner.request(
+                "POST", f"/internal-content/{record['id']}/publish",
+                headers={"x-editor-key": self.EDITOR_KEY},
+            )
+        self.assertEqual(published.status_code, 200)
+        self.assertEqual(
+            owner.request("GET", f"/internal-content/published/{record['id']}").status_code,
+            200,
+        )
+        self.assertEqual(
+            owner.request("GET", "/internal-content/notifications").json()["unread"],
+            1,
+        )
+
+        deleted = owner.request("DELETE", f"/internal-content/{record['id']}")
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json(), {"deleted": True})
+        self.assertEqual(
+            owner.request("GET", f"/internal-content/published/{record['id']}").status_code,
+            404,
+        )
+        self.assertEqual(owner.request("GET", "/internal-content/mine").json()["items"], [])
+        self.assertEqual(
+            owner.request("GET", "/internal-content/notifications").json()["items"],
+            [],
+        )
+
+    def test_author_can_withdraw_submission_and_resume_editing(self):
+        owner = ApiClient()
+        record = self._submit_story(owner, title="Withdrawable story")
+
+        withdrawn = owner.request("POST", f"/internal-content/{record['id']}/withdraw")
+        self.assertEqual(withdrawn.status_code, 200)
+        self.assertEqual(withdrawn.json()["status"], "withdrawn")
+        self.assertTrue(withdrawn.json()["withdrawn_at"])
+
+        revised = owner.request("PUT", f"/internal-content/{record['id']}", json_body={
+            "title": "Revised after withdrawal",
+            "body": "The author can safely continue editing this withdrawn submission.",
+        })
+        self.assertEqual(revised.status_code, 200)
+        self.assertEqual(revised.json()["title"], "Revised after withdrawal")
+
+    def test_editor_archive_and_restore_preserve_published_record(self):
+        owner = ApiClient()
+        record = self._submit_story(owner, title="Archive lifecycle story")
+        with patch.dict(os.environ, {"INTERNAL_EDITOR_KEY": self.EDITOR_KEY}):
+            published = owner.request(
+                "POST", f"/internal-content/{record['id']}/publish",
+                headers={"x-editor-key": self.EDITOR_KEY},
+            )
+            self.assertEqual(published.status_code, 200)
+            archived = owner.request(
+                "POST", f"/internal-content/{record['id']}/archive",
+                headers={"x-editor-key": self.EDITOR_KEY},
+            )
+            self.assertEqual(archived.status_code, 200)
+            self.assertEqual(archived.json()["status"], "archived")
+            self.assertEqual(owner.request("GET", f"/internal-content/published/{record['id']}").status_code, 404)
+
+            restored = owner.request(
+                "POST", f"/internal-content/{record['id']}/restore",
+                headers={"x-editor-key": self.EDITOR_KEY},
+            )
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(restored.json()["status"], "published")
+        self.assertEqual(owner.request("GET", f"/internal-content/published/{record['id']}").status_code, 200)
+
+    def test_expired_publication_disappears_without_deleting_author_record(self):
+        owner = ApiClient()
+        record = self._submit_story(
+            owner,
+            title="Expired announcement",
+            content_type="announcement",
+            expires_at="2020-01-01T00:00:00Z",
+        )
+        with patch.dict(os.environ, {"INTERNAL_EDITOR_KEY": self.EDITOR_KEY}):
+            published = owner.request(
+                "POST", f"/internal-content/{record['id']}/publish",
+                headers={"x-editor-key": self.EDITOR_KEY},
+            )
+        self.assertEqual(published.status_code, 200)
+        self.assertEqual(published.json()["status"], "published")
+        self.assertEqual(owner.request("GET", f"/internal-content/published/{record['id']}").status_code, 404)
+        mine = {item["id"]: item for item in owner.request("GET", "/internal-content/mine").json()["items"]}
+        self.assertEqual(mine[record["id"]]["status"], "published")
 
     def test_public_reader_rejects_drafts_and_missing_records(self):
         owner = ApiClient()
@@ -626,7 +720,7 @@ class InternalContentTests(unittest.TestCase):
         record = self._submit_story(owner)
 
         wrong = owner.request("POST", "/internal-content/review/unlock", json_body={"key": "nope"})
-        self.assertEqual(wrong.status_code, 401)
+        self.assertEqual(wrong.status_code, 403)
 
         # The whole session lives under one stable server configuration.
         with patch.dict(os.environ, {"INTERNAL_EDITOR_KEY": self.EDITOR_KEY}):
@@ -646,7 +740,7 @@ class InternalContentTests(unittest.TestCase):
             locked = owner.request("POST", "/internal-content/review/lock")
         self.assertEqual(locked.status_code, 200)
         denied = owner.request("GET", "/internal-content/review")
-        self.assertEqual(denied.status_code, 401)
+        self.assertEqual(denied.status_code, 403)
 
     # -- leadership channel -------------------------------------------------
 

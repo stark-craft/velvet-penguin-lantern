@@ -6,6 +6,8 @@ import { getFingerprint, getSessionId } from './utils/session.js';
 // that owns the endpoints. Baking localhost or a machine name into the bundle
 // would make a copied Windows build call the viewer's own PC instead.
 const BASE = '';
+const GET_CACHE = new Map();
+const GET_IN_FLIGHT = new Map();
 
 function selectedProfileOverride() {
   if (typeof window === 'undefined') return '';
@@ -26,7 +28,55 @@ async function jsonFetch(url, opts = {}) {
       ...(opts.headers || {}),
     },
   });
-  return readApiResponse(res);
+  const body = await readApiResponse(res);
+  if (String(opts.method || 'GET').toUpperCase() !== 'GET') {
+    GET_CACHE.clear();
+  }
+  return body;
+}
+
+function abortableSharedPromise(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(new DOMException('Request aborted', 'AbortError'));
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      signal.addEventListener('abort', () => reject(new DOMException('Request aborted', 'AbortError')), { once: true });
+    }),
+  ]);
+}
+
+/**
+ * Tiny same-origin stale-while-revalidate cache for read-heavy product data.
+ * Shared in-flight promises deduplicate route switches. A caller can stop
+ * waiting with AbortController without cancelling another screen's request.
+ */
+async function cachedJsonFetch(url, { staleMs = 30_000, maxStaleMs = 5 * 60_000, signal } = {}) {
+  const now = Date.now();
+  const cached = GET_CACHE.get(url);
+  const age = cached ? now - cached.savedAt : Number.POSITIVE_INFINITY;
+  if (cached && age <= staleMs) return cached.data;
+
+  const refresh = () => {
+    if (GET_IN_FLIGHT.has(url)) return GET_IN_FLIGHT.get(url);
+    const request = jsonFetch(url)
+      .then((data) => {
+        GET_CACHE.set(url, { data, savedAt: Date.now() });
+        if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sense-api-cache-update', { detail: { url, data } }));
+        }
+        return data;
+      })
+      .finally(() => GET_IN_FLIGHT.delete(url));
+    GET_IN_FLIGHT.set(url, request);
+    return request;
+  };
+
+  if (cached && age <= maxStaleMs) {
+    refresh().catch(() => {});
+    return cached.data;
+  }
+  return abortableSharedPromise(refresh(), signal);
 }
 
 // Same-origin multipart upload. The browser supplies the Content-Type with its
@@ -78,11 +128,11 @@ function normalizeKeywordsForApi(keywords) {
 }
 
 // ---------- Briefing / feed ----------
-export const getLatestBriefing = () => jsonFetch('/latest-briefing');
-export const getSharedBriefing = () => jsonFetch('/briefing/shared/latest');
+export const getLatestBriefing = () => cachedJsonFetch('/latest-briefing', { staleMs: 30_000 });
+export const getSharedBriefing = () => cachedJsonFetch('/briefing/shared/latest', { staleMs: 30_000 });
 export const getSamsungInternalFeed = (limit = 100) =>
-  jsonFetch(`/internal-content/samsung-feed?limit=${Math.max(1, Math.min(Number(limit) || 100, 100))}`);
-export const getBriefingMeta   = () => jsonFetch('/briefing/meta');
+  cachedJsonFetch(`/internal-content/samsung-feed?limit=${Math.max(1, Math.min(Number(limit) || 100, 100))}`, { staleMs: 60_000 });
+export const getBriefingMeta   = () => cachedJsonFetch('/briefing/meta', { staleMs: 30_000 });
 export const removeFromBriefing  = (title)   => jsonFetch('/briefing/remove',  { method:'POST', body: JSON.stringify({ title }) });
 export const restoreToBriefing   = (article) => jsonFetch('/briefing/restore', { method:'POST', body: JSON.stringify({ article }) });
 export const getInsight = (article) => jsonFetch('/insight', { method:'POST', body: JSON.stringify(article) });
@@ -204,7 +254,7 @@ export const resetViewerPersonalization = () =>
   jsonFetch('/viewer/personalization/reset', { method: 'POST' });
 
 // ---------- Explainable For You ----------
-export const getRecommendationStatus = () => jsonFetch('/viewer/recommendation-status');
+export const getRecommendationStatus = () => cachedJsonFetch('/viewer/recommendation-status', { staleMs: 60_000 });
 export const getViewerPreferences = () => jsonFetch('/viewer/preferences');
 export const updateViewerPreferences = (preferences) =>
   jsonFetch('/viewer/preferences', { method: 'PUT', body: JSON.stringify(preferences) });
@@ -280,7 +330,7 @@ export const addSite  = (site) => jsonFetch('/sites', { method:'POST', body: JSO
 // ---------- History ----------
 export function getHistoryList() {
   const u = new URLSearchParams({ session_id: getSessionId() });
-  return jsonFetch('/history/list?' + u.toString());
+  return cachedJsonFetch('/history/list?' + u.toString(), { staleMs: 30_000 });
 }
 
 export function getHistoryFile(filename) {
@@ -297,9 +347,9 @@ export const trackEvent = (fingerprint, action, detail) =>
   jsonFetch('/track', { method:'POST', body: JSON.stringify({ fingerprint, action, detail }) });
 
 // ---------- Status ----------
-export const getStatus = () => jsonFetch('/status');
+export const getStatus = () => cachedJsonFetch('/status', { staleMs: 10_000, maxStaleMs: 30_000 });
 export const getProfile = () => jsonFetch('/profile');
-export const getViewerProfile = () => jsonFetch('/viewer/profile');
+export const getViewerProfile = () => cachedJsonFetch('/viewer/profile', { staleMs: 60_000 });
 export const updateViewerProfile = (profile) =>
   jsonFetch('/viewer/profile', {
     method: 'POST',
@@ -313,12 +363,12 @@ export const updateViewerProfile = (profile) =>
 export const getAnalyticsAccess = () => jsonFetch('/analytics/access');
 export const getTrendsAccess = () => jsonFetch('/trends/access');
 export const getAnalytics = (key) => {
-  const u = new URLSearchParams({ key });
-  return jsonFetch('/analytics?' + u.toString());
+  const normalized = String(key || '').trim();
+  return jsonFetch(normalized ? `/analytics?${new URLSearchParams({ key: normalized }).toString()}` : '/analytics');
 };
 export const getRecommendationAnalytics = (key) => {
-  const u = new URLSearchParams({ key });
-  return jsonFetch('/analytics/recommendation-summary?' + u.toString());
+  const normalized = String(key || '').trim();
+  return jsonFetch(normalized ? `/analytics/recommendation-summary?${new URLSearchParams({ key: normalized }).toString()}` : '/analytics/recommendation-summary');
 };
 
 // ---------- Gatekeeper Review ----------
@@ -356,6 +406,11 @@ export const rejectInternalContent = (recordId, note = '') =>
     body: JSON.stringify({ note: String(note || '') }),
   });
 
+// Published notices are removed through the reversible archive transition.
+// The permanent-delete endpoint is intentionally reserved for access admins.
+export const archiveInternalContent = (recordId) =>
+  jsonFetch(`/internal-content/${recordId}/archive`, { method: 'POST' });
+
 export const getInternalNotifications = () => jsonFetch('/internal-content/notifications');
 
 export const markInternalNotificationsRead = (ids) =>
@@ -365,6 +420,22 @@ export const markInternalNotificationsRead = (ids) =>
   });
 
 export const getGatekeeperAccess = () => jsonFetch('/gatekeeper/access');
+
+// ---------- Capability authorization / operations ----------
+export const getAccessCapabilities = () => jsonFetch('/access-control/capabilities');
+export const unlockCapabilitySession = (role, key) => jsonFetch('/access-control/session/unlock', {
+  method: 'POST',
+  body: JSON.stringify({ role: String(role || ''), key: String(key || '') }),
+});
+export const logoutCapabilitySession = () => jsonFetch('/access-control/session/logout', { method: 'POST' });
+export const getAccessPrincipals = () => jsonFetch('/access-control/principals');
+export const updateAccessPrincipal = (principal, record) => jsonFetch(`/access-control/principals/${encodeURIComponent(principal)}`, {
+  method: 'PUT',
+  body: JSON.stringify(record || {}),
+});
+export const getAccessAudit = (limit = 200) => jsonFetch(`/access-control/audit?limit=${Math.max(1, Math.min(Number(limit) || 200, 1000))}`);
+export const getSchedulerStatus = () => cachedJsonFetch('/scheduler/status', { staleMs: 10_000, maxStaleMs: 30_000 });
+export const runSchedulerNow = () => jsonFetch('/scheduler/run', { method: 'POST' });
 
 export function getGatekeeperDropped({
   key,
@@ -630,7 +701,7 @@ export const uploadContributionCover = async (id, file, focalX = 0.5, focalY = 0
   return fromBackendRecord(await uploadFetch(`/internal-content/${id}/cover`, form));
 };
 
-export const deleteContributionDraft = (id) => jsonFetch(`/internal-content/${id}`, { method: 'DELETE' });
+export const deleteContributionRecord = (id) => jsonFetch(`/internal-content/${id}`, { method: 'DELETE' });
 
 export const submitContributionDraft = async (id) =>
   fromBackendRecord(await jsonFetch(`/internal-content/${id}/submit`, { method: 'POST' }));

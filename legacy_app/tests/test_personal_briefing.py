@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from core.storage import JsonStore
+from core import network_safety
 from news_scrapper import application
 
 
@@ -31,7 +32,7 @@ def request_from(ip="10.0.0.25"):
 class PersonalBriefingTests(unittest.TestCase):
     def test_private_network_urls_are_rejected(self):
         with patch.object(
-            application.socket,
+            network_safety.socket,
             "getaddrinfo",
             return_value=[(None, None, None, None, ("127.0.0.1", 443))],
         ):

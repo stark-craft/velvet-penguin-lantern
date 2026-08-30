@@ -20,6 +20,8 @@ export default function WorkflowBriefingCard({
   onOpen,
   onApprove,
   onRemove,
+  canApprove = true,
+  canRemove = true,
   busyAction = '',
 }) {
   const approved = mode === 'approved';
@@ -76,14 +78,14 @@ export default function WorkflowBriefingCard({
         <button className="btn-dark-secondary" onClick={() => onOpen(item)} type="button">
           <Icon name="file" size={14} /> Open Dossier
         </button>
-        {!approved && (
+        {!approved && canApprove && (
           <button className="btn-dark-primary" disabled={Boolean(busyAction)} onClick={() => onApprove(item)} type="button">
             <Icon name="shield" size={14} /> {busyAction === 'approve' ? 'Approving…' : 'Approve'}
           </button>
         )}
-        <button className="workflow-brief-remove" disabled={Boolean(busyAction)} onClick={() => onRemove(item)} type="button">
+        {canRemove && <button className="workflow-brief-remove" disabled={Boolean(busyAction)} onClick={() => onRemove(item)} type="button">
           {busyAction === 'remove' ? 'Removing…' : approved ? 'Remove approval' : 'Remove'}
-        </button>
+        </button>}
       </footer>
     </article>
   );

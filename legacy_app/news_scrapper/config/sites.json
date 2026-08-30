@@ -120,6 +120,27 @@
     "legacy_profile": "default"
   },
   {
+    "name": "Samsung India Newsroom",
+    "url": "https://news.samsung.com/in",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/in/feed/rss",
+    "category": "Samsung / Local India",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "be05a0f6293c683156",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "lookback_days": 7,
+    "legacy_profile": "default"
+  },
+  {
     "name": "AnandTech",
     "url": "https://www.anandtech.com",
     "domain": "anandtech.com",

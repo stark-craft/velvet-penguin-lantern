@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import logging
+import warnings
 
 from PIL import Image, ImageOps
 
@@ -19,6 +20,7 @@ from .document_parser import ContributionError
 logger = logging.getLogger(__name__)
 
 COVER_MAX_BYTES = 10 * 1024 * 1024
+COVER_MAX_PIXELS = 40_000_000
 ALLOWED_FORMATS = {"JPEG", "PNG", "WEBP"}
 MIN_CROP_WIDTH = 960
 MIN_CROP_HEIGHT = 540
@@ -42,8 +44,17 @@ def normalize_cover(data: bytes, filename: str, focal_x: float = 0.5, focal_y: f
     """
 
     try:
-        image = Image.open(io.BytesIO(data))
-        image_format = (image.format or "").upper()
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            image = Image.open(io.BytesIO(data))
+            image_format = (image.format or "").upper()
+            width, height = image.size
+            if width <= 0 or height <= 0 or width * height > COVER_MAX_PIXELS:
+                raise ContributionError(
+                    "This image has too many pixels to process safely. Choose a smaller image."
+                )
+    except ContributionError:
+        raise
     except Exception as error:  # noqa: BLE001 - Pillow raises many internal types
         logger.warning("[internal-content] cover open failed for %s: %s", filename, error)
         raise ContributionError(

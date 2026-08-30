@@ -13,6 +13,7 @@ from fastapi import HTTPException, Request
 
 from core.profile import client_ip as resolve_client_ip
 from core.profile import normalize_ip
+from news_scrapper.access_control import service as capability_service
 
 
 def _ip_set(value: str | None, default: str = "") -> set[str]:
@@ -42,12 +43,17 @@ def get_client_ip(request: Request) -> str:
 
 
 def is_contributor_ip(request: Request) -> bool:
-    return get_client_ip(request) in CONTRIBUTIONS_ALLOWED_IPS
+    return (
+        get_client_ip(request) in CONTRIBUTIONS_ALLOWED_IPS
+        or capability_service.has_capability(request, "contributions.create")
+    )
 
 
 def require_contributor_ip(request: Request) -> str:
     ip = get_client_ip(request)
-    if ip not in CONTRIBUTIONS_ALLOWED_IPS:
+    if ip not in CONTRIBUTIONS_ALLOWED_IPS and not capability_service.has_capability(
+        request, "contributions.create"
+    ):
         raise HTTPException(
             status_code=403,
             detail="Contributions are not enabled for this network.",

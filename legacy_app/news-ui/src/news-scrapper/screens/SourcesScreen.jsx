@@ -37,7 +37,7 @@ function groupByCategory(sources) {
   }, {});
 }
 
-export default function SourcesScreen() {
+export default function SourcesScreen({ canManage = false }) {
   const [sites, setSites] = useState([]);
   const [loading, setLoad] = useState(true);
   const [form, setForm] = useState({ name: '', url: '', category: '', profile: 'Default' });
@@ -132,7 +132,7 @@ export default function SourcesScreen() {
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Source Control</div>
             <h1 className="mt-2 text-3xl font-semibold text-white sm:text-5xl">Manage intelligence sources</h1>
-            <p className="mt-3 text-slate-400">RSS and news sources used by scheduled scans. Sources can be added, not deleted.</p>
+            <p className="mt-3 text-slate-400">RSS and news sources used by scheduled scans. {canManage ? 'Your role can update this catalog.' : 'This is a read-only view for your role.'}</p>
           </div>
           <button className="btn-dark-secondary" disabled={loading} onClick={refresh} type="button">
             <Icon name="refresh" /> {loading ? 'Refreshing…' : 'Refresh'}
@@ -147,7 +147,7 @@ export default function SourcesScreen() {
         <div className="signal-stat"><span>Failed</span><strong>{failed}</strong></div>
       </section>
 
-      <section className="source-add-panel workspace-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
+      {canManage && <section className="source-add-panel workspace-panel rounded-[24px] border border-white/10 bg-[#101827]/80 p-5">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-lg font-semibold text-white">
             <Icon name="plus" /> Add Intelligence Source
@@ -184,7 +184,7 @@ export default function SourcesScreen() {
         )}
         {formError && <div className="mt-3 text-sm text-red-300" role="alert">{formError}</div>}
         {notice && <div className="mt-3 text-sm text-emerald-300" role="status">{notice}</div>}
-      </section>
+      </section>}
 
       <section className="source-filter-panel rounded-[22px] border border-white/10 bg-white/[0.035] p-4">
         <input className="dark-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search sources..." />
@@ -217,9 +217,9 @@ export default function SourcesScreen() {
           <p className="mt-2 text-slate-400">{sites.length ? 'Clear the search or select All to restore the catalog.' : 'Add the first source to include it in a future scan.'}</p>
           {sites.length ? (
             <button className="btn-dark-secondary mt-5" onClick={() => { setQuery(''); setFilter('All'); }} type="button">Clear filters</button>
-          ) : (
+          ) : canManage ? (
             <button className="btn-dark-primary mt-5" onClick={() => setAddOpen(true)} type="button"><Icon name="plus" size={15} /> Add first source</button>
-          )}
+          ) : <span className="mt-5 block text-sm text-slate-500">No sources are currently available.</span>}
         </div>
       ) : (
         <section className="source-groups space-y-8">

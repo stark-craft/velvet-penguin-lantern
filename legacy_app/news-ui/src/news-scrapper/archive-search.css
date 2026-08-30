@@ -408,3 +408,4 @@ html[data-theme="light"] .scan-tour-scrim {
     transition: none;
   }
 }
+.scan-pagination{display:flex;align-items:center;justify-content:center;gap:1rem;margin:1.2rem 0 .2rem;color:var(--text-muted);font-size:.8rem}.scan-pagination button{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--line);border-radius:999px;background:var(--surface-soft);padding:.55rem .8rem;color:var(--text);font-weight:750}.scan-pagination button:hover:not(:disabled){border-color:var(--accent-line);background:var(--surface-strong)}.scan-pagination button:disabled{opacity:.38;cursor:not-allowed}

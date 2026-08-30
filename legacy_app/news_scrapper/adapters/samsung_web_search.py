@@ -5,13 +5,14 @@ from __future__ import annotations
 import os
 import re
 import time
-from urllib.parse import urlparse, urlsplit, urlunsplit
+from urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
 
 import requests
 from newspaper import Article
 
 from core.rate_limit import PacedRateLimiter
 from core.secure_http import tls_verify
+from core.network_safety import assert_public_http_url
 
 
 ENDPOINT = (
@@ -22,6 +23,10 @@ ENDPOINT = (
 TIMEOUT = int(os.environ.get("SAMSUNG_WEB_SEARCH_TIMEOUT", "90"))
 ARTICLE_FETCH_TIMEOUT = int(
     os.environ.get("SAMSUNG_WEB_SEARCH_ARTICLE_FETCH_TIMEOUT", "30")
+)
+ARTICLE_FETCH_MAX_BYTES = max(
+    250_000,
+    int(os.environ.get("SAMSUNG_WEB_SEARCH_ARTICLE_FETCH_MAX_BYTES", "5000000")),
 )
 DEBUG = os.environ.get("SAMSUNG_WEB_SEARCH_DEBUG", "false").lower() in {"1", "true", "yes"}
 REQUESTS_PER_MINUTE = min(
@@ -136,23 +141,46 @@ def safe_error_excerpt(response, limit: int = 1200) -> str:
 def fetch_exact_article_content(url: str) -> dict:
     """Complete a snippet-only reference by fetching only its exact URL."""
 
-    response = requests.get(
-        url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 Chrome/124 Safari/537.36"
-            )
-        },
-        timeout=ARTICLE_FETCH_TIMEOUT,
-        verify=tls_verify("SAMSUNG_WEB_SEARCH"),
-    )
+    current_url = assert_public_http_url(url)
+    response = None
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 Chrome/124 Safari/537.36"
+        )
+    }
+    for _ in range(5):
+        response = requests.get(
+            current_url,
+            headers=headers,
+            timeout=ARTICLE_FETCH_TIMEOUT,
+            verify=tls_verify("SAMSUNG_WEB_SEARCH"),
+            allow_redirects=False,
+            stream=True,
+        )
+        if response.status_code in {301, 302, 303, 307, 308}:
+            location = response.headers.get("location", "")
+            if not location:
+                raise RuntimeError("exact article redirect omitted its destination")
+            current_url = assert_public_http_url(urljoin(current_url, location))
+            continue
+        break
+    if response is None:
+        raise RuntimeError("exact article fetch returned no response")
     if response.status_code >= 400:
         raise RuntimeError(
             f"exact article fetch returned HTTP {response.status_code}"
         )
-    article = Article(url=url)
-    article.set_html(response.text)
+    content_type = str(response.headers.get("content-type", "")).lower()
+    if content_type and "html" not in content_type:
+        raise RuntimeError("exact article fetch did not return HTML")
+    body = bytearray()
+    for chunk in response.iter_content(chunk_size=64 * 1024):
+        body.extend(chunk)
+        if len(body) > ARTICLE_FETCH_MAX_BYTES:
+            raise RuntimeError("exact article fetch exceeded the safe size limit")
+    article = Article(url=current_url)
+    article.set_html(bytes(body).decode(response.encoding or "utf-8", errors="replace"))
     article.parse()
     text = clean_text(article.text)
     if len(text) < 200:

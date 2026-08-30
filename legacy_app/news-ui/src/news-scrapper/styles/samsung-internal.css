@@ -1211,17 +1211,32 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
   animation: sni-announcement-flow 32s linear infinite;
 }
 
+.sni-announcement-entry {
+  display: flex;
+  min-width: min(410px, 70vw);
+  align-items: stretch;
+  border-right: 1px solid color-mix(in srgb, #e59466 26%, var(--theme-border));
+}
+.sni-wire-announcements.is-manageable .sni-announcement-window{overflow-x:auto;scrollbar-width:thin}
+.sni-wire-announcements.is-manageable .sni-announcement-track{width:max-content;min-width:100%}
+.sni-wire-announcements.is-manageable .sni-announcement-entry{min-width:286px}
+.sni-wire-announcements.is-manageable .sni-announcement-item{gap:7px;padding:0 8px}
+.sni-wire-announcements.is-manageable .sni-announcement-item>span{display:none}
+.sni-wire-announcements.is-manageable .sni-announcement-item strong{max-width:13ch}
+.sni-wire-announcements.is-manageable .sni-announcement-item time{display:none}
+
 .sni-wire-announcements.is-paused .sni-announcement-track { animation-play-state: paused; }
 .sni-wire-announcements.is-static .sni-announcement-track { width: 100%; animation: none; }
 
 .sni-announcement-item {
   display: inline-flex;
-  min-width: min(360px, 66vw);
+  min-width: 0;
+  flex: 1 1 auto;
   align-items: center;
   gap: 13px;
   padding: 0 16px;
   border: 0;
-  border-right: 1px solid color-mix(in srgb, #e59466 26%, var(--theme-border));
+  border-right: 0;
   background: transparent;
   color: inherit;
   cursor: pointer;
@@ -1233,6 +1248,27 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 .sni-announcement-item span { color: color-mix(in srgb, #d67a4e 80%, var(--text)); font-size: 7px; font-weight: 850; letter-spacing: 0.15em; text-transform: uppercase; }
 .sni-announcement-item strong { max-width: 32ch; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .sni-announcement-item time { margin-left: auto; color: var(--text-muted); font-size: 8px; white-space: nowrap; }
+
+.sni-announcement-remove {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  margin: 5px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, #df735f 34%, var(--theme-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, #b54d42 8%, transparent);
+  color: color-mix(in srgb, #df735f 82%, var(--text));
+  font-size: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.sni-announcement-remove:hover,.sni-announcement-remove:focus-visible{background:color-mix(in srgb,#b54d42 17%,transparent);outline:2px solid color-mix(in srgb,#df735f 46%,transparent);outline-offset:1px}
+.sni-announcement-remove:disabled{cursor:wait;opacity:.58}
+
+.sni-management-feedback{margin:0;padding:10px 14px;border:1px solid color-mix(in srgb,#5bc9a5 32%,var(--theme-border));border-radius:13px;background:color-mix(in srgb,#5bc9a5 8%,var(--surface));color:var(--text);font-size:11px}
+.sni-management-feedback.is-error{border-color:color-mix(in srgb,#df735f 40%,var(--theme-border));background:color-mix(in srgb,#df735f 8%,var(--surface))}
 
 @keyframes sni-announcement-flow { to { transform: translateX(-50%); } }
 
@@ -1337,9 +1373,8 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
   box-shadow: var(--shadow-lg, 0 24px 70px rgba(0, 0, 0, 0.2));
 }
 
-.sni-wire > header { display: flex; align-items: center; justify-content: space-between; padding: 22px 22px 16px; border-bottom: 1px solid var(--theme-border); }
-.sni-wire > header span { color: var(--theme-accent, #6f9ae0); font-size: 9px; font-weight: 800; letter-spacing: 0.22em; text-transform: uppercase; }
-.sni-wire > header h2 { margin: 5px 0 0; color: var(--text); font-size: clamp(1.05rem, 1.3vw, 1.35rem); letter-spacing: -0.02em; }
+.sni-wire > header { display: flex; min-height: 46px; align-items: center; justify-content: space-between; padding: 11px 20px; border-bottom: 1px solid var(--theme-border); }
+.sni-wire > header h2 { margin: 0; color: var(--theme-accent, #6f9ae0); font-size: .68rem; font-weight: 850; letter-spacing: .19em; text-transform: uppercase; }
 .sni-wire > header i { width: 8px; height: 8px; border-radius: 50%; background: #62d9b1; box-shadow: 0 0 0 6px rgba(98, 217, 177, 0.12); }
 .sni-wire-window { position: relative; min-height: 0; overflow: hidden; }
 .sni-wire-window::before,

@@ -42,10 +42,9 @@ import threading
 import secrets
 import platform
 import hashlib
-import ipaddress
-import socket
+import warnings
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from newspaper import Article
@@ -53,9 +52,17 @@ from fastapi import BackgroundTasks
 from concurrent.futures import ThreadPoolExecutor
 from threading import Semaphore
 from core.secure_http import tls_verify
+from core.request_limits import REQUEST_LIMITER
+from core.network_safety import assert_public_http_url, canonical_public_http_url
 from core.storage import JsonStore
+from news_scrapper.runtime_safety import (
+    SchedulerOwnership,
+    enforce_single_worker_configuration,
+    sweep_orphan_runtime_files,
+)
 from news_scrapper.personalization import PersonalizationService
 from news_scrapper.recommendation.identity import bind_viewer_request, set_viewer_cookie
+from news_scrapper.access_control import service as capability_service
 from news_scrapper.source_catalog import (
     build_shadow_briefing,
     canonical_url as canonical_source_url,
@@ -88,6 +95,7 @@ load_dotenv(PROJECT_ROOT / ".env", override=False)
 ensure_runtime_directories()
 migrate_legacy_news_runtime()
 UNIFIED_MIGRATION_REPORT = migrate_unified_news_state()
+enforce_single_worker_configuration()
 
 
 def env_bool(name: str, default: bool = False) -> bool:
@@ -242,6 +250,13 @@ WEB_SEARCH_REQUIRE_KEYWORD_MATCH = env_bool(
 )
 WEB_SEARCH_MAX_ENRICH_PER_RUN = max(0, int(os.environ.get("WEB_SEARCH_MAX_ENRICH_PER_RUN", "0")))
 WEB_SEARCH_ENRICH_DELAY_SECONDS = max(0.0, float(os.environ.get("WEB_SEARCH_ENRICH_DELAY_SECONDS", "0")))
+WEB_SEARCH_DEGRADE_MIN_ATTEMPTS = max(
+    1, int(os.environ.get("WEB_SEARCH_DEGRADE_MIN_ATTEMPTS", "5"))
+)
+WEB_SEARCH_DEGRADE_FAILURE_RATIO = min(
+    1.0,
+    max(0.0, float(os.environ.get("WEB_SEARCH_DEGRADE_FAILURE_RATIO", "0.5"))),
+)
 FINAL_CHAT_SUMMARY_ENABLED = env_bool("FINAL_CHAT_SUMMARY_ENABLED", False)
 FINAL_CHAT_SUMMARY_DELAY_SECONDS = max(0.0, float(os.environ.get("FINAL_CHAT_SUMMARY_DELAY_SECONDS", "0")))
 FINAL_CHAT_SUMMARY_MAX_ARTICLES = max(0, int(os.environ.get("FINAL_CHAT_SUMMARY_MAX_ARTICLES", "0")))
@@ -288,6 +303,8 @@ CHAT_SUMMARY_CACHE = JsonStore(
 )
 pipeline_health_lock = threading.Lock()
 pipeline_health_cache = {"checked_at": 0.0, "result": None}
+pipeline_accounting_lock = threading.Lock()
+LAST_PIPELINE_ACCOUNTING: dict[str, dict] = {}
 
 
 def resolve_pipeline_capabilities(force=False):
@@ -646,13 +663,7 @@ def is_analytics_allowed_ip(ip: str) -> bool:
 
 def require_analytics_access(request: Request, key: str = None):
     ip = get_client_ip(request)
-
-    if not is_analytics_allowed_ip(ip):
-        raise HTTPException(status_code=403, detail="Analytics is not enabled for this network.")
-
-    if key != ANALYTICS_KEY:
-        raise HTTPException(status_code=403, detail="Invalid analytics key.")
-
+    capability_service.require_capability(request, "analytics.view")
     return ip
 
 
@@ -1225,19 +1236,52 @@ def apply_learned_regions(items, profile=DEFAULT_PROFILE):
 # ==========================================
 # --- HELPER: Robust Image Downloader ---
 # ==========================================
+EXPORT_IMAGE_MAX_BYTES = max(
+    250_000, int(os.environ.get("EXPORT_IMAGE_MAX_BYTES", str(10 * 1024 * 1024)))
+)
+EXPORT_IMAGE_MAX_PIXELS = max(
+    1_000_000, int(os.environ.get("EXPORT_IMAGE_MAX_PIXELS", "40000000"))
+)
+
+
 def download_image_for_export(url, add_border=False):
     if not url:
         return None
     try:
+        current_url = assert_public_article_url(url)
         headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(
-            url,
-            headers=headers,
-            timeout=(5, 10),
-            verify=tls_verify("ARTICLE_IMAGE_METADATA"),
-        )
-        if response.status_code == 200:
-            img = Image.open(io.BytesIO(response.content))
+        for _ in range(5):
+            response = requests.get(
+                current_url,
+                headers=headers,
+                timeout=(5, 10),
+                verify=tls_verify("ARTICLE_IMAGE_METADATA"),
+                allow_redirects=False,
+                stream=True,
+            )
+            if response.status_code in {301, 302, 303, 307, 308}:
+                location = response.headers.get("location", "")
+                if not location:
+                    return None
+                current_url = assert_public_article_url(urljoin(current_url, location))
+                continue
+            if response.status_code != 200:
+                return None
+            content_type = str(response.headers.get("content-type", "")).split(";", 1)[0].lower()
+            if not content_type.startswith("image/"):
+                return None
+            body = bytearray()
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                body.extend(chunk)
+                if len(body) > EXPORT_IMAGE_MAX_BYTES:
+                    raise ValueError("Image exceeded the export download limit.")
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                img = Image.open(io.BytesIO(bytes(body)))
+                width, height = img.size
+                if width <= 0 or height <= 0 or width * height > EXPORT_IMAGE_MAX_PIXELS:
+                    raise ValueError("Image dimensions exceeded the export safety limit.")
+                img.load()
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
             if add_border:
@@ -1724,7 +1768,72 @@ def matched_pipeline_keywords(item, keywords):
 
 
 class WebSearchRuntimeFailure(RuntimeError):
-    """Signal that discovery-only candidates require a full Scrapy retry."""
+    """Legacy compatibility signal; item-level fallback now avoids full retries."""
+
+
+def _has_usable_article_text(item: dict) -> bool:
+    text = str(
+        item.get("full_contents")
+        or item.get("full_content")
+        or item.get("summary_input")
+        or item.get("master_summary")
+        or item.get("snippet")
+        or ""
+    ).strip()
+    return len(text) >= 200
+
+
+def targeted_local_extract_article(item: dict, *, reason: str) -> dict:
+    """Recover one candidate without repeating discovery or other articles."""
+
+    original = dict(item or {})
+    if _has_usable_article_text(original):
+        return {
+            **original,
+            "enrichment_status": "local_fallback",
+            "extracted_by": "existing_scrapy_content",
+            "enrichment_fallback_reason": reason,
+        }
+    url = str(
+        original.get("canonical_link")
+        or original.get("link")
+        or original.get("url")
+        or ""
+    ).strip()
+    if not url:
+        raise RuntimeError("Candidate has no recoverable article URL.")
+    extracted = fetch_personal_article(url)
+    preserved = {
+        key: original.get(key)
+        for key in (
+            "id",
+            "profile",
+            "legacy_profile",
+            "vertical",
+            "verticals",
+            "audiences",
+            "keywords_found",
+            "discovered_at",
+        )
+        if original.get(key) not in (None, "", [], {})
+    }
+    return {
+        **original,
+        **extracted,
+        **preserved,
+        "enrichment_status": "local_fallback",
+        "extracted_by": "targeted_local_extraction",
+        "enrichment_fallback_reason": reason,
+    }
+
+
+def _record_pipeline_accounting(profile: str, accounting: dict) -> None:
+    snapshot = dict(accounting)
+    snapshot["updated_at"] = datetime.datetime.now(
+        datetime.timezone.utc
+    ).isoformat(timespec="seconds")
+    with pipeline_accounting_lock:
+        LAST_PIPELINE_ACCOUNTING[profile] = snapshot
 
 
 def run_bouncer_filter_on_items(items, profile=DEFAULT_PROFILE, stage="raw"):
@@ -1787,29 +1896,48 @@ def enrich_raw_articles(
         print(f"[PIPELINE:{profile}] {message}; keeping crawler content.", flush=True)
         return source_items
 
-    limit = WEB_SEARCH_MAX_ENRICH_PER_RUN or len(source_items)
+    limit = min(WEB_SEARCH_MAX_ENRICH_PER_RUN or len(source_items), len(source_items))
     output = []
     successful = 0
     rejected_for_keywords = 0
     service_failures = 0
-    strict = WEB_SEARCH_REQUIRE_SUCCESS or SAMSUNG_PIPELINE_ENABLED
-    print(f"[PIPELINE:{profile}] Web Search enrichment: {min(limit, len(source_items))} article(s).", flush=True)
+    fallback_count = 0
+    overflow_count = max(0, len(source_items) - limit)
+    cached_hits = 0
+    explicit_errors = 0
+    web_attempts = 0
+    degraded = False
+    cached_values = WEB_SEARCH_CACHE.read()
+    if not isinstance(cached_values, dict):
+        cached_values = {}
+    print(
+        f"[PIPELINE:{profile}] Discovered: {len(source_items)}\n"
+        f"[PIPELINE:{profile}] Web Search budget: {limit}",
+        flush=True,
+    )
     for index, item in enumerate(source_items):
-        if index >= limit:
-            if not strict:
-                output.append(item)
+        if index >= limit or degraded:
+            reason = "web_search_overflow" if index >= limit else "web_search_runtime_degraded"
+            try:
+                output.append(targeted_local_extract_article(item, reason=reason))
+                fallback_count += 1
+            except Exception as error:
+                explicit_errors += 1
+                print(
+                    f"[PIPELINE:{profile}] Targeted local extraction failed for "
+                    f"'{str(item.get('title') or item.get('link') or '')[:70]}': "
+                    f"{type(error).__name__}: {error}",
+                    flush=True,
+                )
             continue
         cache_key = pipeline_cache_key(item)
-        cached_values = WEB_SEARCH_CACHE.read()
-        cached = (
-            cached_values.get(cache_key)
-            if isinstance(cached_values, dict)
-            else None
-        )
+        cached = cached_values.get(cache_key)
         if isinstance(cached, dict):
             enriched = dict(cached)
             enriched["enrichment_cache"] = "hit"
+            cached_hits += 1
         else:
+            web_attempts += 1
             try:
                 enriched = enrich_article_with_web_search(item, keywords=keywords)
             except Exception as error:
@@ -1832,29 +1960,73 @@ def enrich_raw_articles(
                     f"profile keywords: {item.get('title', '')[:70]}",
                     flush=True,
                 )
-                if not strict:
-                    output.append(enriched)
+                # Keyword validation is an intentional product rejection, not
+                # a provider failure and therefore does not trigger fallback.
             else:
                 successful += 1
                 output.append(enriched)
-        elif strict:
-            service_failures += 1
-            print(f"[PIPELINE:{profile}] Enrichment rejected: {item.get('title', '')[:70]}", flush=True)
         else:
-            output.append(enriched)
+            service_failures += 1
+            try:
+                output.append(
+                    targeted_local_extract_article(
+                        item,
+                        reason="web_search_request_failed",
+                    )
+                )
+                fallback_count += 1
+            except Exception as error:
+                explicit_errors += 1
+                print(
+                    f"[PIPELINE:{profile}] Web Search and targeted fallback both "
+                    f"failed for '{item.get('title', '')[:70]}': "
+                    f"{type(error).__name__}: {error}",
+                    flush=True,
+                )
+            if (
+                web_attempts >= WEB_SEARCH_DEGRADE_MIN_ATTEMPTS
+                and service_failures / max(1, web_attempts)
+                >= WEB_SEARCH_DEGRADE_FAILURE_RATIO
+            ):
+                degraded = True
+                print(
+                    f"[PIPELINE:{profile}] Web Search degraded after "
+                    f"{service_failures}/{web_attempts} request failures; remaining "
+                    "candidates will use targeted local extraction.",
+                    flush=True,
+                )
         if index + 1 < min(limit, len(source_items)) and WEB_SEARCH_ENRICH_DELAY_SECONDS:
             time.sleep(WEB_SEARCH_ENRICH_DELAY_SECONDS)
+    accounted = len(output) + rejected_for_keywords + explicit_errors
+    accounting = {
+        "discovered": len(source_items),
+        "web_search_budget": limit,
+        "web_search_success": successful,
+        "web_search_failures": service_failures,
+        "targeted_local_fallback": fallback_count,
+        "web_search_overflow": overflow_count,
+        "cached_hits": cached_hits,
+        "keyword_rejected": rejected_for_keywords,
+        "explicit_errors": explicit_errors,
+        "final_retained_before_bouncer": len(output),
+        "accounted": accounted,
+    }
+    _record_pipeline_accounting(profile, accounting)
     print(
-        f"[PIPELINE:{profile}] Web Search enriched {successful}/"
-        f"{min(limit, len(source_items))}; keyword mismatches "
-        f"{rejected_for_keywords}.",
+        f"[PIPELINE:{profile}] Web Search success: {successful}\n"
+        f"[PIPELINE:{profile}] Web Search failures: {service_failures}\n"
+        f"[PIPELINE:{profile}] Targeted local fallback: {fallback_count}\n"
+        f"[PIPELINE:{profile}] Overflow local extraction: {overflow_count}\n"
+        f"[PIPELINE:{profile}] Cached hits: {cached_hits}\n"
+        f"[PIPELINE:{profile}] Keyword rejected: {rejected_for_keywords}\n"
+        f"[PIPELINE:{profile}] Explicitly errored: {explicit_errors}\n"
+        f"[PIPELINE:{profile}] Candidate accounting: {accounted}/{len(source_items)}",
         flush=True,
     )
-    if raise_on_service_failure and service_failures:
-        raise WebSearchRuntimeFailure(
-            "Samsung Web Search failed for "
-            f"{service_failures}/{min(limit, len(source_items))} candidate(s) "
-            "after preflight; full Scrapy extraction is required."
+    if accounted != len(source_items):
+        raise RuntimeError(
+            f"Pipeline accounting invariant failed: {accounted}/"
+            f"{len(source_items)} candidates accounted for."
         )
     return output
 
@@ -1972,11 +2144,25 @@ def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
         FINAL_CHAT_SUMMARY_ENABLED if use_chat is None else bool(use_chat)
     )
     chat_limit = FINAL_CHAT_SUMMARY_MAX_ARTICLES or len(items or [])
-    chat_failures = []
+    if chat_enabled and summarize_article_with_chat is None:
+        chat_limit = 0
+    chat_fallback_indices = []
+    chat_successes = 0
+    metadata_failures = 0
     for index, original in enumerate(items or []):
         item = dict(original)
         if enrich_article_image_metadata is not None:
-            item = enrich_article_image_metadata(item)
+            try:
+                item = enrich_article_image_metadata(item)
+            except Exception as error:
+                metadata_failures += 1
+                item["metadata_status"] = "failed"
+                item["metadata_error"] = f"{type(error).__name__}: {error}"[:500]
+                print(
+                    f"[PIPELINE:{profile}] Image/metadata failed for "
+                    f"'{item.get('title', '')[:70]}'; retaining the article.",
+                    flush=True,
+                )
         if chat_enabled and summarize_article_with_chat is not None and index < chat_limit:
             cache_key = pipeline_cache_key(item, include_sources=True)
             cached_values = CHAT_SUMMARY_CACHE.read()
@@ -1992,7 +2178,14 @@ def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
                 item.update(chat_summary_cache_payload(cached))
                 item["chat_summary_cache"] = "hit"
             else:
-                summarized = summarize_article_with_chat(item)
+                try:
+                    summarized = summarize_article_with_chat(item)
+                except Exception as error:
+                    summarized = {
+                        **item,
+                        "chat_summary_status": "failed",
+                        "chat_summary_error": f"{type(error).__name__}: {error}"[:500],
+                    }
                 if summarized.get("chat_summary_status") == "success":
                     cache_success(
                         CHAT_SUMMARY_CACHE,
@@ -2009,23 +2202,38 @@ def enrich_final_articles(items, profile=DEFAULT_PROFILE, use_chat=None):
                     "Queued for local BART fallback.",
                     flush=True,
                 )
-                chat_failures.append(len(output))
+                chat_fallback_indices.append(len(output))
+            else:
+                chat_successes += 1
             if index + 1 < min(chat_limit, len(items)) and FINAL_CHAT_SUMMARY_DELAY_SECONDS:
                 time.sleep(FINAL_CHAT_SUMMARY_DELAY_SECONDS)
+        elif chat_enabled and index >= chat_limit:
+            # Fast clustering intentionally omitted local summarization because
+            # Chat owned the stage. Items beyond the configured Chat budget
+            # therefore require explicit local completion.
+            chat_fallback_indices.append(len(output))
+            item["chat_summary_status"] = "budget_local_fallback"
         output.append(item)
     if not chat_enabled:
         return [
             structure_summary_for_dossier(item, "local_bart")
             for item in output
         ]
-    if chat_failures:
+    if chat_fallback_indices:
         fallback_items = apply_local_bart_fallback(
-            [output[index] for index in chat_failures],
+            [output[index] for index in chat_fallback_indices],
             profile,
         )
-        for index, fallback in zip(chat_failures, fallback_items):
+        for index, fallback in zip(chat_fallback_indices, fallback_items):
             fallback["chat_summary_status"] = "fallback"
             output[index] = fallback
+    print(
+        f"[PIPELINE:{profile}] Chat eligible: {min(chat_limit, len(output))}; "
+        f"success: {chat_successes}; local fallback: "
+        f"{len(chat_fallback_indices)}; metadata failures: {metadata_failures}; "
+        f"final retained: {len(output)}",
+        flush=True,
+    )
     return output
 
 
@@ -2048,56 +2256,16 @@ PERSONAL_BRIEFING_MAX_BYTES = max(
 
 def canonical_personal_url(value):
     try:
-        parsed = urlsplit(str(value or "").strip())
+        return canonical_public_http_url(value)
     except ValueError:
         return ""
-    if (
-        parsed.scheme.lower() not in {"http", "https"}
-        or not parsed.hostname
-        or parsed.username
-        or parsed.password
-    ):
-        return ""
-    port = parsed.port
-    if port and port not in {80, 443}:
-        return ""
-    netloc = parsed.hostname.lower().removeprefix("www.")
-    if port:
-        netloc = f"{netloc}:{port}"
-    return urlunsplit(
-        (
-            parsed.scheme.lower(),
-            netloc,
-            parsed.path or "/",
-            parsed.query,
-            "",
-        )
-    )
 
 
 def assert_public_article_url(value):
-    canonical = canonical_personal_url(value)
-    if not canonical:
-        raise ValueError("Use a valid public HTTP or HTTPS article URL.")
-    hostname = urlsplit(canonical).hostname
-    if hostname in {"localhost"} or hostname.endswith((".local", ".internal")):
-        raise ValueError("Private or local network URLs are not allowed.")
     try:
-        addresses = {
-            result[4][0]
-            for result in socket.getaddrinfo(
-                hostname,
-                urlsplit(canonical).port or 443,
-                type=socket.SOCK_STREAM,
-            )
-        }
-    except socket.gaierror as error:
-        raise ValueError("The article hostname could not be resolved.") from error
-    for address in addresses:
-        parsed_ip = ipaddress.ip_address(address)
-        if not parsed_ip.is_global:
-            raise ValueError("Private or local network URLs are not allowed.")
-    return canonical
+        return assert_public_http_url(value)
+    except ValueError as error:
+        raise ValueError(str(error).replace("hostname", "article hostname")) from error
 
 
 def fetch_personal_article(url):
@@ -3112,6 +3280,10 @@ def run_scheduler_for_profile(profile: str, capabilities=None):
         return True
     if UNIFIED_CORPUS_ENABLED:
         profile = UNIFIED_PROFILE
+    sweep_orphan_runtime_files(
+        NEWS_RUNTIME_DIR,
+        active_job_ids=set(active_jobs),
+    )
     config = get_profile_config(profile)
     capabilities = capabilities or resolve_pipeline_capabilities()
     today = datetime.datetime.now()
@@ -3191,42 +3363,12 @@ def run_scheduler_for_profile(profile: str, capabilities=None):
                 "Web Search before Gatekeeper scoring.",
                 flush=True,
             )
-            try:
-                raw_data = enrich_raw_articles(
-                    raw_data,
-                    config["keywords"],
-                    profile,
-                    use_web_search=True,
-                    raise_on_service_failure=True,
-                )
-            except WebSearchRuntimeFailure as error:
-                print(
-                    f"[SCHEDULER:{profile}] WEB SEARCH RUNTIME FAILURE: {error} "
-                    "FALLBACK: restarting this profile with full Scrapy "
-                    "article extraction.",
-                    flush=True,
-                )
-                fallback_cmd = [
-                    (
-                        "discovery_only=false"
-                        if str(argument).startswith("discovery_only=")
-                        else argument
-                    )
-                    for argument in cmd
-                ]
-                execute_crawl(fallback_cmd)
-                if not os.path.exists(output_file):
-                    raise RuntimeError(
-                        "Full Scrapy fallback completed without creating an "
-                        "output file"
-                    )
-                with open(output_file, "r", encoding="utf-8") as f:
-                    raw_data = json.load(f)
-                if not isinstance(raw_data, list):
-                    raise RuntimeError(
-                        "Full Scrapy fallback output must be a JSON list"
-                    )
-                web_search_used = False
+            raw_data = enrich_raw_articles(
+                raw_data,
+                config["keywords"],
+                profile,
+                use_web_search=True,
+            )
 
         if web_search_used:
             if config["use_bouncer"]:
@@ -3557,6 +3699,10 @@ def run_morning_briefing():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     ensure_runtime_directories()
+    sweep_orphan_runtime_files(
+        NEWS_RUNTIME_DIR,
+        active_job_ids=set(active_jobs),
+    )
     ensure_profile_storage()
     migrate_tracker_privacy()
     resume_personal_briefing_jobs()
@@ -3568,9 +3714,11 @@ async def lifespan(app: FastAPI):
         enqueue_bouncer_retrain(UNIFIED_PROFILE)
     scheduler_shutdown_event.clear()
     scheduler = BackgroundScheduler()
+    scheduler_ownership = SchedulerOwnership(NEWS_RUNTIME_DIR / "scheduler_owner.lock")
+    owns_scheduler = scheduler_ownership.acquire() if SCHEDULER_ENABLED else False
     next_run = datetime.datetime.now() + datetime.timedelta(minutes=2)
 
-    if SCHEDULER_ENABLED:
+    if SCHEDULER_ENABLED and owns_scheduler:
         now = datetime.datetime.now()
         due_times = []
         due_profiles = (
@@ -3606,6 +3754,13 @@ async def lifespan(app: FastAPI):
         )
         scheduler.start()
         print("SYSTEM: Autonomous Intelligence Engine online.")
+    elif SCHEDULER_ENABLED:
+        SCHEDULER_STATUS["next_run"] = None
+        print(
+            "SYSTEM: Scheduler ownership belongs to another TechScout process; "
+            "this process will not register duplicate jobs.",
+            flush=True,
+        )
     else:
         SCHEDULER_STATUS["next_run"] = None
         print("SYSTEM: Autonomous scheduler disabled by configuration.")
@@ -3618,6 +3773,7 @@ async def lifespan(app: FastAPI):
             process.terminate()
     if scheduler.running:
         scheduler.shutdown(wait=False)
+    scheduler_ownership.release()
     training_worker_stop.set()
     training_queue.put(None)
     ml_executor.shutdown(wait=False)
@@ -3642,10 +3798,10 @@ if cors_allowed_origins:
 
 @app.middleware("http")
 async def bind_private_viewer(request: Request, call_next):
-    """Give every private viewer API a signed, browser-scoped identity."""
+    """Give the entire product one signed, browser-scoped viewer identity."""
 
     identity = None
-    if request.url.path == "/viewer" or request.url.path.startswith("/viewer/"):
+    if not request.url.path.startswith("/assets/"):
         request.state.private_viewer_cookie_middleware = True
         identity = bind_viewer_request(request)
         if identity[1]:
@@ -3687,7 +3843,7 @@ def get_profile(request: Request):
     }
     # Local storage paths and cross-profile configuration are operational
     # diagnostics, not normal viewer data.
-    if get_client_ip(request) in SYSTEM_STATUS_ALLOWED_IPS:
+    if capability_service.has_capability(request, "system.status.detail"):
         response["paths"] = {
             "sites_file": config["sites_file"],
             "history_dir": config["history_dir"],
@@ -3723,6 +3879,9 @@ def get_profile_settings_access(request: Request):
 # ==========================================
 @app.post("/export-ppt")
 async def export_ppt(http_request: Request, request: ExportRequest):
+    REQUEST_LIMITER.check(
+        "export", get_client_ip(http_request), limit=20, window_seconds=60 * 60
+    )
     if get_active_profile_name(http_request) == BROADCAST_PROFILE:
         raise HTTPException(
             status_code=403,
@@ -3845,7 +4004,10 @@ async def export_ppt(http_request: Request, request: ExportRequest):
 # --- EXPORT: EXCEL ---
 # ==========================================
 @app.post("/export-excel")
-async def export_excel(request: ExportRequest):
+async def export_excel(http_request: Request, request: ExportRequest):
+    REQUEST_LIMITER.check(
+        "export", get_client_ip(http_request), limit=20, window_seconds=60 * 60
+    )
     safe_filename = sanitize_filename(request.filename)
     wb = Workbook()
     ws = wb.active
@@ -3908,7 +4070,10 @@ async def export_excel(request: ExportRequest):
 # --- EXPORT: WORD ---
 # ==========================================
 @app.post("/export-word")
-async def export_word(request: ExportRequest):
+async def export_word(http_request: Request, request: ExportRequest):
+    REQUEST_LIMITER.check(
+        "export", get_client_ip(http_request), limit=20, window_seconds=60 * 60
+    )
     safe_filename = sanitize_filename(request.filename)
     doc = Document()
     section = doc.sections[0]
@@ -4120,17 +4285,31 @@ async def export_word(request: ExportRequest):
 # ==========================================
 @app.get("/workflow")
 def get_workflow(request: Request):
+    capabilities = capability_service.effective_capabilities(request)
+    if not capabilities.intersection(
+        {"review.news.view", "review.news.submit", "review.news.approve", "approved.view"}
+    ):
+        raise HTTPException(status_code=403, detail="You do not have access to the Review Center.")
     profile = get_profile_for_request(request)
     store = resolve_workflow_identities(load_workflow_store(request))
     return {
-        "selected": apply_learned_regions(store.get("selected", []), profile),
-        "approved": apply_learned_regions(store.get("approved", []), profile),
+        "selected": (
+            apply_learned_regions(store.get("selected", []), profile)
+            if capabilities.intersection({"review.news.view", "review.news.submit", "review.news.approve"})
+            else []
+        ),
+        "approved": (
+            apply_learned_regions(store.get("approved", []), profile)
+            if capabilities.intersection({"approved.view", "review.news.approve"})
+            else []
+        ),
         "profile": profile,
     }
 
 
 @app.post("/workflow/select")
 def select_news(request: Request, item: dict = Body(...)):
+    capability_service.require_capability(request, "review.news.submit")
     profile = get_profile_for_request(request)
     viewer_ip = get_client_ip(request)
     viewer_key = get_viewer_key(viewer_ip)
@@ -4151,6 +4330,7 @@ def select_news(request: Request, item: dict = Body(...)):
 def import_archived_news(request: Request, payload: dict = Body(...)):
     """Import selected archive signals into the shared profile review queue."""
 
+    capability_service.require_capability(request, "review.news.submit")
     profile = get_profile_for_request(request)
     client_ip = get_client_ip(request)
     viewer_key = get_viewer_key(client_ip)
@@ -4225,11 +4405,9 @@ def import_archived_news(request: Request, payload: dict = Body(...)):
 
 @app.post("/workflow/approve")
 def approve_news(request: Request, payload: dict = Body(...)):
+    capability_service.require_capability(request, "review.news.approve")
     profile = get_profile_for_request(request)
     item_title = payload.get("title")
-    key = payload.get("key")
-    if key != DIRECTOR_KEY:
-        return {"status": "error", "message": "Invalid Director Key", "profile": profile}
     approver_ip = get_client_ip(request)
     with workflow_lock:
         store = load_workflow_store(request)
@@ -4257,6 +4435,10 @@ def remove_news(request: Request, payload: dict = Body(...)):
     list_type = payload.get("list_type")
     if list_type not in ["selected", "approved"]:
         return {"status": "error", "message": "Invalid list type", "profile": profile}
+    capability_service.require_capability(
+        request,
+        "review.news.approve" if list_type == "approved" else "review.news.submit",
+    )
     with workflow_lock:
         store = load_workflow_store(request)
         store[list_type] = [i for i in store[list_type] if i["title"] != title]
@@ -4269,6 +4451,7 @@ def remove_news(request: Request, payload: dict = Body(...)):
 # ==========================================
 @app.post("/region/correct")
 def correct_region(request: Request, payload: dict = Body(...)):
+    capability_service.require_capability(request, "region.correct")
     profile = get_active_profile_name(request)
     title = str(payload.get("title", "")).strip()
     region = normalize_region_label(payload.get("region"))
@@ -4318,6 +4501,7 @@ def correct_region(request: Request, payload: dict = Body(...)):
 # ==========================================
 @app.get("/sites")
 def get_sites(request: Request):
+    capability_service.require_capability(request, "sources.view")
     profile = UNIFIED_PROFILE if UNIFIED_CORPUS_ENABLED else get_profile_for_request(request)
     sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(profile)
     if os.path.exists(sites_path):
@@ -4329,6 +4513,7 @@ def get_sites(request: Request):
 
 @app.post("/sites")
 def add_site(site: dict, request: Request):
+    capability_service.require_capability(request, "sources.manage")
     profile = UNIFIED_PROFILE if UNIFIED_CORPUS_ENABLED else get_profile_for_request(request)
     sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(profile)
     with sites_lock:
@@ -4400,6 +4585,7 @@ def _source_record_index(sites: list[dict], source_id: str) -> int | None:
 def update_site(source_id: str, request: Request, payload: dict = Body(...)):
     """Update/toggle one record in the authoritative unified catalog."""
 
+    capability_service.require_capability(request, "sources.manage")
     sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(
         get_profile_for_request(request)
     )
@@ -4432,6 +4618,7 @@ def update_site(source_id: str, request: Request, payload: dict = Body(...)):
 def delete_site(source_id: str, request: Request):
     """Remove one explicitly addressed source from the unified catalog."""
 
+    capability_service.require_capability(request, "sources.manage")
     sites_path = DEFAULT_SITES_FILE if UNIFIED_CORPUS_ENABLED else get_sites_file_for_profile(
         get_profile_for_request(request)
     )
@@ -4456,7 +4643,7 @@ def delete_site(source_id: str, request: Request):
 @app.get("/status")
 def get_system_status(request: Request):
     active_profile = get_active_profile_name(request)
-    details_allowed = get_client_ip(request) in SYSTEM_STATUS_ALLOWED_IPS
+    details_allowed = capability_service.has_capability(request, "system.status.detail")
     cached_capabilities = pipeline_health_cache.get("result")
     with scheduler_lock:
         running_jobs = sum(
@@ -4500,6 +4687,28 @@ def get_system_status(request: Request):
                 }
             )
         return response
+
+
+@app.get("/scheduler/status")
+def get_scheduler_status(request: Request):
+    capability_service.require_capability(request, "scheduler.view")
+    return get_system_status(request)
+
+
+@app.post("/scheduler/run")
+def trigger_scheduler_run(request: Request, background_tasks: BackgroundTasks):
+    capability_service.require_capability(request, "scheduler.control")
+    REQUEST_LIMITER.check(
+        "scheduler.control",
+        get_client_ip(request),
+        limit=3,
+        window_seconds=60 * 60,
+    )
+    with scheduler_lock:
+        if SCHEDULER_STATUS.get("is_active"):
+            raise HTTPException(status_code=409, detail="The scheduler is already running.")
+    background_tasks.add_task(run_morning_briefing)
+    return {"status": "queued", "message": "A scheduler run was queued."}
 
 
 # ==========================================
@@ -4558,7 +4767,7 @@ def get_briefing_meta(request: Request):
 def get_latest_briefing(request: Request):
     profile = get_profile_for_request(request)
     client_ip = get_client_ip(request)
-    viewer_key = get_viewer_key(client_ip)
+    viewer_key = get_private_viewer_key(request)
     latest = get_latest_briefing_file_for_profile(profile)
     if latest:
         try:
@@ -4575,7 +4784,12 @@ def get_latest_briefing(request: Request):
                         profile,
                         get_viewer_saved_items(request, profile),
                     )
-                    viewer = get_viewer_profile(client_ip)
+                    profiles = load_viewer_profiles()
+                    viewer = (
+                        profiles.get(viewer_key)
+                        or profiles.get(get_viewer_key(client_ip))
+                        or {}
+                    )
                     personalization["viewer_name"] = (
                         viewer.get("display_name")
                         or get_team_owner_for_ip(client_ip)
@@ -4670,6 +4884,7 @@ def _paired_state_failure(operation: str, error: Exception, rollback_error: Exce
 
 @app.post("/briefing/remove")
 def remove_from_briefing(request: Request, payload: dict = Body(...)):
+    capability_service.require_capability(request, "gatekeeper.review")
     profile = get_profile_for_request(request)
     title = str(payload.get("title", "")).strip()
     if not title:
@@ -4700,6 +4915,7 @@ def remove_from_briefing(request: Request, payload: dict = Body(...)):
 
 @app.post("/briefing/restore")
 def restore_to_briefing(request: Request, payload: dict = Body(...)):
+    capability_service.require_capability(request, "gatekeeper.review")
     profile = get_profile_for_request(request)
     article = payload.get("article")
     if not isinstance(article, dict) or not str(article.get("title", "")).strip():
@@ -5135,16 +5351,12 @@ def require_gatekeeper_ip_access(request: Request):
     """Authorize destructive shared-feed actions by resolved client IP only."""
     ip = get_client_ip(request)
     if ip not in GATEKEEPER_ALLOWED_IPS:
-        raise HTTPException(status_code=403, detail="Global article removal is not enabled for this network.")
+        capability_service.require_capability(request, "gatekeeper.review")
     return ip
 
 
 def require_gatekeeper_access(request: Request):
-    ip = require_gatekeeper_ip_access(request)
-    provided = request.headers.get("x-gatekeeper-key", "")
-    if not provided or not secrets.compare_digest(str(provided), str(GATEKEEPER_KEY)):
-        raise HTTPException(status_code=403, detail="Invalid Gatekeeper key.")
-    return ip
+    return require_gatekeeper_ip_access(request)
 
 
 def load_dropped_articles():
@@ -5199,7 +5411,7 @@ def gatekeeper_access(request: Request):
     ip = get_client_ip(request)
     profile = get_active_profile_name(request)
     return {
-        "allowed": ip in GATEKEEPER_ALLOWED_IPS,
+        "allowed": capability_service.has_capability(request, "gatekeeper.review"),
         "ip": ip,
         "owner": get_viewer_profile(ip).get("display_name") or get_team_owner_for_ip(ip) or "Authorized user",
         "active_profile": profile,
@@ -5388,6 +5600,10 @@ def gatekeeper_retry(request: Request, payload: dict = Body(...)):
 # ==========================================
 @app.post("/train")
 def save_training_data(request: Request, data: VotePayload, background_tasks: BackgroundTasks):
+    capability_service.require_capability(request, "model.train")
+    REQUEST_LIMITER.check(
+        "model.train", get_client_ip(request), limit=10, window_seconds=60 * 60
+    )
     profile = get_active_profile_name(request)
     total = save_training_vote(data.keywords, data.summary, data.vote, data.title or "", profile)
     background_tasks.add_task(enqueue_bouncer_retrain, profile)
@@ -6435,7 +6651,7 @@ def track_activity(request: Request, response: Response, payload: dict = Body(..
 @app.get("/analytics/access")
 def get_analytics_access(request: Request):
     ip = get_client_ip(request)
-    allowed = is_analytics_allowed_ip(ip)
+    allowed = capability_service.has_capability(request, "analytics.view")
     viewer = get_viewer_profile(ip)
 
     return {
@@ -6455,13 +6671,14 @@ def get_analytics_access(request: Request):
 @app.get("/viewer/profile")
 def read_viewer_profile(request: Request):
     ip = get_client_ip(request)
-    viewer = get_viewer_profile(ip)
+    principal = get_private_viewer_key(request)
+    profiles = load_viewer_profiles()
+    viewer = profiles.get(principal) or profiles.get(get_viewer_key(ip)) or {}
     return {
         "status": "success",
         "display_name": viewer.get("display_name", get_team_owner_for_ip(ip) or ""),
         "email": viewer.get("email", ""),
-        "ip": ip,
-        "ip_hash": get_viewer_key(ip),
+        "principal": principal,
     }
 
 
@@ -6472,10 +6689,12 @@ def update_viewer_profile(request: Request, payload: dict = Body(...)):
     if len(display_name) < 2:
         raise HTTPException(status_code=400, detail="Display name must contain at least two characters.")
     ip = get_client_ip(request)
-    viewer_key = get_viewer_key(ip)
+    viewer_key = get_private_viewer_key(request)
+    legacy_viewer_key = get_viewer_key(ip)
     with tracker_lock:
         profiles = load_viewer_profiles()
-        previous_name = str(profiles.get(viewer_key, {}).get("display_name", "")).strip()
+        previous = profiles.get(viewer_key) or profiles.get(legacy_viewer_key) or {}
+        previous_name = str(previous.get("display_name", "")).strip()
         duplicate = next((profile for key, profile in profiles.items() if key != viewer_key and str(profile.get("display_name", "")).casefold() == display_name.casefold()), None)
         if duplicate:
             raise HTTPException(status_code=409, detail="That display name is already in use. Please choose another one.")
@@ -6483,23 +6702,24 @@ def update_viewer_profile(request: Request, payload: dict = Body(...)):
             "display_name": display_name,
             "email": email,
             "updated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "legacy_ip_principal": legacy_viewer_key,
         }
         save_viewer_profiles(profiles)
         tracker = load_tracker()
         for device in tracker.values():
-            if device.get("ip_hash") == viewer_key or device.get("ip") == ip:
+            if device.get("ip_hash") in {viewer_key, legacy_viewer_key} or device.get("ip") == ip:
                 device["display_name"] = display_name
                 device["owner"] = display_name
-                device["ip_hash"] = viewer_key
+                device["viewer_principal"] = viewer_key
+                device["ip_hash"] = legacy_viewer_key
                 device.pop("ip", None)
         save_tracker(tracker)
-        refresh_workflow_identity(viewer_key, previous_name, display_name)
+        refresh_workflow_identity(legacy_viewer_key, previous_name, display_name)
     return {
         "status": "success",
         "display_name": display_name,
         "email": email,
-        "ip": ip,
-        "ip_hash": viewer_key,
+        "principal": viewer_key,
     }
 
 
@@ -6586,6 +6806,14 @@ async def crawl(
     target_sites: str = Query("All"),
     session_id: str = Query(None),
 ):
+    capability_service.require_capability(request, "crawl.run")
+    REQUEST_LIMITER.check(
+        "crawl.run", get_client_ip(request), limit=3, window_seconds=60 * 60
+    )
+    sweep_orphan_runtime_files(
+        NEWS_RUNTIME_DIR,
+        active_job_ids=set(active_jobs),
+    )
     profile = get_profile_for_request(request)
     sites_file = get_sites_file_for_profile(profile)
     effective_keywords = keywords or get_profile_config(profile)["keywords"]
@@ -6805,7 +7033,6 @@ async def crawl(
                         effective_keywords,
                         profile,
                         use_web_search=True,
-                        raise_on_service_failure=True,
                     )
                     yield f"data: {json.dumps({'type': 'status', 'message': 'Running AI Gatekeeper on extracted article text...'})}\n\n"
                     filtered_data, dropped_count, low_priority_count = run_bouncer_filter_on_items(
@@ -6814,54 +7041,6 @@ async def crawl(
                     with open(output_file, "w", encoding="utf-8") as f:
                         json.dump(filtered_data, f, indent=4, ensure_ascii=False)
                     yield f"data: {json.dumps({'type': 'status', 'message': f'Samsung extraction and Gatekeeper complete. Kept {len(filtered_data)}; removed {dropped_count}; low priority kept {low_priority_count}.'})}\n\n"
-                except WebSearchRuntimeFailure as e:
-                    print(
-                        f"[PIPELINE:{profile}] Samsung extraction failed after "
-                        f"preflight: {e}. Restarting with full Scrapy extraction.",
-                        flush=True,
-                    )
-                    yield f"data: {json.dumps({'type': 'status', 'message': 'Samsung Web Search became unavailable. Restarting this scan with full local Scrapy extraction; no discovered articles will be silently discarded.'})}\n\n"
-                    fallback_cmd = [
-                        (
-                            "discovery_only=false"
-                            if str(argument).startswith("discovery_only=")
-                            else argument
-                        )
-                        for argument in cmd
-                    ]
-                    fallback_result = subprocess.run(
-                        fallback_cmd,
-                        cwd=spider_cwd,
-                        env=process_env,
-                        timeout=3600,
-                        check=False,
-                    )
-                    if fallback_result.returncode != 0:
-                        raise RuntimeError(
-                            "Full Scrapy fallback exited with code "
-                            f"{fallback_result.returncode}"
-                        )
-                    if not os.path.exists(output_file):
-                        raise RuntimeError(
-                            "Full Scrapy fallback completed without an output file"
-                        )
-                    with open(output_file, "r", encoding="utf-8") as f:
-                        raw_data = json.load(f)
-                    filtered_data, dropped_count, low_priority_count = (
-                        run_bouncer_filter_on_items(
-                            raw_data,
-                            profile,
-                            "manual_scrapy_fallback",
-                        )
-                    )
-                    with open(output_file, "w", encoding="utf-8") as f:
-                        json.dump(
-                            filtered_data,
-                            f,
-                            indent=4,
-                            ensure_ascii=False,
-                        )
-                    yield f"data: {json.dumps({'type': 'status', 'message': f'Full Scrapy fallback and Gatekeeper complete. Kept {len(filtered_data)}; removed {dropped_count}; low priority kept {low_priority_count}.'})}\n\n"
                 except Exception as e:
                     print(f"[PIPELINE:{profile}] Samsung extraction failed: {e}", flush=True)
                     raise

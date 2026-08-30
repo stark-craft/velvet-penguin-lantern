@@ -70,6 +70,7 @@
     var(--archive-paper);
   box-shadow: var(--shadow-lg);
 }
+.archive-v2-hero.is-compact{min-height:0;grid-template-columns:minmax(0,1.5fr) minmax(220px,.5fr)}.archive-v2-hero.is-compact .archive-v2-hero-copy{padding:1.35rem 1.5rem}.archive-v2-hero.is-compact h1{font-size:clamp(2rem,3.5vw,3.25rem)}.archive-v2-hero.is-compact .archive-v2-index{margin:.8rem;min-height:0;padding:1rem}
 
 .archive-v2-hero::before {
   position: absolute;

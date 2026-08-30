@@ -77,3 +77,97 @@ html[data-theme="light"] .fy-workspace-tabs>button.is-active svg{background:line
 html[data-theme="light"] .fy-create-command{border-color:#b8c9d8;background:linear-gradient(135deg,#edf6f3,#e9eff8);box-shadow:0 12px 32px rgba(35,58,79,.1)}
 html[data-theme="light"] .fy-create-command-mark{color:#0b6d63}
 html[data-theme="light"] .fy-create-command-mark svg{border-color:#a9cec5;background:#ddf1eb}
+
+/* Personal signal horizon. This is deliberately not another glass navbar:
+   the global header owns the capsule, while this layer behaves like an
+   editorial index aligned to the reading canvas below it. */
+.fy-workspace-rail-wrap{width:min(1560px,calc(100% - 48px));margin:0 auto}
+.fy-workspace-switcher{
+  position:relative;
+  isolation:isolate;
+  display:grid;
+  width:100%;
+  max-width:none;
+  min-height:56px;
+  grid-template-columns:minmax(190px,.8fr) auto minmax(220px,.8fr);
+  align-items:stretch;
+  justify-content:stretch;
+  gap:clamp(20px,3vw,54px);
+  overflow:visible;
+  padding:0 3px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+  backdrop-filter:none;
+}
+.fy-workspace-switcher::before{
+  position:absolute;
+  z-index:auto;
+  inset:auto 0 0;
+  height:1px;
+  border-radius:0;
+  background:linear-gradient(90deg,color-mix(in srgb,var(--workspace-accent) 48%,transparent),color-mix(in srgb,var(--line-soft,rgba(164,190,217,.18)) 78%,transparent) 18%,color-mix(in srgb,var(--line-soft,rgba(164,190,217,.18)) 78%,transparent) 82%,color-mix(in srgb,var(--workspace-blue) 42%,transparent));
+  content:"";
+  opacity:.72;
+  pointer-events:none;
+}
+.fy-workspace-switcher::after{position:absolute;right:0;bottom:-1px;left:auto;width:42px;height:2px;background:linear-gradient(90deg,transparent,var(--workspace-blue));content:"";opacity:.75;pointer-events:none}
+.fy-command-identity{display:flex;min-width:0;align-items:center;gap:11px;padding:0;color:var(--text-secondary,#aebed1);white-space:nowrap}
+.fy-command-orbit{position:relative;width:27px;height:27px;flex:0 0 auto;border:1px solid color-mix(in srgb,var(--workspace-blue) 44%,transparent);border-radius:50%;transform:rotate(-18deg)}
+.fy-command-orbit::before{position:absolute;inset:5px;border:1px solid color-mix(in srgb,var(--workspace-accent) 42%,transparent);border-radius:50%;content:""}
+.fy-command-orbit>i:first-child{position:absolute;top:-2px;left:10px;width:5px;height:5px;border-radius:50%;background:var(--workspace-accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--workspace-accent) 10%,transparent),0 0 13px color-mix(in srgb,var(--workspace-accent) 68%,transparent)}
+.fy-command-orbit>i:last-child{position:absolute;right:2px;bottom:3px;width:3px;height:3px;border-radius:50%;background:var(--workspace-blue)}
+.fy-command-greeting{display:grid;min-width:0;gap:1px;color:var(--text-primary,#eef4ff);letter-spacing:-.01em}
+.fy-command-greeting small{color:var(--text-faint,#8092a8);font-size:.56rem;font-weight:760;letter-spacing:.12em;text-transform:uppercase}
+.fy-command-greeting strong{overflow:hidden;max-width:150px;font-size:.82rem;font-weight:780;text-overflow:ellipsis}
+.fy-workspace-tabs{position:relative;display:flex;align-items:stretch;align-self:stretch;gap:clamp(18px,2.5vw,42px);padding:0;border:0;border-radius:0;background:transparent}
+.fy-workspace-tabs>button{position:relative;display:inline-flex;min-height:55px;align-items:center;gap:7px;padding:0 2px;border:0;border-radius:0;background:transparent;color:var(--text-secondary,#aebed1);box-shadow:none;font-size:.74rem;font-weight:720;letter-spacing:-.01em;white-space:nowrap;transition:color .18s ease}
+.fy-workspace-tabs>button::after{position:absolute;right:0;bottom:0;left:0;height:2px;background:linear-gradient(90deg,var(--workspace-accent),var(--workspace-blue));box-shadow:0 -2px 12px color-mix(in srgb,var(--workspace-blue) 42%,transparent);content:"";opacity:0;transform:scaleX(.28);transition:opacity .18s ease,transform .22s ease}
+.fy-workspace-tabs>button:hover{border-color:transparent;background:transparent;color:var(--text-primary,#eef4ff)}
+.fy-workspace-tabs>button.is-active{border-color:transparent;background:transparent;color:var(--text-primary,#eef4ff);box-shadow:none}
+.fy-workspace-tabs>button.is-active::after{opacity:1;transform:scaleX(1)}
+.fy-workspace-tabs>button svg{padding:0;border-radius:0;background:transparent;color:var(--text-faint,#8092a8)}
+.fy-workspace-tabs>button.is-active svg{padding:0;background:transparent;color:var(--workspace-accent)}
+.fy-workspace-index{color:var(--text-faint,#8092a8);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.54rem;font-weight:760;letter-spacing:.08em}
+.fy-workspace-tabs>button.is-active .fy-workspace-index{color:var(--workspace-blue)}
+.fy-workspace-context{position:relative;display:flex;min-width:0;align-items:center;justify-content:flex-end;gap:17px}
+.fy-interest-disclosure{position:relative;display:flex;align-items:center}
+.fy-interest-summary{display:inline-flex;max-width:128px;align-items:center;gap:6px;overflow:hidden;padding:5px 2px;border:0;background:transparent;color:var(--text-faint,#8092a8);font-size:.62rem;font-weight:720;text-overflow:ellipsis;white-space:nowrap;cursor:default}
+.fy-interest-summary svg{color:var(--workspace-blue)}
+.fy-interest-popover{position:absolute;z-index:45;top:calc(100% + 15px);right:-52px;width:min(370px,42vw);padding:14px 15px;border:1px solid color-mix(in srgb,var(--workspace-accent) 25%,var(--line-soft,rgba(164,190,217,.18)));border-radius:17px;background:linear-gradient(145deg,color-mix(in srgb,var(--surface-raised,#151c2b) 97%,var(--workspace-accent) 3%),color-mix(in srgb,var(--surface-raised,#151c2b) 95%,var(--workspace-blue) 5%));box-shadow:0 22px 55px rgba(2,8,20,.3),inset 0 1px rgba(255,255,255,.07);opacity:0;pointer-events:none;transform:translateY(-7px) scale(.96);transform-origin:82% 0;transition:opacity .18s ease,transform .22s cubic-bezier(.2,.85,.25,1);backdrop-filter:blur(24px) saturate(130%)}
+.fy-interest-popover::before{position:absolute;top:-6px;right:73px;width:11px;height:11px;border-top:1px solid color-mix(in srgb,var(--workspace-accent) 25%,transparent);border-left:1px solid color-mix(in srgb,var(--workspace-accent) 25%,transparent);background:inherit;content:"";transform:rotate(45deg)}
+.fy-interest-popover>span{display:block;color:var(--workspace-accent);font-size:.55rem;font-weight:850;letter-spacing:.14em;text-transform:uppercase}
+.fy-interest-popover>div{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.fy-interest-popover b{padding:6px 9px;border:1px solid color-mix(in srgb,var(--workspace-blue) 22%,transparent);border-radius:999px;background:color-mix(in srgb,var(--workspace-blue) 9%,transparent);color:var(--text-primary,#eef4ff);font-size:.62rem;font-weight:720;line-height:1.2}
+.fy-interest-popover small{display:block;margin-top:11px;color:var(--text-faint,#8092a8);font-size:.56rem;line-height:1.4}
+.fy-interest-disclosure:hover .fy-interest-popover,.fy-interest-disclosure:focus-within .fy-interest-popover{opacity:1;pointer-events:auto;transform:translateY(0) scale(1)}
+.fy-tune-action{position:relative;display:inline-flex;min-height:40px;align-items:center;gap:7px;margin:0;padding:0 1px;border:0;border-radius:0;background:transparent;color:var(--text-secondary,#aebed1);font-size:.7rem;font-weight:760;white-space:nowrap}
+.fy-tune-action::after{position:absolute;right:0;bottom:5px;left:0;height:1px;background:color-mix(in srgb,var(--workspace-blue) 35%,transparent);content:"";transform:scaleX(.34);transform-origin:right;transition:background .18s ease,transform .2s ease}
+.fy-tune-action:hover{border-color:transparent;background:transparent;color:var(--text-primary,#eef4ff)}
+.fy-tune-action:hover::after{background:var(--workspace-blue);transform:scaleX(1)}
+.fy-tune-action svg:last-child{transition:transform .18s ease}
+.fy-tune-action:hover svg:last-child{transform:translateX(2px)}
+.fy-workspace-tabs>button:focus-visible,.fy-tune-action:focus-visible{outline:2px solid color-mix(in srgb,var(--workspace-blue) 72%,transparent);outline-offset:5px;border-radius:3px}
+html[data-theme="light"] .fy-workspace-switcher{border-color:transparent;background:transparent;box-shadow:none}
+html[data-theme="light"] .fy-command-greeting{color:#142b40}
+html[data-theme="light"] .fy-command-greeting small,html[data-theme="light"] .fy-workspace-index{color:#61778a}
+html[data-theme="light"] .fy-workspace-tabs{border-color:transparent;background:transparent}
+html[data-theme="light"] .fy-workspace-tabs>button{color:#526a80}
+html[data-theme="light"] .fy-workspace-tabs>button:hover,html[data-theme="light"] .fy-workspace-tabs>button.is-active{border-color:transparent;background:transparent;color:#142b40;box-shadow:none}
+html[data-theme="light"] .fy-workspace-tabs>button svg{background:transparent;color:#61778a}
+html[data-theme="light"] .fy-workspace-tabs>button.is-active svg{background:transparent;color:#087266}
+html[data-theme="light"] .fy-workspace-tabs>button.is-active .fy-workspace-index{color:#376da6}
+html[data-theme="light"] .fy-interest-summary{color:#526a80}
+html[data-theme="light"] .fy-command-orbit{border-color:#3a82a8;background:radial-gradient(circle at 34% 28%,#f5fffc 0 16%,#d8f4ed 42%,#dceafd 100%);box-shadow:0 0 0 4px rgba(44,131,144,.08),0 7px 18px rgba(52,94,126,.14)}
+html[data-theme="light"] .fy-command-orbit::before{border-color:#218c7d}
+html[data-theme="light"] .fy-command-orbit>i:first-child{background:#087b70;box-shadow:0 0 0 4px rgba(8,123,112,.11),0 0 10px rgba(8,123,112,.36)}
+html[data-theme="light"] .fy-command-orbit>i:last-child{background:#376da6}
+html[data-theme="light"] .fy-command-greeting small{color:#496579}
+html[data-theme="light"] .fy-command-greeting strong{color:#10283d}
+html[data-theme="light"] .fy-interest-popover{border-color:#a9c9ca;background:linear-gradient(145deg,rgba(250,253,253,.98),rgba(233,241,249,.98));box-shadow:0 22px 50px rgba(53,75,96,.2),inset 0 1px #fff}
+html[data-theme="light"] .fy-interest-popover>span{color:#087266}
+html[data-theme="light"] .fy-interest-popover b{border-color:#bdcfdf;background:#f4f8fc;color:#1d3a51}
+html[data-theme="light"] .fy-interest-popover small{color:#526a80}
+html[data-theme="light"] .fy-tune-action{color:#405a70}
+@media(prefers-reduced-motion:reduce){.fy-workspace-tabs>button,.fy-workspace-tabs>button::after,.fy-tune-action::after,.fy-tune-action svg:last-child,.fy-interest-popover{transition:none}}
