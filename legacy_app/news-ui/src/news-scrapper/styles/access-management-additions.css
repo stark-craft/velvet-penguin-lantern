@@ -32,3 +32,218 @@ html[data-theme="light"] .access-management-page .workflow-empty h2 {
 html[data-theme="light"] .access-management-page .workflow-empty p {
   color: var(--day-muted, #5d6e84);
 }
+
+.access-env-recipe {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, .75fr);
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.access-env-copy > span {
+  color: var(--accent);
+  font-size: .66rem;
+  font-weight: 850;
+  letter-spacing: .17em;
+  text-transform: uppercase;
+}
+
+.access-env-copy h2 {
+  margin: .28rem 0 .8rem;
+  color: var(--text);
+  font-size: 1.18rem;
+}
+
+.access-env-copy ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.access-env-copy li {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  padding: .68rem;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface-soft);
+}
+
+.access-env-copy li b {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: .67rem;
+}
+
+.access-env-copy li p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: .7rem;
+  line-height: 1.5;
+}
+
+.access-env-copy li code {
+  color: var(--text);
+  font-size: .68rem;
+}
+
+.access-env-code {
+  display: grid;
+  align-content: center;
+  gap: .7rem;
+  padding: .9rem;
+  border: 1px solid var(--accent-line);
+  border-radius: 17px;
+  background: var(--accent-soft);
+}
+
+.access-env-code small {
+  color: var(--accent);
+  font-size: .64rem;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.access-env-code code {
+  padding: .72rem .8rem;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: .76rem;
+  font-weight: 750;
+}
+
+.access-env-code .btn-dark-secondary {
+  justify-self: start;
+}
+
+.access-full-access {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .75rem;
+  margin-top: 1rem;
+  padding: .82rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+  text-align: left;
+  color: var(--text-muted);
+  transition: border-color .18s, background .18s, transform .18s;
+}
+
+.access-full-access:hover {
+  border-color: var(--accent-line);
+  transform: translateY(-1px);
+}
+
+.access-full-access.is-active {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.access-full-access > span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--surface);
+}
+
+.access-full-access div {
+  display: grid;
+  gap: .2rem;
+}
+
+.access-full-access strong {
+  color: var(--text);
+  font-size: .84rem;
+}
+
+.access-full-access small {
+  color: var(--text-muted);
+  font-size: .67rem;
+}
+
+.access-full-access b {
+  min-width: 38px;
+  padding: .35rem .5rem;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-faint);
+  font-size: .64rem;
+  text-align: center;
+}
+
+.access-full-access.is-active b {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.access-specific-permissions {
+  margin-top: .75rem;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-soft);
+}
+
+.access-specific-permissions > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .78rem .9rem;
+  cursor: pointer;
+  color: var(--text);
+  font-size: .74rem;
+  font-weight: 750;
+  list-style: none;
+}
+
+.access-specific-permissions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.access-specific-permissions > summary small {
+  color: var(--text-muted);
+  font-size: .65rem;
+  font-weight: 600;
+}
+
+.access-specific-permissions .access-capability-groups {
+  margin: 0;
+  padding: 0 .75rem .75rem;
+}
+
+.access-save {
+  margin-top: 1rem;
+}
+
+html[data-theme="light"] .access-env-copy h2,
+html[data-theme="light"] .access-env-code code,
+html[data-theme="light"] .access-full-access strong,
+html[data-theme="light"] .access-specific-permissions > summary {
+  color: var(--day-text, #172235);
+}
+
+@media (max-width: 980px) {
+  .access-env-recipe {
+    grid-template-columns: 1fr;
+  }
+}

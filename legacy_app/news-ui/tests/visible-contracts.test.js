@@ -392,3 +392,13 @@ test('the primary interface font is bundled instead of fetched at runtime', () =
   assert.match(entrySource, /@fontsource-variable\/geist\/wght\.css/);
   assert.match(polishSource, /font-family:\s*"Geist Variable"/);
 });
+
+test('Access Management offers a simple exact-IP full-access path and env recipe', () => {
+  const accessSource = readFileSync(new URL('../src/news-scrapper/screens/AccessManagementScreen.jsx', import.meta.url), 'utf8');
+  assert.match(accessSource, /FULL_ACCESS_ALLOWED_IPS=192\.0\.2\.25/);
+  assert.match(accessSource, /Add an IP address/);
+  assert.match(accessSource, /Full access is selected by default/);
+  assert.match(accessSource, /grant_by_ip/);
+  assert.match(accessSource, /Choose specific access instead/);
+  assert.doesNotMatch(accessSource, /Viewer identity token/);
+});

@@ -2,10 +2,8 @@
 
 ## TechScout access-management and `.env` operator grimoire
 
-This guide explains exactly how TechScout authorization works, what every
-Access Management checkbox grants, which `.env` setting provides each
-deployment-level bootstrap, which key belongs in each protected prompt, and
-what an administrator should enter when adding a person.
+Start with the short IP recipe below. The remaining sections are reference
+material for administrators who need limited access or troubleshooting.
 
 It describes the active production-shaped application in `legacy_app/`. Older
 top-level applications and old Default/Broadcast profile-routing documents are
@@ -13,12 +11,39 @@ not the authority for access control.
 
 ---
 
+## The simple answer: give one IP full access
+
+Example only: `192.0.2.25` is a documentation address. Replace it with the
+user's real IP address.
+
+1. Open `legacy_app/.env`.
+2. Add this one line:
+
+   ```dotenv
+   FULL_ACCESS_ALLOWED_IPS=192.0.2.25
+   ```
+
+3. Save `.env` and restart the backend.
+
+That exact IP now has every TechScout capability. Nothing else is required.
+For a different IP, change only the value after `=`.
+
+To do the same from the UI, open **Settings → Access Management**, click
+**Add an IP address**, enter the real IP, leave **Full access** switched on, and
+click **Save access**. UI changes are immediate; ask the user to refresh.
+
+For limited access, switch **Full access** off, expand **Choose specific access
+instead**, and select only the required tools.
+
+---
+
 ## 1. The three gates
 
 TechScout combines three independent authorization sources:
 
-1. **A runtime grant for a signed browser identity**
-   - Created from **Settings → Access Management → Add a person**.
+1. **A runtime grant for an exact IP or signed browser identity**
+   - The simple UI path is **Settings → Access Management → Add an IP
+     address**.
    - Stored in `NEWSSCRAPPER_RUNTIME_DIR/access_control.json`.
    - Takes effect on the backend immediately; no backend restart is required.
    - The recipient should reload TechScout so the frontend fetches its new
@@ -54,8 +79,6 @@ allowlist or an active role session.
 
 - It does **not** edit `.env`.
 - It does **not** store a person's raw browser cookie.
-- The optional **Trusted network addresses** field is recognition/audit
-  metadata. It does not itself grant a capability.
 - It does **not** restart the backend.
 - It does **not** make a public article private or a private draft public.
 
@@ -104,7 +127,8 @@ Put the first administrator's exact client address in:
 
 ```dotenv
 NEWSSCRAPPER_ENV=production
-ACCESS_MANAGEMENT_ALLOWED_IPS=10.24.8.17
+FULL_ACCESS_ALLOWED_IPS=10.24.8.17
+ACCESS_MANAGEMENT_ALLOWED_IPS=
 TRUSTED_PROXY_IPS=127.0.0.1,::1
 ```
 
@@ -141,10 +165,12 @@ Once the first administrator can open Access Management:
 
 ---
 
-## 4. What to paste into “Viewer identity token”
+## 4. Advanced: browser identity principals
 
-Despite the field's historical label, the Access Management API expects the
-person's stable **principal**, not their raw `techscout_viewer` cookie.
+The simplified UI now adds access by exact IP and does not ask for a viewer
+token. Existing identity-based records remain supported. For an advanced API or
+migration workflow, use the person's stable **principal**, never their raw
+`techscout_viewer` cookie.
 
 On the person's own TechScout browser, open the same-origin route:
 
@@ -184,17 +210,18 @@ for that browser for one year. Clearing the TechScout identity cookie or
 changing `NEWSSCRAPPER_VIEWER_COOKIE_SECRET` creates a new identity, so a new
 principal must then be granted.
 
-### Adding a person, field by field
+### Adding an IP address in the UI
 
-1. Click **Add a person**.
-2. In **Viewer identity token**, paste the `principal` value described above.
-3. In **Name shown in this workspace**, enter a readable team name. This is for
-   the access list and audit display; it is not used for authentication.
-4. In **Trusted network addresses**, optionally enter exact office or VPN
-   addresses separated by commas. These are descriptive metadata only.
-5. Select the minimum required checkboxes.
-6. Click **Save access**.
-7. Ask the recipient to reload TechScout.
+1. Click **Add an IP address**.
+2. Enter one exact IPv4 or IPv6 address, such as `192.0.2.25`.
+3. Optionally add a readable label.
+4. Leave **Full access** on, or switch it off and choose specific access.
+5. Click **Save access**.
+6. Ask the recipient to reload TechScout.
+
+The IP field is active authorization for new network records. Older browser
+identity records can still exist, but their historical reference addresses do
+not become active IP grants automatically.
 
 The backend writes the grant atomically and records capability changes in:
 
@@ -487,6 +514,7 @@ ACCESS_MANAGEMENT_ALLOWED_IPS=10.24.8.17
 
 | `.env` variable | Capabilities granted to matching exact IPs |
 |---|---|
+| `FULL_ACCESS_ALLOWED_IPS` | Every defined capability, including `access.manage` |
 | `CONTRIBUTIONS_ALLOWED_IPS` | `contributions.create` |
 | `ANALYTICS_ALLOWED_IPS` | `analytics.view` |
 | `GATEKEEPER_ALLOWED_IPS` | `gatekeeper.review`, `model.train`, `region.correct` |

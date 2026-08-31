@@ -64,6 +64,66 @@ class AccessControlTests(unittest.TestCase):
         self.assertEqual(response.json()["ip"], "192.0.2.25")
         self.assertIn("access.manage", response.json()["capabilities"])
 
+    def test_full_access_allowlist_grants_every_capability(self):
+        with patch.dict(
+            os.environ,
+            {"FULL_ACCESS_ALLOWED_IPS": "192.0.2.25"},
+            clear=False,
+        ):
+            response = self.call(
+                "GET",
+                "/access-control/capabilities",
+                ip="192.0.2.25",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(set(response.json()["capabilities"]), set(service.ALL_CAPABILITIES))
+
+    def test_runtime_ip_grant_is_immediate_but_legacy_ip_metadata_is_not(self):
+        with patch.dict(
+            os.environ,
+            {"ACCESS_MANAGEMENT_ALLOWED_IPS": "10.0.0.25"},
+            clear=False,
+        ):
+            saved = self.call(
+                "PUT",
+                "/access-control/principals/ip%3A192.0.2.44",
+                ip="10.0.0.25",
+                body={
+                    "display_name": "Office laptop",
+                    "known_ips": ["192.0.2.44"],
+                    "grant_by_ip": True,
+                    "capabilities": ["review.news.view", "approved.view"],
+                },
+            )
+            network_view = self.call(
+                "GET",
+                "/access-control/capabilities",
+                ip="192.0.2.44",
+            )
+            legacy_record = self.call(
+                "PUT",
+                "/access-control/principals/viewer-with-metadata",
+                ip="10.0.0.25",
+                body={
+                    "display_name": "Identity only",
+                    "known_ips": ["192.0.2.45"],
+                    "capabilities": ["analytics.view"],
+                },
+            )
+            metadata_view = self.call(
+                "GET",
+                "/access-control/capabilities",
+                ip="192.0.2.45",
+            )
+        self.assertEqual(saved.status_code, 200)
+        self.assertTrue(saved.json()["item"]["grant_by_ip"])
+        self.assertEqual(
+            set(network_view.json()["capabilities"]),
+            {"review.news.view", "approved.view"},
+        )
+        self.assertEqual(legacy_record.status_code, 200)
+        self.assertNotIn("analytics.view", metadata_view.json()["capabilities"])
+
     def test_dynamic_capability_change_is_immediate_and_audited(self):
         with patch.dict(
             os.environ,

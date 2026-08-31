@@ -90,6 +90,7 @@ def save_principal(principal: str, request: Request, payload: dict = Body(...)):
             display_name=str(payload.get("display_name") or ""),
             known_ips=payload.get("known_ips") or [],
             capabilities=payload.get("capabilities") or [],
+            grant_by_ip=bool(payload.get("grant_by_ip")),
             actor=actor,
         )
     except ValueError as error:

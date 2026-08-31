@@ -1,13 +1,13 @@
 """Runtime capability store with safe env bootstrap and auditable changes.
 
-The signed browser identity is the canonical principal. Client IP is retained
-only as deployment bootstrap/network context, and forwarded addresses are
-accepted only from configured trusted proxies.
+Access can follow an explicit exact-IP grant or a signed browser identity.
+Forwarded addresses are accepted only from configured trusted proxies.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import ipaddress
 import os
 import secrets
 import threading
@@ -94,6 +94,7 @@ def bootstrap_capabilities_for_ip(ip: str) -> set[str]:
     resolved = normalize_ip(ip)
     capabilities: set[str] = set()
     mappings = (
+        ("FULL_ACCESS_ALLOWED_IPS", "", set(ALL_CAPABILITIES)),
         ("CONTRIBUTIONS_ALLOWED_IPS", "127.0.0.1,::1", {"contributions.create"}),
         ("ANALYTICS_ALLOWED_IPS", "127.0.0.1,::1", {"analytics.view"}),
         (
@@ -152,6 +153,35 @@ def principal_record(principal: str) -> dict:
 def dynamic_capabilities(principal: str) -> set[str]:
     values = principal_record(principal).get("capabilities", [])
     return {str(value) for value in values if str(value) in ALL_CAPABILITIES}
+
+
+def network_capabilities(ip: str) -> set[str]:
+    """Return explicit runtime grants attached to one exact network address.
+
+    Older identity records can contain known_ips as descriptive metadata. They
+    remain metadata unless grant_by_ip is explicitly true, preventing an
+    upgrade from silently turning historical labels into authorization.
+    """
+
+    resolved = normalize_ip(ip)
+    if resolved == "unknown":
+        return set()
+    granted: set[str] = set()
+    for record in _normalized_store()["principals"].values():
+        if not isinstance(record, dict) or not bool(record.get("grant_by_ip")):
+            continue
+        addresses = {
+            normalize_ip(value)
+            for value in record.get("known_ips", [])
+            if normalize_ip(value) != "unknown"
+        }
+        if resolved in addresses:
+            granted.update(
+                str(value)
+                for value in record.get("capabilities", [])
+                if str(value) in ALL_CAPABILITIES
+            )
+    return granted
 
 
 def _prune_sessions(now: float | None = None) -> None:
@@ -226,6 +256,7 @@ def effective_capabilities(request: Request, response: Response | None = None) -
     principal, ip = resolve_principal(request, response)
     return (
         dynamic_capabilities(principal)
+        | network_capabilities(ip)
         | bootstrap_capabilities_for_ip(ip)
         | session_capabilities(request)
     )
@@ -270,18 +301,29 @@ def update_principal(
     known_ips: Iterable[str],
     capabilities: Iterable[str],
     actor: str,
+    grant_by_ip: bool = False,
 ) -> dict:
     principal = str(principal or "").strip()
     if not principal or len(principal) > 256:
         raise ValueError("Choose a valid viewer principal.")
     next_capabilities = sorted({value for value in capabilities if value in ALL_CAPABILITIES})
     next_ips = sorted({normalize_ip(value) for value in known_ips if normalize_ip(value) != "unknown"})
+    grant_by_ip = bool(grant_by_ip)
+    if grant_by_ip and not next_ips:
+        raise ValueError("Enter an IP address before saving network access.")
+    if grant_by_ip:
+        try:
+            for value in next_ips:
+                ipaddress.ip_address(value)
+        except ValueError as error:
+            raise ValueError("Enter a valid IPv4 or IPv6 address.") from error
     with ACCESS_LOCK:
         data = _normalized_store()
         previous = dict(data["principals"].get(principal, {}))
         record = {
             "display_name": str(display_name or previous.get("display_name") or "")[:200],
             "known_ips": next_ips,
+            "grant_by_ip": grant_by_ip,
             "capabilities": next_capabilities,
             "updated_at": utc_now(),
             "updated_by": str(actor)[:256],
