@@ -1462,6 +1462,11 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sni-announcement-track {
+    animation-duration: var(--announcement-duration, 56s) !important;
+    animation-iteration-count: infinite !important;
+  }
+
   .sni-card,
   .sni-focus-action,
   .sni-focus-dots button { transition-duration: .01ms; }

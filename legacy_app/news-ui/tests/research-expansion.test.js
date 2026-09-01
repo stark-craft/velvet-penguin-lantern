@@ -11,6 +11,8 @@ const research = read("../src/news-scrapper/screens/ResearchScreen.jsx");
 const samsung = read("../src/news-scrapper/screens/SamsungInternalScreen.jsx");
 const continuousStream = read("../src/news-scrapper/components/ContinuousSignalStream.jsx");
 const continuousStreamStyles = read("../src/news-scrapper/styles/continuous-signal-stream.css");
+const samsungStyles = read("../src/news-scrapper/styles/samsung-internal.css");
+const themeStyles = read("../src/news-scrapper/theme-toggle.css");
 const autoplay = read("../src/news-scrapper/hooks/useAutoplayState.js");
 const publishing = read("../src/news-scrapper/screens/InternalPublishingScreen.jsx");
 const saved = read("../src/news-scrapper/screens/SavedScreen.jsx");
@@ -56,7 +58,6 @@ test("Samsung Focus pins leadership while keeping every carousel zone fixed", ()
   assert.match(samsung, /Pause Samsung Focus/);
   assert.match(autoplay, /prefers-reduced-motion: reduce/);
   assert.match(samsung, /Read full message/);
-  const samsungStyles = read("../src/news-scrapper/styles/samsung-internal.css");
   assert.match(samsungStyles, /grid-template-rows: 52px 38px minmax\(0, 1fr\) 72px/);
   assert.match(samsungStyles, /-webkit-line-clamp: 3/);
 });
@@ -69,6 +70,11 @@ test("live streams keep flowing on Windows motion settings and tall displays", (
   assert.doesNotMatch(continuousStream, /IntersectionObserver/);
   assert.match(continuousStreamStyles, /translateY\(-25%\)/);
   assert.doesNotMatch(continuousStreamStyles, /animation:none/);
+  // The global accessibility reset intentionally suppresses ordinary motion.
+  // Required live streams must opt back into only their slowed, pausable loops.
+  assert.match(themeStyles, /animation-duration:\s*0\.01ms\s*!important/);
+  assert.match(continuousStreamStyles, /prefers-reduced-motion:reduce[\s\S]*animation-duration:var\(--stream-duration,63s\)!important[\s\S]*animation-iteration-count:infinite!important/);
+  assert.match(samsungStyles, /prefers-reduced-motion: reduce[\s\S]*\.sni-announcement-track[\s\S]*animation-duration: var\(--announcement-duration, 56s\) !important[\s\S]*animation-iteration-count: infinite !important/);
   assert.match(autoplay, /document\.visibilityState === 'visible'/);
   assert.equal(repeatingCycleCount(3840, 1, 286), 28);
   assert.equal(repeatingCycleCount(7680, 1, 286), 55);
@@ -95,7 +101,6 @@ test("Samsung Internal nests a compact announcement rail in the wire and keeps t
 });
 
 test("Samsung Internal renders on theme tokens via its stylesheet", () => {
-  const samsungStyles = read("../src/news-scrapper/styles/samsung-internal.css");
   assert.match(samsungStyles, /samsung-internal-page/);
   assert.match(samsungStyles, /var\(--text\)/);
   assert.match(samsungStyles, /sni-notice-with-image/);
