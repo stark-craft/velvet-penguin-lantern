@@ -57,7 +57,7 @@ class UnifiedSourceTests(unittest.TestCase):
         rollback = Path("news_scrapper/config/sites_broadcast.json")
         sites = load_sites(primary)
         entrypoints = [canonical_url(site.get("rss_url") or site.get("url")) for site in sites]
-        self.assertEqual(len(sites), 166)
+        self.assertEqual(len(sites), 167)
         self.assertEqual(len(entrypoints), len(set(entrypoints)))
         self.assertEqual(sum("broadcast" in (site.get("verticals") or []) for site in sites), 59)
         rollback_entrypoints = {
@@ -67,7 +67,7 @@ class UnifiedSourceTests(unittest.TestCase):
         self.assertTrue(rollback_entrypoints.issubset(set(entrypoints)))
 
         _, report = build_unified_catalog(primary, rollback)
-        self.assertEqual(report["records"], 166)
+        self.assertEqual(report["records"], 167)
         self.assertEqual(report["duplicate_records_removed"], 59)
         self.assertFalse(report["duplicate_entrypoints"])
 

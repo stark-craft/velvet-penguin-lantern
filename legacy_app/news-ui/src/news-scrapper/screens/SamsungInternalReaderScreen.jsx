@@ -28,7 +28,9 @@ export default function SamsungInternalReaderScreen({ kind }) {
       const actual = result?.contentType;
       const allowed = kind === 'announcement'
         ? actual === 'announcement'
-        : actual === 'leadership';
+        : kind === 'leadership'
+          ? actual === 'leadership'
+          : actual === 'story' || actual === 'document_import';
       if (!allowed) throw new Error('This published record does not belong to this reader.');
       setRecord(result);
     }).catch((loadError) => {
@@ -41,20 +43,21 @@ export default function SamsungInternalReaderScreen({ kind }) {
   if (!record) return <main className="sni-reader-page"><div className="sni-state" role="status"><span className="sni-loader" /><h1>Opening the published message…</h1></div></main>;
   const image = coverUrl(record);
   const isAnnouncement = kind === 'announcement';
+  const isLeadership = kind === 'leadership';
   return (
-    <main className={`sni-reader-page${isAnnouncement ? ' is-announcement' : ' is-leadership'}`}>
+    <main className={`sni-reader-page${isAnnouncement ? ' is-announcement' : isLeadership ? ' is-leadership' : ' is-story'}`}>
       <button className="sni-reader-back" onClick={goBack} type="button"><Icon name="chevL" size={15} /> Back to Samsung Internal</button>
       <article className="sni-reader-shell">
         <header className="sni-reader-hero">
           <div className="sni-reader-hero-copy">
-            <span>{isAnnouncement ? 'Company announcement' : 'From the MD’s desk'}</span>
-            <h1>{record.title || (isAnnouncement ? 'Company announcement' : 'Leadership message')}</h1>
+            <span>{isAnnouncement ? 'Company announcement' : isLeadership ? 'From the MD’s desk' : 'Inside Samsung · Colleague story'}</span>
+            <h1>{record.title || (isAnnouncement ? 'Company announcement' : isLeadership ? 'Leadership message' : 'Colleague story')}</h1>
             {record.summary && <p>{record.summary}</p>}
             <div><span>{record.author || 'Samsung Internal desk'}</span>{record.category && <span>{record.category}</span>}{record.publishedAt && <time>{dateLabel(record.publishedAt)}</time>}</div>
           </div>
           {image && <figure><img alt="" onError={(event) => { event.currentTarget.closest('figure')?.remove(); }} src={image} /></figure>}
         </header>
-        <section className="sni-reader-body"><span>{isAnnouncement ? 'Full notice' : 'Full message'}</span>{paragraphs(record.body || record.summary).map((paragraph, index) => <p key={`${paragraph.slice(0, 30)}-${index}`}>{paragraph}</p>)}</section>
+        <section className="sni-reader-body"><span>{isAnnouncement ? 'Full notice' : isLeadership ? 'Full message' : 'Full story'}</span>{paragraphs(record.body || record.summary).map((paragraph, index) => <p key={`${paragraph.slice(0, 30)}-${index}`}>{paragraph}</p>)}</section>
       </article>
     </main>
   );

@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import { SignalVisual } from '../components/ArticleCard.jsx';
 import ContinuousSignalStream from '../components/ContinuousSignalStream.jsx';
+import useAutoplayState, { autoplayDelay, repeatingCycleCount } from '../hooks/useAutoplayState.js';
 import { archiveInternalContent, getPublishedInternalContent, getSamsungInternalFeed, getSharedBriefing, getLatestBriefing } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import {
@@ -13,7 +14,6 @@ import {
 import '../styles/samsung-internal.css';
 
 const HERO_SLIDE_LIMIT = 5;
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const CHANNELS = [
   { id: 'global', label: 'Samsung Global', icon: 'globe' },
   { id: 'local', label: 'Samsung Local', icon: 'radar' },
@@ -40,24 +40,6 @@ function excerptOf(text, limit = 320) {
   return clean.length > limit ? `${clean.slice(0, limit).trimEnd()}…` : clean;
 }
 
-function useMotionPause() {
-  const [paused, setPaused] = useState(false);
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia?.(REDUCED_MOTION_QUERY);
-    const syncMotion = () => setReduced(Boolean(media?.matches));
-    const syncVisibility = () => setPaused(document.visibilityState !== 'visible');
-    syncMotion(); syncVisibility();
-    media?.addEventListener?.('change', syncMotion);
-    document.addEventListener('visibilitychange', syncVisibility);
-    return () => {
-      media?.removeEventListener?.('change', syncMotion);
-      document.removeEventListener('visibilitychange', syncVisibility);
-    };
-  }, []);
-  return { paused, reduced, setPaused };
-}
-
 function ResilientImage({ src, alt = '', className = '', loading = 'lazy' }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [src]);
@@ -71,21 +53,32 @@ function rememberInternalPosition() {
 
 function AnnouncementRail({ items, busyId = '', onRemove }) {
   const navigate = useNavigate();
-  const { paused, reduced, setPaused } = useMotionPause();
+  const [manualPaused, setManualPaused] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(() => typeof window === 'undefined' ? 1920 : window.innerWidth);
+  const { documentVisible, reducedMotion } = useAutoplayState();
+  useEffect(() => {
+    const sync = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
+  }, []);
   if (!items.length) return null;
-  const staticMode = reduced || Boolean(onRemove);
-  const entries = staticMode ? items : [...items, ...items];
+  const paused = manualPaused || !documentVisible;
+  // Repeat enough complete cycles to cover two full viewports. This avoids a
+  // blank rail or a visible reset when one short notice is shown on a 4K TV.
+  const minimumEntryWidth = onRemove ? 286 : 410;
+  const copyCount = repeatingCycleCount(viewportWidth, items.length, minimumEntryWidth);
+  const entries = Array.from({ length: copyCount }, (_, copyIndex) => copyIndex)
+    .flatMap((copyIndex) => items.map((record) => ({ record, copyIndex })));
   return (
     <section
       aria-label="Company announcements"
-      className={`sni-wire-announcements${paused ? ' is-paused' : ''}${staticMode ? ' is-static' : ''}${onRemove ? ' is-manageable' : ''}`}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}
-      onFocus={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
+      className={`sni-wire-announcements${paused ? ' is-paused' : ''}${onRemove ? ' is-manageable' : ''}`}
+      style={{ '--announcement-copy-count': copyCount, '--announcement-duration': `${reducedMotion ? 56 : 32}s` }}
     >
-      <div className="sni-announcement-label"><Icon name="megaphone" size={13} /><span>Notices</span></div>
+      <button aria-label={manualPaused ? 'Resume company announcements' : 'Pause company announcements'} aria-pressed={manualPaused} className="sni-announcement-label" onClick={() => setManualPaused((value) => !value)} title={manualPaused ? 'Resume announcements' : 'Pause announcements'} type="button"><Icon name={manualPaused ? 'play' : 'megaphone'} size={13} /><span>Notices</span></button>
       <div className="sni-announcement-window"><div className="sni-announcement-track">
-        {entries.map((record, index) => {
-          const duplicate = !staticMode && index >= items.length;
+        {entries.map(({ record, copyIndex }, index) => {
+          const duplicate = copyIndex > 0;
           const content = <><span>{record.category || 'Announcement'}</span><strong>{record.title || 'Company announcement'}</strong><time>{formatDate(record.publishedAt)}</time></>;
           if (duplicate) return <div aria-hidden="true" className="sni-announcement-entry" key={`${record.id}-${index}`}><div className="sni-announcement-item">{content}</div></div>;
           return <div className="sni-announcement-entry" key={`${record.id}-${index}`}>
@@ -123,13 +116,14 @@ function channelLabel(item) {
 function FocusCarousel({ slides }) {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
-  const { paused, reduced, setPaused } = useMotionPause();
+  const [manualPaused, setManualPaused] = useState(false);
+  const { documentVisible, reducedMotion } = useAutoplayState();
   useEffect(() => { if (index >= slides.length) setIndex(0); }, [index, slides.length]);
   useEffect(() => {
-    if (paused || reduced || slides.length <= 1) return undefined;
-    const timer = window.setInterval(() => setIndex((current) => (current + 1) % slides.length), 8000);
+    if (manualPaused || !documentVisible || slides.length <= 1) return undefined;
+    const timer = window.setInterval(() => setIndex((current) => (current + 1) % slides.length), autoplayDelay(8000, reducedMotion));
     return () => window.clearInterval(timer);
-  }, [paused, reduced, slides.length]);
+  }, [documentVisible, manualPaused, reducedMotion, slides.length]);
   if (!slides.length) return null;
   const active = slides[index];
   const article = active.kind === 'signal' ? active.item : null;
@@ -150,8 +144,6 @@ function FocusCarousel({ slides }) {
     <section
       aria-label="Samsung Focus" aria-roledescription="carousel"
       className={`sni-focus-carousel${record ? ' is-leadership' : ''}`}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }}
-      onFocus={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}
     >
       {!record && <SignalVisual className="sni-focus-visual" item={{ ...article, image_url: image }} label={false} />}
       {record && image && <ResilientImage alt={`${record.author || 'Leadership'} portrait`} className="sni-focus-portrait" loading="eager" src={image} />}
@@ -162,6 +154,7 @@ function FocusCarousel({ slides }) {
           <div className="sni-focus-controls">
             <button aria-label="Previous Samsung Focus slide" className="carousel-control" onClick={() => move(-1)} type="button"><Icon name="chevL" /></button>
             <button aria-label="Next Samsung Focus slide" className="carousel-control" onClick={() => move(1)} type="button"><Icon name="chevR" /></button>
+            <button aria-label={manualPaused ? 'Resume Samsung Focus' : 'Pause Samsung Focus'} aria-pressed={manualPaused} className="carousel-control" onClick={() => setManualPaused((value) => !value)} type="button"><Icon name={manualPaused ? 'play' : 'pause'} /></button>
           </div>
         </header>
         <div className="sni-focus-tags">
@@ -226,11 +219,14 @@ function SignalCard({ item }) {
 }
 
 function ContributionCard({ record }) {
+  const navigate = useNavigate();
   const image = coverUrl(record);
   return (
     <article className="sni-card sni-card-internal">
-      <div className={`sni-card-media${image ? '' : ' is-empty'}`}>{image ? <ResilientImage alt="" src={image} /> : <span aria-hidden="true"><Icon name="note" size={22} /></span>}<span className="sni-card-kind">Colleague story</span></div>
-      <div className="sni-card-body"><h3>{record.title || 'Untitled'}</h3><p>{excerptOf(record.summary || record.body, 180)}</p><footer><span>{record.author || 'Samsung colleague'}</span><span>{formatDate(record.publishedAt)}</span></footer></div>
+      <button aria-label={`Read colleague story: ${record.title || 'Untitled'}`} className="sni-card-open" onClick={() => { rememberInternalPosition(); navigate(`/samsung-internal/story/${encodeURIComponent(record.id)}`); }} type="button">
+        <div className={`sni-card-media${image ? '' : ' is-empty'}`}>{image ? <ResilientImage alt="" src={image} /> : <span aria-hidden="true"><Icon name="note" size={22} /></span>}<span className="sni-card-kind">Colleague story</span></div>
+        <div className="sni-card-body"><h3>{record.title || 'Untitled'}</h3><p>{excerptOf(record.summary || record.body, 180)}</p><footer><span>{record.author || 'Samsung colleague'}</span><span>{formatDate(record.publishedAt)}</span><span>Read story <Icon name="chevR" size={12} /></span></footer></div>
+      </button>
     </article>
   );
 }

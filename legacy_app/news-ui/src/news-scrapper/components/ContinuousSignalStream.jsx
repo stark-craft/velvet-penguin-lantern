@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import Icon from './Icon.jsx';
+import useAutoplayState from '../hooks/useAutoplayState.js';
 import '../styles/continuous-signal-stream.css';
 
 export default function ContinuousSignalStream({
@@ -9,61 +10,39 @@ export default function ContinuousSignalStream({
   duration = 36,
   className = '',
 }) {
-  const rootRef = useRef(null);
   const [manualPaused, setManualPaused] = useState(false);
-  const [visible, setVisible] = useState(true);
-  const [documentVisible, setDocumentVisible] = useState(true);
-  const [reduced, setReduced] = useState(false);
+  const { documentVisible, reducedMotion } = useAutoplayState();
 
-  useEffect(() => {
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    const sync = () => setReduced(Boolean(media?.matches));
-    sync();
-    media?.addEventListener?.('change', sync);
-    return () => media?.removeEventListener?.('change', sync);
-  }, []);
-
-  useEffect(() => {
-    const sync = () => setDocumentVisible(document.visibilityState === 'visible');
-    sync();
-    document.addEventListener('visibilitychange', sync);
-    return () => document.removeEventListener('visibilitychange', sync);
-  }, []);
-
-  useEffect(() => {
-    if (!('IntersectionObserver' in window) || !rootRef.current) return undefined;
-    const observer = new IntersectionObserver(([entry]) => setVisible(Boolean(entry?.isIntersecting)), { rootMargin: '120px' });
-    observer.observe(rootRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  const moving = items.length > 1 && !manualPaused && !reduced && visible && documentVisible;
-  const renderGroup = (duplicate) => (
-    <div aria-hidden={duplicate ? 'true' : undefined} className="continuous-stream-group">
-      {items.map((item, index) => (
-        <React.Fragment key={`${item?.id || item?.link || item?.title || index}-${duplicate ? 'copy' : 'original'}`}>
-          {renderItem(item, index, duplicate)}
-        </React.Fragment>
-      ))}
-    </div>
-  );
+  const moving = items.length > 1 && !manualPaused && documentVisible;
+  const effectiveDuration = Math.max(12, duration) * (reducedMotion ? 1.75 : 1);
+  const renderGroup = (copyIndex) => {
+    const duplicate = copyIndex > 0;
+    return (
+      <div aria-hidden={duplicate ? 'true' : undefined} className="continuous-stream-group" key={`stream-copy-${copyIndex}`}>
+        {items.map((item, index) => (
+          <React.Fragment key={`${item?.id || item?.link || item?.title || index}-${copyIndex}`}>
+            {renderItem(item, index, duplicate)}
+          </React.Fragment>
+        ))}
+      </div>
+    );
+  };
 
   return (
-    <div aria-label={ariaLabel} className={`continuous-signal-stream ${className}`.trim()} ref={rootRef}>
+    <div aria-label={ariaLabel} className={`continuous-signal-stream ${className}`.trim()}>
       <button
         aria-pressed={manualPaused}
         className="continuous-stream-toggle"
         onClick={() => setManualPaused((value) => !value)}
-        title={manualPaused ? 'Resume stream' : 'Pause stream'}
+        title={manualPaused ? 'Resume stream' : `Pause stream${reducedMotion ? ' (slowed for Windows motion preference)' : ''}`}
         type="button"
       >
         <Icon name={manualPaused ? 'play' : 'pause'} size={13} />
         <span>{manualPaused ? 'Resume' : 'Pause'}</span>
       </button>
       <div className="continuous-stream-window">
-        <div className={moving ? 'continuous-stream-track is-moving' : 'continuous-stream-track'} style={{ '--stream-duration': `${Math.max(12, duration)}s` }}>
-          {renderGroup(false)}
-          {!reduced && renderGroup(true)}
+        <div className={moving ? 'continuous-stream-track is-moving' : 'continuous-stream-track'} style={{ '--stream-duration': `${effectiveDuration}s` }}>
+          {[0, 1, 2, 3].map(renderGroup)}
         </div>
       </div>
     </div>

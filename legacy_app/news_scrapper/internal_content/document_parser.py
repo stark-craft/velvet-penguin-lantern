@@ -24,7 +24,7 @@ DOCX_MAX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 DOCX_MAX_ARCHIVE_MEMBERS = 5000
 PDF_MAX_PAGES = 100
 EXTRACT_MAX_CHARS = 200_000
-MIN_READABLE_CHARS = 40
+MIN_READABLE_CHARS = 8
 
 WORD_DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 PDF_TYPE = "application/pdf"
@@ -44,7 +44,7 @@ class ContributionError(Exception):
 
 
 def extension_of(filename: str) -> str:
-    name = str(filename or "")
+    name = str(filename or "").strip()
     return name.rsplit(".", 1)[-1].lower() if "." in name else ""
 
 
@@ -73,7 +73,10 @@ def validate_document_upload(filename: str, declared_type: str, size_bytes: int)
 
 def _signature_matches(kind: str, data: bytes) -> bool:
     if kind == "pdf":
-        return data[:5] == b"%PDF-"
+        # ISO 32000 readers are expected to find the PDF header within the
+        # first 1024 bytes. Some Windows print/export drivers add a BOM or a
+        # short preamble, so requiring byte zero rejects otherwise valid PDFs.
+        return b"%PDF-" in data[:1024]
     if kind == "docx":
         if data[:4] != b"PK\x03\x04":
             return False

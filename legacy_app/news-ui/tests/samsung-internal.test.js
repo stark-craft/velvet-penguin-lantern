@@ -170,14 +170,17 @@ test("Samsung wire follows the 5/3/3 editorial sequence without cross-filling sh
   assert.deepEqual(short.map((item) => item.id), ["g-1", "g-2", "i-1", "g-3"]);
 });
 
-test("published destination has dedicated announcement and leadership readers", () => {
+test("published destination has dedicated announcement, leadership, and colleague-story readers", () => {
   const app = read("../src/news-scrapper/App.jsx");
   assert.match(app, /\/samsung-internal\/leadership\/:id/);
   assert.match(app, /\/samsung-internal\/announcement\/:id/);
+  assert.match(app, /\/samsung-internal\/story\/:id/);
   const screen = read("../src/news-scrapper/screens/SamsungInternalScreen.jsx");
   assert.match(screen, /Samsung Intelligence Wire/);
   assert.match(screen, /sni-wire-announcements/);
   assert.match(screen, /<AnnouncementRail[\s\S]*items=\{announcements\}[\s\S]*onRemove=\{onRemoveAnnouncement\}/);
+  assert.match(screen, /navigate\(`\/samsung-internal\/story\/\$\{encodeURIComponent\(record\.id\)\}`\)/);
+  assert.match(screen, /Read colleague story/);
   assert.doesNotMatch(screen, /id: 'announcements'/);
 });
 

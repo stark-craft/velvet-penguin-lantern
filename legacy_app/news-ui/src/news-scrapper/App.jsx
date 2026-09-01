@@ -484,6 +484,7 @@ export default function App() {
             <Route path="/samsung-internal" element={<SamsungInternalScreen canManageAnnouncements={hasCapability("review.contributions.publish")} contributionAllowed={Boolean(contributionAccess?.allowed)} />} />{" "}
             <Route path="/samsung-internal/leadership/:id" element={<SamsungInternalReaderScreen kind="leadership" />} />{" "}
             <Route path="/samsung-internal/announcement/:id" element={<SamsungInternalReaderScreen kind="announcement" />} />{" "}
+            <Route path="/samsung-internal/story/:id" element={<SamsungInternalReaderScreen kind="story" />} />{" "}
             <Route
               path="/internal-publishing"
               element={<ContributionOnly access={contributionAccess}><InternalPublishingScreen /></ContributionOnly>}

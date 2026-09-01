@@ -1,12 +1,17 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { repeatingCycleCount } from "../src/news-scrapper/hooks/useAutoplayState.js";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const app = read("../src/news-scrapper/App.jsx");
 const topBar = read("../src/news-scrapper/components/TopBar.jsx");
+const briefing = read("../src/news-scrapper/screens/FeedScreen.jsx");
 const research = read("../src/news-scrapper/screens/ResearchScreen.jsx");
 const samsung = read("../src/news-scrapper/screens/SamsungInternalScreen.jsx");
+const continuousStream = read("../src/news-scrapper/components/ContinuousSignalStream.jsx");
+const continuousStreamStyles = read("../src/news-scrapper/styles/continuous-signal-stream.css");
+const autoplay = read("../src/news-scrapper/hooks/useAutoplayState.js");
 const publishing = read("../src/news-scrapper/screens/InternalPublishingScreen.jsx");
 const saved = read("../src/news-scrapper/screens/SavedScreen.jsx");
 
@@ -47,11 +52,27 @@ test("Samsung Focus pins leadership while keeping every carousel zone fixed", ()
   assert.match(samsung, /sni-focus-carousel/);
   assert.match(samsung, /sni-focus-controls/);
   assert.match(samsung, /window\.setInterval[\s\S]*8000/);
-  assert.match(samsung, /prefers-reduced-motion: reduce/);
+  assert.match(samsung, /autoplayDelay\(8000, reducedMotion\)/);
+  assert.match(samsung, /Pause Samsung Focus/);
+  assert.match(autoplay, /prefers-reduced-motion: reduce/);
   assert.match(samsung, /Read full message/);
   const samsungStyles = read("../src/news-scrapper/styles/samsung-internal.css");
   assert.match(samsungStyles, /grid-template-rows: 52px 38px minmax\(0, 1fr\) 72px/);
   assert.match(samsungStyles, /-webkit-line-clamp: 3/);
+});
+
+test("live streams keep flowing on Windows motion settings and tall displays", () => {
+  assert.match(briefing, /autoplayDelay\(8000, reducedMotion\)/);
+  assert.match(briefing, /Pause carousel/);
+  assert.match(continuousStream, /\[0, 1, 2, 3\]\.map\(renderGroup\)/);
+  assert.match(continuousStream, /reducedMotion \? 1\.75 : 1/);
+  assert.doesNotMatch(continuousStream, /IntersectionObserver/);
+  assert.match(continuousStreamStyles, /translateY\(-25%\)/);
+  assert.doesNotMatch(continuousStreamStyles, /animation:none/);
+  assert.match(autoplay, /document\.visibilityState === 'visible'/);
+  assert.equal(repeatingCycleCount(3840, 1, 286), 28);
+  assert.equal(repeatingCycleCount(7680, 1, 286), 55);
+  assert.equal(repeatingCycleCount(1920, 10, 410), 4);
 });
 
 test("Samsung Internal nests a compact announcement rail in the wire and keeps three archive channels", () => {
@@ -62,6 +83,11 @@ test("Samsung Internal nests a compact announcement rail in the wire and keeps t
   assert.match(samsung, /DateGroupedSignals/);
   assert.match(samsung, /Sampark stream/);
   assert.match(samsung, /sni-wire-announcements/);
+  assert.match(samsung, /repeatingCycleCount\(viewportWidth, items\.length, minimumEntryWidth\)/);
+  assert.match(samsung, /Array\.from\(\{ length: copyCount \}/);
+  assert.match(samsung, /--announcement-copy-count/);
+  assert.match(samsung, /Pause company announcements/);
+  assert.doesNotMatch(samsung, /staticMode = reduced \|\| Boolean\(onRemove\)/);
   assert.match(samsung, /function IntelligenceWire\(\{[\s\S]*announcements = \[\][\s\S]*items[\s\S]*onRemoveAnnouncement[\s\S]*\}\)/);
   assert.match(samsung, /<AnnouncementRail[\s\S]*items=\{announcements\}[\s\S]*onRemove=\{onRemoveAnnouncement\}/);
   assert.match(samsung, /Samsung Intelligence Wire/);

@@ -1191,6 +1191,7 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
   gap: 8px;
   justify-content: center;
   padding: 0 10px;
+  border: 0;
   border-right: 1px solid color-mix(in srgb, #e59466 35%, var(--theme-border));
   background: color-mix(in srgb, #c87449 12%, var(--surface-strong));
   color: color-mix(in srgb, #d67a4e 84%, var(--text));
@@ -1199,6 +1200,8 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   white-space: nowrap;
+  cursor: pointer;
+  text-align: center;
 }
 
 .sni-announcement-window { overflow: hidden; }
@@ -1206,9 +1209,8 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 .sni-announcement-track {
   display: flex;
   width: max-content;
-  min-width: 100%;
   height: 100%;
-  animation: sni-announcement-flow 32s linear infinite;
+  animation: sni-announcement-flow var(--announcement-duration, 32s) linear infinite;
 }
 
 .sni-announcement-entry {
@@ -1217,8 +1219,8 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
   align-items: stretch;
   border-right: 1px solid color-mix(in srgb, #e59466 26%, var(--theme-border));
 }
-.sni-wire-announcements.is-manageable .sni-announcement-window{overflow-x:auto;scrollbar-width:thin}
-.sni-wire-announcements.is-manageable .sni-announcement-track{width:max-content;min-width:100%}
+.sni-wire-announcements.is-manageable .sni-announcement-window{overflow:hidden}
+.sni-wire-announcements.is-manageable .sni-announcement-track{width:max-content}
 .sni-wire-announcements.is-manageable .sni-announcement-entry{min-width:286px}
 .sni-wire-announcements.is-manageable .sni-announcement-item{gap:7px;padding:0 8px}
 .sni-wire-announcements.is-manageable .sni-announcement-item>span{display:none}
@@ -1270,7 +1272,7 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 .sni-management-feedback{margin:0;padding:10px 14px;border:1px solid color-mix(in srgb,#5bc9a5 32%,var(--theme-border));border-radius:13px;background:color-mix(in srgb,#5bc9a5 8%,var(--surface));color:var(--text);font-size:11px}
 .sni-management-feedback.is-error{border-color:color-mix(in srgb,#df735f 40%,var(--theme-border));background:color-mix(in srgb,#df735f 8%,var(--surface))}
 
-@keyframes sni-announcement-flow { to { transform: translateX(-50%); } }
+@keyframes sni-announcement-flow { to { transform: translateX(calc(-100% / var(--announcement-copy-count, 4))); } }
 
 .sni-primary-row {
   display: grid;
@@ -1460,8 +1462,27 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sni-announcement-track,
-  .sni-wire-track { animation: none !important; }
+  .sni-card,
+  .sni-focus-action,
+  .sni-focus-dots button { transition-duration: .01ms; }
+}
+
+.sni-card-open {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sni-card-open:focus-visible {
+  outline: 2px solid var(--theme-accent);
+  outline-offset: -2px;
 }
 
 .sni-image-fallback {

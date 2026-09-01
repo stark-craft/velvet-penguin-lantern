@@ -7,6 +7,7 @@ import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import Bouncer from '../components/Bouncer.jsx';
 import ContinuousSignalStream from '../components/ContinuousSignalStream.jsx';
+import useAutoplayState, { autoplayDelay } from '../hooks/useAutoplayState.js';
 import { correctRegion, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerReactions, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, setViewerReaction } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
@@ -180,16 +181,17 @@ function TopClusterCarousel({
   const slides = useMemo(() => articles.slice(0, HERO_FEED_LIMIT), [articles]);
   const fallbackMode = slides.every(item => (item.source_count || 1) <= 1);
   const [idx, setIdx] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [manualPaused, setManualPaused] = useState(false);
+  const { documentVisible, reducedMotion } = useAutoplayState();
   useEffect(() => {
-    if (paused || slides.length <= 1) {
+    if (manualPaused || !documentVisible || slides.length <= 1) {
       return undefined;
     }
     const timer = setInterval(() => {
       setIdx(current => (current + 1) % slides.length);
-    }, 8000);
+    }, autoplayDelay(8000, reducedMotion));
     return () => clearInterval(timer);
-  }, [paused, slides.length]);
+  }, [documentVisible, manualPaused, reducedMotion, slides.length]);
   useEffect(() => {
     if (idx >= slides.length) {
       setIdx(0);
@@ -217,7 +219,7 @@ function TopClusterCarousel({
 <button className="carousel-control" onClick={() => move(1)} type="button" aria-label="Next slide">
 <Icon name="chevR" />
 </button>
-<button aria-pressed={paused} className="carousel-control" onClick={() => setPaused((value) => !value)} type="button" aria-label={paused ? 'Resume carousel' : 'Pause carousel'}><Icon name={paused ? 'play' : 'pause'} /></button>
+<button aria-pressed={manualPaused} className="carousel-control" onClick={() => setManualPaused((value) => !value)} type="button" aria-label={manualPaused ? 'Resume carousel' : 'Pause carousel'}><Icon name={manualPaused ? 'play' : 'pause'} /></button>
 </div>
 </div>
 <div className="hero-carousel-content pointer-events-auto max-w-3xl">

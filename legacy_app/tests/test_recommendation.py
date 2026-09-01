@@ -349,9 +349,9 @@ class RecommendationTests(unittest.TestCase):
             Path("news_scrapper/config/sites.json"),
             Path("news_scrapper/config/sites_broadcast.json"),
         )
-        self.assertEqual(report["records"], 166)
-        self.assertEqual(report["enabled"], 138)
-        self.assertEqual(report["rss_records"], 98)
+        self.assertEqual(report["records"], 167)
+        self.assertEqual(report["enabled"], 139)
+        self.assertEqual(report["rss_records"], 99)
         self.assertTrue(report["preserves_distinct_source_ids"])
         nvidia = [site for site in catalog["sites"] if site.get("domain") == "nvidianews.nvidia.com"]
         self.assertGreaterEqual(len(nvidia), 18)

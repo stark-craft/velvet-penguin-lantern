@@ -256,6 +256,18 @@ class InternalContentTests(unittest.TestCase):
         self.assertEqual(served.status_code, 200)
         self.assertEqual(served.content, pdf_bytes)
 
+    def test_windows_pdf_preamble_and_short_memo_are_imported(self):
+        owner = ApiClient()
+        # Some Windows print/export drivers prepend a BOM or short preamble.
+        # ISO 32000 permits readers to locate the header within 1024 bytes.
+        windows_pdf = b"\xef\xbb\xbf\r\n" + build_pdf(["Short memo"])
+        response = owner.upload("POST", "/internal-content/import", {
+            "document": ("WINDOWS-EXPORT.PDF", windows_pdf, "application/octet-stream"),
+        })
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["body"], "Short memo")
+        self.assertEqual(response.json()["source_document"]["page_count"], 1)
+
     def test_document_validation_rejects_blocked_and_fake_files(self):
         owner = ApiClient()
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/Icon.jsx';
 import ContinuousSignalStream from '../components/ContinuousSignalStream.jsx';
+import useAutoplayState, { autoplayDelay } from '../hooks/useAutoplayState.js';
 import { getVentureDiscovery } from '../../venture-lens/api.js';
 import '../styles/research-observatory.css';
 
@@ -44,40 +45,25 @@ function routeFor(artifact) {
   return artifact?.url || '/venturelens';
 }
 
-function useStreamMotion() {
-  const [paused, setPaused] = useState(false);
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-    const onMotion = () => setReduced(Boolean(media?.matches));
-    const onVisibility = () => setPaused(document.hidden);
-    onMotion(); onVisibility();
-    media?.addEventListener?.('change', onMotion);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => { media?.removeEventListener?.('change', onMotion); document.removeEventListener('visibilitychange', onVisibility); };
-  }, []);
-  return { paused, reduced, setPaused };
-}
-
 function ObservatoryCarousel({ artifacts }) {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
-  const { paused, reduced, setPaused } = useStreamMotion();
+  const [manualPaused, setManualPaused] = useState(false);
+  const { documentVisible, reducedMotion } = useAutoplayState();
   useEffect(() => { if (index >= artifacts.length) setIndex(0); }, [artifacts.length, index]);
   useEffect(() => {
-    if (paused || reduced || artifacts.length <= 1) return undefined;
-    const timer = window.setInterval(() => setIndex((current) => (current + 1) % artifacts.length), 9000);
+    if (manualPaused || !documentVisible || artifacts.length <= 1) return undefined;
+    const timer = window.setInterval(() => setIndex((current) => (current + 1) % artifacts.length), autoplayDelay(9000, reducedMotion));
     return () => window.clearInterval(timer);
-  }, [artifacts.length, paused, reduced]);
+  }, [artifacts.length, documentVisible, manualPaused, reducedMotion]);
   if (!artifacts.length) return null;
   const active = artifacts[index];
   const move = (delta) => setIndex((current) => (current + delta + artifacts.length) % artifacts.length);
   return (
-    <section aria-label="Research Observatory" aria-roledescription="carousel" className={`rio-observatory is-${active.kind}`}
-      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false); }} onFocus={() => setPaused(true)} onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
+    <section aria-label="Research Observatory" aria-roledescription="carousel" className={`rio-observatory is-${active.kind}`}>
       <div className="rio-orbits" aria-hidden="true"><i /><i /><i /><b /></div>
       <div className="rio-observatory-layout">
-        <header><div><span>Research Observatory</span><small>Live cross-provider evidence</small></div><div><button aria-label="Previous artifact" onClick={() => move(-1)} type="button"><Icon name="chevL" /></button><button aria-label="Next artifact" onClick={() => move(1)} type="button"><Icon name="chevR" /></button></div></header>
+        <header><div><span>Research Observatory</span><small>Live cross-provider evidence</small></div><div><button aria-label="Previous artifact" onClick={() => move(-1)} type="button"><Icon name="chevL" /></button><button aria-label="Next artifact" onClick={() => move(1)} type="button"><Icon name="chevR" /></button><button aria-label={manualPaused ? 'Resume Research Observatory' : 'Pause Research Observatory'} aria-pressed={manualPaused} onClick={() => setManualPaused((value) => !value)} type="button"><Icon name={manualPaused ? 'play' : 'pause'} /></button></div></header>
         <div className="rio-evidence-index"><span>{TYPE_LABELS[active.kind] || active.kind}</span><strong>{String(index + 1).padStart(2, '0')}</strong><small>of {String(artifacts.length).padStart(2, '0')}</small></div>
         <div className="rio-observatory-copy"><span>{active.source} · {active.category}</span><h1>{active.title}</h1><p>{active.summary || 'Open the source record for the complete evidence trail.'}</p></div>
         <footer><button onClick={() => navigate(routeFor(active))} type="button">Inspect evidence <Icon name="chevR" size={14} /></button><div><strong>{displayMetric(active)}</strong><span>{active.momentum == null ? 'Popular now' : `${active.momentum >= 0 ? '+' : ''}${active.momentum}% momentum`}</span></div><nav aria-label="Featured artifacts">{artifacts.map((artifact, dot) => <button aria-label={`Go to artifact ${dot + 1}`} aria-selected={dot === index} className={dot === index ? 'is-active' : ''} key={`${artifact.kind}-${artifact.id}`} onClick={() => setIndex(dot)} type="button" />)}</nav></footer>
