@@ -6,30 +6,30 @@ export const getVentureDiscovery = (refresh = false) =>
   apiRequest(`/venture-lens/discovery${refresh ? "?refresh=true" : ""}`);
 
 export const refreshVentureLens = () =>
-  apiRequest("/venture-lens/refresh", { method: "POST" });
+  apiRequest("/venture-lens/refresh", { method: "POST", timeoutMs: 120_000 });
 
 export const getVentureIntelligence = () =>
   apiRequest("/venture-lens/intelligence");
 
-export const getTechnologyDossier = (id) =>
-  apiRequest(`/venture-lens/dossier/technology/${encodeURIComponent(id)}`);
+export const getTechnologyDossier = (id, options = {}) =>
+  apiRequest(`/venture-lens/dossier/technology/${encodeURIComponent(id)}`, options);
 
-export const getRepositoryDossier = (id) =>
-  apiRequest(`/venture-lens/dossier/repository/${String(id).split("/").map(encodeURIComponent).join("/")}`);
+export const getRepositoryDossier = (id, options = {}) =>
+  apiRequest(`/venture-lens/dossier/repository/${String(id).split("/").map(encodeURIComponent).join("/")}`, options);
 
-export const getPaperDossier = (id) =>
-  apiRequest(`/venture-lens/dossier/paper/${encodeURIComponent(id)}`);
+export const getPaperDossier = (id, options = {}) =>
+  apiRequest(`/venture-lens/dossier/paper/${encodeURIComponent(id)}`, options);
 
 const pathIdentifier = (id) => String(id || "").split("/").map(encodeURIComponent).join("/");
 
-export const getModelDossier = (id) =>
-  apiRequest(`/venture-lens/dossier/model/${pathIdentifier(id)}`);
+export const getModelDossier = (id, options = {}) =>
+  apiRequest(`/venture-lens/dossier/model/${pathIdentifier(id)}`, options);
 
-export const getDatasetDossier = (id) =>
-  apiRequest(`/venture-lens/dossier/dataset/${pathIdentifier(id)}`);
+export const getDatasetDossier = (id, options = {}) =>
+  apiRequest(`/venture-lens/dossier/dataset/${pathIdentifier(id)}`, options);
 
-export const getPatentDossier = (id) =>
-  apiRequest(`/venture-lens/dossier/patent/${pathIdentifier(id)}`);
+export const getPatentDossier = (id, options = {}) =>
+  apiRequest(`/venture-lens/dossier/patent/${pathIdentifier(id)}`, options);
 
 export const compareVentureSignals = (items) =>
   apiRequest("/venture-lens/compare", {

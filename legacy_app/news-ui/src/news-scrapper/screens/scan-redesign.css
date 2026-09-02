@@ -949,6 +949,24 @@ html[data-theme="light"] .scan-studio .scan-results-workspace {
   box-shadow: 0 20px 50px rgba(43, 58, 82, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.85);
 }
 
+.scan-action-feedback {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid;
+  border-radius: 16px;
+  font-size: .82rem;
+}
+.scan-action-feedback.is-success { border-color: rgba(79, 210, 158, .4); background: rgba(25, 111, 81, .24); color: #c9f8e5; }
+.scan-action-feedback.is-error { border-color: rgba(241, 114, 135, .45); background: rgba(121, 30, 49, .28); color: #ffd7df; }
+.scan-action-feedback button:focus-visible { outline: 3px solid var(--scan-accent, #8c79ef); outline-offset: 3px; }
+html[data-theme="light"] .scan-action-feedback.is-success { border-color: #3b936f; background: #e4f5ed; color: #164f3a; }
+html[data-theme="light"] .scan-action-feedback.is-error { border-color: #b95065; background: #fff0f2; color: #732638; }
+.scan-results-header h2:focus { outline: none; }
+
 .scan-results-header {
   justify-content: space-between;
   gap: 24px;

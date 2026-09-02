@@ -197,7 +197,7 @@ test('For You owns a compact Feed, Following and Create workspace', () => {
   assert.match(workspaceShellSource, /<FollowingScreen/);
   assert.match(workspaceShellSource, /<CreateScreen contributionAllowed=\{allowed\}/);
   assert.match(createScreenSource, /Private Briefing[\s\S]*Contributions/);
-  assert.match(createScreenSource, /contributionAllowed &&/);
+  assert.match(createScreenSource, /\.\.\.\(contributionAllowed \? \[\{ id: 'contributions'/);
 });
 
 test('every owned contribution exposes a labelled permanent delete action', () => {
@@ -231,6 +231,33 @@ test('Create uses a compact studio switcher instead of a duplicate desk hero', (
   assert.match(savedSource, /\{!embedded && \(/);
 });
 
+test('private briefing feedback stays with its originating view and recovery is truthful', () => {
+  assert.match(savedSource, /activeTabRef\.current = nextTab/);
+  assert.match(savedSource, /activeTabRef\.current !== requestedTab/);
+  assert.match(savedSource, /activeTabRef\.current !== originTab/);
+  assert.match(savedSource, /Retry this view/);
+  assert.match(savedSource, /Return to URL input/);
+  assert.doesNotMatch(savedSource, /Retry desk data/);
+});
+
+test('new contributions show neutral requirements until the first invalid submit', () => {
+  const editorSource = readFileSync(
+    new URL('../src/news-scrapper/components/personal-desk/ContributionEditor.jsx', import.meta.url),
+    'utf8',
+  );
+  assert.match(editorSource, /const \[attemptedSubmit, setAttemptedSubmit\]/);
+  assert.match(editorSource, /!attemptedSubmit && !gate\.ok/);
+  assert.match(editorSource, /attemptedSubmit && !gate\.ok/);
+  assert.match(editorSource, /className="cw-requirements"/);
+});
+
+test('document import progress names only observable work and preserves failed file context', () => {
+  assert.match(workspaceSource, /\['Uploading and extracting', 'Creating editable draft', 'Ready'\]/);
+  assert.doesNotMatch(workspaceSource, /'Uploading', 'Extracting'/);
+  assert.match(workspaceSource, /failedImportFile/);
+  assert.match(workspaceSource, /Retry \{failedImportFile\.name\}/);
+});
+
 test('a stale recovered draft id heals by creating fresh instead of failing', () => {
   assert.match(workspaceSource, /updateError\?\.status !== 404\) throw updateError/);
   assert.match(workspaceSource, /if \(!stored\) stored = await createContributionDraft\(draft\)/);
@@ -261,6 +288,10 @@ test('browser session recovery never skips the contribution landing page', () =>
   assert.match(workspaceSource, /A previous draft is waiting/);
   assert.match(workspaceSource, /Resume draft/);
   assert.match(workspaceSource, /Discard recovery/);
+  assert.match(workspaceSource, /window\.addEventListener\('pagehide', flushDraft\)/);
+  assert.match(workspaceSource, /flushDraft\(\);[\s\S]*window\.removeEventListener\('pagehide', flushDraft\)/);
+  assert.match(workspaceSource, /persistSessionDraft\(editing\);[\s\S]*setRecoveredDraft\(createContribution\(editing\)\)/);
+  assert.match(workspaceSource, /latestEditing\.current = null;[\s\S]*window\.sessionStorage\.removeItem\(SESSION_KEY\)/);
 });
 
 test('the announcement studio returns explicitly to contributions', () => {

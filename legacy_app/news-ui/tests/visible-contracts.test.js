@@ -283,8 +283,10 @@ test('For You cards are direct-open, followable and reaction-counted without wor
   const cssSource = readFileSync(new URL('../src/news-scrapper/for-you/for-you.css', import.meta.url), 'utf8');
   assert.match(cardSource, /fy-card-open-layer/);
   assert.match(cardSource, /Unfollow this story' : 'Follow this story privately'/);
-  assert.match(cardSource, /<span>\{saved \? 'Following' : 'Follow'\}<\/span>/);
-  assert.match(cardSource, /data-tooltip=\{saved \? 'Stop following this story'/);
+  assert.match(cardSource, /const savedKnown = savedStatus === 'ready'/);
+  assert.match(cardSource, /<span>\{savedLabel\}<\/span>/);
+  assert.match(cardSource, /Following status unavailable · use Retry above/);
+  assert.match(cardSource, /disabled=\{Boolean\(busyAction\) \|\| !savedKnown\}/);
   assert.match(cardSource, /data-tooltip="Hide this article only from your private feed"/);
   assert.match(cardSource, /reactions\.like_count/);
   assert.match(cardSource, /reactions\.dislike_count/);
@@ -309,6 +311,32 @@ test('Briefing reactions share the private counted endpoint and global removal i
   assert.match(bouncerSource, /Dislike this story/);
   assert.match(bouncerSource, /likes > 0/);
   assert.match(bouncerSource, /dislikes > 0/);
+  assert.match(feedSource, /setInterval\(sync, 12_000\)/);
+  assert.match(feedSource, /clearInterval\(timer\)/);
+  assert.match(feedSource, /\? 'stale' : 'error'/);
+  assert.match(feedSource, /Counts are hidden rather than shown as zero/);
+  assert.doesNotMatch(feedSource, /like_count: 0, dislike_count: 0, viewer_reaction: 'neutral'/);
+  assert.match(bouncerSource, /Reaction totals unavailable/);
+});
+
+test('capability transport failures remain distinct from a real access denial', () => {
+  const appSource = readFileSync(new URL('../src/news-scrapper/App.jsx', import.meta.url), 'utf8');
+  assert.match(appSource, /status: 'error'/);
+  assert.match(appSource, /Access could not be verified\./);
+  assert.match(appSource, /TechScout has not treated this as an access denial\./);
+  assert.match(appSource, /capabilityLoadAttempt/);
+  assert.match(appSource, /Try again/);
+});
+
+test('a chunk or bootstrap failure renders a static reload path', () => {
+  const indexSource = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const entrySource = readFileSync(new URL('../src/main.jsx', import.meta.url), 'utf8');
+  assert.match(indexSource, /function showApplicationLoadFailure/);
+  assert.match(indexSource, /TechScout could not start\./);
+  assert.match(indexSource, /Reload TechScout/);
+  assert.match(indexSource, /import\("\/src\/main\.jsx"\)\.catch\(showApplicationLoadFailure\)/);
+  assert.match(entrySource, /launch\(\)\.catch/);
+  assert.match(entrySource, /__senseReportBootstrapFailure/);
 });
 
 test('reaction and following APIs stay same-origin and reactions do not append stale events', () => {

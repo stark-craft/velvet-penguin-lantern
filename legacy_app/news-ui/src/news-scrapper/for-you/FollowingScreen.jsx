@@ -7,13 +7,13 @@ import { articleKey } from '../utils/intelligence.js';
 
 export default function FollowingScreen() {
   const [threads, setThreads] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [requestState, setRequestState] = useState({ status: 'loading', error: '', hasLoaded: false });
+  const [actionError, setActionError] = useState('');
   const [openArticle, setOpenArticle] = useState(null);
   const [busy, setBusy] = useState('');
 
   const load = async () => {
-    setLoading(true);
+    setRequestState((current) => ({ ...current, status: current.hasLoaded ? 'stale' : 'loading', error: '' }));
     try {
       const response = await getFollowingThreads();
       setThreads((response?.threads || []).map((thread, index) => ({
@@ -21,11 +21,13 @@ export default function FollowingScreen() {
         anchor: normalizeArticle(thread.anchor, index),
         updates: (thread.updates || []).map((item, updateIndex) => normalizeArticle(item, updateIndex)).filter(Boolean),
       })).filter((thread) => thread.anchor));
-      setError('');
+      setRequestState({ status: 'ready', error: '', hasLoaded: true });
     } catch (nextError) {
-      setError(nextError?.message || 'Could not open your followed stories.');
-    } finally {
-      setLoading(false);
+      setRequestState((current) => ({
+        ...current,
+        status: 'error',
+        error: nextError?.message || 'Could not open your followed stories.',
+      }));
     }
   };
 
@@ -35,27 +37,29 @@ export default function FollowingScreen() {
     const key = articleKey(thread.anchor);
     if (busy) return;
     setBusy(key);
+    setActionError('');
     try {
       await removeSavedArticle(thread.anchor);
       setThreads((current) => current.filter((value) => value.id !== thread.id));
     } catch (nextError) {
-      setError(nextError?.message || 'Could not unfollow this story.');
+      setActionError(nextError?.message || 'Could not unfollow this story.');
     } finally {
       setBusy('');
     }
   };
 
-  if (loading) return <div className="fy-state"><span className="fy-loader" /><h1>Opening your story threads</h1></div>;
+  if (requestState.status === 'loading') return <div className="fy-state"><span className="fy-loader" /><h1>Opening your story threads</h1></div>;
   return (
     <div className="fy-following-page">
       <header className="fy-compact-intro">
         <div><span>Private story watch</span><h1>Following</h1></div>
         <p>Each story stays anchored here with only close semantic updates—not every article sharing a company name.</p>
       </header>
-      {error && <div className="fy-inline-error" role="alert">{error} <button onClick={load} type="button">Retry</button></div>}
-      {!threads.length ? (
+      {requestState.status === 'error' && <div className="fy-inline-error" role="alert">{requestState.error} <button onClick={load} type="button">Retry</button></div>}
+      {actionError && <div className="fy-inline-error" role="alert">{actionError}</div>}
+      {requestState.status === 'ready' && !threads.length ? (
         <section className="fy-empty-state"><Icon name="bookmark" size={28} /><h2>No followed stories yet</h2><p>Use Follow on a For You card. Closely related updates will collect here for 30 days.</p></section>
-      ) : <div className="fy-thread-list">{threads.map((thread) => (
+      ) : threads.length > 0 ? <div className="fy-thread-list">{threads.map((thread) => (
         <section className="fy-thread" key={thread.id}>
           <article className="fy-thread-anchor">
             <span>Following</span><button onClick={() => setOpenArticle(thread.anchor)} type="button">{thread.anchor.title}</button>
@@ -67,7 +71,7 @@ export default function FollowingScreen() {
             {thread.updates.length ? thread.updates.map((item) => <button className="fy-thread-update" key={articleKey(item)} onClick={() => setOpenArticle(item)} type="button"><span>{item.src || item.source || 'Intelligence source'}</span><strong>{item.title}</strong><small>{Math.round(Number(item.follow_match?.score || 0) * 100)}% story match</small></button>) : <p className="fy-thread-waiting">We will add an update only when its meaning is genuinely close to this story.</p>}
           </div>
         </section>
-      ))}</div>}
+      ))}</div> : null}
       <ArticleModal item={openArticle} onClose={() => setOpenArticle(null)} />
     </div>
   );

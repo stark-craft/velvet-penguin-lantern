@@ -9,6 +9,8 @@
 .reaction-button.is-dislike.is-active{border-color:rgba(251,113,133,.72);background:linear-gradient(135deg,rgba(244,63,94,.31),rgba(239,68,68,.16));color:#ffd7dd;box-shadow:0 0 0 2px rgba(244,63,94,.11)}
 .reaction-button:disabled{cursor:not-allowed;opacity:.48;transform:none}
 .reaction-button svg{width:15px;height:15px;flex:0 0 auto}.reaction-button span{font-size:.68rem;font-weight:800;font-variant-numeric:tabular-nums}
+.reaction-state-indicator{display:grid;width:24px;height:24px;place-items:center;border:1px solid rgba(148,163,184,.28);border-radius:50%;background:rgba(148,163,184,.07);color:#a8b5c7;font-size:.66rem;font-weight:850}.reaction-state-indicator.is-error{border-color:rgba(245,158,11,.36);color:#f5c267}.reaction-state-indicator.is-stale{color:#88baf5}
+html[data-theme="light"] .reaction-state-indicator{border-color:#aebdce;background:#eef3f8;color:#50657c}html[data-theme="light"] .reaction-state-indicator.is-error{border-color:#cc8b27;background:#fff7e6;color:#8b5708}
 html[data-theme="light"] .reaction-button{box-shadow:0 1px 2px rgba(15,23,42,.06)}
 html[data-theme="light"] .reaction-button.is-like{border-color:#8bcdb4;background:#f0fbf6;color:#0f8158}
 html[data-theme="light"] .reaction-button.is-dislike{border-color:#efb0bb;background:#fff5f6;color:#bc3951}

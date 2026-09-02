@@ -298,7 +298,7 @@ html[data-theme="light"] .premium-theme-toggle.is-dark .premium-theme-moon {
 .premium-theme-copy small {
   margin-top: 3px;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1028,7 +1028,7 @@ html[data-theme="light"] .premium-venture-copy small {
 .premium-language-status small {
   margin-top: 5px;
   color: var(--text-faint);
-  font-size: 9px;
+  font-size: 10px;
 }
 
 .premium-language-status strong {
@@ -1090,7 +1090,7 @@ html[data-theme="light"] .premium-venture-copy small {
   grid-column: 1 / -1;
   margin: -2px 0 0;
   color: var(--text-muted);
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.4;
 }
 
@@ -3413,7 +3413,7 @@ html[data-theme="light"] .identity-profile-form .premium-profile-input {
   gap: 6px;
   margin: 11px auto 0;
   color: var(--text-faint);
-  font-size: 8px;
+  font-size: 10px;
   line-height: 1.4;
   text-align: center;
 }

@@ -22,6 +22,21 @@ The application is visually coherent and its normal happy paths are substantiall
 
 These are product trust issues, not subjective styling preferences. The recommended implementation order is P1 first, then truthful loading/error states and navigation recovery, then accessibility and polish.
 
+## Remediation status — 2 September 2026
+
+The current working tree now contains remediations for **UX-01 through UX-34**, implemented in priority order. Verification after the final P3 changes completed successfully:
+
+- 109 frontend tests passed, including new timeout, local-date, carousel-reset, route-state, modal-isolation, tab-semantics, theme-boot, and contrast contracts;
+- 210 backend tests passed;
+- the production Vite build passed;
+- desktop browser QA passed in light and dark themes for For You, Briefing, Scan, Briefing Archive, Research, Venture Lens, and Samsung Internal;
+- each tested route exposed one `main` landmark, no horizontal page overflow, and no visible error alert;
+- Briefing, Research, and Samsung Internal carousels advanced in the running application;
+- Scan hydrated and then allowed clearing a `?q=` deep link; and
+- a Samsung Internal leadership reader returned to its originating Inside Samsung channel.
+
+Mobile-specific QA remains intentionally out of scope for this audit. This status describes the local working tree; publishing is a separate explicit operation.
+
 ## Audit method and confidence
 
 The audit combined:

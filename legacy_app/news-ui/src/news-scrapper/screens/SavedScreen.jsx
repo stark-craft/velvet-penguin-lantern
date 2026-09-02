@@ -179,6 +179,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
   const [openArticle, setOpenArticle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [errorRecovery, setErrorRecovery] = useState('');
   const [notice, setNotice] = useState('');
   const [urlText, setUrlText] = useState(() => (typeof window === 'undefined' ? '' : window.sessionStorage.getItem('personal-desk-url-draft') || ''));
   const [submitting, setSubmitting] = useState(false);
@@ -200,6 +201,8 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
   const submitInFlight = useRef(false);
   const retryLocks = useRef(new Set());
   const controlLocks = useRef(new Set());
+  const activeTabRef = useRef(tab);
+  const urlInputRef = useRef(null);
 
   const briefingItems = useMemo(
     () => jobs
@@ -260,7 +263,13 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     return 'Everything is filed. Nothing needs you right now.';
   }, [loading, error, jobs, briefingItems, savedItems]);
 
-  useEffect(() => { window.sessionStorage.setItem('personal-desk-tab', tab); }, [tab]);
+  useEffect(() => {
+    activeTabRef.current = tab;
+    setError('');
+    setErrorRecovery('');
+    setNotice('');
+    window.sessionStorage.setItem('personal-desk-tab', tab);
+  }, [tab]);
   useEffect(() => { window.sessionStorage.setItem('personal-desk-url-draft', urlText); }, [urlText]);
 
   // React Router keeps this screen mounted while moving between /saved/*
@@ -290,7 +299,14 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     return '/saved';
   };
   const goToTab = (nextTab) => {
+    // Invalidate work from the old view synchronously. Waiting for the tab
+    // effect leaves a small window where a late request can paint feedback in
+    // the destination view.
+    activeTabRef.current = nextTab;
     setAutoStart('');
+    setError('');
+    setErrorRecovery('');
+    setNotice('');
     setTab(nextTab);
     navigate(deskPathFor(nextTab), { replace: location.pathname !== '/' && location.pathname.startsWith('/saved') });
   };
@@ -315,6 +331,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
       return;
     }
     loadInFlight.current = true;
+    const requestedTab = tab;
     if (!quiet && mounted.current) setLoading(true);
     try {
       do {
@@ -334,15 +351,17 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
           } else if (!embedded) {
             recommendationResponse = await getViewerPreferences().catch(() => null);
           }
-          if (!mounted.current) return;
+          if (!mounted.current || activeTabRef.current !== requestedTab) return;
           if (savedResponse) setSavedItems(normalizeList(savedResponse?.items || []));
           if (briefingResponse) setJobs(Array.isArray(briefingResponse?.jobs) ? briefingResponse.jobs : []);
           if (personalizationResponse) setPersonalization(personalizationResponse);
           if (recommendationResponse) setRecommendationPreferences(recommendationResponse);
           setError('');
+          setErrorRecovery('');
         } catch (requestError) {
-          if (mounted.current) {
+          if (mounted.current && activeTabRef.current === requestedTab) {
             setError(requestError?.message || 'Could not load your personal desk.');
+            setErrorRecovery('reload');
           }
         }
       } while (refreshPending.current && mounted.current);
@@ -369,6 +388,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     actionLocks.current.add(key);
     setBusyActions((current) => ({ ...current, [key]: action }));
     setError('');
+    setErrorRecovery('');
     setNotice('');
     try {
       return await work();
@@ -380,27 +400,33 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
 
   const submitUrls = async (event) => {
     event.preventDefault();
+    const originTab = tab;
     if (submitInFlight.current) return;
     if (!enteredUrlCount) {
       setError('Paste at least one complete http:// or https:// article URL.');
+      setErrorRecovery('urls');
       return;
     }
     if (enteredUrlCount > 20) {
       setError('A private briefing can contain at most 20 article URLs. Remove a few links and try again.');
+      setErrorRecovery('urls');
       return;
     }
     submitInFlight.current = true;
     setSubmitting(true);
     setError('');
+    setErrorRecovery('');
     setNotice('');
     try {
       const response = await createViewerBriefings(urlText);
+      if (activeTabRef.current !== originTab) return;
       const accepted = response?.accepted?.length || 0;
       const duplicates = response?.duplicates || [];
       const invalid = response?.invalid || [];
       const dispatchFailures = response?.dispatch_failures || [];
       if (!invalid.length) setUrlText('');
       await loadAll({ quiet: true });
+      if (activeTabRef.current !== originTab) return;
       const started = Math.max(0, accepted - dispatchFailures.length);
       setNotice([
         started ? `${started} private briefing${started === 1 ? '' : 's'} started.` : '',
@@ -412,6 +438,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
           `${dispatchFailures.length} briefing worker${dispatchFailures.length === 1 ? '' : 's'} could not start. `
           + 'The links are saved below; use Retry when the service is ready.',
         );
+        setErrorRecovery('');
       }
       if (duplicates[0]?.job_id) {
         window.setTimeout(() => {
@@ -422,7 +449,10 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
         }, 100);
       }
     } catch (requestError) {
-      setError(requestError?.message || 'Could not start your private briefing.');
+      if (activeTabRef.current === originTab) {
+        setError(requestError?.message || 'Could not start your private briefing.');
+        setErrorRecovery('urls');
+      }
     } finally {
       submitInFlight.current = false;
       setSubmitting(false);
@@ -469,6 +499,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     retryLocks.current.add(jobId);
     setRetryingJobs((current) => new Set(current).add(jobId));
     setError('');
+    setErrorRecovery('');
     try {
       await retryViewerBriefing(jobId);
       await loadAll({ quiet: true });
@@ -497,6 +528,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     controlLocks.current.add('clear');
     setClearing(true);
     setError('');
+    setErrorRecovery('');
     try {
       const response = await clearViewerBriefings('finished');
       setNotice(`${response?.removed || 0} finished record${response?.removed === 1 ? '' : 's'} cleared. Active work was preserved.`);
@@ -518,6 +550,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     controlLocks.current.add('reset');
     setResetting(true);
     setError('');
+    setErrorRecovery('');
     try {
       const response = await resetViewerPersonalization();
       setPersonalization((current) => ({ ...(current || {}), active: false, event_count: 0, top_interests: [] }));
@@ -538,6 +571,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
     controlLocks.current.add('pause');
     setPauseBusy(true);
     setError('');
+    setErrorRecovery('');
     try {
       const paused = !recommendationPreferences.personalization_paused;
       await pauseViewerPersonalization(paused);
@@ -624,7 +658,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
       </>
       )}
 
-      {error && <div className="error-banner" role="alert"><span>{error}</span><button className="ml-3 underline" disabled={loading} onClick={() => loadAll()} type="button">Retry desk data</button></div>}
+      {error && <div className="error-banner" role="alert"><span>{error}</span>{errorRecovery === 'reload' && <button className="ml-3 underline" disabled={loading} onClick={() => loadAll()} type="button">Retry this view</button>}{errorRecovery === 'urls' && <button className="ml-3 underline" onClick={() => urlInputRef.current?.focus()} type="button">Return to URL input</button>}</div>}
       {notice && <div className="personal-notice" role="status">{notice}</div>}
 
       <div
@@ -657,6 +691,7 @@ export default function SavedScreen({ view = '', autoStart: requestedAutoStart =
                 aria-describedby="personal-url-help"
                 aria-invalid={enteredUrlCount > 20}
                 onChange={(event) => setUrlText(event.target.value)}
+                ref={urlInputRef}
                 placeholder={'https://example.com/article-one\nhttps://example.com/article-two'}
                 value={urlText}
               />

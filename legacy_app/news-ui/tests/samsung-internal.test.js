@@ -179,7 +179,7 @@ test("published destination has dedicated announcement, leadership, and colleagu
   assert.match(screen, /Samsung Intelligence Wire/);
   assert.match(screen, /sni-wire-announcements/);
   assert.match(screen, /<AnnouncementRail[\s\S]*items=\{announcements\}[\s\S]*onRemove=\{onRemoveAnnouncement\}/);
-  assert.match(screen, /navigate\(`\/samsung-internal\/story\/\$\{encodeURIComponent\(record\.id\)\}`\)/);
+  assert.match(screen, /navigate\(`\/samsung-internal\/story\/\$\{encodeURIComponent\(record\.id\)\}\?from=inside`\)/);
   assert.match(screen, /Read colleague story/);
   assert.doesNotMatch(screen, /id: 'announcements'/);
 });

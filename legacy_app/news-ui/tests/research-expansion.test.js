@@ -36,6 +36,10 @@ test("Research is a discovery gateway with an observatory, evidence stream and p
   assert.match(research, /\/venturelens\/patents/);
   assert.match(research, /payload\?\.providers\?\.\[lane\.provider\]\?\.available !== false/);
   assert.doesNotMatch(research, /Four ways in|Research & Technology Intelligence/);
+  assert.match(research, /\/venturelens\/radar\?focus=\$\{encoded\}/);
+  assert.doesNotMatch(research, /\/venturelens\/radar\?signal=/);
+  const venture = read("../src/venture-lens/VentureLensApp.jsx");
+  assert.match(venture, /radar: "technology"/);
 });
 
 test("Samsung Internal is rebuilt from live contracts, not prototype stores", () => {
@@ -53,7 +57,9 @@ test("Samsung Internal is rebuilt from live contracts, not prototype stores", ()
 test("Samsung Focus pins leadership while keeping every carousel zone fixed", () => {
   assert.match(samsung, /sni-focus-carousel/);
   assert.match(samsung, /sni-focus-controls/);
-  assert.match(samsung, /window\.setInterval[\s\S]*8000/);
+  assert.match(samsung, /window\.setTimeout[\s\S]*8000/);
+  assert.match(samsung, /window\.clearTimeout\(timer\)/);
+  assert.match(samsung, /\[documentVisible, index, manualPaused, reducedMotion, slides\.length\]/);
   assert.match(samsung, /autoplayDelay\(8000, reducedMotion\)/);
   assert.match(samsung, /Pause Samsung Focus/);
   assert.match(autoplay, /prefers-reduced-motion: reduce/);
@@ -93,6 +99,10 @@ test("Samsung Internal nests a compact announcement rail in the wire and keeps t
   assert.match(samsung, /Array\.from\(\{ length: copyCount \}/);
   assert.match(samsung, /--announcement-copy-count/);
   assert.match(samsung, /Pause company announcements/);
+  assert.match(samsung, /sni-announcement-manager/);
+  assert.match(samsung, /Remove any notice without waiting for the moving rail\./);
+  assert.match(samsung, /Existing items are kept until a successful refresh\./);
+  assert.doesNotMatch(samsung, /getPublishedInternalContent\(\)\.catch\(\(\) => \[\]\)/);
   assert.doesNotMatch(samsung, /staticMode = reduced \|\| Boolean\(onRemove\)/);
   assert.match(samsung, /function IntelligenceWire\(\{[\s\S]*announcements = \[\][\s\S]*items[\s\S]*onRemoveAnnouncement[\s\S]*\}\)/);
   assert.match(samsung, /<AnnouncementRail[\s\S]*items=\{announcements\}[\s\S]*onRemove=\{onRemoveAnnouncement\}/);

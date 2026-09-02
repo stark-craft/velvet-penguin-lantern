@@ -317,8 +317,8 @@
 .vl-dossier-head > div:last-child { display:flex; gap:8px; }
 .vl-close { width:36px; height:36px; border:1px solid var(--vl-line); border-radius:10px; background:rgba(255,255,255,.025); color:var(--vl-muted); font-size:22px; cursor:pointer; }
 .vl-dossier-body { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); }
-.vl-dossier-body > main { padding:34px 38px 48px; }
-.vl-dossier-body > main section + section { margin-top:32px; padding-top:28px; border-top:1px solid var(--vl-line); }
+.vl-dossier-body > .vl-dossier-reading { padding:34px 38px 48px; }
+.vl-dossier-body > .vl-dossier-reading section + section { margin-top:32px; padding-top:28px; border-top:1px solid var(--vl-line); }
 .vl-dossier-body h3,.vl-related-list h3 { margin:0 0 11px; font:600 14px "Manrope",sans-serif; }
 .vl-dossier-body p,.vl-dossier-body li { color:var(--vl-muted); line-height:1.72; }
 .vl-dossier-lead { margin-top:10px; color:#dce9e4!important; font-size:17px; }
@@ -437,7 +437,7 @@
   .vl-modal-scrim { padding:6px; }
   .vl-dossier { max-height:calc(100vh - 12px); border-radius:18px; }
   .vl-dossier-head { padding:20px; }
-  .vl-dossier-body > main,.vl-dossier-body > aside { padding:22px 20px; }
+  .vl-dossier-body > .vl-dossier-reading,.vl-dossier-body > aside { padding:22px 20px; }
   .vl-compare-table { grid-template-columns:100px repeat(var(--compare-columns),minmax(140px,1fr)); }
 }
 
@@ -1122,9 +1122,14 @@ html[data-theme="light"] .vl-artifact-card { background: linear-gradient(145deg,
   justify-content: center;
   gap: 2px;
   padding: 3px;
+  scroll-padding-inline: 44px;
+  overscroll-behavior-inline: contain;
   border: 1px solid color-mix(in srgb, var(--vl-line) 74%, transparent);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-inset, #181320) 62%, transparent);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--surface-inset, #181320) 88%, transparent), transparent 28px) left / 44px 100% no-repeat,
+    linear-gradient(270deg, color-mix(in srgb, var(--surface-inset, #181320) 88%, transparent), transparent 28px) right / 44px 100% no-repeat,
+    color-mix(in srgb, var(--surface-inset, #181320) 62%, transparent);
 }
 .vl-research-shell-head .vl-nav button {
   min-height: 39px;
@@ -1151,6 +1156,12 @@ html[data-theme="light"] .vl-artifact-card { background: linear-gradient(145deg,
   color: var(--vl-muted);
 }
 .vl-research-shell-head .vl-sync-control { border-color: rgba(117,224,181,.2); color: var(--vl-mint); }
+
+.vl-dossier-loading.is-error { gap: 12px; color: var(--vl-text); text-align: center; }
+.vl-dossier-loading.is-error > svg { color: #ef7f92; }
+.vl-dossier-loading.is-error > div { display: flex; flex-wrap: wrap; justify-content: center; gap: 9px; margin-top: 6px; }
+.vl-dossier-loading.is-error button { min-height: 40px; padding: 0 16px; border: 1px solid var(--vl-line); border-radius: 999px; background: var(--vl-panel); color: var(--vl-text); cursor: pointer; }
+.vl-dossier-loading.is-error button:first-child { border-color: rgba(var(--vl-blue-rgb), .34); background: rgba(var(--vl-blue-rgb), .14); }
 
 .vl-page { min-height: 720px; }
 .vl-page > div:not([hidden]) { display: block; }

@@ -22,7 +22,7 @@ import ContributionPreview from './ContributionPreview.jsx';
 import useContributions, { notifyContributionsChanged } from './useContributions.js';
 
 const SESSION_KEY = 'personal-desk-contribute-session-v1';
-const IMPORT_STEPS = ['Validating document', 'Uploading', 'Extracting text', 'Creating editable draft', 'Ready'];
+const IMPORT_STEPS = ['Uploading and extracting', 'Creating editable draft', 'Ready'];
 const DOC_ACCEPT = '.pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const EDITABLE_CONTRIBUTION_STATUSES = new Set(['draft', 'ready', 'needs_changes', 'withdrawn']);
 
@@ -57,6 +57,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
   const [viewing, setViewing] = useState(null);
   const [recoveredDraft, setRecoveredDraft] = useState(null);
   const [importState, setImportState] = useState(null);
+  const [failedImportFile, setFailedImportFile] = useState(null);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -65,6 +66,17 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
   const docInputRef = useRef(null);
   const alive = useRef(true);
   const sessionTimer = useRef(0);
+  const latestEditing = useRef(null);
+  latestEditing.current = editing;
+
+  const persistSessionDraft = (draft = latestEditing.current) => {
+    if (!draft) return;
+    try {
+      window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ draft, savedAt: Date.now() }));
+    } catch {
+      // Pending File objects are not serializable; the text and metadata remain recoverable.
+    }
+  };
 
   useEffect(() => {
     alive.current = true;
@@ -105,14 +117,20 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     } catch {
       // A damaged session draft is discarded; the landing view stays usable.
     }
-    return () => { window.clearTimeout(sessionTimer.current); };
+    const flushDraft = () => persistSessionDraft();
+    window.addEventListener('pagehide', flushDraft);
+    return () => {
+      flushDraft();
+      window.removeEventListener('pagehide', flushDraft);
+      window.clearTimeout(sessionTimer.current);
+    };
   }, []);
 
   useEffect(() => {
     window.clearTimeout(sessionTimer.current);
     if (!editing) return undefined;
     sessionTimer.current = window.setTimeout(() => {
-      try { window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ draft: editing, savedAt: Date.now() })); } catch { /* File objects are not serializable; metadata only */ }
+      persistSessionDraft(editing);
     }, 400);
     return () => window.clearTimeout(sessionTimer.current);
   }, [editing]);
@@ -162,19 +180,23 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
       setError(validation.message);
       return;
     }
+    setFailedImportFile(null);
     setImportState({ fileName: file.name, step: IMPORT_STEPS[0], indeterminate: false });
-    window.setTimeout(() => {
-      if (alive.current) setImportState({ fileName: file.name, step: IMPORT_STEPS[1], indeterminate: false });
-    }, 150);
     try {
       const record = await importContributionDocument(file, authorSuggestion);
       if (!alive.current) return;
-      setImportState({ fileName: file.name, step: IMPORT_STEPS[3], indeterminate: false });
+      setImportState({ fileName: file.name, step: IMPORT_STEPS[1], indeterminate: false });
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+      if (!alive.current) return;
+      setImportState({ fileName: file.name, step: IMPORT_STEPS[2], indeterminate: false });
+      await new Promise((resolve) => window.setTimeout(resolve, 220));
+      if (!alive.current) return;
       setRecoveredDraft(null);
       setEditing(record);
       notifyContributionsChanged();
       setNotice(`${file.name} was converted into an editable draft. Review it before submitting.`);
     } catch (importError) {
+      setFailedImportFile(file);
       setError(importError?.message || `${file.name} could not be imported.`);
     } finally {
       if (alive.current) setImportState(null);
@@ -231,6 +253,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     try {
       const stored = await persistEditing(editing);
       const submitted = await submitContributionDraft(stored.id);
+      latestEditing.current = null;
       window.sessionStorage.removeItem(SESSION_KEY);
       setEditing(null);
       notifyContributionsChanged();
@@ -256,6 +279,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
       await deleteContributionRecord(record.id);
       if (viewing?.id === record.id) setViewing(null);
       if (editing?.id === record.id) {
+        latestEditing.current = null;
         setEditing(null);
         window.sessionStorage.removeItem(SESSION_KEY);
       }
@@ -272,7 +296,10 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
     // Prevent the still-current leadership address from reopening the
     // composer during the same batched navigation render.
     autoStartConsumed.current = true;
-    if (editing) setRecoveredDraft(createContribution(editing));
+    if (editing) {
+      persistSessionDraft(editing);
+      setRecoveredDraft(createContribution(editing));
+    }
     setEditing(null);
     setViewing(null);
     setError('');
@@ -362,7 +389,7 @@ export default function ContributionWorkspace({ authorSuggestion = '', autoStart
         ref={docInputRef}
         type="file"
       />
-      {(error || loadError) && <div className="cw-alert" role="alert"><Icon name="warning" size={15} /> {error || loadError}</div>}
+      {(error || loadError) && <div className="cw-alert" role="alert"><Icon name="warning" size={15} /><span>{error || loadError}</span>{failedImportFile && <button className="btn-dark-secondary" onClick={() => importDocument(failedImportFile)} type="button"><Icon name="refresh" size={13} /> Retry {failedImportFile.name}</button>}</div>}
       {notice && <p className="cw-note" role="status">{notice}</p>}
       {recoveredDraft && (
         <section className="cw-recovery" aria-label="Recovered contribution draft">

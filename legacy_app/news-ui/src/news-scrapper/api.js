@@ -1,5 +1,10 @@
 // Thin API wrappers. In dev, vite proxies these paths to the backend.
 import { getFingerprint, getSessionId } from './utils/session.js';
+import {
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  UPLOAD_REQUEST_TIMEOUT_MS,
+  fetchWithTimeout,
+} from '../shared/api/requestTimeout.js';
 
 // Always use same-origin API paths. Vite proxies these paths during local
 // development, while the production bundle is served by the same FastAPI app
@@ -20,16 +25,17 @@ function selectedProfileOverride() {
 
 async function jsonFetch(url, opts = {}) {
   const profileOverride = selectedProfileOverride();
-  const res = await fetch(BASE + url, {
-    ...opts,
+  const { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...fetchOptions } = opts;
+  const res = await fetchWithTimeout(BASE + url, {
+    ...fetchOptions,
     headers: {
       'Content-Type': 'application/json',
       ...(profileOverride ? { 'X-Sense-Profile': profileOverride } : {}),
-      ...(opts.headers || {}),
+      ...(fetchOptions.headers || {}),
     },
-  });
+  }, timeoutMs);
   const body = await readApiResponse(res);
-  if (String(opts.method || 'GET').toUpperCase() !== 'GET') {
+  if (String(fetchOptions.method || 'GET').toUpperCase() !== 'GET') {
     GET_CACHE.clear();
   }
   return body;
@@ -73,8 +79,10 @@ async function cachedJsonFetch(url, { staleMs = 30_000, maxStaleMs = 5 * 60_000,
   };
 
   if (cached && age <= maxStaleMs) {
-    refresh().catch(() => {});
-    return cached.data;
+    // A background refresh cannot update React consumers by itself. Await the
+    // shared fresh read so mounted routes converge, but keep the last known
+    // value as the resilient fallback when the refresh fails.
+    return abortableSharedPromise(refresh().catch(() => cached.data), signal);
   }
   return abortableSharedPromise(refresh(), signal);
 }
@@ -83,11 +91,11 @@ async function cachedJsonFetch(url, { staleMs = 30_000, maxStaleMs = 5 * 60_000,
 // form boundary; adding one manually would break the request.
 async function uploadFetch(url, formData, method = 'POST') {
   const profileOverride = selectedProfileOverride();
-  const res = await fetch(BASE + url, {
+  const res = await fetchWithTimeout(BASE + url, {
     method,
     headers: profileOverride ? { 'X-Sense-Profile': profileOverride } : undefined,
     body: formData,
-  });
+  }, UPLOAD_REQUEST_TIMEOUT_MS);
   return readApiResponse(res);
 }
 
@@ -568,7 +576,7 @@ async function exportBinary(path, items, filename) {
   }
 
   const profileOverride = selectedProfileOverride();
-  const res = await fetch(BASE + path, {
+  const res = await fetchWithTimeout(BASE + path, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -578,7 +586,7 @@ async function exportBinary(path, items, filename) {
       items: payloadItems,
       filename,
     }),
-  });
+  }, UPLOAD_REQUEST_TIMEOUT_MS);
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');

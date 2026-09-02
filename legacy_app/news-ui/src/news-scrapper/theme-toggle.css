@@ -24,7 +24,7 @@ html[data-theme="dark"] {
   --text: #f4f0fa;
   --text-secondary: #d4cbe1;
   --text-muted: #a99db9;
-  --text-faint: #81748f;
+  --text-faint: #9b8faa;
   --line-soft: rgba(224, 211, 244, 0.08);
   --line: rgba(224, 211, 244, 0.15);
   --line-strong: rgba(183, 150, 232, 0.34);
@@ -62,8 +62,8 @@ html[data-theme="light"] {
   --surface-hover: #d9e3ef;
   --text: #1d2a3d;
   --text-secondary: #405169;
-  --text-muted: #61738b;
-  --text-faint: #78889e;
+  --text-muted: #4b5f78;
+  --text-faint: #52667e;
   --line-soft: rgba(53, 77, 112, 0.08);
   --line: rgba(53, 77, 112, 0.15);
   --line-strong: rgba(65, 105, 166, 0.32);

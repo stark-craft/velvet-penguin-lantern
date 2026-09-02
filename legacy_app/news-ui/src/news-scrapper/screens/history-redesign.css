@@ -655,6 +655,22 @@ html[data-theme="light"] .archive-v2-import-one {
   scroll-snap-type: inline proximity;
 }
 
+.archive-v2-show-runs {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: .4rem;
+  margin-top: .65rem;
+  padding: .55rem .8rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--archive-paper-soft);
+  color: var(--text-secondary);
+  font-size: .72rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
 .archive-v2-run {
   position: relative;
   display: grid;

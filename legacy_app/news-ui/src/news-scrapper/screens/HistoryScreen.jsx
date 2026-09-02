@@ -7,10 +7,11 @@ import DateRangePicker from '../components/DateRangePicker.jsx';
 import { correctRegion, getHistoryFile, getHistoryList, getHistoryRange, getWorkflow, importWorkflow } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleKey, groupedByDate, publishedTime, scoreOf } from '../utils/intelligence.js';
+import { addLocalDays, localDateString } from '../utils/localDate.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import './history-redesign.css';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const TODAY = localDateString();
 const ARCHIVE_PAGE_SIZE = 48;
 
 const EMPTY_FILTERS = {
@@ -23,10 +24,8 @@ const EMPTY_FILTERS = {
   sort: 'date_desc',
 };
 
-function dateAddDays(dateStr, delta) {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + delta);
-  return d.toISOString().slice(0, 10);
+export function dateAddDays(dateStr, delta) {
+  return addLocalDays(dateStr, delta);
 }
 
 function parseRun(file) {
@@ -77,7 +76,7 @@ function metricSummary(items) {
 
 function friendlyDate(value, options = {}) {
   if (!value) return 'Date unavailable';
-  const parsed = new Date(value);
+  const parsed = new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? `${value}T12:00:00` : value);
   if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toLocaleDateString(undefined, {
     day: 'numeric',
@@ -214,6 +213,8 @@ function applyArchiveFilters(items, filters) {
 }
 
 function ArchiveRunStrip({ runs, activeRunLabel, onOpenRun, disabled }) {
+  const [visibleCount, setVisibleCount] = useState(18);
+  useEffect(() => setVisibleCount(18), [runs]);
   if (!runs.length) return null;
 
   return (
@@ -224,11 +225,11 @@ function ArchiveRunStrip({ runs, activeRunLabel, onOpenRun, disabled }) {
           <h2 id="archive-run-heading">Revisit a single newsroom run</h2>
           <p>Each edition preserves the exact signals available at that moment.</p>
         </div>
-        <span className="archive-v2-count-badge">{runs.length} run{runs.length === 1 ? '' : 's'}</span>
+        <span className="archive-v2-count-badge">{Math.min(visibleCount, runs.length)} of {runs.length} run{runs.length === 1 ? '' : 's'}</span>
       </div>
 
       <div className="archive-v2-run-track">
-        {runs.slice(0, 18).map((run) => (
+        {runs.slice(0, visibleCount).map((run) => (
           <button
             key={run.filename}
             className={activeRunLabel === run.label ? 'archive-v2-run is-active' : 'archive-v2-run'}
@@ -244,6 +245,7 @@ function ArchiveRunStrip({ runs, activeRunLabel, onOpenRun, disabled }) {
           </button>
         ))}
       </div>
+      {visibleCount < runs.length && <button className="archive-v2-show-runs" onClick={() => setVisibleCount((count) => Math.min(runs.length, count + 18))} type="button"><Icon name="chevD" size={15} /> Show {Math.min(18, runs.length - visibleCount)} more editions</button>}
     </section>
   );
 }
@@ -455,7 +457,7 @@ export default function HistoryScreen({ reviewAllowed = false }) {
   };
 
   return (
-    <main className="archive-v2-page">
+    <div className="archive-v2-page">
       <section className="archive-v2-hero is-compact" aria-labelledby="archive-page-title">
         <div className="archive-v2-hero-copy">
           <span className="archive-v2-kicker"><Icon name="archive" size={15} /> Briefing archive</span>
@@ -633,7 +635,7 @@ export default function HistoryScreen({ reviewAllowed = false }) {
             >
               <Icon name="download" size={15} /> Export selected
             </button>}
-            <button
+            {reviewAllowed && <button
               className="archive-v2-primary-button"
               disabled={!checkedArticles.length || importing}
               onClick={() => importArticles(checkedArticles)}
@@ -641,7 +643,7 @@ export default function HistoryScreen({ reviewAllowed = false }) {
             >
               <Icon name="upload" size={15} />
               {importing ? 'Importing…' : `Send to review${checkedArticles.length ? ` (${checkedArticles.length})` : ''}`}
-            </button>
+            </button>}
             {checkedArticles.length > 0 && (
               <button className="archive-v2-clear-button" onClick={() => setCheckedKeys(new Set())} type="button" aria-label="Clear all selected archive signals">
                 <Icon name="x" size={15} />
@@ -763,6 +765,6 @@ export default function HistoryScreen({ reviewAllowed = false }) {
         source="archive"
         onClose={() => setDraftExportOpen(false)}
       />
-    </main>
+    </div>
   );
 }

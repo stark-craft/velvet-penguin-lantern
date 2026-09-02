@@ -10,6 +10,7 @@ import DraftExportModal from '../components/modals/DraftExportModal.jsx';
 import { correctRegion, getSites, getViewerHidden, getViewerReactions, hideArticleForViewer, selectWorkflow, setViewerReaction } from '../api.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, cardVariant, groupedByDate, reactionIdentity, scoreOf } from '../utils/intelligence.js';
+import useAutoplayState from '../hooks/useAutoplayState.js';
 import './scan-redesign.css';
 
 const fmt = (date) => {
@@ -543,7 +544,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const initialQ = params.get('q') || '';
   const today = new Date();
 
-  const query = manualScan?.query ?? initialQ;
+  const query = manualScan?.query ?? '';
   const from = manualScan?.from || fmt(today);
   const to = manualScan?.to || fmt(today);
   const pickedSites = manualScan?.pickedSites || [];
@@ -580,6 +581,16 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const dateRangeRef = useRef(null);
   const sourcesRef = useRef(null);
   const searchRef = useRef(null);
+  const resultsTitleRef = useRef(null);
+  const userPageChangeRef = useRef(false);
+  const hydratedQueryRef = useRef('');
+  const { reducedMotion } = useAutoplayState();
+
+  useEffect(() => {
+    if (!initialQ || running || started || query || hydratedQueryRef.current === initialQ) return;
+    hydratedQueryRef.current = initialQ;
+    setManualScan({ query: initialQ });
+  }, [initialQ, query, running, setManualScan, started]);
 
   const reactionSignature = useMemo(() => cards.map(reactionIdentity).filter(Boolean).join('|'), [cards]);
   useEffect(() => {
@@ -663,6 +674,20 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
   const scanFailed = !running && logs[logs.length - 1]?.level === 'error';
   const scanStateLabel = running ? 'Searching archive' : scanFailed ? 'Search unavailable' : started ? 'Search complete' : 'Ready';
   const hasFilteredOut = cards.length > 0 && visibleCards.length === 0;
+  const changePage = (nextPage) => {
+    const bounded = Math.max(1, Math.min(pageCount, nextPage));
+    if (bounded === page) return;
+    userPageChangeRef.current = true;
+    setPage(bounded);
+  };
+  useEffect(() => {
+    if (!userPageChangeRef.current) return;
+    userPageChangeRef.current = false;
+    window.requestAnimationFrame(() => {
+      resultsTitleRef.current?.focus({ preventScroll: true });
+      resultsTitleRef.current?.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    });
+  }, [page, reducedMotion]);
   const milestones = [
     { label: 'Query captured', state: query.trim() ? 'complete' : 'waiting' },
     { label: 'Scope mapped', state: query.trim() ? 'complete' : 'waiting' },
@@ -955,9 +980,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
       {(actionBusy || actionError || actionNotice) && (
         <div
-          className={actionError
-            ? 'my-4 flex flex-col gap-3 rounded-2xl border border-red-300/20 bg-red-950/20 p-4 text-sm text-red-200 sm:flex-row sm:items-center sm:justify-between'
-            : 'my-4 flex flex-col gap-3 rounded-2xl border border-emerald-300/20 bg-emerald-400/[0.07] p-4 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between'}
+          className={`scan-action-feedback ${actionError ? 'is-error' : 'is-success'}`}
           role={actionError ? 'alert' : 'status'}
           aria-live="polite"
         >
@@ -974,7 +997,7 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
         <header className="scan-results-header">
           <div>
             <span className="scan-results-kicker">03 · Intelligence return</span>
-            <h2 id="scan-results-title">
+            <h2 id="scan-results-title" ref={resultsTitleRef} tabIndex={-1}>
               {running ? 'Scanning the retained archive' : scanFailed ? 'The archive search needs attention' : started ? `${cards.length} signals surfaced` : 'Your local results will land here'}
             </h2>
             <p>
@@ -1102,9 +1125,10 @@ export default function ScanScreen({ manualScan, setManualScan, startManualScan,
 
         {visibleCards.length > PAGE_SIZE && (
           <nav className="scan-pagination" aria-label="Scan result pages">
-            <button disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))} type="button"><Icon name="chevL" size={14} /> Previous</button>
+            <button disabled={page <= 1} onClick={() => changePage(page - 1)} type="button"><Icon name="chevL" size={14} /> Previous</button>
             <span>Page <strong>{page}</strong> of {pageCount} · {visibleCards.length} matches</span>
-            <button disabled={page >= pageCount} onClick={() => setPage((value) => Math.min(pageCount, value + 1))} type="button">Next <Icon name="chevR" size={14} /></button>
+            <button disabled={page >= pageCount} onClick={() => changePage(page + 1)} type="button">Next <Icon name="chevR" size={14} /></button>
+            <span className="sr-only" aria-live="polite">Page {page} of {pageCount} loaded</span>
           </nav>
         )}
 

@@ -22,8 +22,28 @@ export default function useModalFocus(open, onClose) {
 
     const previousFocus = document.activeElement;
     const previousOverflow = document.documentElement.style.overflow;
+    const isolatedNodes = [];
     document.documentElement.style.overflow = 'hidden';
     const dialog = dialogRef.current;
+    // Isolate every sibling branch between the dialog and <body>. This works
+    // for both body portals and the older inline overlays without ever making
+    // the dialog's own ancestor inert.
+    let activeBranch = dialog;
+    while (activeBranch?.parentElement && activeBranch.parentElement !== document.documentElement) {
+      const parent = activeBranch.parentElement;
+      [...parent.children].forEach((node) => {
+        if (node === activeBranch || node.contains(activeBranch)) return;
+        isolatedNodes.push({
+          node,
+          hadInert: node.hasAttribute('inert'),
+          ariaHidden: node.getAttribute('aria-hidden'),
+        });
+        node.setAttribute('inert', '');
+        node.setAttribute('aria-hidden', 'true');
+      });
+      if (parent === document.body) break;
+      activeBranch = parent;
+    }
     const timer = window.requestAnimationFrame(() => {
       const preferred = dialog?.querySelector('[autofocus], input, button');
       (preferred || dialog)?.focus?.();
@@ -59,6 +79,11 @@ export default function useModalFocus(open, onClose) {
       window.cancelAnimationFrame(timer);
       document.removeEventListener('keydown', onKeyDown);
       document.documentElement.style.overflow = previousOverflow;
+      isolatedNodes.forEach(({ node, hadInert, ariaHidden }) => {
+        if (!hadInert) node.removeAttribute('inert');
+        if (ariaHidden === null) node.removeAttribute('aria-hidden');
+        else node.setAttribute('aria-hidden', ariaHidden);
+      });
       previousFocus?.focus?.();
     };
   }, [open]);

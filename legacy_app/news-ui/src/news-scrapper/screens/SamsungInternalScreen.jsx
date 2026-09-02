@@ -47,11 +47,22 @@ function ResilientImage({ src, alt = '', className = '', loading = 'lazy' }) {
   return <img alt={alt} className={className} loading={loading} onError={() => setFailed(true)} src={src} />;
 }
 
-function rememberInternalPosition() {
-  window.sessionStorage.setItem('samsung-internal-scroll-y', String(window.scrollY || 0));
+function channelFromSearch(search) {
+  const value = new URLSearchParams(search || '').get('channel');
+  if (value === 'local') return 'local';
+  if (value === 'inside' || value === 'internal') return 'internal';
+  return 'global';
 }
 
-function AnnouncementRail({ items, busyId = '', onRemove }) {
+function channelSearch(channel) {
+  return channel === 'global' ? '' : `?channel=${channel === 'internal' ? 'inside' : channel}`;
+}
+
+function rememberInternalPosition(channel = 'global') {
+  window.sessionStorage.setItem(`samsung-internal-scroll-y-${channel}`, String(window.scrollY || 0));
+}
+
+function AnnouncementRail({ items, busyId = '', onRemove, returnChannel = 'global' }) {
   const navigate = useNavigate();
   const [manualPaused, setManualPaused] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(() => typeof window === 'undefined' ? 1920 : window.innerWidth);
@@ -65,7 +76,7 @@ function AnnouncementRail({ items, busyId = '', onRemove }) {
   const paused = manualPaused || !documentVisible;
   // Repeat enough complete cycles to cover two full viewports. This avoids a
   // blank rail or a visible reset when one short notice is shown on a 4K TV.
-  const minimumEntryWidth = onRemove ? 286 : 410;
+  const minimumEntryWidth = 410;
   const copyCount = repeatingCycleCount(viewportWidth, items.length, minimumEntryWidth);
   const entries = Array.from({ length: copyCount }, (_, copyIndex) => copyIndex)
     .flatMap((copyIndex) => items.map((record) => ({ record, copyIndex })));
@@ -86,11 +97,27 @@ function AnnouncementRail({ items, busyId = '', onRemove }) {
               aria-label={`Read announcement: ${record.title || 'Company announcement'}`}
               className="sni-announcement-item"
               onClick={() => {
-                rememberInternalPosition();
-                navigate(`/samsung-internal/announcement/${encodeURIComponent(record.id)}`);
+                rememberInternalPosition(returnChannel);
+                navigate(`/samsung-internal/announcement/${encodeURIComponent(record.id)}?from=${returnChannel === 'internal' ? 'inside' : returnChannel}`);
               }} type="button"
             >{content}</button>
-            {onRemove && <button
+          </div>;
+        })}
+      </div></div>
+      {onRemove && <details className="sni-announcement-manager">
+        <summary><Icon name="settings" size={12} /><span>Manage</span><small>{items.length}</small></summary>
+        <div className="sni-announcement-manager-panel">
+          <header><strong>Live announcements</strong><span>Remove any notice without waiting for the moving rail.</span></header>
+          <ul>{items.map((record) => <li key={record.id}>
+            <button
+              className="sni-announcement-manager-read"
+              onClick={() => {
+                rememberInternalPosition(returnChannel);
+                navigate(`/samsung-internal/announcement/${encodeURIComponent(record.id)}?from=${returnChannel === 'internal' ? 'inside' : returnChannel}`);
+              }}
+              type="button"
+            ><span>{record.category || 'Announcement'}</span><strong>{record.title || 'Company announcement'}</strong></button>
+            <button
               aria-busy={busyId === record.id}
               aria-label={`Remove announcement: ${record.title || 'Company announcement'}`}
               className="sni-announcement-remove"
@@ -98,10 +125,10 @@ function AnnouncementRail({ items, busyId = '', onRemove }) {
               onClick={() => onRemove(record)}
               title="Remove this announcement from Samsung Internal"
               type="button"
-            ><Icon name="trash" size={12} /><span>Remove</span></button>}
-          </div>;
-        })}
-      </div></div>
+            ><Icon name="trash" size={12} /><span>{busyId === record.id ? 'Removing…' : 'Remove'}</span></button>
+          </li>)}</ul>
+        </div>
+      </details>}
     </section>
   );
 }
@@ -113,7 +140,7 @@ function channelLabel(item) {
   return 'Samsung Global';
 }
 
-function FocusCarousel({ slides }) {
+function FocusCarousel({ slides, returnChannel = 'global' }) {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
@@ -121,9 +148,9 @@ function FocusCarousel({ slides }) {
   useEffect(() => { if (index >= slides.length) setIndex(0); }, [index, slides.length]);
   useEffect(() => {
     if (manualPaused || !documentVisible || slides.length <= 1) return undefined;
-    const timer = window.setInterval(() => setIndex((current) => (current + 1) % slides.length), autoplayDelay(8000, reducedMotion));
-    return () => window.clearInterval(timer);
-  }, [documentVisible, manualPaused, reducedMotion, slides.length]);
+    const timer = window.setTimeout(() => setIndex((current) => (current + 1) % slides.length), autoplayDelay(8000, reducedMotion));
+    return () => window.clearTimeout(timer);
+  }, [documentVisible, index, manualPaused, reducedMotion, slides.length]);
   if (!slides.length) return null;
   const active = slides[index];
   const article = active.kind === 'signal' ? active.item : null;
@@ -133,8 +160,8 @@ function FocusCarousel({ slides }) {
   const summary = record?.summary || record?.body || article?.summary || article?.snippet || '';
   const move = (delta) => setIndex((current) => (current + delta + slides.length) % slides.length);
   const openActive = () => {
-    rememberInternalPosition();
-    if (record) navigate(`/samsung-internal/leadership/${encodeURIComponent(record.id)}`);
+    rememberInternalPosition(returnChannel);
+    if (record) navigate(`/samsung-internal/leadership/${encodeURIComponent(record.id)}?from=${returnChannel === 'internal' ? 'inside' : returnChannel}`);
     else {
       const link = signalLinkOf(article);
       if (link) window.open(link, '_blank', 'noopener,noreferrer');
@@ -190,11 +217,11 @@ function WireCard({ item, duplicate = false }) {
   );
 }
 
-function IntelligenceWire({ announcementBusy = '', announcements = [], items, onRemoveAnnouncement }) {
+function IntelligenceWire({ announcementBusy = '', announcements = [], items, onRemoveAnnouncement, returnChannel = 'global' }) {
   return (
     <aside aria-label="Samsung Intelligence Wire" className="sni-wire">
       <header><h2>Live intelligence</h2><i aria-hidden="true" /></header>
-      <AnnouncementRail busyId={announcementBusy} items={announcements} onRemove={onRemoveAnnouncement} />
+      <AnnouncementRail busyId={announcementBusy} items={announcements} onRemove={onRemoveAnnouncement} returnChannel={returnChannel} />
       {items.length ? <div className="sni-wire-window"><ContinuousSignalStream ariaLabel="Samsung Intelligence Wire" className="sni-continuous-wire" duration={42} items={items} renderItem={(item, index, duplicate) => <WireCard duplicate={duplicate} item={item} key={`${item.id || item.link || item.title}-${index}`} />} /></div>
         : <div className="sni-wire-empty"><Icon name="inbox" size={22} /><p>The wire will populate after the unified archive contains Samsung signals.</p></div>}
       <footer><span>Global</span><span>Local</span><span>Inside</span></footer>
@@ -223,7 +250,7 @@ function ContributionCard({ record }) {
   const image = coverUrl(record);
   return (
     <article className="sni-card sni-card-internal">
-      <button aria-label={`Read colleague story: ${record.title || 'Untitled'}`} className="sni-card-open" onClick={() => { rememberInternalPosition(); navigate(`/samsung-internal/story/${encodeURIComponent(record.id)}`); }} type="button">
+      <button aria-label={`Read colleague story: ${record.title || 'Untitled'}`} className="sni-card-open" onClick={() => { rememberInternalPosition('internal'); navigate(`/samsung-internal/story/${encodeURIComponent(record.id)}?from=inside`); }} type="button">
         <div className={`sni-card-media${image ? '' : ' is-empty'}`}>{image ? <ResilientImage alt="" src={image} /> : <span aria-hidden="true"><Icon name="note" size={22} /></span>}<span className="sni-card-kind">Colleague story</span></div>
         <div className="sni-card-body"><h3>{record.title || 'Untitled'}</h3><p>{excerptOf(record.summary || record.body, 180)}</p><footer><span>{record.author || 'Samsung colleague'}</span><span>{formatDate(record.publishedAt)}</span><span>Read story <Icon name="chevR" size={12} /></span></footer></div>
       </button>
@@ -250,34 +277,51 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
   const [published, setPublished] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [publishedError, setPublishedError] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [tab, setTab] = useState('global');
+  const [tab, setTab] = useState(() => channelFromSearch(location.search));
   const [announcementBusy, setAnnouncementBusy] = useState('');
   const [announcementFeedback, setAnnouncementFeedback] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setPublishedError('');
     Promise.all([
       getSamsungInternalFeed(100).catch(async () => {
         const briefingData = await getSharedBriefing().catch(() => getLatestBriefing());
         return splitByScope(normalizeList(briefingData?.result || briefingData?.results || briefingData?.articles || briefingData || []).filter(isSamsungSignal));
       }),
-      getPublishedInternalContent().catch(() => []),
-    ]).then(([feed, records]) => {
+      getPublishedInternalContent()
+        .then((records) => ({ records, failure: '' }))
+        .catch((publishedLoadError) => ({
+          records: null,
+          failure: publishedLoadError?.message || 'Published Samsung content could not be verified.',
+        })),
+    ]).then(([feed, publishedResult]) => {
       if (cancelled) return;
       setChannels({ global: normalizeChannel(feed?.global || [], 'global'), local: normalizeChannel(feed?.local || [], 'local'), inside: normalizeChannel(feed?.sampark || feed?.inside || [], 'inside') });
-      setPublished(Array.isArray(records) ? records : []);
+      if (Array.isArray(publishedResult.records)) setPublished(publishedResult.records);
+      setPublishedError(publishedResult.failure);
     }).catch((loadError) => { if (!cancelled) setError(loadError?.message || 'Samsung Internal could not be loaded.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [loadAttempt]);
 
   useEffect(() => {
+    setTab(channelFromSearch(location.search));
+  }, [location.search]);
+
+  useEffect(() => {
     if (loading || !location.state?.restore) return;
-    const top = Number(window.sessionStorage.getItem('samsung-internal-scroll-y') || 0);
+    const returnChannel = channelFromSearch(location.search);
+    const top = Number(window.sessionStorage.getItem(`samsung-internal-scroll-y-${returnChannel}`) || 0);
     window.requestAnimationFrame(() => window.scrollTo({ top, behavior: 'auto' }));
-  }, [loading, location.state]);
+  }, [loading, location.search, location.state]);
+
+  const selectChannel = (nextTab) => {
+    setTab(nextTab);
+    navigate({ pathname: '/samsung-internal', search: channelSearch(nextTab) }, { replace: true });
+  };
 
   const model = useMemo(() => {
     const leadership = activeLeadership(published);
@@ -316,10 +360,11 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
   if (loading) return <div className="samsung-internal-page"><div aria-live="polite" className="sni-state" role="status"><span className="sni-loader" /><h1>Opening Samsung Internal…</h1><p>Aligning leadership, company notices and the Samsung intelligence wire.</p></div></div>;
   if (error) return <div className="samsung-internal-page"><div className="sni-state sni-state-error" role="alert"><Icon name="warning" size={20} /><h1>Samsung Internal could not load</h1><p>{error}</p><button className="btn-dark-secondary" onClick={() => setLoadAttempt((value) => value + 1)} type="button"><Icon name="refresh" size={14} /> Try again</button></div></div>;
   return <div className="samsung-internal-page">
+    {publishedError && <section className="sni-published-service-notice" role="alert"><Icon name="warning" size={17} /><div><strong>Published content could not be verified</strong><p>{publishedError} Existing items are kept until a successful refresh.</p></div><button onClick={() => setLoadAttempt((value) => value + 1)} type="button"><Icon name="refresh" size={13} /> Try again</button></section>}
     {announcementFeedback && <p className={`sni-management-feedback is-${announcementFeedback.kind}`} role={announcementFeedback.kind === 'error' ? 'alert' : 'status'}>{announcementFeedback.message}</p>}
-    <section className="sni-primary-row">{model.slides.length ? <FocusCarousel slides={model.slides} /> : <EmptyPanel copy="The unified archive has no Samsung signals yet." title="Samsung Focus is preparing" />}<IntelligenceWire announcementBusy={announcementBusy} announcements={model.announcements} items={model.wire} onRemoveAnnouncement={removeAnnouncement} /></section>
-    {!model.leadership && <p className="sni-note" role="note">A published leadership message will take the first Samsung Focus position automatically.</p>}
-    <nav aria-label="Samsung Internal archive channels" className="sni-tabs" role="tablist">{CHANNELS.map((entry) => <button aria-selected={tab === entry.id} className={`sni-tab${tab === entry.id ? ' is-active' : ''}`} key={entry.id} onClick={() => setTab(entry.id)} role="tab" type="button"><Icon name={entry.icon} size={15} /><span>{entry.label}</span><small>{counts[entry.id]}</small></button>)}</nav>
+    <section className="sni-primary-row">{model.slides.length ? <FocusCarousel returnChannel={tab} slides={model.slides} /> : <EmptyPanel copy="The unified archive has no Samsung signals yet." title="Samsung Focus is preparing" />}<IntelligenceWire announcementBusy={announcementBusy} announcements={model.announcements} items={model.wire} onRemoveAnnouncement={removeAnnouncement} returnChannel={tab} /></section>
+    {!model.leadership && !publishedError && <p className="sni-note" role="note">A published leadership message will take the first Samsung Focus position automatically.</p>}
+    <nav aria-label="Samsung Internal archive channels" className="sni-tabs" role="tablist">{CHANNELS.map((entry) => <button aria-selected={tab === entry.id} className={`sni-tab${tab === entry.id ? ' is-active' : ''}`} key={entry.id} onClick={() => selectChannel(entry.id)} role="tab" type="button"><Icon name={entry.icon} size={15} /><span>{entry.label}</span><small>{counts[entry.id]}</small></button>)}</nav>
     <section aria-label={`${CHANNELS.find((entry) => entry.id === tab)?.label} archive`} className="sni-panel" role="tabpanel">{renderTab()}</section>
     <footer className="sni-foot"><span>Samsung Internal · curated by your editorial desk</span>{contributionAllowed && <button className="btn-dark-secondary" onClick={() => navigate('/for-you/create/contributions')} type="button"><Icon name="plus" size={14} /> Contribute a story</button>}</footer>
   </div>;

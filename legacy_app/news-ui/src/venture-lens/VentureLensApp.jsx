@@ -163,10 +163,10 @@ function MetricBars({ metrics = {} }) {
   return <div className="vl-metric-bars">{Object.entries(metrics).map(([label, raw]) => { const value = Number(raw) || 0; return <div key={label}><header><span>{label.replaceAll("_", " ")}</span><strong>{value}</strong></header><i><b style={{ width: `${Math.max(3, Math.min(100, value))}%` }} /></i></div>; })}</div>;
 }
 
-function DossierModal({ dossier, loading, watched, watchable = true, onClose, onWatch, onOpenRelated }) {
+function DossierModal({ dossier, error, loading, watched, watchable = true, onClose, onRetry, onWatch, onOpenRelated }) {
   const dialogRef = useRef(null);
   const closeRef = useRef(onClose);
-  const open = Boolean(dossier || loading);
+  const open = Boolean(dossier || loading || error);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!open) return undefined;
@@ -195,8 +195,8 @@ function DossierModal({ dossier, loading, watched, watchable = true, onClose, on
     };
   }, [open]);
   if (!open) return null;
-  const title = dossier?.label || dossier?.full_name || dossier?.title || "Loading intelligence";
-  return <div className="vl-modal-scrim" onMouseDown={onClose} role="presentation"><section aria-label={`${title} dossier`} aria-modal="true" className="vl-dossier" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>{loading ? <div className="vl-dossier-loading"><i /><strong>Building dossier</strong><span>Connecting implementation and research evidence…</span></div> : <><header className="vl-dossier-head"><div><span>{dossier.kind} dossier</span><h2>{title}</h2><p>{dossier.stage || "Signal"} · Momentum {dossier.momentum_score || dossier.score || "—"}/100</p></div><div>{watchable && <WatchButton active={watched} onClick={onWatch} />}<button aria-label="Close dossier" className="vl-close" onClick={onClose} type="button"><X size={18} /></button></div></header><div className="vl-dossier-body"><main><section><span className="vl-dossier-label">Executive assessment</span><p className="vl-dossier-lead">{dossier.assessment || dossier.summary || dossier.executive_summary}</p></section>{dossier.why_now && <section><h3>Why now</h3><p>{dossier.why_now}</p></section>}{dossier.contribution && <section><h3>Core contribution</h3><p>{dossier.contribution}</p></section>}{dossier.practical_relevance && <section><h3>Practical relevance</h3><p>{dossier.practical_relevance}</p></section>}{dossier.recommendation && <section className="vl-recommendation"><h3>Recommended posture</h3><p>{dossier.recommendation}</p></section>}{!!dossier.strengths?.length && <section><h3>Strengths</h3><ul>{dossier.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.risks?.length && <section><h3>Risks and validation points</h3><ul>{dossier.risks.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.limitations?.length && <section><h3>Limitations</h3><ul>{dossier.limitations.map((item) => <li key={item}>{item}</li>)}</ul></section>}</main><aside>{dossier.metrics && <MetricBars metrics={dossier.metrics} />}<div className="vl-dossier-facts">{Number.isFinite(dossier.stars) && <span><small>Stars</small><strong>{compactNumber.format(dossier.stars)}</strong></span>}{Number.isFinite(dossier.forks) && <span><small>Forks</small><strong>{compactNumber.format(dossier.forks)}</strong></span>}{dossier.repository_count !== undefined && <span><small>Repositories</small><strong>{dossier.repository_count}</strong></span>}{dossier.paper_count !== undefined && <span><small>Papers</small><strong>{dossier.paper_count}</strong></span>}</div>{[...(dossier.repositories || dossier.related_repositories || []), ...(dossier.papers || dossier.related_papers || [])].length > 0 && <div className="vl-related-list"><h3>Connected evidence</h3>{(dossier.repositories || dossier.related_repositories || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("repository", item.id)} type="button"><span>Repository</span><strong>{item.full_name || item.name}</strong></button>)}{(dossier.papers || dossier.related_papers || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("paper", item.id)} type="button"><span>Research</span><strong>{item.title}</strong></button>)}</div>}{(dossier.url || dossier.pdf_url) && <a className="vl-primary-link" href={dossier.url || dossier.pdf_url} rel="noreferrer" target="_blank">Open original source <ArrowIcon /></a>}</aside></div></>}</section></div>;
+  const title = dossier?.label || dossier?.full_name || dossier?.title || (error ? "Dossier unavailable" : "Loading intelligence");
+  return <div className="vl-modal-scrim" onMouseDown={onClose} role="presentation"><section aria-label={`${title} dossier`} aria-modal="true" className="vl-dossier" onMouseDown={(event) => event.stopPropagation()} ref={dialogRef} role="dialog" tabIndex={-1}>{loading ? <div className="vl-dossier-loading"><i /><strong>Building dossier</strong><span>Connecting implementation and research evidence…</span></div> : error ? <div className="vl-dossier-loading is-error" role="alert"><Radar aria-hidden="true" size={24} /><strong>Dossier temporarily unavailable</strong><span>{error}</span><div><button onClick={onRetry} type="button">Try this dossier again</button><button onClick={onClose} type="button">Close</button></div></div> : <><header className="vl-dossier-head"><div><span>{dossier.kind} dossier</span><h2>{title}</h2><p>{dossier.stage || "Signal"} · Momentum {dossier.momentum_score || dossier.score || "—"}/100</p></div><div>{watchable && <WatchButton active={watched} onClick={onWatch} />}<button aria-label="Close dossier" className="vl-close" onClick={onClose} type="button"><X size={18} /></button></div></header><div className="vl-dossier-body"><div className="vl-dossier-reading"><section><span className="vl-dossier-label">Executive assessment</span><p className="vl-dossier-lead">{dossier.assessment || dossier.summary || dossier.executive_summary}</p></section>{dossier.why_now && <section><h3>Why now</h3><p>{dossier.why_now}</p></section>}{dossier.contribution && <section><h3>Core contribution</h3><p>{dossier.contribution}</p></section>}{dossier.practical_relevance && <section><h3>Practical relevance</h3><p>{dossier.practical_relevance}</p></section>}{dossier.recommendation && <section className="vl-recommendation"><h3>Recommended posture</h3><p>{dossier.recommendation}</p></section>}{!!dossier.strengths?.length && <section><h3>Strengths</h3><ul>{dossier.strengths.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.risks?.length && <section><h3>Risks and validation points</h3><ul>{dossier.risks.map((item) => <li key={item}>{item}</li>)}</ul></section>}{!!dossier.limitations?.length && <section><h3>Limitations</h3><ul>{dossier.limitations.map((item) => <li key={item}>{item}</li>)}</ul></section>}</div><aside>{dossier.metrics && <MetricBars metrics={dossier.metrics} />}<div className="vl-dossier-facts">{Number.isFinite(dossier.stars) && <span><small>Stars</small><strong>{compactNumber.format(dossier.stars)}</strong></span>}{Number.isFinite(dossier.forks) && <span><small>Forks</small><strong>{compactNumber.format(dossier.forks)}</strong></span>}{dossier.repository_count !== undefined && <span><small>Repositories</small><strong>{dossier.repository_count}</strong></span>}{dossier.paper_count !== undefined && <span><small>Papers</small><strong>{dossier.paper_count}</strong></span>}</div>{[...(dossier.repositories || dossier.related_repositories || []), ...(dossier.papers || dossier.related_papers || [])].length > 0 && <div className="vl-related-list"><h3>Connected evidence</h3>{(dossier.repositories || dossier.related_repositories || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("repository", item.id)} type="button"><span>Repository</span><strong>{item.full_name || item.name}</strong></button>)}{(dossier.papers || dossier.related_papers || []).slice(0, 4).map((item) => <button key={item.id} onClick={() => onOpenRelated("paper", item.id)} type="button"><span>Research</span><strong>{item.title}</strong></button>)}</div>}{(dossier.url || dossier.pdf_url) && <a className="vl-primary-link" href={dossier.url || dossier.pdf_url} rel="noreferrer" target="_blank">Open original source <ArrowIcon /></a>}</aside></div></>}</section></div>;
 }
 
 function metricValue(item, definition) {
@@ -238,6 +238,8 @@ export default function VentureLensApp() {
   const [paperVisible, setPaperVisible] = useState(ALL_PAGE_SIZE);
   const [dossier, setDossier] = useState(null);
   const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierError, setDossierError] = useState("");
+  const [dossierRequest, setDossierRequest] = useState(null);
   const [compareItems, setCompareItems] = useState(storedComparison);
   const [comparison, setComparison] = useState(null);
   const [comparing, setComparing] = useState(false);
@@ -245,7 +247,9 @@ export default function VentureLensApp() {
   const [notificationsReading, setNotificationsReading] = useState(false);
   const [pendingWatchKeys, setPendingWatchKeys] = useState(() => new Set());
   const notificationRef = useRef(null);
+  const navigationRef = useRef(null);
   const focusedArtifactRef = useRef("");
+  const dossierRequestRef = useRef({ token: 0, controller: null });
 
   async function loadWorkspace() {
     setLoading(true); setError("");
@@ -259,19 +263,24 @@ export default function VentureLensApp() {
   }
 
   useEffect(() => { loadWorkspace(); }, []);
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "auto" }); setNotificationsOpen(false); }, [location.pathname]);
   useEffect(() => {
-    if (!discovery) return;
+    window.scrollTo({ top: 0, behavior: "auto" });
+    setNotificationsOpen(false);
+    const active = navigationRef.current?.querySelector(`[data-workspace="${page}"]`);
+    active?.scrollIntoView?.({ behavior: "auto", block: "nearest", inline: "center" });
+  }, [location.pathname, page]);
+  useEffect(() => {
+    if (loading && !payload && !intelligence && !discovery) return;
     const identifier = new URLSearchParams(location.search).get("focus");
-    const kind = { repositories: "repository", research: "paper", models: "model", datasets: "dataset", patents: "patent" }[page];
+    const kind = { radar: "technology", repositories: "repository", research: "paper", models: "model", datasets: "dataset", patents: "patent" }[page];
     const key = kind && identifier ? `${kind}:${identifier}` : "";
     if (!key || focusedArtifactRef.current === key) return;
-    focusedArtifactRef.current = key;
     openDossier(kind, identifier);
-  }, [discovery, location.search, page]);
+  }, [discovery, intelligence, loading, location.search, page, payload]);
   useEffect(() => { setRepoVisible(ALL_PAGE_SIZE); }, [repoCategory, repoQuery]);
   useEffect(() => { setPaperVisible(ALL_PAGE_SIZE); }, [paperCategory, paperQuery]);
   useEffect(() => { window.sessionStorage.setItem(COMPARISON_STORAGE_KEY, JSON.stringify(compareItems)); }, [compareItems]);
+  useEffect(() => () => dossierRequestRef.current.controller?.abort(), []);
   useEffect(() => {
     if (!notificationsOpen) return undefined;
     const handlePointerDown = (event) => { if (!notificationRef.current?.contains(event.target)) setNotificationsOpen(false); };
@@ -306,10 +315,35 @@ export default function VentureLensApp() {
       dataset: getDatasetDossier,
       patent: getPatentDossier,
     };
-    setDossier(null); setDossierLoading(true);
-    try { setDossier(await (loaders[kind] || getTechnologyDossier)(id)); }
-    catch (requestError) { setError(requestError.message); }
-    finally { setDossierLoading(false); }
+    dossierRequestRef.current.controller?.abort();
+    const token = dossierRequestRef.current.token + 1;
+    const controller = new AbortController();
+    dossierRequestRef.current = { token, controller };
+    const key = referenceKey(kind, id);
+    setDossierRequest({ kind, id });
+    setDossier(null);
+    setDossierError("");
+    setDossierLoading(true);
+    try {
+      const result = await (loaders[kind] || getTechnologyDossier)(id, { signal: controller.signal });
+      if (dossierRequestRef.current.token !== token) return;
+      setDossier(result);
+      focusedArtifactRef.current = key;
+    } catch (requestError) {
+      if (requestError?.name === "AbortError" || dossierRequestRef.current.token !== token) return;
+      focusedArtifactRef.current = "";
+      setDossierError(requestError.message || "This dossier could not be loaded.");
+    } finally {
+      if (dossierRequestRef.current.token === token) setDossierLoading(false);
+    }
+  }
+  function closeDossier() {
+    dossierRequestRef.current.controller?.abort();
+    dossierRequestRef.current = { token: dossierRequestRef.current.token + 1, controller: null };
+    setDossier(null);
+    setDossierError("");
+    setDossierLoading(false);
+    setDossierRequest(null);
   }
   async function toggleWatch(kind, id, label) {
     const key = referenceKey(kind, id);
@@ -339,8 +373,8 @@ export default function VentureLensApp() {
     finally { setNotificationsReading(false); }
   }
   const dossierWatched = dossier ? watchedKeys.has(referenceKey(dossier.kind, dossier.id)) : false;
-  const initialLoading = loading && !payload && !intelligence;
-  const fatalError = !loading && !!error && !payload && !intelligence;
+  const initialLoading = loading && !payload && !intelligence && !discovery;
+  const fatalError = !loading && !!error && !payload && !intelligence && !discovery;
 
   const repoCards = (items) => items.map((repository) => { const key = referenceKey("repository", repository.id); return <RepoCard compared={comparedKeys.has(key)} key={`${repository.category}-${repository.id}`} onCompare={() => toggleCompare("repository", repository.id, repository.full_name || repository.name)} onOpen={openDossier} onWatch={() => toggleWatch("repository", repository.id, repository.full_name || repository.name)} repository={repository} watched={watchedKeys.has(key)} watchPending={pendingWatchKeys.has(key)} />; });
   const paperCards = (items) => items.map((paper) => { const key = referenceKey("paper", paper.id); return <PaperCard compared={comparedKeys.has(key)} key={`${paper.category}-${paper.id}`} onCompare={() => toggleCompare("paper", paper.id, paper.title)} onOpen={openDossier} onWatch={() => toggleWatch("paper", paper.id, paper.title)} paper={paper} watched={watchedKeys.has(key)} watchPending={pendingWatchKeys.has(key)} />; });
@@ -355,8 +389,8 @@ export default function VentureLensApp() {
           <button aria-label="Return to Research landing" onClick={() => navigate("/research")} type="button"><Radar size={20} /></button>
           <div><span>Sense.AI Research</span><strong>Venture Lens</strong><small>Evidence-led technology decision intelligence</small></div>
         </div>
-        <nav aria-label="Research workspaces" className="vl-nav">
-          {visiblePages.map(([id, label, PageIcon]) => <button aria-current={page === id ? "page" : undefined} className={page === id ? "active" : ""} key={id} onClick={() => navigate(routeFor(id))} title={label} type="button"><PageIcon aria-hidden="true" size={15} /><span>{label}</span></button>)}
+        <nav aria-label="Research workspaces" className="vl-nav" ref={navigationRef}>
+          {visiblePages.map(([id, label, PageIcon]) => <button aria-current={page === id ? "page" : undefined} className={page === id ? "active" : ""} data-workspace={id} key={id} onClick={() => navigate(routeFor(id))} title={label} type="button"><PageIcon aria-hidden="true" size={15} /><span>{label}</span></button>)}
         </nav>
         <div className="vl-top-actions">
           <div className="vl-notification-wrap" ref={notificationRef}>
@@ -413,7 +447,7 @@ export default function VentureLensApp() {
         </div>
       </section>
 
-      <main className={`vl-page vl-page-${page}`}>
+      <div className={`vl-page vl-page-${page}`}>
         {initialLoading && <WorkspaceLoading />}
         {fatalError && <WorkspaceFailure message={error} onRetry={loadWorkspace} />}
         {error && !fatalError && <div className="vl-notice" role="alert"><strong>Venture Lens needs your attention.</strong><span>{error}</span><button onClick={loadWorkspace} type="button">Try again</button><button aria-label="Dismiss message" onClick={() => setError("")} type="button"><X size={15} /></button></div>}
@@ -465,11 +499,11 @@ export default function VentureLensApp() {
 
         {page === "briefs" && <section className="vl-section vl-page-section vl-brief-section"><SectionHead number="07" title="Opportunity briefs" copy="Decision notes assembled from the strongest signals in the current cache." /><div className="vl-brief-grid">{(intelligence?.briefs || []).map((brief, index) => <article key={brief.id}><header><span>0{index + 1}</span><small>{brief.type}</small></header><h3>{brief.title}</h3><p>{brief.summary}</p><ul>{brief.actions.map((action) => <li key={action}>{action}</li>)}</ul><button onClick={() => brief.technology_id ? openDossier("technology", brief.technology_id) : brief.repository_id ? openDossier("repository", brief.repository_id) : brief.paper_id ? openDossier("paper", brief.paper_id) : undefined} type="button">Open supporting intelligence <ArrowIcon /></button></article>)}</div>{!intelligence?.briefs?.length && <EmptyWorkspace>No opportunity briefs are available yet. Sync live data to assemble the next set.</EmptyWorkspace>}</section>}
         </div>
-      </main>
+      </div>
 
       {compareItems.length > 0 && page !== "compare" && <aside aria-live="polite" className="vl-compare-tray"><div><GitCompareArrows aria-hidden="true" size={17} /><span><strong>{compareItems.length} {compareItems[0].kind}{compareItems.length === 1 ? "" : "s"}</strong> selected for comparison</span></div><button onClick={() => navigate("/venturelens/compare")} type="button">Open compare</button><button aria-label="Clear comparison selection" onClick={() => { setCompareItems([]); setComparison(null); }} type="button"><X aria-hidden="true" size={15} /></button></aside>}
       <footer className="vl-footer"><button className="vl-brand" onClick={() => navigate("/venturelens")} type="button"><span className="vl-brand-mark"><i /><i /><i /></span><span><strong>Sense.AI</strong><small>Decision intelligence</small></span></button><p>Public-source signals. Cached responsibly. Built for internal exploration.</p><span>Designed & engineered by Vineet Singh</span></footer>
-      <DossierModal dossier={dossier} loading={dossierLoading} onClose={() => { setDossier(null); setDossierLoading(false); }} onOpenRelated={openDossier} onWatch={() => dossier && toggleWatch(dossier.kind, dossier.id, dossier.label || dossier.full_name || dossier.title)} watchable={["repository", "paper", "technology"].includes(dossier?.kind)} watched={dossierWatched} />
+      <DossierModal dossier={dossier} error={dossierError} loading={dossierLoading} onClose={closeDossier} onOpenRelated={openDossier} onRetry={() => dossierRequest && openDossier(dossierRequest.kind, dossierRequest.id)} onWatch={() => dossier && toggleWatch(dossier.kind, dossier.id, dossier.label || dossier.full_name || dossier.title)} watchable={["repository", "paper", "technology"].includes(dossier?.kind)} watched={dossierWatched} />
     </div>
   );
 }

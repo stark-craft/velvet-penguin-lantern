@@ -22,6 +22,10 @@ const vocSource = readFileSync(
   new URL('../src/components/VocFeedback.jsx', import.meta.url),
   'utf8',
 );
+const requestTimeoutSource = readFileSync(
+  new URL('../src/shared/api/requestTimeout.js', import.meta.url),
+  'utf8',
+);
 
 test('viewer APIs are same-origin in both Vite and the portable build', () => {
   assert.match(apiSource, /const BASE = '';/);
@@ -37,6 +41,10 @@ test('viewer APIs are same-origin in both Vite and the portable build', () => {
   assert.doesNotMatch(sharedApiSource, /VITE_API_BASE/);
   assert.doesNotMatch(vocSource, /VITE_API_BASE_URL/);
   assert.doesNotMatch(vocSource, /https?:\/\/127\.0\.0\.1:8000/);
+  assert.match(apiSource, /fetchWithTimeout/);
+  assert.match(sharedApiSource, /fetchWithTimeout/);
+  assert.match(requestTimeoutSource, /RequestTimeoutError/);
+  assert.match(requestTimeoutSource, /callerSignal\?\.addEventListener\('abort'/);
 });
 
 test('private briefing polling cannot lose a submit or retry refresh', () => {

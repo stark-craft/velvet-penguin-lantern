@@ -8,6 +8,7 @@ export default function ForYouCard({
   index,
   section,
   saved,
+  savedStatus = 'ready',
   onOpen,
   onSave,
   onHide,
@@ -59,6 +60,8 @@ export default function ForYouCard({
   }, [index, item, onImpression, section]);
 
   const reactions = item.reactions || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
+  const savedKnown = savedStatus === 'ready';
+  const savedLabel = savedKnown ? (saved ? 'Following' : 'Follow') : savedStatus === 'loading' ? 'Checking…' : 'Status unavailable';
   return (
     <article aria-busy={Boolean(busyAction)} className={`fy-card${compact ? ' is-compact' : ''}${executiveVariant ? ` is-executive-${executiveVariant}` : ''}`} ref={ref}>
       <button aria-label={`Open dossier for ${item.title}`} className="fy-card-open-layer" onClick={() => onOpen(item)} type="button" />
@@ -78,7 +81,7 @@ export default function ForYouCard({
         )}
         <div className="fy-card-footer">
           <div className="fy-card-actions">
-            <button aria-label={saved ? `Stop following ${item.title}` : `Follow ${item.title}`} className={`fy-follow-action${saved ? ' active' : ''}`} data-tooltip={saved ? 'Stop following this story' : 'Follow this story for closely related updates'} disabled={Boolean(busyAction)} onClick={() => onSave(item)} title={busyAction === 'save' ? 'Updating follow state' : saved ? 'Unfollow this story' : 'Follow this story privately'} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={15} /><span>{saved ? 'Following' : 'Follow'}</span></button>
+            <button aria-label={savedKnown ? (saved ? `Stop following ${item.title}` : `Follow ${item.title}`) : `Following status unavailable for ${item.title}`} className={`fy-follow-action${savedKnown && saved ? ' active' : ''}`} data-tooltip={savedKnown ? (saved ? 'Stop following this story' : 'Follow this story for closely related updates') : 'Following status unavailable · use Retry above'} disabled={Boolean(busyAction) || !savedKnown} onClick={() => onSave(item)} title={busyAction === 'save' ? 'Updating follow state' : savedKnown ? (saved ? 'Unfollow this story' : 'Follow this story privately') : 'Following status unavailable'} type="button"><Icon name={savedKnown && saved ? 'check' : 'bookmark'} size={15} /><span>{savedLabel}</span></button>
             <Bouncer disabled={Boolean(busyAction)} dislikeCount={reactions.dislike_count} likeCount={reactions.like_count} reactions={reactions} onVote={(value) => onReact(item, value)} />
             <button aria-label={`Hide ${item.title} only from your feed`} className="fy-hide-action" data-tooltip="Hide this article only from your private feed" disabled={Boolean(busyAction)} onClick={() => onHide(item)} title="Hide only from your feed" type="button"><Icon name="eye" size={15} /></button>
           </div>

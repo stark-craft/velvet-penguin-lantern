@@ -1175,9 +1175,9 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 .sni-wire-announcements {
   position: relative;
   display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
+  grid-template-columns: 78px minmax(0, 1fr) auto;
   min-height: 38px;
-  overflow: hidden;
+  overflow: visible;
   border-block: 1px solid color-mix(in srgb, #e59466 38%, var(--theme-border));
   background: linear-gradient(90deg, color-mix(in srgb, #b85f3e 13%, var(--surface)), color-mix(in srgb, #d08a58 7%, var(--surface)) 58%, var(--surface));
   color: var(--text);
@@ -1221,11 +1221,6 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 }
 .sni-wire-announcements.is-manageable .sni-announcement-window{overflow:hidden}
 .sni-wire-announcements.is-manageable .sni-announcement-track{width:max-content}
-.sni-wire-announcements.is-manageable .sni-announcement-entry{min-width:286px}
-.sni-wire-announcements.is-manageable .sni-announcement-item{gap:7px;padding:0 8px}
-.sni-wire-announcements.is-manageable .sni-announcement-item>span{display:none}
-.sni-wire-announcements.is-manageable .sni-announcement-item strong{max-width:13ch}
-.sni-wire-announcements.is-manageable .sni-announcement-item time{display:none}
 
 .sni-wire-announcements.is-paused .sni-announcement-track { animation-play-state: paused; }
 .sni-wire-announcements.is-static .sni-announcement-track { width: 100%; animation: none; }
@@ -1268,6 +1263,65 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 }
 .sni-announcement-remove:hover,.sni-announcement-remove:focus-visible{background:color-mix(in srgb,#b54d42 17%,transparent);outline:2px solid color-mix(in srgb,#df735f 46%,transparent);outline-offset:1px}
 .sni-announcement-remove:disabled{cursor:wait;opacity:.58}
+
+.sni-announcement-manager {
+  position: relative;
+  z-index: 8;
+  min-width: 82px;
+}
+.sni-announcement-manager > summary {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border-left: 1px solid color-mix(in srgb, #e59466 35%, var(--theme-border));
+  background: color-mix(in srgb, #c87449 10%, var(--surface-strong));
+  color: var(--text-secondary);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  list-style: none;
+  cursor: pointer;
+}
+.sni-announcement-manager > summary::-webkit-details-marker { display: none; }
+.sni-announcement-manager > summary:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: -3px; }
+.sni-announcement-manager > summary small { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 50%; background: color-mix(in srgb, #d67a4e 18%, var(--surface)); color: var(--text); font-size: 8px; }
+.sni-announcement-manager-panel {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 20;
+  width: min(390px, calc(100vw - 48px));
+  max-height: min(360px, 52vh);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--theme-border-strong, var(--line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-raised) 97%, transparent);
+  color: var(--text);
+  box-shadow: 0 24px 58px rgba(4, 10, 22, .34);
+  backdrop-filter: blur(18px) saturate(120%);
+}
+.sni-announcement-manager-panel > header { display: grid; gap: 3px; padding: 2px 2px 10px; }
+.sni-announcement-manager-panel > header strong { font-size: 11px; }
+.sni-announcement-manager-panel > header span { color: var(--text-muted); font-size: 9px; line-height: 1.4; }
+.sni-announcement-manager-panel ul { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.sni-announcement-manager-panel li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; gap: 7px; padding: 6px; border: 1px solid var(--theme-border, var(--line)); border-radius: 11px; background: var(--surface-soft); }
+.sni-announcement-manager-read { display: grid; min-width: 0; gap: 3px; padding: 2px 5px; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.sni-announcement-manager-read span { color: color-mix(in srgb, #d67a4e 80%, var(--text)); font-size: 7px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.sni-announcement-manager-read strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.sni-announcement-manager-read:focus-visible { border-radius: 7px; outline: 2px solid var(--theme-accent); outline-offset: 1px; }
+
+.sni-published-service-notice { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 11px; padding: 12px 14px; border: 1px solid color-mix(in srgb, #e49b45 38%, var(--theme-border)); border-radius: 14px; background: color-mix(in srgb, #e49b45 8%, var(--surface)); color: var(--text); }
+.sni-published-service-notice > svg { color: #e49b45; }
+.sni-published-service-notice strong { display: block; font-size: 11px; }
+.sni-published-service-notice p { margin: 3px 0 0; color: var(--text-muted); font-size: 9.5px; line-height: 1.45; }
+.sni-published-service-notice button { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid var(--theme-border); border-radius: 10px; background: var(--surface-soft); color: var(--text); font-size: 9px; font-weight: 750; cursor: pointer; }
 
 .sni-management-feedback{margin:0;padding:10px 14px;border:1px solid color-mix(in srgb,#5bc9a5 32%,var(--theme-border));border-radius:13px;background:color-mix(in srgb,#5bc9a5 8%,var(--surface));color:var(--text);font-size:11px}
 .sni-management-feedback.is-error{border-color:color-mix(in srgb,#df735f 40%,var(--theme-border));background:color-mix(in srgb,#df735f 8%,var(--surface))}
@@ -1446,7 +1500,7 @@ html[data-theme="light"] .samsung-internal-page .sni-notice {
 }
 
 @media (max-width: 640px) {
-  .sni-wire-announcements { grid-template-columns: 68px minmax(0, 1fr); }
+  .sni-wire-announcements { grid-template-columns: 68px minmax(0, 1fr) auto; }
   .sni-announcement-label { min-height: 38px; border-right: 1px solid color-mix(in srgb, #e59466 35%, var(--theme-border)); border-bottom: 0; }
   .sni-announcement-item { min-width: min(310px, 70vw); }
   .sni-focus-carousel { min-height: 540px; border-radius: 22px; }

@@ -81,9 +81,11 @@ export default function ForYouWorkspaceScreen({ contributionAccess, viewer }) {
           </div>
           <div aria-label="Personal workspace views" className="fy-workspace-tabs" role="tablist">
             {tabs.map((tab, index) => <button
+              aria-controls="fy-workspace-panel"
               aria-selected={section === tab.id}
               className={section === tab.id ? 'is-active' : ''}
               key={tab.id}
+              id={`fy-workspace-${tab.id}-tab`}
               onClick={() => navigate(tab.to)}
               onKeyDown={(event) => {
                 if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -120,7 +122,7 @@ export default function ForYouWorkspaceScreen({ contributionAccess, viewer }) {
           </div>
         </nav>
       </div>
-      <section className="fy-workspace-panel" role="tabpanel">
+      <section aria-labelledby={`fy-workspace-${section}-tab`} className="fy-workspace-panel" id="fy-workspace-panel" role="tabpanel">
         <Suspense fallback={<WorkspaceFallback />}>
           {section === 'feed' && <ForYouScreen onWorkspaceMeta={setFeedMeta} />}
           {section === 'following' && <FollowingScreen />}

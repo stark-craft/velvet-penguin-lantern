@@ -515,7 +515,7 @@ export default function TopBar({
       <div className="command-header-inner premium-command-inner">
         <div className="header-identity premium-header-identity">
           <button
-            aria-label={language === "ko" ? "브리핑 홈으로 이동" : "Go to briefing home"}
+            aria-label={language === "ko" ? "For You로 이동" : "Go to For You"}
             className="news-wordmark premium-wordmark"
             onClick={() => navigate("/for-you")}
             type="button"

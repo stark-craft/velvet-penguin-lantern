@@ -187,11 +187,11 @@ function TopClusterCarousel({
     if (manualPaused || !documentVisible || slides.length <= 1) {
       return undefined;
     }
-    const timer = setInterval(() => {
+    const timer = setTimeout(() => {
       setIdx(current => (current + 1) % slides.length);
     }, autoplayDelay(8000, reducedMotion));
-    return () => clearInterval(timer);
-  }, [documentVisible, manualPaused, reducedMotion, slides.length]);
+    return () => clearTimeout(timer);
+  }, [documentVisible, idx, manualPaused, reducedMotion, slides.length]);
   useEffect(() => {
     if (idx >= slides.length) {
       setIdx(0);
@@ -487,6 +487,7 @@ function SearchLoadedBriefing({
 function ImageFeedCard({
   item,
   vote,
+  reactionStatus = 'ready',
   onVote,
   onHide,
   onSelect,
@@ -533,7 +534,7 @@ function ImageFeedCard({
 <Icon name={isSaved ? 'check' : 'bookmark'} size={14} /> {busyAction === 'save' ? 'Updating…' : isSaved ? 'Following' : 'Follow'}
 </button>
 </div>
-<Bouncer disabled={Boolean(busyAction)} reactions={vote} onVote={value => onVote(item, value)} />
+<Bouncer disabled={Boolean(busyAction) || ['loading', 'error'].includes(reactionStatus)} reactions={vote} status={reactionStatus} onVote={value => onVote(item, value)} />
 </div>
 </div>
 </div>
@@ -548,6 +549,8 @@ export default function FeedScreen({ capabilities = [] }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
   const [votes, setVotes] = useState({});
+  const [reactionState, setReactionState] = useState({ status: 'loading', error: '' });
+  const [reactionLoadAttempt, setReactionLoadAttempt] = useState(0);
   const canKill = capabilitySet.has('gatekeeper.review');
   const [openArticle, setOpen] = useState(null);
   const [pendingSelect, setPendingSelect] = useState(null);
@@ -584,11 +587,6 @@ export default function FeedScreen({ capabilities = [] }) {
         const normalizedItems = normalizeList(data?.result || data?.results || data?.articles || data || []);
         const items = normalizeArticleImages(normalizedItems);
         setArticles(items);
-        getViewerReactions(items.map(reactionIdentity).filter(Boolean)).then((reactionData) => {
-          if (cancelled) return;
-          const snapshots = reactionData?.reactions || {};
-          setVotes(Object.fromEntries(items.map((item) => [articleKey(item), snapshots[reactionIdentity(item)] || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' }])));
-        }).catch(() => {});
         setPersonalizationMeta(data?.personalization || null);
         setShowPersonalizationNotice(Boolean(data?.personalization?.applied));
         trackAction('briefing_view', { screen: 'briefing', item_count: items.length });
@@ -641,19 +639,28 @@ export default function FeedScreen({ capabilities = [] }) {
           return next;
         });
         setOpen((current) => current && snapshots[reactionIdentity(current)] ? { ...current, reactions: snapshots[reactionIdentity(current)] } : current);
-      } catch {
-        // Keep the current briefing interactive if a count refresh is delayed.
+        setReactionState({ status: 'ready', error: '' });
+      } catch (reactionError) {
+        if (cancelled) return;
+        setReactionState((current) => ({
+          status: current.status === 'ready' || current.status === 'stale' ? 'stale' : 'error',
+          error: reactionError?.message || 'Reaction totals could not be verified.',
+        }));
       }
     };
+    setReactionState((current) => ({ status: current.status === 'ready' ? 'stale' : 'loading', error: '' }));
+    sync();
     const onVisibility = () => { if (document.visibilityState === 'visible') sync(); };
+    const timer = window.setInterval(sync, 12_000);
     window.addEventListener('focus', sync);
     document.addEventListener('visibilitychange', onVisibility);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
       window.removeEventListener('focus', sync);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [articles, reactionSignature]);
+  }, [articles, reactionLoadAttempt, reactionSignature]);
   useEffect(() => {
     if (!showPersonalizationNotice) return undefined;
     const timer = window.setTimeout(() => setShowPersonalizationNotice(false), 6500);
@@ -722,18 +729,23 @@ export default function FeedScreen({ capabilities = [] }) {
   };
   const onVote = async (item, voteValue) => {
     const key = articleKey(item);
-    const previousVote = votes[key] || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
+    const previousVote = votes[key];
     const detail = articleActivityDetail(item, 'feed');
     return runArticleAction('vote', item, async () => {
       try {
       const response = await setViewerReaction(item, voteValue || 'neutral');
       const snapshot = { like_count: response.like_count, dislike_count: response.dislike_count, viewer_reaction: response.viewer_reaction };
       setVotes((previous) => ({ ...previous, [key]: snapshot }));
+      setReactionState({ status: 'ready', error: '' });
       setOpen((current) => current && articleKey(current) === key ? { ...current, reactions: snapshot } : current);
       await trackAction(voteValue === 'dislike' ? 'vote_not_interested' : voteValue === 'like' ? 'vote_interested' : 'vote_neutral', detail);
       setActionFeedback({ type: 'success', message: voteValue === 'neutral' ? 'Reaction removed. The story stays in the briefing.' : `Your ${voteValue} was counted. The story stays in the briefing.` });
       } catch (error) {
-        setVotes((previous) => ({ ...previous, [key]: previousVote }));
+        setVotes((previous) => {
+          const next = { ...previous };
+          if (previousVote) next[key] = previousVote; else delete next[key];
+          return next;
+        });
         setActionFeedback({ type: 'error', message: error?.message || 'Feedback could not be recorded. Please try again.' });
       }
     });
@@ -980,6 +992,7 @@ export default function FeedScreen({ capabilities = [] }) {
 {showPersonalizationNotice && <div className="personalization-toast" role="status"><Icon name="sparkle" size={15} /><span><strong>{personalizationMeta?.viewer_name ? `Personalized for ${personalizationMeta.viewer_name}` : 'Your personalized feed'}</strong><small>Recent reading and saved signals shape the order—not what is available.</small></span><button onClick={() => setShowPersonalizationNotice(false)} type="button" aria-label="Dismiss personalization message"><Icon name="x" size={13} /></button></div>}
 {actionFeedback && <div className={actionFeedback.type === 'error' ? 'error-banner' : 'personal-notice'} role={actionFeedback.type === 'error' ? 'alert' : 'status'}><span>{actionFeedback.message}</span>{actionFeedback.action && <button className="ml-3 underline" onClick={actionFeedback.action} type="button">{actionFeedback.actionLabel}</button>}<button aria-label="Dismiss message" className="ml-3" onClick={() => setActionFeedback(null)} type="button"><Icon name="x" size={13} /></button></div>}
 {Object.values(supportingState).includes('error') && <div className="error-banner" role="status"><span>Some personal state could not be verified. Save or Review Queue actions stay disabled where their current state is unknown.</span><button className="ml-3 underline" onClick={retrySupportingState} type="button">Retry personal state</button></div>}
+{['error', 'stale'].includes(reactionState.status) && <div className="error-banner" role="status"><span>{reactionState.status === 'stale' ? 'Showing last-known reaction totals while the count service reconnects.' : `${reactionState.error} Counts are hidden rather than shown as zero.`}</span><button className="ml-3 underline" onClick={() => setReactionLoadAttempt((current) => current + 1)} type="button">Retry reaction totals</button></div>}
 <section className="briefing-stage grid gap-4 2xl:gap-5">
 <div className="briefing-top-row briefing-hero-row grid min-h-0 gap-4 2xl:gap-5">
 <div className="briefing-hero-stack">
@@ -997,7 +1010,7 @@ export default function FeedScreen({ capabilities = [] }) {
 <div className="h-px flex-1 bg-white/10" />
 <span className="text-sm text-slate-500">                  {items.length} signals                </span>
 </div>
-<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard busyAction={busyActions[articleKey(item)] || ''} canKill={canKill} key={item.id} item={item} vote={votes[articleKey(item)]} onVote={onVote} onKill={killArticle} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={reviewAllowed ? onCheck : undefined} reviewAllowed={reviewAllowed} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} savedReady={supportingState.saved === 'ready'} workflowReady={supportingState.workflow === 'ready'} />)}              </div>
+<div className="home-article-grid grid gap-8">                {items.map(item => <ImageFeedCard busyAction={busyActions[articleKey(item)] || ''} canKill={canKill} key={item.id} item={item} vote={votes[articleKey(item)]} reactionStatus={reactionState.status} onVote={onVote} onKill={killArticle} onHide={hideArticle} onSave={toggleSave} onSelect={setPendingSelect} onOpen={openDossier} onCheck={reviewAllowed ? onCheck : undefined} reviewAllowed={reviewAllowed} checked={!!checked[articleKey(item)]} isSaved={savedKeys.has(articleKey(item))} isSelected={selectedIds.has(item.id) || selectedIds.has(item.title)} isApproved={approvedIds.has(item.id) || approvedIds.has(item.title)} savedReady={supportingState.saved === 'ready'} workflowReady={supportingState.workflow === 'ready'} />)}              </div>
 </div>)}        {filteredArticles.length === 0 && <div className="rounded-[24px] border border-white/10 bg-[#101827]/80 p-10 text-center">
 <h2 className="text-xl font-semibold text-white">              No loaded briefing signals match these filters            </h2>
 <p className="mt-2 text-slate-400">              Try changing region, date, source, or category.            </p>
@@ -1009,7 +1022,7 @@ export default function FeedScreen({ capabilities = [] }) {
 </span>
 <span className="btn-dark-secondary h-9">          Open Hidden Review        </span>
 </button>
-<ArticleModal item={openArticle} onClose={closeDossier} onSelect={reviewAllowed ? selectFromDossier : undefined} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={onVote} onCorrectRegion={capabilitySet.has('region.correct') ? onCorrectRegion : undefined} onSourceOpen={(item) => trackAction('source_open', articleActivityDetail(item, 'dossier'))} onWhyThisStory={(item) => trackAction('why_this_story_open', articleActivityDetail(item, 'dossier'))} />
+<ArticleModal item={openArticle} onClose={closeDossier} onSelect={reviewAllowed ? selectFromDossier : undefined} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={reactionState.status === 'ready' || reactionState.status === 'stale' ? onVote : undefined} onCorrectRegion={capabilitySet.has('region.correct') ? onCorrectRegion : undefined} onSourceOpen={(item) => trackAction('source_open', articleActivityDetail(item, 'dossier'))} onWhyThisStory={(item) => trackAction('why_this_story_open', articleActivityDetail(item, 'dossier'))} />
 {reviewAllowed && <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />}
 {reviewAllowed && <NameModal open={!!batchSelect} article={batchSelect} title={`Send ${selectedBatch.length} articles to Review Queue`} description="Enter your name." confirmLabel="Send to Review Queue" onClose={() => setBatchSelect(null)} onConfirm={confirmBatch} />}
 <DraftExportModal items={selectedBatch} open={draftExportOpen} source="briefing" onClose={() => setDraftExportOpen(false)} />      {reviewAllowed && selectedBatch.length > 0 && <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">

@@ -29,6 +29,7 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
   const [feed, setFeed] = useState(null);
   const [items, setItems] = useState([]);
   const [savedKeys, setSavedKeys] = useState(new Set());
+  const [savedState, setSavedState] = useState({ status: 'loading', error: '' });
   const [openArticle, setOpenArticle] = useState(null);
   const [setupOpen, setSetupOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -43,6 +44,7 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
   const dwellAccumulated = useRef(0);
   const actionLocks = useRef(new Set());
   const controlLocks = useRef(new Set());
+  const savedRequest = useRef(0);
   const { record, flush } = useRecommendationEvents(
     feed?.feed_request_id,
     status?.event_flush_seconds || 15,
@@ -65,6 +67,24 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
     return result;
   }, []);
 
+  const loadSavedState = useCallback(async () => {
+    const requestId = savedRequest.current + 1;
+    savedRequest.current = requestId;
+    setSavedState((current) => ({ status: current.status === 'ready' ? 'stale' : 'loading', error: '' }));
+    try {
+      const saved = await getViewerSaved();
+      if (savedRequest.current !== requestId) return;
+      setSavedKeys(new Set(normalizeList(saved?.items || []).map(articleKey)));
+      setSavedState({ status: 'ready', error: '' });
+    } catch (nextError) {
+      if (savedRequest.current !== requestId) return;
+      setSavedState((current) => ({
+        status: current.status === 'stale' ? 'stale-error' : 'error',
+        error: nextError?.message || 'Following status could not be verified.',
+      }));
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -78,17 +98,18 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
         setPreferences(pref?.preferences || {});
         setSetupOpen(Boolean(nextStatus?.enabled && !pref?.preferences?.completed_at));
         if (nextStatus?.enabled) await loadFeed();
-        const saved = await getViewerSaved();
-        if (cancelled) return;
-        setSavedKeys(new Set(normalizeList(saved?.items || []).map(articleKey)));
       } catch (nextError) {
         if (!cancelled) setError(nextError?.message || 'Could not prepare your intelligence mix.');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
-  }, [loadAttempt, loadFeed]);
+    loadSavedState();
+    return () => {
+      cancelled = true;
+      savedRequest.current += 1;
+    };
+  }, [loadAttempt, loadFeed, loadSavedState]);
 
   useEffect(() => () => { flush({ keepalive: true }); }, [flush]);
 
@@ -287,6 +308,10 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
     }
   };
   const toggleSave = async (item) => {
+    if (savedState.status !== 'ready') {
+      setSavedState((current) => ({ ...current, error: current.error || 'Following status must be verified before it can be changed.' }));
+      return;
+    }
     return runItemAction('save', item, async () => {
       try {
       const key = articleKey(item);
@@ -351,6 +376,7 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
 
   const cardProps = (item, index, section) => ({
     index, section, saved: savedKeys.has(articleKey(item)),
+    savedStatus: savedState.status,
     busyAction: busyActions[articleKey(item)] || '',
     onOpen: openDossier, onSave: toggleSave, onHide: hide,
     onReact: react,
@@ -364,6 +390,7 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
   return (
     <div className="fy-page">
       {error && <div className="fy-inline-error" role="alert">{error}</div>}
+      {['error', 'stale-error'].includes(savedState.status) && <div className="fy-inline-error" role="alert"><span>{savedState.error} Existing feed cards remain readable; follow actions are paused until the status is known.</span> <button onClick={loadSavedState} type="button">Retry following status</button></div>}
       {actionNotice && <div className="fy-feedback" role="status"><span>{actionNotice.message}</span><div>{actionNotice.action && <button onClick={actionNotice.action} type="button">{actionNotice.label}</button>}<button aria-label="Dismiss message" onClick={() => setActionNotice(null)} type="button"><Icon name="x" size={13} /></button></div></div>}
       {status?.migration_offer?.available && (
         <section className="fy-migration-offer" aria-label="Existing desk found">
@@ -381,7 +408,7 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
       {feed?.cursor && <div className="fy-load-more"><button disabled={loadingMore} onClick={loadMore} type="button">{loadingMore ? 'Loading…' : 'Load more intelligence'} {!loadingMore && <Icon name="chevR" size={14} />}</button></div>}
       <div className="fy-controls"><button disabled={Boolean(controlBusy)} onClick={async () => { if (controlLocks.current.has('pause')) return; controlLocks.current.add('pause'); setControlBusy('pause'); setError(''); try { await pauseViewerPersonalization(feed?.mode !== 'paused'); await refresh(); setActionNotice({ message: feed?.mode === 'paused' ? 'Personalization resumed.' : 'Personalization paused. Shared editorial order is available.' }); } catch (nextError) { setError(nextError?.message || 'Could not update personalization.'); } finally { controlLocks.current.delete('pause'); setControlBusy(''); } }} type="button"><Icon name={feed?.mode === 'paused' ? 'play' : 'pause'} size={14} /> {controlBusy === 'pause' ? 'Updating…' : feed?.mode === 'paused' ? 'Resume personalization' : 'Pause personalization'}</button><button disabled={Boolean(controlBusy)} onClick={resetDesk} type="button"><Icon name="refresh" size={14} /> {controlBusy === 'reset' ? 'Resetting…' : 'Reset this desk'}</button><button onClick={() => navigate('/home')} type="button">Open shared Briefing</button></div>
       <InterestSetup open={setupOpen} taxonomy={status?.taxonomy} initial={preferences} onClose={() => setSetupOpen(false)} onSkip={useStarterMix} onComplete={completeSetup} />
-      <ArticleModal item={openArticle} onClose={closeDossier} onSave={toggleSave} isSaved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} onHide={async (item) => { closeDossier(); await hide(item); }} onSourceOpen={(item) => record('source_open', item, { section: 'dossier' })} onWhyThisStory={(item) => record('why_this_story_open', item, { section: 'dossier' })} />
+      <ArticleModal item={openArticle} onClose={closeDossier} onSave={savedState.status === 'ready' ? toggleSave : undefined} isSaved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} onHide={async (item) => { closeDossier(); await hide(item); }} onSourceOpen={(item) => record('source_open', item, { section: 'dossier' })} onWhyThisStory={(item) => record('why_this_story_open', item, { section: 'dossier' })} />
     </div>
   );
 }

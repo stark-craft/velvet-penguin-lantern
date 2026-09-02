@@ -123,7 +123,17 @@ function RouteLoading() {
   return <div className="fy-state" role="status"><span className="fy-loader" /><p>Opening workspace…</p></div>;
 }
 
-function CapabilityOnly({ capabilities, any = [], all = [], children }) {
+function CapabilityOnly({ capabilities, error = '', onRetry, any = [], all = [], children }) {
+  if (error) {
+    return (
+      <section className="workflow-empty restricted-workspace" role="alert">
+        <Icon name="warning" size={26} />
+        <h2>Access could not be verified.</h2>
+        <p>{error} Your permissions have not been changed.</p>
+        <button className="btn-dark-secondary" onClick={onRetry} type="button"><Icon name="refresh" size={14} /> Try again</button>
+      </section>
+    );
+  }
   if (capabilities === null) return <RouteLoading />;
   const values = new Set(capabilities);
   const allowed = (any.length === 0 || any.some((capability) => values.has(capability)))
@@ -155,7 +165,8 @@ export default function App() {
   const [profileRequired, setProfileRequired] = useState(false);
   const [viewerRevision, setViewerRevision] = useState(0);
   const [recommendationStatus, setRecommendationStatus] = useState(null);
-  const [capabilityState, setCapabilityState] = useState(null);
+  const [capabilityState, setCapabilityState] = useState({ status: 'loading', capabilities: [], principal: '', error: '' });
+  const [capabilityLoadAttempt, setCapabilityLoadAttempt] = useState(0);
   const [manualScan, setManualScan] = useState({
     query: "",
     from: "",
@@ -223,19 +234,27 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    setCapabilityState((current) => ({ ...current, status: 'loading', error: '' }));
     getAccessCapabilities()
       .then((result) => {
         if (!cancelled) setCapabilityState({
+          status: 'ready',
           capabilities: Array.isArray(result?.capabilities) ? result.capabilities : [],
           principal: result?.principal || "",
+          error: '',
         });
       })
       .catch((error) => {
         console.warn("[Access] Capability check failed closed:", error);
-        if (!cancelled) setCapabilityState({ capabilities: [], principal: "" });
+        if (!cancelled) setCapabilityState({
+          status: 'error',
+          capabilities: [],
+          principal: '',
+          error: error?.message || 'The access service is temporarily unavailable.',
+        });
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [capabilityLoadAttempt]);
 
   const toggleTheme = () => {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
@@ -412,11 +431,14 @@ export default function App() {
   const defaultLanding = recommendationStatus?.enabled && recommendationStatus?.default_landing
     ? "/for-you"
     : "/home";
-  const capabilities = capabilityState?.capabilities ?? null;
+  const capabilities = capabilityState.status === 'ready' ? capabilityState.capabilities : null;
+  const capabilityError = capabilityState.status === 'error' ? capabilityState.error : '';
+  const retryCapabilities = () => setCapabilityLoadAttempt((current) => current + 1);
+  const capabilityGate = { capabilities, error: capabilityError, onRetry: retryCapabilities };
   const hasCapability = (capability) => Boolean(capabilities?.includes(capability));
-  const contributionAccess = capabilities === null
+  const contributionAccess = capabilityState.status === 'loading'
     ? null
-    : { allowed: hasCapability("contributions.create"), ip: "" };
+    : { allowed: hasCapability("contributions.create"), unavailable: Boolean(capabilityError), ip: "" };
   return (
     <DesignViewport>
       {" "}
@@ -477,8 +499,8 @@ export default function App() {
                 />
               }
             />{" "}
-            <Route path="/selected" element={<CapabilityOnly capabilities={capabilities} any={["review.news.view", "review.contributions.view"]}><SelectedScreen capabilities={capabilities || []} /></CapabilityOnly>} />{" "}
-            <Route path="/approved" element={<CapabilityOnly capabilities={capabilities} any={["approved.view", "review.news.approve"]}><ApprovedScreen /></CapabilityOnly>} />{" "}
+            <Route path="/selected" element={<CapabilityOnly {...capabilityGate} any={["review.news.view", "review.contributions.view"]}><SelectedScreen capabilities={capabilities || []} /></CapabilityOnly>} />{" "}
+            <Route path="/approved" element={<CapabilityOnly {...capabilityGate} any={["approved.view", "review.news.approve"]}><ApprovedScreen /></CapabilityOnly>} />{" "}
             <Route path="/saved/*" element={<LegacySavedRedirect />} />{" "}
             <Route path="/research" element={<ResearchScreen />} />{" "}
             <Route path="/samsung-internal" element={<SamsungInternalScreen canManageAnnouncements={hasCapability("review.contributions.publish")} contributionAllowed={Boolean(contributionAccess?.allowed)} />} />{" "}
@@ -491,31 +513,31 @@ export default function App() {
             />{" "}
             <Route path="/venturelens/*" element={<VentureLensApp />} />{" "}
             <Route path="/rejected" element={<RejectedScreen />} />{" "}
-            <Route path="/sources" element={<CapabilityOnly capabilities={capabilities} any={["sources.view", "sources.manage"]}><SourcesScreen canManage={hasCapability("sources.manage")} /></CapabilityOnly>} />{" "}
+            <Route path="/sources" element={<CapabilityOnly {...capabilityGate} any={["sources.view", "sources.manage"]}><SourcesScreen canManage={hasCapability("sources.manage")} /></CapabilityOnly>} />{" "}
             <Route path="/manage-sources" element={<Navigate to="/sources" replace />} />{" "}
-            <Route path="/scheduler" element={<CapabilityOnly capabilities={capabilities} any={["scheduler.view", "scheduler.control"]}><SchedulerScreen canControl={hasCapability("scheduler.control")} /></CapabilityOnly>} />{" "}
+            <Route path="/scheduler" element={<CapabilityOnly {...capabilityGate} any={["scheduler.view", "scheduler.control"]}><SchedulerScreen canControl={hasCapability("scheduler.control")} /></CapabilityOnly>} />{" "}
             <Route path="/history" element={<HistoryScreen reviewAllowed={hasCapability("review.news.submit")} />} />{" "}
             {PROFILE_SWITCHER_ENABLED && <Route path="/trends" element={<TrendsScreen />} />}{" "}
             <Route path="/voc" element={<VocScreen />} />{" "}
-            <Route path="/director-analytics" element={<CapabilityOnly capabilities={capabilities} any={["analytics.view"]}><AnalyticsScreen /></CapabilityOnly>} />{" "}
+            <Route path="/director-analytics" element={<CapabilityOnly {...capabilityGate} any={["analytics.view"]}><AnalyticsScreen /></CapabilityOnly>} />{" "}
             <Route
               path="/gatekeeper-review"
-              element={<CapabilityOnly capabilities={capabilities} any={["gatekeeper.review"]}><GatekeeperReviewScreen /></CapabilityOnly>}
+              element={<CapabilityOnly {...capabilityGate} any={["gatekeeper.review"]}><GatekeeperReviewScreen /></CapabilityOnly>}
             />{" "}
-            <Route path="/access-management" element={<CapabilityOnly capabilities={capabilities} any={["access.manage"]}><AccessManagementScreen /></CapabilityOnly>} />{" "}
+            <Route path="/access-management" element={<CapabilityOnly {...capabilityGate} any={["access.manage"]}><AccessManagementScreen /></CapabilityOnly>} />{" "}
             <Route path="*" element={recommendationStatus === null
               ? <div className="fy-state"><span className="fy-loader" /><p>Preparing TechScout…</p></div>
               : <Navigate to={defaultLanding} replace />} />{" "}
           </Routes></Suspense>{" "}
         </main>{" "}
-        {viewerError && (
+        {(capabilityError || viewerError) && (
           <aside className="shell-service-notice" role="alert">
             <span aria-hidden="true"><Icon name="warning" size={17} /></span>
             <div>
-              <strong>Profile temporarily unavailable</strong>
-              <p>{viewerError}</p>
+              <strong>{capabilityError ? 'Access service temporarily unavailable' : 'Profile temporarily unavailable'}</strong>
+              <p>{capabilityError ? `${capabilityError} TechScout has not treated this as an access denial.` : viewerError}</p>
             </div>
-            <button onClick={() => setViewerLoadAttempt((current) => current + 1)} type="button">
+            <button onClick={capabilityError ? retryCapabilities : () => setViewerLoadAttempt((current) => current + 1)} type="button">
               Try again
             </button>
           </aside>

@@ -41,7 +41,7 @@ function routeFor(artifact) {
   if (artifact?.kind === 'model') return `/venturelens/models?focus=${encoded}`;
   if (artifact?.kind === 'dataset') return `/venturelens/datasets?focus=${encoded}`;
   if (artifact?.kind === 'patent') return `/venturelens/patents?focus=${encoded}`;
-  if (artifact?.kind === 'technology') return artifact.url || `/venturelens/radar?signal=${encoded}`;
+  if (artifact?.kind === 'technology') return `/venturelens/radar?focus=${encoded}`;
   return artifact?.url || '/venturelens';
 }
 
@@ -53,9 +53,11 @@ function ObservatoryCarousel({ artifacts }) {
   useEffect(() => { if (index >= artifacts.length) setIndex(0); }, [artifacts.length, index]);
   useEffect(() => {
     if (manualPaused || !documentVisible || artifacts.length <= 1) return undefined;
-    const timer = window.setInterval(() => setIndex((current) => (current + 1) % artifacts.length), autoplayDelay(9000, reducedMotion));
-    return () => window.clearInterval(timer);
-  }, [artifacts.length, documentVisible, manualPaused, reducedMotion]);
+    // Keying this timeout by the active index restarts a complete reading
+    // interval after arrows, dots, and automatic advances alike.
+    const timer = window.setTimeout(() => setIndex((current) => (current + 1) % artifacts.length), autoplayDelay(9000, reducedMotion));
+    return () => window.clearTimeout(timer);
+  }, [artifacts.length, documentVisible, index, manualPaused, reducedMotion]);
   if (!artifacts.length) return null;
   const active = artifacts[index];
   const move = (delta) => setIndex((current) => (current + delta + artifacts.length) % artifacts.length);
@@ -95,9 +97,14 @@ export default function ResearchScreen() {
   const lanes = useMemo(() => LANE_DEFINITIONS.filter((lane) => !lane.provider || payload?.providers?.[lane.provider]?.available !== false), [payload]);
   if (!payload && !failed) return <div className="research-command-center"><div className="rio-state" role="status"><span /><h1>Calibrating the Research Observatory…</h1><p>Loading cached evidence while stale providers refresh independently.</p></div></div>;
   if (failed || !payload) return <div className="research-command-center"><div className="rio-state is-error" role="alert"><Icon name="warning" size={22} /><h1>The discovery gateway is temporarily unavailable.</h1><p>Existing Venture Lens workspaces remain available and the NewsScrapper scheduler is unaffected.</p><button onClick={() => navigate('/venturelens')} type="button">Open Venture Lens</button></div></div>;
+  const streamArtifacts = (payload.stream || []).slice(0, 12);
+  const featuredArtifacts = ((payload.featured || []).length ? payload.featured : streamArtifacts).slice(0, 6);
+  const hasObservatory = featuredArtifacts.length > 0;
+  const hasStream = streamArtifacts.length > 0;
   return (
     <div className="research-command-center">
-      <section className="rio-primary-row"><ObservatoryCarousel artifacts={(payload.featured || []).slice(0, 6)} /><EvidenceStream artifacts={(payload.stream || []).slice(0, 12)} /></section>
+      {(hasObservatory || hasStream) ? <section className={`rio-primary-row${hasObservatory && hasStream ? '' : ' has-one-panel'}`}>{hasObservatory && <ObservatoryCarousel artifacts={featuredArtifacts} />}{hasStream && <EvidenceStream artifacts={streamArtifacts} />}</section>
+        : <section className="rio-state rio-no-evidence" role="status"><Icon name="radar" size={24} /><h1>No research evidence is cached yet.</h1><p>Open Venture Lens to sync public-source research, model, repository and dataset signals.</p><button onClick={() => navigate('/venturelens')} type="button">Open Venture Lens</button></section>}
       <nav aria-label="Research intelligence lanes" className="rio-lanes">{lanes.map((lane, index) => <button key={lane.id} onClick={() => navigate(lane.route)} type="button"><span>{String(index + 1).padStart(2, '0')}</span><i><Icon name={lane.icon} size={18} /></i><div><strong>{lane.label}</strong><small>{lane.detail}</small></div><Icon name="chevR" size={15} /></button>)}</nav>
       <footer className="rio-provider-status"><span>Discovery generated {new Date(payload.generated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span><div>{Object.entries(payload.providers || {}).map(([name, state]) => <span className={state.available ? state.stale ? 'is-stale' : 'is-live' : 'is-offline'} key={name}>{name} · {state.available ? state.stale ? 'cached' : 'live' : 'not configured'}</span>)}</div><button onClick={() => navigate('/venturelens')} type="button">Open full Venture Lens <Icon name="external" size={14} /></button></footer>
     </div>

@@ -26,6 +26,7 @@ export default function ContributionEditor({
 }) {
   const [previewing, setPreviewing] = useState(false);
   const [problems, setProblems] = useState([]);
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
   const gate = canSubmitContribution(draft);
 
   const update = (patch) => {
@@ -34,6 +35,7 @@ export default function ContributionEditor({
   };
 
   const attemptSubmit = () => {
+    setAttemptedSubmit(true);
     if (!gate.ok) {
       setProblems(gate.problems);
       return;
@@ -152,10 +154,13 @@ export default function ContributionEditor({
         </>
       )}
 
+      {!attemptedSubmit && !gate.ok && (
+        <p className="cw-requirements">Complete the required story fields before submitting. You can save an unfinished draft at any time.</p>
+      )}
       <div aria-live="assertive">
-        {(problems.length > 0 || !gate.ok) && (
+        {attemptedSubmit && !gate.ok && (
           <div className="cw-problems" role="alert">
-            <strong>{problems.length ? 'Before this can be submitted:' : 'Submission needs:'}</strong>
+            <strong>Before this can be submitted:</strong>
             <ul>
               {(problems.length ? problems : gate.problems).map((problem) => <li key={problem}>{problem}</li>)}
             </ul>
@@ -167,7 +172,7 @@ export default function ContributionEditor({
         {onCancel && (
           <button className="btn-dark-secondary" onClick={onCancel} type="button">Discard</button>
         )}
-        <span className="cw-actions-note">Drafts stay in this browser until the internal backend is connected.</span>
+        <span className="cw-actions-note">Recovery stays in this browser while you edit. Save draft stores the latest version on the private internal backend.</span>
         <div className="cw-action-buttons">
           <button className="btn-dark-secondary" disabled={busy || saving} onClick={onSave} type="button">
             <Icon name="check2" size={14} /> {saving ? 'Saving…' : 'Save draft'}

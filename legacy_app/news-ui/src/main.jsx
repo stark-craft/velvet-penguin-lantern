@@ -47,4 +47,13 @@ async function launch() {
   );
 }
 
-launch();
+launch().catch((error) => {
+  if (typeof window.__senseReportBootstrapFailure === "function") {
+    window.__senseReportBootstrapFailure(error);
+    return;
+  }
+  console.error("[Sense.AI] Application bootstrap failed", error);
+  const root = document.getElementById("root");
+  root.hidden = false;
+  root.textContent = "TechScout could not start. Reload the page to try again.";
+});
