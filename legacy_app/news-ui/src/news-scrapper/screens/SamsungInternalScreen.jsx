@@ -235,12 +235,13 @@ function IntelligenceWire({ announcementBusy = '', announcements = [], items, on
 function SignalCard({ item, onOpenSignal }) {
   const image = resolveInternalImage(item);
   const link = signalLinkOf(item);
+  const Media = onOpenSignal ? 'button' : 'div';
   return (
     <article className="sni-card">
-      <div className={`sni-card-media${image ? '' : ' is-empty'}`}>
+      <Media className={`sni-card-media${image ? '' : ' is-empty'}`} {...(onOpenSignal ? { type: 'button', 'aria-label': `Open dossier: ${item.title}`, onClick: () => onOpenSignal(item) } : {})}>
         {image ? <ResilientImage alt="" src={image} /> : <span aria-hidden="true"><Icon name="globe" size={22} /></span>}
         <span className={`sni-card-scope sni-chip-scope-${item.samsung_internal_channel || signalScope(item)}`}>{channelLabel(item)}</span>
-      </div>
+      </Media>
       <div className="sni-card-body"><h3>{onOpenSignal ? <button className="sp-samsung-title" onClick={() => onOpenSignal(item)} type="button">{item.title}</button> : link ? <a href={link} rel="noreferrer" target="_blank">{item.title}</a> : item.title}</h3>{item.summary && <p>{excerptOf(item.summary, 180)}</p>}
         <footer><span>{item.source || item.src || 'Tech press'}</span>{formatDate(item.published_at || item.first_seen || item.date) && <span><Icon name="calendar" size={12} /> {formatDate(item.published_at || item.first_seen || item.date)}</span>}<span className="sni-chip">{item.source_count || 1} {(item.source_count || 1) === 1 ? 'source' : 'sources'}</span></footer>
       </div>

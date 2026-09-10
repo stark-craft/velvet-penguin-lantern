@@ -524,3 +524,15 @@ working. Work only in legacy_app and preserve unrelated changes.
 - User next requested: publish this checkpoint to the already-public GitHub
   repository, then start Sampark Samsung Internal. Research and Create remain
   excluded from that next visual pass.
+
+
+### 10 September 2026 — Samsung Internal in Sampark
+
+The completed news checkpoint and Samsung newsroom integration were pushed and
+fast-forwarded into public `main` at `86fa523`. Sampark now routes Samsung Global,
+Local and Inside channels and the existing leadership/announcement/story readers
+within its own shell. Search/category filters, keyboard channel tabs and original
+dossier opening reuse canonical data and preserve publishing capabilities.
+Research/Create still use the original workspaces. Subsequent QA added image
+opening and corrected portalled dossier theme text. See
+`legacy_app/docs/SAMPARK_NEWS_RELEASE.md` for validation and data limitations.

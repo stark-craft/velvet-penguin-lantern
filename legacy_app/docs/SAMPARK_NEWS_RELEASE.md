@@ -28,5 +28,21 @@ Korean article translation and English restoration. Role-session authorization
 and private viewer isolation are covered by backend tests. Runtime service
 credentials and model readiness remain deployment configuration.
 
-Research and Create continue to open the original workspaces. Samsung Internal
-is the next requested presentation milestone.
+Research and Create continue to open the original workspaces.
+
+Samsung Internal first presentation pass is now available at
+`/sampark/samsung-internal`. It reuses the existing Samsung Global, Samsung Local
+and Inside Samsung channels, leadership carousel, announcements and published
+readers. Archive search and category filtering combine without changing the
+corpus. Channel tabs support arrow keys, Home and End. Signal images, headlines,
+hero actions and the intelligence wire open the original dossier within Sampark.
+Published readers return to the originating channel. Publishing and archiving
+retain the existing server capabilities; authoring stays in the original editor.
+
+Follow-up QA verified search/no-results/reset, category filtering, all three
+channels, leadership reader and return navigation, image-to-dossier interaction,
+keyboard channel selection, and light/dark layouts at desktop and 390px. Fixed
+portal dossier colors to avoid white text on a light background. Local data had
+no published colleague stories or announcements during this pass; their reader
+and permission contracts remain covered by the existing automated suites.
+Frontend verification now passes 115 tests and the production build.

@@ -252,3 +252,14 @@ html[data-presentation="sampark"] .sp-app header.is-settings-only .premium-setti
 
 .sp-app .sni-date-group > header h2 { font-family:inherit; font-size:clamp(19px,2vw,26px); }
 @media(max-width:520px) { .sp-app .sni-tab { min-width:0; gap:5px; } .sp-app .sni-tab svg { display:none; } }
+
+.sp-app button.sni-card-media { display:block; width:100%; padding:0; border:0; cursor:pointer; text-align:left; }
+.sp-app button.sni-card-media:hover img { filter:brightness(.94); }
+/* Dossiers are portalled outside .sp-app: give their text explicit theme colors. */
+html[data-presentation="sampark"] .modal.dossier { background:var(--sp-surface)!important; color:var(--sp-text); }
+html[data-presentation="sampark"] .dossier :is(.dossier-head,.dossier-rail) { background:var(--sp-bg)!important; border-color:var(--sp-line)!important; }
+html[data-presentation="sampark"] .dossier :is(.dossier-title,.dossier-head h3) { color:var(--sp-text)!important; }
+html[data-presentation="sampark"] .dossier :is(.dossier-section,.dossier-rail) :is(.text-white,.text-slate-100,.text-slate-200) { color:var(--sp-text)!important; }
+html[data-presentation="sampark"] .dossier :is(.text-slate-300,.text-slate-400,.text-slate-500) { color:var(--sp-muted)!important; }
+html[data-presentation="sampark"] .dossier :is(.text-sky-200,.text-emerald-200) { color:var(--sp-accent)!important; }
+html[data-presentation="sampark"] .dossier :is(.signal-chip,.signal-stat,.dossier-tile,.dossier-strength,.source-coverage-card) { background:var(--sp-soft)!important; color:var(--sp-text)!important; border-color:var(--sp-line)!important; }
