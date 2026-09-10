@@ -215,6 +215,35 @@ test('Original NewsScrapper screens remain presentation-agnostic and Sampark own
   assert.doesNotMatch(read('../src/sampark/SamparkApp.jsx'), /presentation="sampark"/);
 });
 
+test('Sampark secondary workspaces are Sampark-native under /sampark with real APIs and no old UI leakage', () => {
+  const app = read('../src/sampark/SamparkApp.jsx');
+  for (const route of ['/following', '/hidden', '/history', '/voc', '/review', '/approved', '/gatekeeper', '/sources', '/scheduler', '/analytics', '/access']) {
+    assert.match(app, new RegExp(`path="${route}"`));
+  }
+  assert.match(app, /SamparkFollowing|SamparkHidden|SamparkHistory|SamparkVoc/);
+  assert.match(app, /SamparkReview|SamparkApproved|SamparkGatekeeper/);
+  assert.doesNotMatch(app, /href="\/rejected"|href="\/history"|href="\/voc"[^"]/);
+  const settings = read('../src/sampark/SamparkSettingsModal.jsx');
+  assert.match(settings, /href="\/sampark\/following/);
+  assert.match(settings, /href="\/sampark\/hidden/);
+  assert.doesNotMatch(settings, /href="\/rejected"/);
+  const following = read('../src/sampark/SamparkFollowing.jsx');
+  assert.match(following, /getFollowingThreads/);
+  assert.doesNotMatch(following, /ForYouScreen|FeedScreen/);
+  const hidden = read('../src/sampark/SamparkHidden.jsx');
+  assert.match(hidden, /getViewerHidden|restoreArticleForViewer/);
+  const history = read('../src/sampark/SamparkHistory.jsx');
+  assert.match(history, /getHistoryList/);
+  const voc = read('../src/sampark/SamparkVoc.jsx');
+  assert.match(voc, /Voice of Customer|getTrendsAccess|\/voc/);
+  const shell = read('../src/sampark/shared/SamparkWorkspaceShell.jsx');
+  assert.match(shell, /WorkspaceHeader|WorkspaceEmpty|WorkspaceLoading/);
+  const css = read('../src/sampark/sampark.css');
+  assert.match(css, /sampark-workspace/);
+  const doc = read('../../SAMPARK_WORKSPACES.md');
+  assert.match(doc, /Saved & Following[\s\S]*\/sampark\/following/);
+});
+
 test('Sampark fresh viewer onboarding, search isolation, privacy and persistent activity', () => {
   const forYou = read('../src/sampark/SamparkForYou.jsx');
   assert.match(forYou, /completed_at[\s\S]*setPrefsOpen/);

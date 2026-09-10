@@ -334,6 +334,43 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .sampark-thread-waiting { margin: 0; color: var(--faint); font-size: 13px; font-style: italic; }
 .sampark-following-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); background: #fafafa; }
 .sampark-following-footnote { color: var(--faint); font-size: 12px; }
+/* Workspace shell */
+.sampark-workspace { display: grid; gap: 18px; }
+.sampark-workspace-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.sampark-workspace-title { margin: 0; font-size: 20px; font-weight: 700; color: var(--text); }
+.sampark-workspace-desc { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.sampark-workspace-actions { display: flex; gap: 8px; }
+.sampark-workspace-empty, .sampark-workspace-loading, .sampark-workspace-error { display: grid; place-items: center; gap: 10px; padding: 40px 20px; border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
+.sampark-workspace-empty h3 { margin: 0; color: var(--text); font-size: 16px; }
+.sampark-workspace-empty p { margin: 0; max-width: 500px; color: var(--muted); font-size: 13px; }
+.sampark-workspace-empty-icon { color: var(--faint); }
+.sampark-workspace-error { background: #fff1f2; color: #9f1239; border: 1px solid #fecdd3; }
+.sampark-hidden-list { display: grid; gap: 12px; }
+.sampark-hidden-card { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: grid; gap: 8px; }
+.sampark-hidden-meta { display: flex; gap: 8px; color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.sampark-hidden-title { margin: 0; font-size: 15px; font-weight: 600; }
+.sampark-hidden-summary { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-hidden-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.sampark-history-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; }
+.sampark-history-list { display: grid; gap: 6px; align-content: start; }
+.sampark-history-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; background: var(--surface-soft); border: 1px solid transparent; text-align: left; }
+.sampark-history-row.is-active { background: #eef2ff; border-color: #c7d2fe; }
+.sampark-history-date { font-size: 13px; font-weight: 500; }
+.sampark-history-detail { min-height: 300px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.sampark-history-grid { display: grid; gap: 10px; }
+.sampark-history-card { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); display: grid; gap: 4px; }
+.sampark-history-card small { color: var(--faint); font-size: 11px; }
+.sampark-history-card strong { font-size: 13px; line-height: 1.4; }
+.sampark-voc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.sampark-voc-card { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: grid; gap: 8px; }
+.sampark-voc-card h3 { margin: 0; display: flex; gap: 8px; align-items: center; font-size: 14px; }
+.sampark-voc-card p { margin: 0; color: var(--muted); font-size: 13px; }
+.sampark-workspace-note { padding: 10px 12px; border-radius: 8px; background: #f8f9ff; border: 1px solid #e0e7ff; color: var(--muted); font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.sampark-review-summary { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 8px; background: var(--surface-soft); }
+.sampark-review-count { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--primary); }
+.sampark-sources-toolbar, .sampark-scheduler-summary, .sampark-analytics-grid { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 8px; background: var(--surface-soft); font-size: 13px; color: var(--muted); }
+.sampark-analytics-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.sampark-analytics-card { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: flex; gap: 10px; align-items: center; font-size: 13px; }
 /* Header user menu */
 .sampark-user-menu { position: relative; }
 .sampark-user-trigger { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 20px; background: #f5f7fa; border: 1px solid var(--line); }
