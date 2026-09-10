@@ -5,6 +5,7 @@ import {
   getFollowingThreads,
   getForYou,
   getRecommendationStatus,
+  getViewerActivitySummary,
   getViewerPreferences,
   getViewerReactions,
   getViewerSaved,
@@ -17,6 +18,7 @@ import { articleKey, reactionIdentity } from '../news-scrapper/utils/intelligenc
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
 import useRecommendationEvents from '../news-scrapper/for-you/useRecommendationEvents.js';
+import { readSamparkSettings } from './SamparkSettingsModal.jsx';
 
 function imageOf(item) {
   return item?.image_url || item?.imageUrl || item?.thumbnail_url || item?.og_image || item?.top_image || '';
@@ -389,6 +391,14 @@ export default function SamparkForYou() {
   );
   const dwellStarted = useRef(0);
   const dwellAccumulated = useRef(0);
+  const [activity, setActivity] = useState(null);
+  const loadActivity = useCallback(async () => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const res = await getViewerActivitySummary(tz);
+      setActivity(res?.activity || null);
+    } catch {}
+  }, []);
 
   useEffect(() => () => { flush({ keepalive: true }); }, [flush]);
 
@@ -474,7 +484,12 @@ export default function SamparkForYou() {
         setStatus(nextStatus);
         const pref = await getViewerPreferences();
         if (cancelled) return;
-        setPreferences(pref?.preferences || {});
+        const prefData = pref?.preferences || {};
+        setPreferences(prefData);
+        // Fresh viewer onboarding: auto-open 3-step wizard if enabled and not completed
+        if (nextStatus?.enabled && !prefData?.completed_at) {
+          setPrefsOpen(true);
+        }
         if (nextStatus?.enabled) await loadFeed();
       } catch (nextError) {
         if (!cancelled) setError(nextError?.message || 'Could not prepare your intelligence mix.');
@@ -483,11 +498,12 @@ export default function SamparkForYou() {
       }
     })();
     loadSavedState();
+    loadActivity();
     return () => {
       cancelled = true;
       savedRequest.current += 1;
     };
-  }, [loadAttempt, loadFeed, loadSavedState]);
+  }, [loadAttempt, loadFeed, loadSavedState, loadActivity]);
 
   const reactionSignature = useMemo(() => items.map(reactionIdentity).filter(Boolean).join('|'), [items]);
   useEffect(() => {
@@ -535,6 +551,14 @@ export default function SamparkForYou() {
     }
   };
 
+  const shouldRecordPassive = () => {
+    try {
+      const s = readSamparkSettings();
+      if (s.personalizedFeed === false) return false;
+    } catch {}
+    return status?.mode !== 'paused';
+  };
+
   const openDossier = (item) => {
     dwellAccumulated.current = 0;
     dwellStarted.current = document.visibilityState === 'visible' ? Date.now() : 0;
@@ -544,16 +568,18 @@ export default function SamparkForYou() {
       next.add(articleKey(item));
       return next;
     });
-    record('dossier_open', item, { section: 'for_you' });
+    if (shouldRecordPassive()) record('dossier_open', item, { section: 'for_you' });
   };
 
   const closeDossier = () => {
     const activeMs = dwellAccumulated.current + (dwellStarted.current ? Date.now() - dwellStarted.current : 0);
-    if (openArticle && activeMs >= 5000) record('dossier_dwell', openArticle, { active_ms: activeMs, section: 'dossier' });
+    const didRecord = openArticle && activeMs >= 5000 && shouldRecordPassive();
+    if (didRecord) record('dossier_dwell', openArticle, { active_ms: activeMs, section: 'dossier' });
     dwellStarted.current = 0;
     dwellAccumulated.current = 0;
     setOpenArticle(null);
     flush();
+    if (didRecord) setTimeout(() => loadActivity(), 900);
   };
 
   useEffect(() => {
@@ -587,6 +613,7 @@ export default function SamparkForYou() {
         return next;
       });
       setActionNotice({ message: saved ? 'Removed from followed stories.' : 'Saved and followed privately.' });
+      setTimeout(() => loadActivity(), 700);
     });
   };
 
@@ -595,10 +622,11 @@ export default function SamparkForYou() {
     setItems((current) => current.filter((candidate) => articleKey(candidate) !== articleKey(item)));
     record('hide', item);
     setActionNotice({ message: 'Hidden only from your feed.' });
+    setTimeout(() => loadActivity(), 700);
   });
 
-  const handleSourceOpen = (item) => record('source_open', item, { section: 'dossier' });
-  const handleWhyOpen = (item) => record('why_this_story_open', item, { section: 'dossier' });
+  const handleSourceOpen = (item) => { if (shouldRecordPassive()) record('source_open', item, { section: 'dossier' }); };
+  const handleWhyOpen = (item) => { if (shouldRecordPassive()) record('why_this_story_open', item, { section: 'dossier' }); };
 
   const unfollowThread = async (thread) => {
     const key = articleKey(thread.anchor);
@@ -630,13 +658,24 @@ export default function SamparkForYou() {
     setItems((currentItems) => currentItems.map(apply));
     setOpenArticle((currentArticle) => currentArticle && articleKey(currentArticle) === articleKey(item) ? apply(currentArticle) : currentArticle);
     setActionNotice({ message: nextReaction === 'neutral' ? 'Reaction removed.' : `Your ${nextReaction} was counted.` });
+    setTimeout(() => loadActivity(), 700);
   });
 
   // Five is a layout number, not a feed cap. Backend dictates count (limit 20 + cursor).
   // We keep the stable snapshot; pagination can extend far beyond 20 when cursor permits.
   const featured = items.slice(0, 5);
   const remaining = items.slice(5);
-  const likedCount = items.filter((i) => i.reactions?.viewer_reaction === 'like').length;
+
+  const formatTrend = (current, previous, trend, state) => {
+    if (state === 'new') return 'New';
+    if (state === 'stable' && current === 0 && previous === 0) return '—';
+    if (trend === null || trend === undefined) return '—';
+    if (trend === 0) return '—';
+    const sign = trend > 0 ? '↑' : '↓';
+    return `${sign} ${Math.abs(trend)}%`;
+  };
+  const newsTrendLabel = activity ? `${formatTrend(activity.news_read.today, activity.news_read.yesterday, activity.news_read.trend_percent, activity.news_read.trend_state)} vs yesterday` : '—';
+  const likesTrendLabel = activity ? `${formatTrend(activity.likes.this_week, activity.likes.last_week, activity.likes.trend_percent, activity.likes.trend_state)} vs last week` : '—';
 
   if (loading) {
     return (
@@ -683,9 +722,31 @@ export default function SamparkForYou() {
           )}
         </div>
         <div className="sampark-metrics-grid">
-          <div className="sampark-metric-card"><span className="sampark-metric-icon blue"><Icon name="eye" size={18} /></span><div className="sampark-metric-info"><div className="sampark-metric-value">{reviewed.size}</div><div className="sampark-metric-label">News read</div></div></div>
-          <div className="sampark-metric-card"><span className="sampark-metric-icon green"><Icon name="thumbsUp" size={18} /></span><div className="sampark-metric-info"><div className="sampark-metric-value">{likedCount}</div><div className="sampark-metric-label">Likes</div></div></div>
-          <button className="sampark-metric-card is-interactive" onClick={openFollowing} type="button"><span className="sampark-metric-icon purple"><Icon name="bookmark" size={18} /></span><div className="sampark-metric-info"><div className="sampark-metric-value">{savedKeys.size}</div><div className="sampark-metric-label">Follows · View</div></div><Icon name="chevR" size={14} /></button>
+          <div className="sampark-metric-card">
+            <span className="sampark-metric-icon blue"><Icon name="eye" size={18} /></span>
+            <div className="sampark-metric-info">
+              <div className="sampark-metric-value">{activity ? activity.news_read.today : 0}</div>
+              <div className="sampark-metric-label">News read</div>
+              <div className="sampark-metric-sub">TODAY · {activity ? newsTrendLabel : '—'}</div>
+            </div>
+          </div>
+          <div className="sampark-metric-card">
+            <span className="sampark-metric-icon green"><Icon name="thumbsUp" size={18} /></span>
+            <div className="sampark-metric-info">
+              <div className="sampark-metric-value">{activity ? activity.likes.this_week : 0}</div>
+              <div className="sampark-metric-label">Likes</div>
+              <div className="sampark-metric-sub">THIS WEEK · {activity ? likesTrendLabel : '—'}</div>
+            </div>
+          </div>
+          <button className="sampark-metric-card is-interactive" onClick={openFollowing} type="button">
+            <span className="sampark-metric-icon purple"><Icon name="bookmark" size={18} /></span>
+            <div className="sampark-metric-info">
+              <div className="sampark-metric-value">{activity ? activity.following.total : savedKeys.size}</div>
+              <div className="sampark-metric-label">Following</div>
+              <div className="sampark-metric-sub">TOTAL</div>
+            </div>
+            <Icon name="chevR" size={14} />
+          </button>
         </div>
       </section>
 

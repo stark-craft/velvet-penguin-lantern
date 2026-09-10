@@ -315,6 +315,10 @@ export async function getViewerReactions(articleIds = []) {
   };
 }
 export const getFollowingThreads = () => jsonFetch('/viewer/following');
+export const getViewerActivitySummary = (tz) => {
+  const param = encodeURIComponent(String(tz || 'UTC'));
+  return jsonFetch(`/viewer/activity-summary?tz=${param}`);
+};
 
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');

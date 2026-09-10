@@ -486,6 +486,140 @@ def following_threads(request: Request, response: Response):
     return {"status": "success", "threads": threads, "count": len(threads), "scope": "current_viewer_only"}
 
 
+def _validated_timezone(value: str | None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "UTC"
+    try:
+        import zoneinfo
+        zoneinfo.ZoneInfo(raw)
+        return raw
+    except Exception:
+        return "UTC"
+
+
+def _activity_summary_for_viewer(viewer_key: str, tz_name: str) -> dict:
+    import zoneinfo
+    try:
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = zoneinfo.ZoneInfo("UTC")
+        tz_name = "UTC"
+    state = REPOSITORY.read(viewer_key)
+    events = state.get("events") if isinstance(state.get("events"), list) else []
+    reaction_events = state.get("reaction_events") if isinstance(state.get("reaction_events"), dict) else {}
+    # Use supplied tz for reporting windows, store is UTC
+    now_utc = dt.datetime.now(dt.timezone.utc)
+    now_tz = now_utc.astimezone(tz)
+    today_start = now_tz.replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday_start = today_start - dt.timedelta(days=1)
+    # Monday is 0
+    week_start = today_start - dt.timedelta(days=today_start.weekday())
+    last_week_start = week_start - dt.timedelta(days=7)
+    # News Read: unique article with qualifying dossier_dwell>=5s or source_open per day
+    def _parse_utc(value: str) -> dt.datetime | None:
+        try:
+            d = dt.datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+            if d.tzinfo is None:
+                d = d.replace(tzinfo=dt.timezone.utc)
+            return d.astimezone(dt.timezone.utc)
+        except Exception:
+            return None
+    def _to_tz(d: dt.datetime) -> dt.datetime:
+        return d.astimezone(tz)
+    # Collect unique reads per day
+    today_ids: set[str] = set()
+    yesterday_ids: set[str] = set()
+    for ev in events:
+        action = str(ev.get("action") or "")
+        if action == "dossier_dwell":
+            if int(ev.get("active_ms") or 0) < 5000:
+                continue
+        elif action not in {"dossier_dwell", "source_open"}:
+            # Only qualifying reads: dwell>=5s or source_open (and dossier_dwell already filtered)
+            # dossier_open alone is not counted as read per spec (needs dwell or source)
+            continue
+        if action == "source_open" or (action == "dossier_dwell" and int(ev.get("active_ms") or 0) >= 5000):
+            pass
+        else:
+            continue
+        parsed = _parse_utc(ev.get("occurred_at"))
+        if not parsed:
+            continue
+        tz_time = _to_tz(parsed)
+        aid = str(ev.get("article_id") or "").strip()
+        if not aid:
+            continue
+        if tz_time >= today_start:
+            today_ids.add(aid)
+        elif tz_time >= yesterday_start:
+            yesterday_ids.add(aid)
+    today = len(today_ids)
+    yesterday = len(yesterday_ids)
+    if yesterday > 0:
+        trend = round(((today - yesterday) / yesterday) * 100)
+        trend_state = "up" if trend > 0 else "down" if trend < 0 else "stable"
+    else:
+        trend = None
+        trend_state = "new" if today > 0 else "stable"
+        if today == 0 and yesterday == 0:
+            trend_state = "stable"
+    # Likes this week / last week: distinct articles where current reaction == like and updated_at in week
+    this_week_ids: set[str] = set()
+    last_week_ids: set[str] = set()
+    for aid, rec in reaction_events.items():
+        if not isinstance(rec, dict) or rec.get("reaction") != "like":
+            continue
+        parsed = _parse_utc(rec.get("updated_at"))
+        if not parsed:
+            continue
+        tz_time = _to_tz(parsed)
+        if tz_time >= week_start:
+            this_week_ids.add(str(aid))
+        elif tz_time >= last_week_start:
+            last_week_ids.add(str(aid))
+    this_week = len(this_week_ids)
+    last_week = len(last_week_ids)
+    if last_week > 0:
+        like_trend = round(((this_week - last_week) / last_week) * 100)
+        like_state = "up" if like_trend > 0 else "down" if like_trend < 0 else "stable"
+    else:
+        like_trend = None
+        like_state = "new" if this_week > 0 else "stable"
+        if this_week == 0 and last_week == 0:
+            like_state = "stable"
+    # Following total: from saved store via legacy helper? Use REPOSITORY not enough, need saved count
+    # We will compute via legacy helper in endpoint, but for summary we approximate via reaction? Instead use saved count passed in
+    # For now return 0, endpoint will override with real saved count
+    return {
+        "news_read": {"today": today, "yesterday": yesterday, "trend_percent": trend, "trend_state": trend_state},
+        "likes": {"this_week": this_week, "last_week": last_week, "trend_percent": like_trend, "trend_state": like_state},
+        "following": {"total": 0},
+        "timezone": tz_name,
+    }
+
+
+@router.get("/viewer/activity-summary")
+def activity_summary(request: Request, response: Response, tz: str = Query(default="UTC")):
+    viewer_key, _ = resolve_viewer(request, response)
+    tz_name = _validated_timezone(tz)
+    summary = _activity_summary_for_viewer(viewer_key, tz_name)
+    # Following total is viewer-private saved anchors
+    try:
+        legacy = _legacy()
+        profile, _ = _profile_and_articles(request)
+        saved = legacy.get_viewer_saved_items(request, profile)
+        if UNIFIED_CORPUS_ENABLED:
+            saved = [
+                *legacy.get_viewer_saved_items(request, "default"),
+                *legacy.get_viewer_saved_items(request, "broadcast"),
+            ]
+        summary["following"]["total"] = len(saved) if isinstance(saved, list) else 0
+    except Exception:
+        summary["following"]["total"] = 0
+    return {"status": "success", "activity": summary}
+
+
 def process_reaction_consensus() -> dict:
     """Persist mature consensus rows and queue one coalesced Bouncer rebuild."""
 

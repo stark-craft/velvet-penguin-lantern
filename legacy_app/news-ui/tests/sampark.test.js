@@ -164,6 +164,40 @@ test('Viewer/browser identity is cookie-primary and same-IP browsers remain isol
   assert.doesNotMatch(forYou, /get_client_ip|fingerprint.*primary.*viewer_key/i);
 });
 
+test('Sampark header, auth and settings remain standalone and SSO-ready without portal chrome', () => {
+  const app = read('../src/sampark/SamparkApp.jsx');
+  assert.match(app, /techscout-header/);
+  assert.match(app, /sampark-user-menu|sampark-user-trigger/);
+  assert.match(app, /SamparkLogin/);
+  assert.match(app, /path="\/login"/);
+  assert.match(app, /Search Technologies News/);
+  assert.match(app, /lang-btn/);
+  assert.doesNotMatch(app, /sampark-header|sampark-nav/);
+  assert.match(app, /create-news-btn/);
+  assert.doesNotMatch(app, /Create News.*workflow|contribution.*create.*modal/i);
+  const login = read('../src/sampark/SamparkLogin.jsx');
+  assert.match(login, /useSamparkAuth|login\(role/);
+  assert.match(login, /Access TechScout|Samsung Sampark SSO will be used/);
+  assert.doesNotMatch(login, /localStorage.*key|localStorage.*token/i);
+  assert.doesNotMatch(login, /\?user=|X-User-ID/);
+  const auth = read('../src/sampark/auth/SamparkAuthContext.jsx');
+  assert.match(auth, /getAccessCapabilities|getViewerProfile|unlockCapabilitySession|logoutCapabilitySession/);
+  assert.match(auth, /ssoMode.*false|samparkPrincipal/);
+  assert.match(auth, /useSamparkAuth/);
+  const settings = read('../src/sampark/SamparkSettingsModal.jsx');
+  assert.match(settings, /updateViewerProfile/);
+  assert.match(settings, /pauseViewerPersonalization/);
+  assert.match(settings, /SAMPARK_SETTINGS_KEY/);
+  assert.doesNotMatch(settings, /fetch\(.*\/access-control.*key.*localStorage/i);
+  const handoff = read('../../SAMPARK_SSO_INTEGRATION.md');
+  assert.match(handoff, /Current State/);
+  assert.match(handoff, /Final Sampark Goal/);
+  assert.match(handoff, /TBD/);
+  assert.match(handoff, /Integration Boundary/);
+  assert.match(handoff, /Security Requirements/);
+  assert.match(handoff, /Never trust.*frontend/i);
+});
+
 test('Sampark structural routes stay inside the separate entry', () => {
   const app = read('../src/sampark/SamparkApp.jsx');
   for (const route of ['/for-you', '/all-news', '/research', '/samsung-news']) {
@@ -179,4 +213,24 @@ test('Original NewsScrapper screens remain presentation-agnostic and Sampark own
   assert.doesNotMatch(read('../src/news-scrapper/for-you/ForYouScreen.jsx'), /presentation.*sampark|SamparkForYouView/);
   assert.doesNotMatch(read('../src/news-scrapper/screens/FeedScreen.jsx'), /presentation.*sampark|SamparkBriefingView/);
   assert.doesNotMatch(read('../src/sampark/SamparkApp.jsx'), /presentation="sampark"/);
+});
+
+test('Sampark fresh viewer onboarding, search isolation, privacy and persistent activity', () => {
+  const forYou = read('../src/sampark/SamparkForYou.jsx');
+  assert.match(forYou, /completed_at[\s\S]*setPrefsOpen/);
+  assert.match(forYou, /getViewerActivitySummary/);
+  assert.match(forYou, /loadActivity/);
+  assert.match(forYou, /shouldRecordPassive/);
+  const app = read('../src/sampark/SamparkApp.jsx');
+  assert.match(app, /getNamespacedHistoryKey/);
+  assert.match(app, /readSearchHistoryForViewer/);
+  assert.match(app, /SEARCH_HISTORY_KEY/);
+  const api = read('../src/news-scrapper/api.js');
+  assert.match(api, /getViewerActivitySummary/);
+  const router = read('../../news_scrapper/recommendation/router.py');
+  assert.match(router, /def activity_summary/);
+  assert.match(router, /_validated_timezone/);
+  assert.match(router, /news_read/);
+  assert.match(router, /likes/);
+  assert.match(forYou, /activity\.news_read\.today/);
 });

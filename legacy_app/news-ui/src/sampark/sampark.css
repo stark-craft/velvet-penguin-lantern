@@ -128,8 +128,14 @@ a { color: inherit; text-decoration: none; }
 .settings-field { display: grid; gap: 5px; margin-top: 10px; color: var(--muted); font-size: 13px; }
 .settings-field small { color: var(--faint); font-style: normal; }
 .settings-field input, .settings-field select { width: 100%; height: 38px; border: 1px solid var(--line); border-radius: 8px; outline: 0; padding: 0 10px; background: #fff; color: var(--text); }
+.settings-field input[aria-invalid="true"] { border-color: #ef4444; background: #fff1f2; }
+.settings-field input[aria-invalid="true"]:focus { border-color: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.15); }
+.sampark-field-error { margin: 6px 0 0; color: #b91c1c; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
 .settings-field input:focus, .settings-field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(20 40 160 / 10%); }
 .settings-note { margin: 5px 0 0; color: var(--faint); font-size: 12px; }
+.sampark-privacy-status { margin-top: 12px; padding: 10px 12px; border-radius: 8px; background: #f8f9ff; border: 1px solid #e0e7ff; }
+.sampark-privacy-status strong { display: block; font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.sampark-privacy-status span { color: var(--muted); font-size: 13px; line-height: 1.5; }
 .settings-inline-actions, .settings-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .settings-inline-actions button, .settings-links a { border-radius: 7px; padding: 7px 10px; background: #eef2ff; color: var(--primary); font-size: 13px; font-weight: 500; }
 .settings-inline-actions button:first-child { background: var(--primary); color: #fff; }
@@ -174,6 +180,7 @@ html[data-sampark-density="compact"] .stream-structure .shell-region-space { min
 .sampark-metric-icon.purple { background: linear-gradient(135deg, #6d28d9, #7c3aed); }
 .sampark-metric-value { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1.1; }
 .sampark-metric-label { font-size: 13px; color: var(--muted); }
+.sampark-metric-sub { font-size: 11px; color: var(--faint); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-top: 2px; }
 .sampark-news-for-you { display: grid; gap: 14px; }
 /* One composition: 1 large + 2×2 beside it — 5 together, minimal scroll */
 .sampark-foryou-grid { display: grid; grid-template-columns: 1.32fr 1fr; gap: 16px; align-items: stretch; }
@@ -327,6 +334,46 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .sampark-thread-waiting { margin: 0; color: var(--faint); font-size: 13px; font-style: italic; }
 .sampark-following-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line); background: #fafafa; }
 .sampark-following-footnote { color: var(--faint); font-size: 12px; }
+/* Header user menu */
+.sampark-user-menu { position: relative; }
+.sampark-user-trigger { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 20px; background: #f5f7fa; border: 1px solid var(--line); }
+.sampark-user-trigger:hover { background: #eef2ff; border-color: #c7d2fe; }
+.sampark-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+.sampark-avatar.large { width: 40px; height: 40px; font-size: 14px; }
+.sampark-user-name { font-size: 14px; font-weight: 500; color: var(--text); }
+.sampark-user-dropdown { position: absolute; top: calc(100% + 8px); right: 0; width: 320px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 32px rgba(15,23,42,.12); padding: 12px; z-index: 50; }
+.sampark-user-card { display: flex; gap: 12px; padding: 10px; border-radius: 8px; background: var(--surface-soft); margin-bottom: 10px; }
+.sampark-user-card div { display: flex; flex-direction: column; gap: 2px; }
+.sampark-user-card strong { font-size: 14px; }
+.sampark-user-card small { color: var(--muted); font-size: 12px; }
+.sampark-user-capabilities { color: var(--primary) !important; font-weight: 500; }
+.sampark-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border-radius: 8px; background: transparent; color: var(--text); font-size: 14px; text-align: left; }
+.sampark-menu-item:hover { background: var(--surface-soft); }
+.sampark-menu-item.is-danger { color: #9f1239; }
+.sampark-menu-item.is-danger:hover { background: #fff1f2; }
+.sampark-menu-hint { display: block; padding: 8px 10px; color: var(--faint); font-size: 12px; }
+/* Login page */
+.sampark-login-page { display: grid; place-items: center; min-height: calc(100vh - 200px); padding: 32px 16px; }
+.sampark-login-card { width: min(96vw, 520px); background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 8px 32px rgba(15,23,42,.08); padding: 24px; display: grid; gap: 18px; }
+.sampark-login-brand { display: grid; gap: 6px; text-align: center; }
+.sampark-login-logo { font-size: 20px; font-weight: 700; }
+.sampark-login-logo .logo-samsung { color: var(--primary); }
+.sampark-login-logo .logo-techscout { color: var(--text); font-weight: 350; margin-left: 6px; }
+.sampark-login-tagline { margin: 0; color: var(--muted); font-size: 13px; }
+.sampark-login-intro h1 { margin: 0 0 6px; font-size: 20px; }
+.sampark-login-intro p { margin: 0 0 8px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.sampark-login-sso-note { display: flex; gap: 6px; align-items: flex-start; padding: 8px 10px; border-radius: 8px; background: #eef2ff; color: var(--primary); font-size: 13px; }
+.sampark-login-status { padding: 10px; border-radius: 8px; font-size: 13px; }
+.sampark-login-status.is-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+.sampark-login-form { display: grid; gap: 12px; }
+.sampark-login-field { display: grid; gap: 6px; font-size: 13px; }
+.sampark-login-field select, .sampark-login-field input { height: 40px; border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; background: #fff; }
+.sampark-login-field select:focus, .sampark-login-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(20,40,160,.1); outline: 0; }
+.sampark-login-error { padding: 8px 10px; border-radius: 8px; background: #fff1f2; color: #9f1239; font-size: 13px; }
+.sampark-login-success { padding: 8px 10px; border-radius: 8px; background: #ecfdf5; color: #065f46; font-size: 13px; }
+.sampark-login-submit { width: 100%; justify-content: center; }
+.sampark-login-help { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--faint); }
+.sampark-login-foot { display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--faint); }
 
 @media (max-width: 720px) {
   .techscout-header { padding: 14px 16px; }
