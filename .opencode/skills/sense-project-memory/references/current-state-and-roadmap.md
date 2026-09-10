@@ -536,3 +536,15 @@ dossier opening reuse canonical data and preserve publishing capabilities.
 Research/Create still use the original workspaces. Subsequent QA added image
 opening and corrected portalled dossier theme text. See
 `legacy_app/docs/SAMPARK_NEWS_RELEASE.md` for validation and data limitations.
+
+### 10 September 2026 — Sampark presentation reset
+
+The user rejected the integrated Sampark presentation as a hybrid that did not
+faithfully follow the signed-off design. The Sampark entry has been reset to a
+light-only structural milestone: the TechScout header, four primary tabs,
+designer-aligned category/channel navigation, and empty section regions only.
+It intentionally mounts no feeds, cards, hero banners, streams, search results,
+modals, translation, access controls, or article interactions yet. The obsolete
+Sampark-specific screen adapters and combined prototype stylesheet were removed.
+The original application and backend remain intact. Add Sampark content and
+behavior one reviewed component at a time from this baseline.

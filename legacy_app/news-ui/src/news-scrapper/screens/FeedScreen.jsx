@@ -14,7 +14,6 @@ import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, publishedTime, reactionIdentity, scoreOf } from '../utils/intelligence.js';
 import '../styles/home-refinement.css';
 import { emptyFilters, applyFilters } from './briefingFilters.js';
-import SamparkBriefingView from '../../sampark/SamparkBriefingView.jsx';
 const HERO_FEED_LIMIT = 5;
 function resolveArticleImage(item) {
   if (!item || typeof item !== 'object') {
@@ -466,7 +465,7 @@ function ImageFeedCard({
 </div>
 </article>;
 }
-export default function FeedScreen({ capabilities = [], presentation = 'original' }) {
+export default function FeedScreen({ capabilities = [] }) {
   const capabilitySet = useMemo(() => new Set(capabilities), [capabilities]);
   const reviewAllowed = capabilitySet.has('review.news.submit');
   const workflowVisible = reviewAllowed || capabilitySet.has('review.news.view') || capabilitySet.has('review.news.approve') || capabilitySet.has('approved.view');
@@ -597,7 +596,7 @@ export default function FeedScreen({ capabilities = [], presentation = 'original
   const lenses = useMemo(() => briefingLensOptions(articles), [articles]);
   const lensArticles = useMemo(() => articles.filter(item => matchesBriefingLens(item, activeLens)), [activeLens, articles]);
   const filteredArticles = useMemo(() => applyFilters(lensArticles, filters, selectedIds), [filters, lensArticles, selectedIds]);
-  const stageArticles = presentation === 'sampark' ? filteredArticles : lensArticles;
+  const stageArticles = lensArticles;
   const heroFeed = useMemo(() => getHeroFeed(stageArticles), [stageArticles]);
   const heroFeedKeys = useMemo(() => new Set(heroFeed.map(stableSignalKey).filter(Boolean)), [heroFeed]);
   const groups = useMemo(() => groupedByDatePreservingOrder(filteredArticles), [filteredArticles]);
@@ -915,20 +914,11 @@ export default function FeedScreen({ capabilities = [], presentation = 'original
 <button className="btn-dark-secondary mt-4" onClick={() => { setLoading(true); setLoadAttempt((current) => current + 1); }} type="button"><Icon name="refresh" size={14} /> Check again</button>
 </div>;
   }
-  if (presentation === 'sampark') {
-    return <>
-      {actionFeedback && <div className={actionFeedback.type === 'error' ? 'error-banner' : 'personal-notice'} role={actionFeedback.type === 'error' ? 'alert' : 'status'}><span>{actionFeedback.message}</span>{actionFeedback.action && <button onClick={actionFeedback.action} type="button">{actionFeedback.actionLabel}</button>}<button aria-label="Dismiss message" onClick={() => setActionFeedback(null)} type="button"><Icon name="x" size={13} /></button></div>}
-      <SamparkBriefingView articles={articles} filteredArticles={filteredArticles} filters={filters} setFilters={setFilters} options={options} votes={votes} savedKeys={savedKeys} busyActions={busyActions} onOpen={openDossier} onVote={onVote} onSave={toggleSave} onHide={hideArticle} />
-      <ArticleModal item={openArticle} onClose={closeDossier} onSelect={reviewAllowed ? selectFromDossier : undefined} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={reactionState.status === 'ready' || reactionState.status === 'stale' ? onVote : undefined} onCorrectRegion={capabilitySet.has('region.correct') ? onCorrectRegion : undefined} />
-      {reviewAllowed && <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />}
-    </>;
-  }
   return <div className="briefing-home space-y-4 2xl:space-y-5">
 {showPersonalizationNotice && <div className="personalization-toast" role="status"><Icon name="sparkle" size={15} /><span><strong>{personalizationMeta?.viewer_name ? `Personalized for ${personalizationMeta.viewer_name}` : 'Your personalized feed'}</strong><small>Recent reading and saved signals shape the order—not what is available.</small></span><button onClick={() => setShowPersonalizationNotice(false)} type="button" aria-label="Dismiss personalization message"><Icon name="x" size={13} /></button></div>}
 {actionFeedback && <div className={actionFeedback.type === 'error' ? 'error-banner' : 'personal-notice'} role={actionFeedback.type === 'error' ? 'alert' : 'status'}><span>{actionFeedback.message}</span>{actionFeedback.action && <button className="ml-3 underline" onClick={actionFeedback.action} type="button">{actionFeedback.actionLabel}</button>}<button aria-label="Dismiss message" className="ml-3" onClick={() => setActionFeedback(null)} type="button"><Icon name="x" size={13} /></button></div>}
 {Object.values(supportingState).includes('error') && <div className="error-banner" role="status"><span>Some personal state could not be verified. Save or Review Queue actions stay disabled where their current state is unknown.</span><button className="ml-3 underline" onClick={retrySupportingState} type="button">Retry personal state</button></div>}
 {['error', 'stale'].includes(reactionState.status) && <div className="error-banner" role="status"><span>{reactionState.status === 'stale' ? 'Showing last-known reaction totals while the count service reconnects.' : `${reactionState.error} Counts are hidden rather than shown as zero.`}</span><button className="ml-3 underline" onClick={() => setReactionLoadAttempt((current) => current + 1)} type="button">Retry reaction totals</button></div>}
-{presentation === 'sampark' && <SearchLoadedBriefing extended filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={lensArticles.length} />}
 <section className="briefing-stage grid gap-4 2xl:gap-5">
 <div className="briefing-top-row briefing-hero-row grid min-h-0 gap-4 2xl:gap-5">
 <div className="briefing-hero-stack">
@@ -939,7 +929,7 @@ export default function FeedScreen({ capabilities = [], presentation = 'original
 </div>
 <LatestDaySignals articles={stageArticles} excludeKeys={heroFeedKeys} onOpen={openDossier} />
 </section>
-{presentation !== 'sampark' && <SearchLoadedBriefing filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={lensArticles.length} />}
+<SearchLoadedBriefing filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={lensArticles.length} />
 <section className="space-y-8">        {Object.entries(groups).map(([day, items]) => <div key={day} className="space-y-4">
 <div className="flex items-center gap-4">
 <h2 className="text-lg font-semibold text-white">                  {day}                </h2>

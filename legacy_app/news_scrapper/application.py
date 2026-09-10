@@ -2977,10 +2977,13 @@ def get_viewer_saved_items(request, profile=None):
 
 def get_viewer_hidden_items(request, profile=None):
     profile_name = profile or get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
-    store = load_viewer_hidden_store()
-    viewer_store = store.get(viewer_key, {})
-    items = viewer_store.get(profile_name, [])
+    with viewer_hidden_lock:
+        store = load_viewer_hidden_store()
+        viewer_key, migrated = claim_legacy_private_bucket(store, request)
+        if migrated:
+            save_viewer_hidden_store(store)
+        viewer_store = store.get(viewer_key, {})
+        items = viewer_store.get(profile_name, [])
     return items if isinstance(items, list) else []
 
 
@@ -5753,13 +5756,15 @@ def get_personal_hidden(request: Request):
 @app.post("/viewer/hidden")
 def hide_for_current_viewer(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
     article_key = _article_identity(payload)
     if not article_key:
         raise HTTPException(status_code=400, detail="An article title or link is required.")
 
     with viewer_hidden_lock:
         store = load_viewer_hidden_store()
+        viewer_key, migrated = claim_legacy_private_bucket(store, request)
+        if migrated:
+            save_viewer_hidden_store(store)
         viewer_store = store.setdefault(viewer_key, {})
         items = viewer_store.setdefault(profile, [])
         if not any(
@@ -5786,13 +5791,15 @@ def hide_for_current_viewer(request: Request, payload: dict = Body(...)):
 @app.post("/viewer/hidden/restore")
 def restore_for_current_viewer(request: Request, payload: dict = Body(...)):
     profile = get_profile_for_request(request)
-    viewer_key = get_viewer_key(get_client_ip(request))
     target_key = str(payload.get("article_key") or _article_identity(payload))
     if not target_key:
         raise HTTPException(status_code=400, detail="An article title or link is required.")
 
     with viewer_hidden_lock:
         store = load_viewer_hidden_store()
+        viewer_key, migrated = claim_legacy_private_bucket(store, request)
+        if migrated:
+            save_viewer_hidden_store(store)
         viewer_store = store.setdefault(viewer_key, {})
         items = viewer_store.get(profile, [])
         remaining = [
