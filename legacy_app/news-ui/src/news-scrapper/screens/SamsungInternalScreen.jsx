@@ -270,6 +270,11 @@ function EmptyPanel({ title, copy, action }) {
   return <div className="sni-empty"><Icon name="inbox" size={26} /><h3>{title}</h3><p>{copy}</p>{action}</div>;
 }
 
+function SamparkSamsungTile({ item, onOpen }) {
+  const image = resolveInternalImage(item);
+  return <article className="latest-news-card"><button className="lnc-image" onClick={() => onOpen(item)} style={image ? { backgroundImage: `url("${image}")` } : undefined} type="button">{!image && <Icon name="layers" size={30} />}</button><div className="lnc-tags">{item.source || item.src || 'Samsung'} | {item.category || 'Samsung News'}</div><button className="lnc-title" onClick={() => onOpen(item)} type="button">{item.title}</button></article>;
+}
+
 function normalizeChannel(items, channel) {
   return normalizeList(items || []).map((item) => ({ ...item, image_url: resolveInternalImage(item), samsung_internal_channel: channel }));
 }
@@ -283,7 +288,7 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
   const [error, setError] = useState('');
   const [publishedError, setPublishedError] = useState('');
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [tab, setTab] = useState(() => channelFromSearch(location.search));
+  const [tab, setTab] = useState(() => presentation === 'sampark' && !location.search ? 'internal' : channelFromSearch(location.search));
   const [announcementBusy, setAnnouncementBusy] = useState('');
   const [archiveQuery, setArchiveQuery] = useState('');
   const [archiveCategory, setArchiveCategory] = useState('all');
@@ -314,8 +319,8 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
   }, [loadAttempt]);
 
   useEffect(() => {
-    setTab(channelFromSearch(location.search));
-  }, [location.search]);
+    setTab(presentation === 'sampark' && !location.search ? 'internal' : channelFromSearch(location.search));
+  }, [location.search, presentation]);
 
   useEffect(() => {
     if (loading || !location.state?.restore) return;
@@ -373,6 +378,21 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
 
   if (loading) return <div className="samsung-internal-page"><div aria-live="polite" className="sni-state" role="status"><span className="sni-loader" /><h1>Opening Samsung Internal…</h1><p>Aligning leadership, company notices and the Samsung intelligence wire.</p></div></div>;
   if (error) return <div className="samsung-internal-page"><div className="sni-state sni-state-error" role="alert"><Icon name="warning" size={20} /><h1>Samsung Internal could not load</h1><p>{error}</p><button className="btn-dark-secondary" onClick={() => setLoadAttempt((value) => value + 1)} type="button"><Icon name="refresh" size={14} /> Try again</button></div></div>;
+  if (presentation === 'sampark') {
+    const selected = tab === 'global' ? filteredModel.global : tab === 'local' ? filteredModel.local : [...filteredModel.inside, ...filteredModel.stories];
+    const open = item => {
+      if (item.content_type === 'colleague_story' && item.id) navigate(`/samsung-internal/story/${item.id}`);
+      else onOpenSignal?.(item);
+    };
+    return <div className="tab-content active samsung-news-view">
+      {publishedError && <div className="error-banner" role="alert">{publishedError}</div>}
+      <nav aria-label="Samsung News sections" className="sub-tabs"><button className={`sub-tab${tab === 'internal' ? ' active' : ''}`} onClick={() => selectChannel('internal')} type="button">SRI-D</button><button className={`sub-tab${tab === 'local' ? ' active' : ''}`} onClick={() => selectChannel('local')} type="button">Local</button><button className={`sub-tab${tab === 'global' ? ' active' : ''}`} onClick={() => selectChannel('global')} type="button">Global</button></nav>
+      {tab === 'internal' && model.leadership && <section className="srid-leadership"><div><span>Samsung Research Institute Delhi</span><h2>{model.leadership.title}</h2><p>{excerptOf(model.leadership.summary || model.leadership.body, 240)}</p><button onClick={() => navigate(`/samsung-internal/leadership/${model.leadership.id}`)} type="button">Read message</button></div><Icon name="layers" size={72} /></section>}
+      <div className="carousel-news-container samsung-focus-layout"><section className="featured-carousel">{selected[0] ? <button className="carousel-slides" onClick={() => open(selected[0])} style={resolveInternalImage(selected[0]) ? { backgroundImage: `url("${resolveInternalImage(selected[0])}")` } : undefined} type="button"><div className="slide-overlay"><span className="slide-source">{selected[0].source || selected[0].src || 'Samsung'} · {selected[0].date || 'Latest'}</span><h3>{selected[0].title}</h3></div></button> : <div className="sampark-empty">The next Samsung edition is being prepared.</div>}</section><aside className="live-news-sidebar"><h3 className="sidebar-title">Briefing Stream</h3><div className="live-news-list">{selected.slice(0, 8).map(item => <button className="live-news-item" key={item.id || item.link || item.title} onClick={() => open(item)} type="button"><span className="ln-category ai">{item.category || 'Samsung'}</span><p className="ln-headline">{item.title}</p><span className="ln-meta">{item.source || item.src || 'Samsung'} | {item.date || 'Latest'}</span></button>)}</div></aside></div>
+      <section className="latest-news-section"><div className="latest-news-header"><h3>{tab === 'internal' ? 'SRI-D News' : tab === 'local' ? 'Local Samsung News' : 'Global Samsung News'} <span className="news-count">({selected.length} News)</span></h3></div><div className="latest-news-scroll">{selected.map(item => <SamparkSamsungTile item={item} key={item.id || item.link || item.title} onOpen={open} />)}</div></section>
+      {contributionAllowed && tab === 'internal' && <div className="samsung-contribute"><button className="create-news-btn" onClick={() => navigate('/for-you/create/contributions')} type="button"><Icon name="plus" size={14} /> Contribute a story</button></div>}
+    </div>;
+  }
   return <div className="samsung-internal-page">
     {publishedError && <section className="sni-published-service-notice" role="alert"><Icon name="warning" size={17} /><div><strong>Published content could not be verified</strong><p>{publishedError} Existing items are kept until a successful refresh.</p></div><button onClick={() => setLoadAttempt((value) => value + 1)} type="button"><Icon name="refresh" size={13} /> Try again</button></section>}
     {announcementFeedback && <p className={`sni-management-feedback is-${announcementFeedback.kind}`} role={announcementFeedback.kind === 'error' ? 'alert' : 'status'}>{announcementFeedback.message}</p>}

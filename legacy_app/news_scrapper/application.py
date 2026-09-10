@@ -5171,7 +5171,7 @@ def search_extracted_intelligence(
         ),
         reverse=True,
     )
-    results = results[:limit]
+    results = results[:limit] if limit is not None else results
     return {
         "status": "success",
         "results": results,
@@ -5195,6 +5195,8 @@ def search_archive(
     to_date: str = Query(None),
     target_sites: str = Query(None),
     limit: int = Query(250, ge=1, le=500),
+    offset: int = 0,
+    sort: str = "relevance",
 ):
     profile = get_profile_for_request(request)
     result = search_extracted_intelligence(
@@ -5203,11 +5205,19 @@ def search_archive(
         from_date=from_date,
         to_date=to_date,
         target_sites=target_sites,
-        limit=limit,
+        limit=None,
     )
     visible_results = filter_viewer_hidden(result.get("results", []), request, profile)
-    result["results"] = visible_results
-    result["count"] = len(visible_results)
+    if sort == "date_desc":
+        visible_results.sort(key=lambda article: (
+            str(article.get("archive_date") or article.get("date") or ""),
+            str(article.get("link") or article.get("title") or ""),
+        ), reverse=True)
+    offset = max(0, offset)
+    result["total"] = len(visible_results)
+    result["results"] = visible_results[offset:offset + limit]
+    result["count"] = len(result["results"])
+    result["has_more"] = offset + result["count"] < result["total"]
     return result
 
 

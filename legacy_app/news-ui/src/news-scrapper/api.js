@@ -167,6 +167,8 @@ export function searchExtractedIntelligence(params, signal) {
   if (params.to_date)      u.set('to_date', params.to_date);
   if (params.target_sites) u.set('target_sites', params.target_sites);
   if (params.limit)        u.set('limit', String(params.limit));
+  if (params.offset) u.set('offset', String(params.offset));
+  if (params.sort) u.set('sort', params.sort);
   return jsonFetch(`/archive/search?${u.toString()}`, { signal });
 }
 

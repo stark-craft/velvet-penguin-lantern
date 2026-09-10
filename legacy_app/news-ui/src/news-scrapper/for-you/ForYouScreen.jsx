@@ -18,11 +18,20 @@ import InterestSetup from './InterestSetup.jsx';
 import SinceLastVisit from './SinceLastVisit.jsx';
 import useRecommendationEvents from './useRecommendationEvents.js';
 import { filterFeedItems } from './filterFeedItems.js';
+import SamparkForYouView from '../../sampark/SamparkForYouView.jsx';
 import './for-you.css';
 
 const migrationDismissKey = 'for-you-migration-dismissed';
 
-export default function ForYouScreen({ onWorkspaceMeta, searchQuery = '', resetPath = '/for-you' }) {
+function metaLabels(status, preferences) {
+  const options = [...(status?.taxonomy?.topics || []), ...(status?.taxonomy?.outcomes || [])];
+  const labels = [...(preferences?.topics || []), ...(preferences?.outcomes || [])]
+    .slice(0, 5)
+    .map((id) => options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' '));
+  return labels.length ? labels : ['Balanced mix'];
+}
+
+export default function ForYouScreen({ onWorkspaceMeta, searchQuery = '', resetPath = '/for-you', presentation = 'original' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState(null);
@@ -53,11 +62,7 @@ export default function ForYouScreen({ onWorkspaceMeta, searchQuery = '', resetP
   );
 
   useEffect(() => {
-    const options = [...(status?.taxonomy?.topics || []), ...(status?.taxonomy?.outcomes || [])];
-    const labels = [...(preferences?.topics || []), ...(preferences?.outcomes || [])]
-      .slice(0, 5)
-      .map((id) => options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' '));
-    onWorkspaceMeta?.({ labels: labels.length ? labels : ['Balanced mix'] });
+    onWorkspaceMeta?.({ labels: metaLabels(status, preferences) });
   }, [onWorkspaceMeta, preferences, status]);
 
   const loadFeed = useCallback(async () => {
@@ -389,6 +394,26 @@ export default function ForYouScreen({ onWorkspaceMeta, searchQuery = '', resetP
   if (loading) return <div className="fy-state"><span className="fy-loader" /><h1>Preparing your intelligence mix</h1><p>Balancing freshness, evidence, relevance and useful surprise.</p></div>;
   if (error && !feed) return <div className="fy-state is-error" role="alert"><Icon name="warning" size={28} /><h1>We could not tune this edition</h1><p>{error}</p><button onClick={() => { setError(''); setLoading(true); setLoadAttempt((current) => current + 1); }} type="button">Try again</button></div>;
   if (status && !status.enabled) return <div className="fy-state"><Icon name="sparkle" size={28} /><h1>For You is ready for its pilot</h1><p>The recommendation service is installed but disabled by configuration. Your shared Briefing remains unchanged.</p><button onClick={() => navigate('/home')} type="button">Open Briefing</button></div>;
+
+  if (presentation === 'sampark') return <>
+    {error && <div className="sampark-feedback" role="alert">{error}</div>}
+    {actionNotice && <div className="sampark-feedback" role="status"><span>{actionNotice.message}</span>{actionNotice.action && <button onClick={actionNotice.action} type="button">{actionNotice.label}</button>}<button aria-label="Dismiss message" onClick={() => setActionNotice(null)} type="button"><Icon name="x" size={13} /></button></div>}
+    <SamparkForYouView
+      busyActions={busyActions}
+      items={items}
+      labels={metaLabels(status, preferences)}
+      onEditPreferences={() => setSetupOpen(true)}
+      onHide={hide}
+      onOpen={openDossier}
+      onReact={react}
+      onSave={toggleSave}
+      reviewedCount={reviewed.size}
+      savedKeys={savedKeys}
+      savedReady={savedState.status === 'ready'}
+    />
+    <InterestSetup open={setupOpen} taxonomy={status?.taxonomy} initial={preferences} onClose={() => setSetupOpen(false)} onSkip={useStarterMix} onComplete={completeSetup} />
+    <ArticleModal item={openArticle} onClose={closeDossier} onSave={savedState.status === 'ready' ? toggleSave : undefined} isSaved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} onHide={async (item) => { closeDossier(); await hide(item); }} onVote={react} onSourceOpen={(item) => record('source_open', item, { section: 'dossier' })} onWhyThisStory={(item) => record('why_this_story_open', item, { section: 'dossier' })} />
+  </>;
 
   return (
     <div className="fy-page">

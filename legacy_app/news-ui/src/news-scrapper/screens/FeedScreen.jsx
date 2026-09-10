@@ -14,6 +14,7 @@ import { articleActivityDetail, trackAction } from '../utils/tracking.js';
 import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, publishedTime, reactionIdentity, scoreOf } from '../utils/intelligence.js';
 import '../styles/home-refinement.css';
 import { emptyFilters, applyFilters } from './briefingFilters.js';
+import SamparkBriefingView from '../../sampark/SamparkBriefingView.jsx';
 const HERO_FEED_LIMIT = 5;
 function resolveArticleImage(item) {
   if (!item || typeof item !== 'object') {
@@ -913,6 +914,14 @@ export default function FeedScreen({ capabilities = [], presentation = 'original
 <p className="mt-2 text-slate-400">          Try widening the date range, adding sources, or changing keywords.        </p>
 <button className="btn-dark-secondary mt-4" onClick={() => { setLoading(true); setLoadAttempt((current) => current + 1); }} type="button"><Icon name="refresh" size={14} /> Check again</button>
 </div>;
+  }
+  if (presentation === 'sampark') {
+    return <>
+      {actionFeedback && <div className={actionFeedback.type === 'error' ? 'error-banner' : 'personal-notice'} role={actionFeedback.type === 'error' ? 'alert' : 'status'}><span>{actionFeedback.message}</span>{actionFeedback.action && <button onClick={actionFeedback.action} type="button">{actionFeedback.actionLabel}</button>}<button aria-label="Dismiss message" onClick={() => setActionFeedback(null)} type="button"><Icon name="x" size={13} /></button></div>}
+      <SamparkBriefingView articles={articles} filteredArticles={filteredArticles} filters={filters} setFilters={setFilters} options={options} votes={votes} savedKeys={savedKeys} busyActions={busyActions} onOpen={openDossier} onVote={onVote} onSave={toggleSave} onHide={hideArticle} />
+      <ArticleModal item={openArticle} onClose={closeDossier} onSelect={reviewAllowed ? selectFromDossier : undefined} onHide={hideFromDossier} onSave={toggleSave} isSaved={!!openArticle && savedKeys.has(articleKey(openArticle))} onVote={reactionState.status === 'ready' || reactionState.status === 'stale' ? onVote : undefined} onCorrectRegion={capabilitySet.has('region.correct') ? onCorrectRegion : undefined} />
+      {reviewAllowed && <NameModal open={!!pendingSelect} article={pendingSelect} onClose={() => setPendingSelect(null)} onConfirm={confirmSelect} />}
+    </>;
   }
   return <div className="briefing-home space-y-4 2xl:space-y-5">
 {showPersonalizationNotice && <div className="personalization-toast" role="status"><Icon name="sparkle" size={15} /><span><strong>{personalizationMeta?.viewer_name ? `Personalized for ${personalizationMeta.viewer_name}` : 'Your personalized feed'}</strong><small>Recent reading and saved signals shape the order—not what is available.</small></span><button onClick={() => setShowPersonalizationNotice(false)} type="button" aria-label="Dismiss personalization message"><Icon name="x" size={13} /></button></div>}

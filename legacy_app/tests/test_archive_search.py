@@ -103,6 +103,26 @@ class ExtractedArchiveSearchTests(unittest.TestCase):
         self.assertEqual(correct_source["count"], 1)
         self.assertEqual(correct_source["results"][0]["source"], "Media Desk")
 
+    def test_date_pages_include_all_matches_after_private_hidden_filter(self):
+        records = [
+            {"title": "OLED older", "date": "2026-07-20", "link": "https://test/old"},
+            {"title": "OLED newest", "date": "2026-07-24", "link": "https://test/new"},
+            {"title": "OLED hidden", "date": "2026-07-25", "link": "https://test/hidden"},
+        ]
+        with open(self.archive_path, "w") as file_obj:
+            json.dump(records, file_obj)
+        with (
+            patch.object(main, "get_profile_history_files", return_value=[self.archive_path]),
+            patch.object(main, "filter_viewer_hidden", side_effect=lambda items, *_: [a for a in items if a["title"] != "OLED hidden"]),
+        ):
+            first = main.search_archive(request_from(), query="OLED", from_date=None, to_date=None, target_sites=None, limit=1, offset=0, sort="date_desc")
+            second = main.search_archive(request_from(), query="OLED", from_date=None, to_date=None, target_sites=None, limit=1, offset=1, sort="date_desc")
+        self.assertEqual(first["total"], 2)
+        self.assertTrue(first["has_more"])
+        self.assertEqual(first["results"][0]["title"], "OLED newest")
+        self.assertEqual(second["results"][0]["title"], "OLED older")
+        self.assertFalse(second["has_more"])
+
     def test_invalid_date_returns_clear_error_without_reading_files(self):
         with patch.object(main, "get_profile_history_files") as history_files:
             result = main.search_extracted_intelligence(
