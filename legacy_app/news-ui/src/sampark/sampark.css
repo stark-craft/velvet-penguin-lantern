@@ -436,3 +436,264 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .sampark-dossier-media { min-height: 180px; padding: 10px; }
   .sampark-dossier-img { max-height: 260px; }
 }
+
+/* ========== SAMPARK ALL NEWS (Phase A) ========== */
+.sampark-all-news-page { display: grid; gap: 18px; }
+.sampark-all-news-loading, .sampark-all-news-error { display: grid; place-items: center; gap: 10px; min-height: 240px; padding: 32px 20px; border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
+.sampark-all-news-error { background: var(--surface); border: 1px solid var(--line); }
+.sampark-all-news-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.sampark-all-news-primary { display: grid; gap: 18px; }
+.sampark-all-news-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--primary); }
+.sampark-all-news-section-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.sampark-all-news-count { color: var(--faint); font-size: 12px; }
+.sampark-all-news-live { padding: 2px 8px; border-radius: 12px; background: #ecfdf5; color: #065f46; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.sampark-all-news-hero-grid { display: grid; grid-template-columns: 1.35fr .9fr; gap: 16px; align-items: stretch; }
+.sampark-all-news-hero-side { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sampark-all-news-featured-card, .sampark-all-news-card { overflow: hidden; border-radius: 12px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); display: flex; flex-direction: column; }
+.sampark-all-news-featured-card { min-height: 420px; }
+.sampark-all-news-media { position: relative; display: grid; place-items: center; width: 100%; border: 0; padding: 0; overflow: hidden; background: #f0f2f8; height: 148px; }
+.sampark-all-news-media--featured { height: auto; flex: 1 1 auto; min-height: 260px; aspect-ratio: 16/10; }
+.sampark-all-news-body { padding: 14px 16px; display: flex; flex-direction: column; flex: 1; }
+.sampark-all-news-kicker { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 6px; }
+.sampark-all-news-title-btn { background: transparent; text-align: left; padding: 0; width: 100%; }
+.sampark-all-news-title-btn h4 { margin: 0 0 6px; font-size: 16px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-all-news-featured-card .sampark-all-news-title-btn h4 { font-size: 19px; line-height: 1.3; -webkit-line-clamp: 3; }
+.sampark-all-news-summary { display: -webkit-box; overflow: hidden; margin: 0 0 10px; color: var(--muted); font-size: 14px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.sampark-all-news-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
+.sampark-all-news-stream { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; }
+.sampark-all-news-stream-list { display: grid; gap: 10px; max-height: 460px; overflow-y: auto; padding-right: 4px; }
+.sampark-all-news-stream-item { display: grid; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 8px; background: var(--surface-soft); border: 1px solid transparent; }
+.sampark-all-news-stream-item:hover { border-color: var(--primary); background: #f8f9ff; }
+.sampark-stream-category { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.sampark-stream-title { font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--text); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-stream-meta { color: var(--faint); font-size: 12px; }
+.sampark-all-news-sidebar { display: grid; gap: 16px; align-content: start; }
+.sampark-all-news-latest, .sampark-all-news-filters { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; }
+.sampark-all-news-latest h2, .sampark-all-news-filters h2 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.sampark-all-news-latest-list { display: grid; gap: 10px; }
+.sampark-all-news-latest-item { display: flex; gap: 10px; text-align: left; padding: 8px; border-radius: 8px; background: var(--surface-soft); border: 1px solid transparent; }
+.sampark-all-news-latest-item:hover { border-color: var(--primary); background: #f8f9ff; }
+.sampark-all-news-latest-thumb { width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: #f0f2f8; display: grid; place-items: center; flex: none; }
+.sampark-all-news-latest-thumb img { width: 100%; height: 100%; object-fit: contain; background: #f0f2f8; }
+.sampark-all-news-latest-thumb.is-empty { color: var(--faint); }
+.sampark-all-news-latest-copy { display: grid; gap: 2px; min-width: 0; }
+.sampark-all-news-latest-copy strong { font-size: 13px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-all-news-latest-copy small { color: var(--faint); font-size: 11px; }
+.sampark-all-news-search { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
+.sampark-all-news-search input { flex: 1; border: 0; outline: 0; background: transparent; font-size: 14px; }
+.sampark-all-news-search button { background: transparent; color: var(--faint); display: grid; place-items: center; }
+.sampark-all-news-filter-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--faint); }
+.sampark-all-news-clear { background: transparent; color: var(--primary); font-weight: 600; font-size: 12px; }
+.sampark-all-news-feed { display: grid; gap: 12px; }
+.sampark-all-news-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
+.sampark-all-news-loadmore { display: flex; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.sampark-all-news-empty { display: grid; place-items: center; gap: 10px; padding: 32px 16px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
+.sampark-all-news-empty-text { color: var(--muted); font-size: 13px; text-align: center; padding: 12px; }
+.sampark-all-news-footnote { color: var(--faint); font-size: 12px; text-align: center; }
+@media (max-width: 1100px) {
+  .sampark-all-news-layout { grid-template-columns: 1fr; }
+  .sampark-all-news-hero-grid { grid-template-columns: 1fr; }
+  .sampark-all-news-hero-side { grid-template-columns: 1fr 1fr; }
+  .sampark-all-news-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+
+/* ========== SAMPARK RESEARCH (Phase B) ========== */
+.sampark-research-page { display: grid; gap: 16px; max-width: 1120px; margin: 0 auto; }
+.sampark-research-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.sampark-research-kicker { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.sampark-research-header h1 { margin: 4px 0 6px; font-size: 20px; }
+.sampark-research-header p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 560px; }
+.sampark-research-meta { display: flex; gap: 12px; color: var(--faint); font-size: 12px; flex: none; align-items: center; }
+.sampark-research-search { display: flex; gap: 10px; align-items: center; }
+.sampark-research-query { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.sampark-research-query input { flex: 1; border: 0; outline: 0; background: transparent; font-size: 15px; }
+.sampark-research-clear { background: transparent; color: var(--faint); display: grid; place-items: center; }
+.sampark-research-filters { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.sampark-research-field { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.sampark-research-field input { height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: #fff; min-width: 150px; }
+.sampark-research-field--grow { flex: 1; }
+.sampark-research-field--grow input { min-width: 220px; }
+.sampark-research-status { min-height: 24px; color: var(--muted); font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.sampark-research-status strong { color: var(--text); }
+.sampark-research-loading, .sampark-research-error { display: inline-flex; gap: 8px; align-items: center; }
+.sampark-research-error { color: #9f1239; }
+.sampark-research-error button { background: transparent; color: inherit; font-weight: 700; text-decoration: underline; }
+.sampark-research-results { display: grid; gap: 22px; }
+.sampark-research-group { display: grid; gap: 10px; }
+.sampark-research-group > header { display: flex; align-items: center; gap: 12px; }
+.sampark-research-group > header h2 { margin: 0; font-size: 15px; }
+.sampark-research-group > header span { color: var(--faint); font-size: 12px; }
+.sampark-research-group > header::after { content: ''; height: 1px; flex: 1; background: var(--line); }
+.sampark-research-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+.sampark-research-card { overflow: hidden; border-radius: 12px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); display: flex; flex-direction: column; }
+.sampark-research-card-media { position: relative; display: grid; place-items: center; width: 100%; height: 140px; border: 0; padding: 0; overflow: hidden; background: #f0f2f8; }
+.sampark-research-card-body { padding: 14px 16px; display: flex; flex-direction: column; flex: 1; }
+.sampark-research-card-kicker { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 6px; }
+.sampark-research-card-title { background: transparent; text-align: left; padding: 0; width: 100%; }
+.sampark-research-card-title h4 { margin: 0 0 6px; font-size: 15px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-research-card-summary { display: -webkit-box; overflow: hidden; margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.sampark-research-matches { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.sampark-research-matches em { padding: 2px 8px; border-radius: 12px; background: #eef2ff; color: var(--primary); font-size: 11px; font-style: normal; font-weight: 600; }
+@media (max-width: 720px) {
+  .sampark-all-news-grid { grid-template-columns: 1fr; }
+  .sampark-all-news-hero-side { grid-template-columns: 1fr; }
+}
+
+/* ========== SAMPARK CREATE (Phase D) ========== */
+.sampark-create-page { display: grid; gap: 16px; max-width: 960px; margin: 0 auto; }
+.sampark-create-loading, .sampark-create-denied { display: grid; place-items: center; gap: 10px; min-height: 260px; padding: 32px 20px; border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
+.sampark-create-denied { background: var(--surface); border: 1px solid var(--line); }
+.sampark-create-denied h2 { margin: 0; font-size: 18px; color: var(--text); }
+.sampark-create-denied small { color: var(--faint); font-size: 12px; }
+.sampark-create-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.sampark-create-kicker { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.sampark-create-header h1 { margin: 6px 0 6px; font-size: 22px; line-height: 1.25; }
+.sampark-create-header p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 620px; }
+.sampark-create-meta { display: flex; gap: 10px; color: var(--faint); font-size: 12px; align-items: center; flex: none; }
+.sampark-create-back { display: inline-flex; gap: 6px; align-items: center; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; }
+.sampark-create-feedback { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 8px; background: #eef2ff; color: var(--primary); font-size: 13px; }
+.sampark-create-feedback.is-error { background: #fff1f2; color: #9f1239; border: 1px solid #fecdd3; }
+.sampark-create-feedback button { margin-left: auto; background: transparent; color: inherit; }
+.sampark-create-templates { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+.sampark-create-template { display: grid; gap: 6px; text-align: left; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.sampark-create-template:hover { border-color: var(--primary); background: #f8f9ff; }
+.sampark-create-template-icon { width: 40px; height: 40px; border-radius: 10px; background: #eef2ff; color: var(--primary); display: grid; place-items: center; }
+.sampark-create-template strong { font-size: 15px; }
+.sampark-create-template p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.sampark-create-template small { color: var(--faint); font-size: 11px; }
+.sampark-create-help { padding: 16px; border-radius: 12px; background: var(--surface-soft); border: 1px solid var(--line); }
+.sampark-create-help h3 { margin: 0 0 8px; font-size: 14px; }
+.sampark-create-help ol { margin: 0 0 8px 18px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.sampark-create-footnote { margin: 0; color: var(--faint); font-size: 11px; }
+.sampark-create-workbench { display: grid; gap: 16px; }
+.sampark-create-editor, .sampark-create-preview { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.sampark-create-import { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--surface-soft); }
+.sampark-create-import h3 { margin: 0; font-size: 13px; }
+.sampark-create-drop { display: flex; gap: 10px; align-items: center; }
+.sampark-create-field { display: grid; gap: 4px; font-size: 13px; }
+.sampark-create-field span { color: var(--muted); font-weight: 500; display: flex; gap: 6px; align-items: center; }
+.sampark-create-field input, .sampark-create-field textarea, .sampark-create-field select { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fff; outline: 0; font-size: 14px; }
+.sampark-create-field textarea { resize: vertical; }
+.sampark-create-field small { color: var(--faint); font-size: 11px; }
+.sampark-create-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.sampark-create-cover { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: var(--surface-soft); }
+.sampark-create-cover h4 { margin: 0; font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.sampark-create-cover h4 em { color: #b91c1c; font-style: normal; font-size: 12px; }
+.sampark-create-cover-actions { display: flex; gap: 8px; }
+.sampark-create-cover-meta { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.sampark-create-footer { display: flex; gap: 10px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line); }
+.sampark-create-preview header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.sampark-create-preview header span { color: var(--faint); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.sampark-create-preview header strong { font-size: 14px; }
+.sampark-create-preview-live { padding: 4px 8px; border-radius: 12px; background: #ecfdf5; color: #065f46; font-size: 11px; }
+.sampark-create-preview article { overflow: hidden; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-soft); }
+.sampark-create-preview article.has-image img { width: 100%; max-height: 320px; object-fit: contain; background: #f0f2f8; display: block; }
+.sampark-create-preview-art { display: grid; place-items: center; height: 180px; background: linear-gradient(135deg, #eef2ff, #e0e7ff); color: var(--primary); font-size: 48px; font-weight: 700; position: relative; overflow: hidden; }
+.sampark-create-preview-art i { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 1px solid rgba(20,40,160,.12); }
+.sampark-create-preview-art i:nth-child(2) { width: 80px; height: 80px; }
+.sampark-create-preview-copy { padding: 14px; display: grid; gap: 6px; background: #fff; }
+.sampark-create-preview-copy span { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.sampark-create-preview-copy h2 { margin: 0; font-size: 18px; line-height: 1.3; }
+.sampark-create-preview-copy p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.sampark-create-preview-body { margin-top: 8px; padding: 10px; border-radius: 8px; background: var(--surface-soft); color: var(--muted); font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.sampark-create-preview-copy footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.sampark-create-preview-copy footer small { color: var(--faint); font-size: 12px; }
+.sampark-create-preview-copy footer button { display: inline-flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 20px; background: var(--primary); color: #fff; font-size: 13px; }
+.sampark-create-readiness { display: grid; gap: 6px; padding: 12px; border-radius: 8px; background: #f8f9ff; }
+.sampark-create-readiness strong { font-size: 12px; }
+.sampark-create-readiness span { display: flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.sampark-create-readiness span.done { color: #065f46; }
+@media (max-width: 720px) {
+  .sampark-create-templates { grid-template-columns: 1fr; }
+  .sampark-create-row { grid-template-columns: 1fr; }
+}
+
+/* ========== SAMPARK SAMSUNG NEWS (Phase C) ========== */
+.sampark-samsung-page { display: grid; gap: 18px; }
+.sampark-samsung-loading, .sampark-samsung-error { display: grid; place-items: center; gap: 10px; min-height: 240px; padding: 32px 20px; border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
+.sampark-samsung-error { background: var(--surface); border: 1px solid var(--line); }
+.sampark-samsung-notice { display: flex; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 8px; background: #fff1f2; color: #9f1239; font-size: 13px; }
+.sampark-samsung-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.sampark-samsung-tab { padding: 8px 14px; border-radius: 20px; background: var(--surface-soft); color: var(--muted); font-size: 14px; font-weight: 500; }
+.sampark-samsung-tab.is-active { background: var(--primary); color: #fff; }
+.sampark-samsung-tab small { font-weight: 400; opacity: .8; }
+.sampark-samsung-leadership { display: grid; grid-template-columns: 1fr 280px; gap: 20px; padding: 20px; border-radius: 12px; background: linear-gradient(135deg, #eef2ff, #e0e7ff); border: 1px solid #c7d2fe; }
+.sampark-samsung-kicker { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.sampark-samsung-leadership h2 { margin: 6px 0 8px; font-size: 18px; line-height: 1.3; }
+.sampark-samsung-leadership p { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.sampark-samsung-leadership-media { display: grid; place-items: center; border-radius: 10px; background: var(--surface); overflow: hidden; min-height: 160px; }
+.sampark-samsung-hero { display: grid; grid-template-columns: 1fr 320px; gap: 16px; align-items: start; }
+.sampark-samsung-featured-media { position: relative; width: 100%; min-height: 340px; border-radius: 12px; overflow: hidden; background: #eef2ff center/cover no-repeat; border: 0; padding: 0; display: grid; place-items: end start; text-align: left; }
+.sampark-samsung-featured-overlay { width: 100%; padding: 18px; background: linear-gradient(0deg, rgba(5,9,20,.78) 0%, rgba(5,9,20,.22) 56%, transparent 100%); color: #fff; display: grid; gap: 6px; }
+.sampark-samsung-featured-kicker { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; opacity: .9; }
+.sampark-samsung-featured-overlay h3 { margin: 0; font-size: 20px; line-height: 1.25; }
+.sampark-samsung-featured-overlay small { opacity: .9; font-size: 13px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-samsung-stream { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px; }
+.sampark-samsung-stream h3 { margin: 0 0 10px; font-size: 14px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; }
+.sampark-samsung-stream-list { display: grid; gap: 8px; max-height: 340px; overflow-y: auto; }
+.sampark-samsung-stream-item { display: grid; gap: 2px; text-align: left; padding: 10px; border-radius: 8px; background: var(--surface-soft); border: 1px solid transparent; }
+.sampark-samsung-stream-item:hover { border-color: var(--primary); background: #f8f9ff; }
+.sampark-samsung-stream-category { color: var(--primary); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.sampark-samsung-stream-item strong { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-samsung-stream-item small { color: var(--faint); font-size: 11px; }
+.sampark-samsung-latest { display: grid; gap: 12px; }
+.sampark-samsung-latest header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sampark-samsung-latest header h3 { margin: 0; font-size: 15px; }
+.sampark-samsung-count { color: var(--faint); font-size: 12px; }
+.sampark-samsung-hint { color: var(--faint); font-size: 11px; }
+.sampark-samsung-latest-scroll { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 280px); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.sampark-samsung-latest-card { display: grid; gap: 6px; }
+.sampark-samsung-latest-media { width: 100%; height: 140px; border-radius: 10px; background: #f0f2f8 center/cover no-repeat; border: 1px solid var(--line); display: grid; place-items: center; color: var(--faint); }
+.sampark-samsung-latest-tags { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.sampark-samsung-latest-title { background: transparent; text-align: left; padding: 0; font-size: 14px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-samsung-empty { color: var(--faint); font-size: 13px; }
+.sampark-samsung-contribute { display: flex; justify-content: flex-end; }
+.sampark-empty { display: grid; place-items: center; gap: 8px; padding: 24px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
+@media (max-width: 1100px) {
+  .sampark-samsung-hero { grid-template-columns: 1fr; }
+  .sampark-samsung-leadership { grid-template-columns: 1fr; }
+}
+
+/* ========== SAMPARK REVIEW & APPROVED (Phase D) ========== */
+.sampark-review-section { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.sampark-review-section h3 { margin: 0; font-size: 15px; }
+.sampark-review-internal { gap: 16px; }
+.sampark-review-internal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sampark-review-internal-head p { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 560px; }
+.sampark-review-actions { display: flex; gap: 8px; flex: none; }
+.sampark-review-unlock { display: flex; gap: 12px; padding: 14px; border: 1px solid #c7d2fe; border-radius: 10px; background: #eef2ff; }
+.sampark-review-unlock strong { font-size: 14px; }
+.sampark-review-unlock p { margin: 4px 0 8px; color: var(--muted); font-size: 13px; }
+.sampark-review-unlock-row { display: flex; gap: 8px; }
+.sampark-review-unlock-row input { flex: 1; height: 38px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: #fff; }
+.sampark-review-error { color: #9f1239; font-size: 12px; }
+.sampark-review-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.sampark-review-card { padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); display: grid; gap: 8px; }
+.sampark-review-card-head { display: flex; gap: 8px; align-items: center; font-size: 11px; }
+.sampark-review-badge { padding: 2px 8px; border-radius: 12px; background: var(--primary); color: #fff; font-weight: 700; font-size: 11px; }
+.sampark-review-badge.is-leadership { background: #7c3aed; }
+.sampark-review-badge.is-announcement { background: #059669; }
+.sampark-review-chip { padding: 2px 8px; border-radius: 12px; background: #eef2ff; color: var(--primary); font-size: 11px; }
+.sampark-review-card h4 { margin: 0; font-size: 15px; line-height: 1.35; }
+.sampark-review-summary-text { margin: 0; color: var(--muted); font-size: 13px; }
+.sampark-review-excerpt { margin: 0; color: var(--faint); font-size: 12px; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-review-meta, .sampark-review-cover-hint { color: var(--faint); font-size: 11px; display: flex; gap: 4px; align-items: center; }
+.sampark-review-note { display: grid; gap: 4px; }
+.sampark-review-note span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.sampark-review-note textarea { width: 100%; min-height: 48px; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 13px; resize: vertical; }
+.sampark-review-card-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sampark-review-empty { color: var(--faint); font-size: 13px; }
+.sampark-approval-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.sampark-approval-grid h3 { margin: 0 0 8px; font-size: 14px; display: flex; gap: 6px; align-items: center; }
+.sampark-approval-grid h3 small { color: var(--faint); font-weight: 400; }
+.sampark-approved-list { display: grid; gap: 8px; }
+.sampark-approved-card { padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); display: grid; gap: 4px; }
+.sampark-approved-card strong { font-size: 13px; line-height: 1.35; }
+.sampark-approved-card small { color: var(--faint); font-size: 11px; }
+.sampark-approved-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; background: #eef2ff; color: var(--primary); font-size: 11px; font-weight: 600; width: fit-content; }
+.sampark-approved-card.is-published { border-color: #a7f3d0; background: #ecfdf5; }
+.sampark-workspace-empty-text { color: var(--faint); font-size: 13px; padding: 12px; text-align: center; }
+@media (max-width: 900px) {
+  .sampark-review-grid { grid-template-columns: 1fr; }
+  .sampark-approval-grid { grid-template-columns: 1fr; }
+}

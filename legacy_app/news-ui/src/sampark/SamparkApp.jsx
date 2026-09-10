@@ -7,6 +7,10 @@ import { useSamparkAuth } from './auth/SamparkAuthContext.jsx';
 import SamparkSearchResults from './SamparkSearchResults.jsx';
 import SamparkSettingsModal, { readSamparkSettings } from './SamparkSettingsModal.jsx';
 import SamparkForYou from './SamparkForYou.jsx';
+import SamparkAllNews from './SamparkAllNews.jsx';
+import SamparkResearch from './SamparkResearch.jsx';
+import SamparkSamsungNews from './SamparkSamsungNews.jsx';
+import SamparkCreate from './SamparkCreate.jsx';
 import SamparkLogin from './SamparkLogin.jsx';
 import SamparkFollowing from './SamparkFollowing.jsx';
 import SamparkHidden from './SamparkHidden.jsx';
@@ -20,10 +24,6 @@ import SamparkScheduler from './SamparkScheduler.jsx';
 import SamparkAnalytics from './SamparkAnalytics.jsx';
 import SamparkAccess from './SamparkAccess.jsx';
 import './sampark.css';
-
-const CATEGORIES = ['All', 'AI', 'Devices', 'Compute', 'Robotics', 'Media'];
-const RESEARCH_CATEGORIES = ['All', 'AI', 'Semiconductors', 'Cloud', 'Robotics'];
-const SAMSUNG_CHANNELS = ['SRI-D', 'Local', 'Global'];
 const SEARCH_HISTORY_KEY = 'sampark-search-history-v1';
 const LEGACY_SEARCH_HISTORY_KEY = 'sampark-search-history-v1';
 
@@ -53,29 +53,20 @@ function readSearchHistory() {
   return readSearchHistoryForViewer(null);
 }
 
-function CategoryBar({ items, label }) {
-  const [active, setActive] = useState(items[0]);
-  return <nav aria-label={label} className="category-filters">{items.map((item) => <button aria-current={active === item ? 'page' : undefined} className={`cat-filter${active === item ? ' active' : ''}`} key={item} onClick={() => setActive(item)} type="button">{item}</button>)}</nav>;
-}
-
-function EmptyRegion({ className = '', heading }) {
-  return <section className={`shell-region ${className}`.trim()}><h2>{heading}</h2><div aria-hidden="true" className="shell-region-space" /></section>;
-}
-
 function ForYouStructure() {
   return <SamparkForYou />;
 }
 
 function AllNewsStructure() {
-  return <div className="shell-page"><CategoryBar items={CATEGORIES} label="All News categories" /><div className="news-layout"><div className="primary-news-structure"><EmptyRegion className="feature-structure" heading="Featured News" /><EmptyRegion className="stream-structure" heading="Briefing Stream" /></div><EmptyRegion className="latest-structure" heading="Latest News" /><EmptyRegion className="filters-structure" heading="Apply Filter & Customize View" /><EmptyRegion className="all-news-structure" heading="All News" /></div></div>;
+  return <SamparkAllNews />;
 }
 
 function ResearchStructure() {
-  return <div className="shell-page"><CategoryBar items={RESEARCH_CATEGORIES} label="Research categories" /><EmptyRegion className="research-structure" heading="Research" /></div>;
+  return <SamparkResearch />;
 }
 
 function SamsungStructure() {
-  return <div className="shell-page"><CategoryBar items={SAMSUNG_CHANNELS} label="Samsung News channels" /><div className="news-layout"><div className="primary-news-structure"><EmptyRegion className="feature-structure" heading="SRI-D Highlights" /><EmptyRegion className="stream-structure" heading="Briefing Stream" /></div><EmptyRegion className="latest-structure" heading="SRI-D News" /></div></div>;
+  return <SamparkSamsungNews />;
 }
 
 export default function SamparkApp() {
@@ -227,14 +218,14 @@ export default function SamparkApp() {
             </div>
           )}
         </div>
-        <button className="create-news-btn" type="button" title="Create News — not implemented in this phase"><Icon name="plus" size={16} />Create News</button>
+        <button className="create-news-btn" onClick={() => navigate('/create')} type="button"><Icon name="plus" size={16} />Create News</button>
       </div>
     </header>
     {serviceError && <div className="shell-status is-error" role="alert">{serviceError}</div>}
     {language === 'ko' && (translationState.translating || translationState.error) && <div className={`shell-status${translationState.error ? ' is-error' : ''}`} data-no-translate role={translationState.error ? 'alert' : 'status'}>{translationState.error ? <><span>{translationState.error}</span><button onClick={translationState.retry} type="button">Retry</button></> : <span>{translationState.phase === 'downloading' ? `한국어 번역 준비 중${translationState.downloadProgress === null ? '' : ` · ${translationState.downloadProgress}%`}` : `한국어로 번역 중 · ${translationState.completed}/${translationState.total}`}</span>}</div>}
     <div className="main-card-container">
       <nav aria-label="TechScout sections" className="main-tabs"><NavLink className={tabClass('/for-you')} to="/for-you"><Icon name="sparkle" size={16} />For You</NavLink><NavLink className={tabClass('/all-news')} to="/all-news"><Icon name="globe" size={16} />All News</NavLink><NavLink className={tabClass('/research')} to="/research"><Icon name="file" size={16} />Research</NavLink><NavLink className={tabClass('/samsung-news')} to="/samsung-news"><Icon name="layers" size={16} />Samsung News</NavLink></nav>
-      <main className="content-area" id="news-main-content" tabIndex={-1}><Routes><Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} />} /><Route path="/search" element={query.trim() ? <SamparkSearchResults query={query} /> : <Navigate replace to="/for-you" />} /><Route path="*" element={<Navigate replace to="/for-you" />} /></Routes></main>
+      <main className="content-area" id="news-main-content" tabIndex={-1}><Routes><Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/create" element={<SamparkCreate />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} />} /><Route path="/search" element={query.trim() ? <SamparkSearchResults query={query} /> : <Navigate replace to="/for-you" />} /><Route path="*" element={<Navigate replace to="/for-you" />} /></Routes></main>
     </div>
     <SamparkSettingsModal capabilities={capabilities} onAccessChanged={refreshAccess} onClose={() => setSettingsOpen(false)} onSaved={async (nextSettings, nextViewer) => { setSettings(nextSettings); setViewer(nextViewer); if (auth?.refresh) await auth.refresh(); if (!nextSettings.saveSearchHistory) { setSearchHistory([]); window.localStorage.removeItem(getNamespacedHistoryKey(nextViewer || viewer)); window.localStorage.removeItem(SEARCH_HISTORY_KEY); } else if (nextViewer?.principal) { // refresh namespaced history after viewer change
         setSearchHistory(readSearchHistoryForViewer(nextViewer));
