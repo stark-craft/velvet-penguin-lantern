@@ -208,3 +208,47 @@ html[data-presentation="sampark"][data-theme="dark"] .sp-app .fy-follow-action {
 html[data-presentation="sampark"] .sp-app header.is-settings-only .premium-settings-trigger { border-radius:8px!important; width:40px!important; height:40px!important; min-width:40px!important; min-height:40px!important; background:var(--sp-surface)!important; color:var(--sp-muted)!important; box-shadow:none!important; transform:none!important; }
 html[data-presentation="sampark"] .sp-app header.is-settings-only .premium-settings-trigger::before,html[data-presentation="sampark"] .sp-app header.is-settings-only .premium-settings-trigger::after { display:none!important; }
 @media(max-width:520px) { .sp-workspace-bar > div { display:block; } .sp-workspace-bar .sp-preference-tags { margin:10px 0; } .sp-workspace-bar .sp-preference-tags span { display:inline-block; } }
+
+/* Samsung newsroom: shared publishing and readers within the Sampark shell. */
+.sp-app :is(.samsung-internal-page,.sni-reader-page) { --text:var(--sp-text); --text-secondary:var(--sp-muted); --text-muted:var(--sp-muted); --theme-border:var(--sp-line); --theme-accent:var(--sp-accent); --theme-accent-soft:var(--sp-soft); --theme-faint:var(--sp-bg); --surface:var(--sp-surface); }
+.sp-app :is(.sni-focus-carousel,.sni-wire,.sni-card,.sni-reader-shell) { border-radius:12px; box-shadow:none; }
+.sp-app .sni-wire { background:var(--sp-surface); }
+.sp-app button.sni-wire-card { width:100%; text-align:left; font:inherit; cursor:pointer; }
+.sp-app .sni-primary-row { gap:20px; }
+.sp-app .sni-focus-copy h1 { font-family:inherit; font-size:clamp(1.8rem,3.1vw,3.2rem); letter-spacing:-.04em; line-height:1.12; }
+.sp-app .sni-focus-action { border-radius:8px; }
+.sp-app .sp-samsung-title { border:0; padding:0; background:none; text-align:left; color:inherit; font:inherit; cursor:pointer; }
+.sp-app .sp-samsung-title:hover { color:var(--sp-accent); }
+.sp-app .sp-samsung-archive-heading { display:flex; align-items:end; justify-content:space-between; gap:16px; margin:30px 0 20px; }
+.sp-app .sp-samsung-archive-heading span { color:var(--sp-muted); font-size:12px; }
+.sp-app .sp-samsung-archive-heading h2 { margin:6px 0; font-size:26px; letter-spacing:-.6px; }
+.sp-app .sp-samsung-archive-heading p { margin:0; color:var(--sp-muted); font-size:14px; }
+.sp-app .sni-tabs { border-radius:10px; background:var(--sp-surface); border:1px solid var(--sp-line); }
+.sp-app .sni-tab { border-radius:7px; }
+.sp-app .sni-tab.is-active { color:var(--sp-accent); background:var(--sp-soft); box-shadow:none; }
+.sp-app .sp-samsung-filters { display:flex; gap:12px; flex-wrap:wrap; margin:18px 0; }
+.sp-app .sp-samsung-filters label { display:flex; align-items:center; gap:8px; padding:10px 12px; border:1px solid var(--sp-line); border-radius:8px; background:var(--sp-surface); color:var(--sp-muted); }
+.sp-app .sp-samsung-filters label:first-child { flex:1; min-width:180px; }
+.sp-app .sp-samsung-filters :is(input,select) { border:0; background:transparent; color:var(--sp-text); font:inherit; width:100%; min-width:0; }
+.sp-app .sp-samsung-filters option { background:var(--sp-surface); }
+.sp-app .sp-samsung-filters button { border:0; background:transparent; color:var(--sp-accent); cursor:pointer; }
+.sp-app .sni-reader-back { border-radius:8px; }
+.sp-app .sni-reader-hero-copy h1 { font-family:inherit; font-size:clamp(2rem,4vw,4rem); line-height:1.1; }
+.sp-app .sni-reader-body p { font-family:inherit; }
+@media(max-width:800px) {
+ .sp-app .sni-primary-row { height:auto; grid-template-columns:1fr; }
+ .sp-app .sni-focus-carousel { min-height:480px; }
+ .sp-app .sni-wire { height:400px; }
+ .sp-app .sp-samsung-archive-heading { align-items:start; flex-direction:column; }
+}
+@media(max-width:520px) {
+ .sp-app .sni-focus-carousel { min-height:470px; }
+ .sp-app .sni-tabs { display:flex; width:100%; overflow-x:auto; }
+ .sp-app .sni-tab { flex:1; padding:10px 8px; white-space:nowrap; }
+ .sp-app .sni-tab small { display:none; }
+ .sp-app .sni-tab span { font-size:12px; }
+ .sp-app .sp-samsung-filters label { max-width:100%; }
+}
+
+.sp-app .sni-date-group > header h2 { font-family:inherit; font-size:clamp(19px,2vw,26px); }
+@media(max-width:520px) { .sp-app .sni-tab { min-width:0; gap:5px; } .sp-app .sni-tab svg { display:none; } }

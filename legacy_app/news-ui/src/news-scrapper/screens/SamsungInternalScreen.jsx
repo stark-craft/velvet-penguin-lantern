@@ -12,6 +12,7 @@ import {
   rankTrending, resolveInternalImage, signalLinkOf, signalScope, splitByScope,
 } from '../internal/samsungInternalModel.js';
 import '../styles/samsung-internal.css';
+import { filterSamsungArchive } from '../internal/samsungInternalModel.js';
 
 const HERO_SLIDE_LIMIT = 5;
 const CHANNELS = [
@@ -140,7 +141,7 @@ function channelLabel(item) {
   return 'Samsung Global';
 }
 
-function FocusCarousel({ slides, returnChannel = 'global' }) {
+function FocusCarousel({ slides, returnChannel = 'global', onOpenSignal }) {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
   const [manualPaused, setManualPaused] = useState(false);
@@ -152,7 +153,7 @@ function FocusCarousel({ slides, returnChannel = 'global' }) {
     return () => window.clearTimeout(timer);
   }, [documentVisible, index, manualPaused, reducedMotion, slides.length]);
   if (!slides.length) return null;
-  const active = slides[index];
+  const active = slides[index] || slides[0];
   const article = active.kind === 'signal' ? active.item : null;
   const record = active.kind === 'leadership' ? active.record : null;
   const image = record ? coverUrl(record) : resolveInternalImage(article);
@@ -162,6 +163,7 @@ function FocusCarousel({ slides, returnChannel = 'global' }) {
   const openActive = () => {
     rememberInternalPosition(returnChannel);
     if (record) navigate(`/samsung-internal/leadership/${encodeURIComponent(record.id)}?from=${returnChannel === 'internal' ? 'inside' : returnChannel}`);
+    else if (onOpenSignal) onOpenSignal(article);
     else {
       const link = signalLinkOf(article);
       if (link) window.open(link, '_blank', 'noopener,noreferrer');
@@ -192,7 +194,7 @@ function FocusCarousel({ slides, returnChannel = 'global' }) {
         </div>
         <div className="sni-focus-copy"><h1>{title}</h1><p>{excerptOf(summary, 520) || 'Open this signal for the complete context.'}</p></div>
         <div className="sni-focus-footer">
-          <button className="sni-focus-action" onClick={openActive} type="button"><Icon name={record ? 'file' : 'external'} size={15} /> {record ? 'Read full message' : 'Read at source'}</button>
+          <button className="sni-focus-action" onClick={openActive} type="button"><Icon name={record ? 'file' : 'external'} size={15} /> {record ? 'Read full message' : onOpenSignal ? 'Open dossier' : 'Read at source'}</button>
           <div aria-label="Samsung Focus slides" className="sni-focus-dots" role="tablist">
             {slides.map((slide, dotIndex) => (
               <button aria-label={`Go to Samsung Focus slide ${dotIndex + 1}`} aria-selected={dotIndex === index}
@@ -207,29 +209,30 @@ function FocusCarousel({ slides, returnChannel = 'global' }) {
   );
 }
 
-function WireCard({ item, duplicate = false }) {
+function WireCard({ item, duplicate = false, onOpenSignal }) {
   const image = resolveInternalImage(item);
   const link = signalLinkOf(item);
   const content = <><span className="sni-wire-marker">{channelLabel(item)}</span><div className="sni-wire-copy"><strong>{item.title}</strong><small>{item.source || item.src || 'Samsung intelligence'} · {formatDate(item.published_at || item.first_seen || item.date) || 'Latest'} · {item.source_count || 1} {(item.source_count || 1) === 1 ? 'source' : 'sources'}</small></div><span className={`sni-wire-thumb${image ? '' : ' is-empty'}`}>{image ? <ResilientImage alt="" src={image} /> : <Icon name="layers" size={16} />}</span></>;
   if (duplicate) return <div aria-hidden="true" className={`sni-wire-card is-${item.samsung_internal_channel || 'global'}`}>{content}</div>;
+  if (onOpenSignal) return <button className={`sni-wire-card is-${item.samsung_internal_channel || 'global'}`} onClick={() => onOpenSignal(item)} type="button">{content}</button>;
   return (
     <a className={`sni-wire-card is-${item.samsung_internal_channel || 'global'}`} href={link || undefined} rel="noreferrer" target={link ? '_blank' : undefined}>{content}</a>
   );
 }
 
-function IntelligenceWire({ announcementBusy = '', announcements = [], items, onRemoveAnnouncement, returnChannel = 'global' }) {
+function IntelligenceWire({ announcementBusy = '', announcements = [], items, onRemoveAnnouncement, returnChannel = 'global', onOpenSignal }) {
   return (
     <aside aria-label="Samsung Intelligence Wire" className="sni-wire">
       <header><h2>Live intelligence</h2><i aria-hidden="true" /></header>
       <AnnouncementRail busyId={announcementBusy} items={announcements} onRemove={onRemoveAnnouncement} returnChannel={returnChannel} />
-      {items.length ? <div className="sni-wire-window"><ContinuousSignalStream ariaLabel="Samsung Intelligence Wire" className="sni-continuous-wire" duration={42} items={items} renderItem={(item, index, duplicate) => <WireCard duplicate={duplicate} item={item} key={`${item.id || item.link || item.title}-${index}`} />} /></div>
+      {items.length ? <div className="sni-wire-window"><ContinuousSignalStream ariaLabel="Samsung Intelligence Wire" className="sni-continuous-wire" duration={42} items={items} renderItem={(item, index, duplicate) => <WireCard onOpenSignal={onOpenSignal} duplicate={duplicate} item={item} key={`${item.id || item.link || item.title}-${index}`} />} /></div>
         : <div className="sni-wire-empty"><Icon name="inbox" size={22} /><p>The wire will populate after the unified archive contains Samsung signals.</p></div>}
       <footer><span>Global</span><span>Local</span><span>Inside</span></footer>
     </aside>
   );
 }
 
-function SignalCard({ item }) {
+function SignalCard({ item, onOpenSignal }) {
   const image = resolveInternalImage(item);
   const link = signalLinkOf(item);
   return (
@@ -238,7 +241,7 @@ function SignalCard({ item }) {
         {image ? <ResilientImage alt="" src={image} /> : <span aria-hidden="true"><Icon name="globe" size={22} /></span>}
         <span className={`sni-card-scope sni-chip-scope-${item.samsung_internal_channel || signalScope(item)}`}>{channelLabel(item)}</span>
       </div>
-      <div className="sni-card-body"><h3>{link ? <a href={link} rel="noreferrer" target="_blank">{item.title}</a> : item.title}</h3>{item.summary && <p>{excerptOf(item.summary, 180)}</p>}
+      <div className="sni-card-body"><h3>{onOpenSignal ? <button className="sp-samsung-title" onClick={() => onOpenSignal(item)} type="button">{item.title}</button> : link ? <a href={link} rel="noreferrer" target="_blank">{item.title}</a> : item.title}</h3>{item.summary && <p>{excerptOf(item.summary, 180)}</p>}
         <footer><span>{item.source || item.src || 'Tech press'}</span>{formatDate(item.published_at || item.first_seen || item.date) && <span><Icon name="calendar" size={12} /> {formatDate(item.published_at || item.first_seen || item.date)}</span>}<span className="sni-chip">{item.source_count || 1} {(item.source_count || 1) === 1 ? 'source' : 'sources'}</span></footer>
       </div>
     </article>
@@ -258,8 +261,8 @@ function ContributionCard({ record }) {
   );
 }
 
-function DateGroupedSignals({ items }) {
-  return <div className="sni-date-groups">{groupSignalsByDate(items).map((group) => <section className="sni-date-group" key={group.date}><header><div><span>Daily edition</span><h2>{formatDateHeading(group.date)}</h2></div><small>{group.signals.length} {group.signals.length === 1 ? 'signal' : 'signals'}</small></header><div className="sni-grid">{group.signals.map((item, index) => <SignalCard item={item} key={item.id || item.link || item.title || index} />)}</div></section>)}</div>;
+function DateGroupedSignals({ items, onOpenSignal }) {
+  return <div className="sni-date-groups">{groupSignalsByDate(items).map((group) => <section className="sni-date-group" key={group.date}><header><div><span>Daily edition</span><h2>{formatDateHeading(group.date)}</h2></div><small>{group.signals.length} {group.signals.length === 1 ? 'signal' : 'signals'}</small></header><div className="sni-grid">{group.signals.map((item, index) => <SignalCard onOpenSignal={onOpenSignal} item={item} key={item.id || item.link || item.title || index} />)}</div></section>)}</div>;
 }
 
 function EmptyPanel({ title, copy, action }) {
@@ -270,7 +273,7 @@ function normalizeChannel(items, channel) {
   return normalizeList(items || []).map((item) => ({ ...item, image_url: resolveInternalImage(item), samsung_internal_channel: channel }));
 }
 
-export default function SamsungInternalScreen({ canManageAnnouncements = false, contributionAllowed = false }) {
+export default function SamsungInternalScreen({ canManageAnnouncements = false, contributionAllowed = false, presentation = 'original', onOpenSignal }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [channels, setChannels] = useState({ global: [], local: [], inside: [] });
@@ -281,6 +284,8 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [tab, setTab] = useState(() => channelFromSearch(location.search));
   const [announcementBusy, setAnnouncementBusy] = useState('');
+  const [archiveQuery, setArchiveQuery] = useState('');
+  const [archiveCategory, setArchiveCategory] = useState('all');
   const [announcementFeedback, setAnnouncementFeedback] = useState(null);
 
   useEffect(() => {
@@ -320,6 +325,7 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
 
   const selectChannel = (nextTab) => {
     setTab(nextTab);
+    setArchiveCategory('all');
     navigate({ pathname: '/samsung-internal', search: channelSearch(nextTab) }, { replace: true });
   };
 
@@ -349,12 +355,19 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
       setAnnouncementBusy('');
     }
   } : null;
+  const filteredModel = presentation === 'sampark' ? Object.fromEntries(
+    ['global', 'local', 'inside', 'stories'].map(key => [key, filterSamsungArchive(model[key], { query: archiveQuery, category: archiveCategory })])
+  ) : model;
+  const archiveItems = tab === 'global' ? model.global : tab === 'local' ? model.local : [...model.inside, ...model.stories];
+  const archiveVisible = tab === 'global' ? filteredModel.global : tab === 'local' ? filteredModel.local : [...filteredModel.inside, ...filteredModel.stories];
+  const archiveCategories = [...new Set(archiveItems.map(item => item.category).filter(Boolean))].sort();
   const contributorAction = contributionAllowed ? <button className="btn-dark-secondary" onClick={() => navigate('/for-you/create/contributions')} type="button"><Icon name="plus" size={14} /> Open contributions</button> : null;
   const renderTab = () => {
-    if (tab === 'global') return model.global.length ? <DateGroupedSignals items={model.global.slice(0, 100)} /> : <EmptyPanel copy="The next unified archive run may bring fresh Samsung coverage." title="Nothing on the global wire yet" />;
-    if (tab === 'local') return model.local.length ? <DateGroupedSignals items={model.local.slice(0, 100)} /> : <EmptyPanel copy="This channel accepts records whose configured source is Samsung Local or Samsung India." title="The local desk is quiet" />;
-    if (!model.inside.length && !model.stories.length) return <EmptyPanel action={contributorAction} copy="Sampark signals and approved colleague stories appear here." title="Nothing inside Samsung yet" />;
-    return <div className="sni-inside-stream">{model.inside.length > 0 && <section className="sni-inside-section"><header><span>Sampark stream</span><h2>From inside the company</h2></header><DateGroupedSignals items={model.inside.slice(0, 100)} /></section>}{model.stories.length > 0 && <section className="sni-inside-section"><header><span>Colleague publishing</span><h2>Stories from your teams</h2></header><div className="sni-grid">{model.stories.map((record) => <ContributionCard key={record.id} record={record} />)}</div></section>}</div>;
+    if (presentation === 'sampark' && archiveItems.length && !archiveVisible.length) return <EmptyPanel title="No stories match these filters" copy="Try another search or clear the category." action={<button onClick={() => { setArchiveQuery(''); setArchiveCategory('all'); }} type="button">Clear filters</button>} />;
+    if (tab === 'global') return filteredModel.global.length ? <DateGroupedSignals onOpenSignal={onOpenSignal} items={filteredModel.global.slice(0, 100)} /> : <EmptyPanel copy="The next unified archive run may bring fresh Samsung coverage." title="Nothing on the global wire yet" />;
+    if (tab === 'local') return filteredModel.local.length ? <DateGroupedSignals onOpenSignal={onOpenSignal} items={filteredModel.local.slice(0, 100)} /> : <EmptyPanel copy="This channel accepts records whose configured source is Samsung Local or Samsung India." title="The local desk is quiet" />;
+    if (!filteredModel.inside.length && !filteredModel.stories.length) return <EmptyPanel action={contributorAction} copy="Sampark signals and approved colleague stories appear here." title="Nothing inside Samsung yet" />;
+    return <div className="sni-inside-stream">{filteredModel.inside.length > 0 && <section className="sni-inside-section"><header><span>Sampark stream</span><h2>From inside the company</h2></header><DateGroupedSignals onOpenSignal={onOpenSignal} items={filteredModel.inside.slice(0, 100)} /></section>}{filteredModel.stories.length > 0 && <section className="sni-inside-section"><header><span>Colleague publishing</span><h2>Stories from your teams</h2></header><div className="sni-grid">{filteredModel.stories.map((record) => <ContributionCard key={record.id} record={record} />)}</div></section>}</div>;
   };
 
   if (loading) return <div className="samsung-internal-page"><div aria-live="polite" className="sni-state" role="status"><span className="sni-loader" /><h1>Opening Samsung Internal…</h1><p>Aligning leadership, company notices and the Samsung intelligence wire.</p></div></div>;
@@ -362,10 +375,19 @@ export default function SamsungInternalScreen({ canManageAnnouncements = false, 
   return <div className="samsung-internal-page">
     {publishedError && <section className="sni-published-service-notice" role="alert"><Icon name="warning" size={17} /><div><strong>Published content could not be verified</strong><p>{publishedError} Existing items are kept until a successful refresh.</p></div><button onClick={() => setLoadAttempt((value) => value + 1)} type="button"><Icon name="refresh" size={13} /> Try again</button></section>}
     {announcementFeedback && <p className={`sni-management-feedback is-${announcementFeedback.kind}`} role={announcementFeedback.kind === 'error' ? 'alert' : 'status'}>{announcementFeedback.message}</p>}
-    <section className="sni-primary-row">{model.slides.length ? <FocusCarousel returnChannel={tab} slides={model.slides} /> : <EmptyPanel copy="The unified archive has no Samsung signals yet." title="Samsung Focus is preparing" />}<IntelligenceWire announcementBusy={announcementBusy} announcements={model.announcements} items={model.wire} onRemoveAnnouncement={removeAnnouncement} returnChannel={tab} /></section>
+    <section className="sni-primary-row">{model.slides.length ? <FocusCarousel onOpenSignal={onOpenSignal} returnChannel={tab} slides={model.slides} /> : <EmptyPanel copy="The unified archive has no Samsung signals yet." title="Samsung Focus is preparing" />}<IntelligenceWire onOpenSignal={onOpenSignal} announcementBusy={announcementBusy} announcements={model.announcements} items={model.wire} onRemoveAnnouncement={removeAnnouncement} returnChannel={tab} /></section>
     {!model.leadership && !publishedError && <p className="sni-note" role="note">A published leadership message will take the first Samsung Focus position automatically.</p>}
-    <nav aria-label="Samsung Internal archive channels" className="sni-tabs" role="tablist">{CHANNELS.map((entry) => <button aria-selected={tab === entry.id} className={`sni-tab${tab === entry.id ? ' is-active' : ''}`} key={entry.id} onClick={() => selectChannel(entry.id)} role="tab" type="button"><Icon name={entry.icon} size={15} /><span>{entry.label}</span><small>{counts[entry.id]}</small></button>)}</nav>
-    <section aria-label={`${CHANNELS.find((entry) => entry.id === tab)?.label} archive`} className="sni-panel" role="tabpanel">{renderTab()}</section>
+    {presentation === 'sampark' && <div className="sp-samsung-archive-heading"><div><span>Samsung newsroom</span><h2>Explore the stories</h2><p>Global developments, local news and life inside Samsung.</p></div><span>{archiveVisible.length} of {archiveItems.length} stories</span></div>}
+    <nav aria-label="Samsung Internal archive channels" className="sni-tabs" role="tablist">{CHANNELS.map((entry) => <button aria-selected={tab === entry.id} aria-controls="samsung-archive-panel" id={`samsung-channel-${entry.id}`} tabIndex={tab === entry.id ? 0 : -1} onKeyDown={(event) => {
+      const index = CHANNELS.findIndex(channel => channel.id === entry.id);
+      const next = event.key === 'ArrowRight' ? (index + 1) % CHANNELS.length : event.key === 'ArrowLeft' ? (index + CHANNELS.length - 1) % CHANNELS.length : event.key === 'Home' ? 0 : event.key === 'End' ? CHANNELS.length - 1 : -1;
+      if (next < 0) return;
+      event.preventDefault();
+      selectChannel(CHANNELS[next].id);
+      event.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next]?.focus();
+    }} className={`sni-tab${tab === entry.id ? ' is-active' : ''}`} key={entry.id} onClick={() => selectChannel(entry.id)} role="tab" type="button"><Icon name={entry.icon} size={15} /><span>{entry.label}</span><small>{counts[entry.id]}</small></button>)}</nav>
+    {presentation === 'sampark' && <div className="sp-samsung-filters"><label><Icon name="search" size={16} /><span className="sr-only">Search Samsung archive</span><input type="search" value={archiveQuery} onChange={event => setArchiveQuery(event.target.value)} placeholder="Search this channel" /></label><label><span className="sr-only">Samsung category</span><select aria-label="Samsung category" value={archiveCategory} onChange={event => setArchiveCategory(event.target.value)}><option value="all">All categories</option>{archiveCategories.map(category => <option key={category} value={category}>{category}</option>)}</select></label>{(archiveQuery || archiveCategory !== 'all') && <button onClick={() => { setArchiveQuery(''); setArchiveCategory('all'); }} type="button">Clear filters</button>}</div>}
+    <section id="samsung-archive-panel" aria-labelledby={`samsung-channel-${tab}`} aria-label={`${CHANNELS.find((entry) => entry.id === tab)?.label} archive`} className="sni-panel" role="tabpanel">{renderTab()}</section>
     <footer className="sni-foot"><span>Samsung Internal · curated by your editorial desk</span>{contributionAllowed && <button className="btn-dark-secondary" onClick={() => navigate('/for-you/create/contributions')} type="button"><Icon name="plus" size={14} /> Contribute a story</button>}</footer>
   </div>;
 }

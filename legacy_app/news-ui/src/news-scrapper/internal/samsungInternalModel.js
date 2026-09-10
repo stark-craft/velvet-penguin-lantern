@@ -226,3 +226,11 @@ export function buildHeroSlides({ articles = [], leadership = null, limit = 5 } 
 export function signalLinkOf(item) {
   return textOf(item?.link || item?.url || '').trim();
 }
+
+// Preserve canonical records while narrowing the currently selected archive.
+export function filterSamsungArchive(items, { query = '', category = 'all' } = {}) {
+  const term = String(query).trim().toLocaleLowerCase();
+  return (items || []).filter(item => (!category || category === 'all' || item.category === category)
+    && (!term || [item.title, item.summary, item.body, item.author, item.source, item.src, item.category]
+      .some(value => String(value || '').toLocaleLowerCase().includes(term))));
+}

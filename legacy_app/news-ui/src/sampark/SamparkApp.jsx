@@ -9,6 +9,8 @@ import { useLanguage } from '../news-scrapper/translation/LanguageProvider.jsx';
 import { useTracking } from '../news-scrapper/utils/tracking.js';
 import '../news-scrapper/for-you/for-you-workspace.css';
 
+const SamsungNewsScreen = lazy(() => import('./SamsungNewsScreen.jsx'));
+const SamsungInternalReaderScreen = lazy(() => import('../news-scrapper/screens/SamsungInternalReaderScreen.jsx'));
 const FeedScreen = lazy(() => import('../news-scrapper/screens/FeedScreen.jsx'));
 const FollowingScreen = lazy(() => import('../news-scrapper/for-you/FollowingScreen.jsx'));
 const RejectedScreen = lazy(() => import('../news-scrapper/screens/RejectedScreen.jsx'));
@@ -124,12 +126,16 @@ export default function SamparkApp() {
     </header>
     {(identityError || accessError) && <div className="sp-service-error" role="alert"><span>{identityError || accessError}</span><button onClick={() => setAttempt(value => value + 1)} type="button">Retry profile and access</button></div>}
     <div className="sp-main-card">
-      <nav className="sp-tabs" aria-label="TechScout sections"><NavLink to="/for-you"><Icon name="sparkle" size={18} />For You</NavLink><NavLink to="/home"><Icon name="globe" size={18} />All News</NavLink><a href="/research"><Icon name="file" size={18} />Research</a><a href="/samsung-internal"><Icon name="layers" size={18} />Samsung News</a></nav>
+      <nav className="sp-tabs" aria-label="TechScout sections"><NavLink to="/for-you"><Icon name="sparkle" size={18} />For You</NavLink><NavLink to="/home"><Icon name="globe" size={18} />All News</NavLink><a href="/research"><Icon name="file" size={18} />Research</a><NavLink to="/samsung-internal"><Icon name="layers" size={18} />Samsung News</NavLink></nav>
       <main id="news-main-content" className="sp-content" tabIndex={-1}>
         <div className="sp-workspace-bar"><div>{isForYou ? <><strong>Your preferences</strong><div className="sp-preference-tags">{meta.labels.map(label => <span key={label}>{label}</span>)}</div><button onClick={() => navigate('/for-you?edit=interests')}>Edit preferences<Icon name="chevR" size={14} /></button></> : <strong>{isNews ? 'The shared briefing' : 'Your workspace'}</strong>}</div><NavLink to="/for-you/following"><Icon name="bookmark" size={15} />Saved & Following</NavLink></div>
         <Suspense fallback={<div className="fy-state" role="status">Opening workspace…</div>}><Routes key={revision}>
           <Route path="/" element={<Navigate to="/for-you" replace />} /><Route path="/index.html" element={<Navigate to="/for-you" replace />} />
           <Route path="/for-you" element={<ForYouScreen onWorkspaceMeta={setMeta} searchQuery={search} resetPath="/sampark/for-you" />} />
+          <Route path="/samsung-internal" element={<SamsungNewsScreen canManageAnnouncements={has('review.contributions.publish')} contributionAllowed={has('contributions.create')} />} />
+          <Route path="/samsung-internal/leadership/:id" element={<SamsungInternalReaderScreen kind="leadership" />} />
+          <Route path="/samsung-internal/announcement/:id" element={<SamsungInternalReaderScreen kind="announcement" />} />
+          <Route path="/samsung-internal/story/:id" element={<SamsungInternalReaderScreen kind="story" />} />
           <Route path="/home" element={<FeedScreen presentation="sampark" capabilities={capabilities || []} />} />
           <Route path="/for-you/following" element={<FollowingScreen />} /><Route path="/saved/*" element={<Navigate to="/for-you/following" replace />} />
           <Route path="/rejected" element={<RejectedScreen />} /><Route path="/history" element={<HistoryScreen reviewAllowed={has('review.news.submit')} />} /><Route path="/voc" element={<VocScreen />} />
@@ -140,7 +146,7 @@ export default function SamparkApp() {
           <Route path="/director-analytics" element={gate(['analytics.view'], <AnalyticsScreen />)} />
           <Route path="/gatekeeper-review" element={gate(['gatekeeper.review'], <GatekeeperScreen />)} />
           <Route path="/access-management" element={gate(['access.manage'], <AccessManagementScreen />)} />
-          {['/research','/samsung-internal','/scan','/for-you/create','/for-you/create/contributions'].map(path => <Route key={path} path={path} element={<ExistingScreen path={path} />} />)}
+          {['/research','/scan','/for-you/create','/for-you/create/contributions'].map(path => <Route key={path} path={path} element={<ExistingScreen path={path} />} />)}
           <Route path="*" element={<div className="sp-not-found"><h1>Page not found</h1><Link to="/for-you">Return to For You</Link></div>} />
         </Routes></Suspense>
       </main>
