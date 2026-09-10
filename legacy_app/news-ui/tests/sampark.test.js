@@ -24,8 +24,11 @@ test('Sampark first milestone contains only the signed-off structural shell', ()
   assert.match(app, /All News/);
   assert.match(app, /Research/);
   assert.match(app, /Samsung News/);
-  assert.match(app, /Briefing Stream/);
-  assert.match(app, /SRI-D/);
+  assert.match(app, /SamparkAllNews|AllNewsStructure/);
+  assert.match(app, /SamparkResearch|ResearchStructure/);
+  assert.match(app, /SamparkSamsungNews|SamsungStructure/);
+  // Final surfaces replace lightweight shell regions with real implementations
+  assert.match(app, /SamparkForYou/);
   assert.doesNotMatch(app, /sampark-header|sampark-nav/);
 });
 
@@ -34,6 +37,10 @@ test('Sampark shell mounts only allowed Search/Settings integrations and viewer 
   assert.match(app, /SamparkSearchResults/);
   assert.match(app, /SamparkSettingsModal/);
   assert.match(app, /SamparkForYou/);
+  assert.match(app, /SamparkAllNews/);
+  assert.match(app, /SamparkResearch/);
+  assert.match(app, /SamparkSamsungNews/);
+  assert.match(app, /SamparkCreate/);
   assert.match(app, /getViewerProfile/);
   assert.match(app, /getAccessCapabilities/);
   assert.match(app, /getRecommendationStatus/);
@@ -44,7 +51,11 @@ test('Sampark shell mounts only allowed Search/Settings integrations and viewer 
   assert.doesNotMatch(app, /UserProfileModal|ArticleModal|Dossier/);
   assert.doesNotMatch(app, /TopBar|theme-toggle|setTheme/);
   assert.doesNotMatch(app, /fetch\(|https?:\/\//);
-  assert.match(app, /shell-region-space/);
+  // Final surfaces replace lightweight shell placeholders with real implementations
+  assert.match(read('../src/sampark/SamparkAllNews.jsx'), /getSharedBriefing|getLatestBriefing/);
+  assert.match(read('../src/sampark/SamparkResearch.jsx'), /searchExtractedIntelligence/);
+  assert.match(read('../src/sampark/SamparkSamsungNews.jsx'), /getSamsungInternalFeed|getPublishedInternalContent/);
+  assert.match(read('../src/sampark/SamparkCreate.jsx'), /createContributionDraft|submitContributionDraft/);
   assert.match(read('../src/sampark/SamparkSearchResults.jsx'), /searchExtractedIntelligence/);
   assert.match(read('../src/sampark/SamparkSearchResults.jsx'), /groupedByDate/);
   assert.match(read('../src/sampark/SamparkSettingsModal.jsx'), /updateViewerProfile|pauseViewerPersonalization/);
@@ -262,4 +273,93 @@ test('Sampark fresh viewer onboarding, search isolation, privacy and persistent 
   assert.match(router, /news_read/);
   assert.match(router, /likes/);
   assert.match(forYou, /activity\.news_read\.today/);
+});
+
+test('Sampark All News is functional with real briefing APIs and Sampark-native presentation', () => {
+  const app = read('../src/sampark/SamparkApp.jsx');
+  assert.match(app, /path="\/all-news"/);
+  assert.match(app, /SamparkAllNews/);
+  const allNews = read('../src/sampark/SamparkAllNews.jsx');
+  assert.match(allNews, /getSharedBriefing|getLatestBriefing/);
+  assert.match(allNews, /getPublishedInternalContent/);
+  assert.match(allNews, /Featured News|Briefing Stream|Latest News|All News/);
+  assert.match(allNews, /categoryMatches|CATEGORIES/);
+  assert.match(allNews, /visibleCount|Load more/);
+  assert.match(allNews, /SamparkAllNewsDossier|sampark-dossier/);
+  assert.match(allNews, /setViewerReaction|saveArticleForLater|hideArticleForViewer/);
+  assert.match(allNews, /sampark-all-news-page|sampark-all-news-hero-grid/);
+  assert.match(allNews, /object-fit:\s*contain|sampark-card-img/);
+  assert.doesNotMatch(allNews, /FeedScreen|fetch\(.*briefing\/shared/);
+  assert.match(read('../src/sampark/sampark.css'), /sampark-all-news-page/);
+});
+
+test('Sampark Research is Sampark-native archive search with real intelligence APIs', () => {
+  const app = read('../src/sampark/SamparkApp.jsx');
+  assert.match(app, /path="\/research"/);
+  assert.match(app, /SamparkResearch/);
+  const research = read('../src/sampark/SamparkResearch.jsx');
+  assert.match(research, /searchExtractedIntelligence/);
+  assert.match(research, /Research.*extracted intelligence|Investigate the retained archive/);
+  assert.match(research, /From|To|Source filter|target_sites/);
+  assert.match(research, /sampark-research-page|sampark-research-grid/);
+  assert.match(research, /SamparkResearchDossier|sampark-dossier/);
+  assert.match(research, /setViewerReaction|saveArticleForLater|hideArticleForViewer/);
+  assert.doesNotMatch(research, /ResearchScreen|getVentureDiscovery|venture-lens/);
+  assert.match(read('../src/sampark/sampark.css'), /sampark-research-page/);
+});
+
+test('Sampark Samsung News uses real Samsung feed and published internal content', () => {
+  const app = read('../src/sampark/SamparkApp.jsx');
+  assert.match(app, /path="\/samsung-news"/);
+  assert.match(app, /SamparkSamsungNews/);
+  const samsung = read('../src/sampark/SamparkSamsungNews.jsx');
+  assert.match(samsung, /getSamsungInternalFeed/);
+  assert.match(samsung, /getPublishedInternalContent/);
+  assert.match(samsung, /SRI-D|Local|Global/);
+  assert.match(samsung, /Briefing Stream|SRI-D News|Samsung News/);
+  assert.match(samsung, /sampark-samsung-page|sampark-samsung-hero/);
+  assert.match(samsung, /SamparkSamsungDossier|sampark-dossier/);
+  assert.match(samsung, /isSamsungSignal|splitByScope|rankTrending/);
+  assert.match(read('../src/sampark/sampark.css'), /sampark-samsung-page/);
+});
+
+test('Sampark Create News workflow is capability-gated with templates, preview and real submission', () => {
+  const app = read('../src/sampark/SamparkApp.jsx');
+  assert.match(app, /path="\/create"/);
+  assert.match(app, /SamparkCreate/);
+  assert.match(app, /navigate\('\/create'\)|navigate\("\/create"\)/);
+  const create = read('../src/sampark/SamparkCreate.jsx');
+  assert.match(create, /getContributionAccess|getAccessCapabilities/);
+  assert.match(create, /createContributionDraft|updateContributionDraft|uploadContributionCover|submitContributionDraft|importContributionDocument/);
+  assert.match(create, /TEMPLATES|Story.*Leadership.*Announcement/);
+  assert.match(create, /Preview|previewOpen|sampark-create-preview/);
+  assert.match(create, /CONTRIBUTION_LIMITS|validateCoverFile|validateCoverDimensions/);
+  assert.match(create, /Save draft|Submit for approval/);
+  assert.match(create, /sampark-create-page|sampark-create-template/);
+  assert.match(read('../src/sampark/sampark.css'), /sampark-create-page/);
+});
+
+test('Sampark Review Center integrates contribution approval and Approved reflects published', () => {
+  const review = read('../src/sampark/SamparkReview.jsx');
+  assert.match(review, /getInternalReviewQueue|publishInternalContent|requestInternalContentChanges|rejectInternalContent/);
+  assert.match(review, /Approve & publish|Send Back|Reject/);
+  assert.match(review, /getWorkflow/);
+  const approved = read('../src/sampark/SamparkApproved.jsx');
+  assert.match(approved, /getPublishedInternalContent/);
+  assert.match(approved, /Published Internal|Approved Briefing/);
+});
+
+test('Sampark routing stays inside /sampark and four primary tabs remain', () => {
+  const app = read('../src/sampark/SamparkApp.jsx');
+  for (const route of ['/for-you', '/all-news', '/research', '/samsung-news', '/create', '/search', '/login', '/following', '/hidden', '/history', '/voc', '/review', '/approved', '/gatekeeper', '/sources', '/scheduler', '/analytics', '/access']) {
+    assert.match(app, new RegExp(`path="${route}"`));
+  }
+  assert.doesNotMatch(app, /href="\/rejected"|href="\/selected"|href="\/approved"[^"]|href="\/history"[^a]/);
+  assert.doesNotMatch(app, /navigate\("\/rejected"|navigate\("\/history"|navigate\("\/voc"/);
+  assert.match(app, /to="\/for-you".*For You/s);
+  assert.match(app, /to="\/all-news".*All News/s);
+  assert.match(app, /to="\/research".*Research/s);
+  assert.match(app, /to="\/samsung-news".*Samsung News/s);
+  assert.match(app, /create-news-btn/);
+  assert.doesNotMatch(app, /SamparkForYouView|SamparkBriefingView|SamsungNewsScreen/);
 });
