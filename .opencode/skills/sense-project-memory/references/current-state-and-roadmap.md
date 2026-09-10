@@ -498,3 +498,29 @@ working. Work only in legacy_app and preserve unrelated changes.
 - The Research Observatory gateway and every backend provider/data contract
   remain unchanged. This was deliberately a presentation and navigation pass,
   not a discovery-pipeline rewrite.
+
+## 2026-09-10: Sampark news flow release checkpoint
+
+- The second frontend entry at `/sampark/` now supports For You, All News,
+  Saved & Following, Hidden Signals, archive, feedback and capability-gated
+  operational tools. Original routes retain their presentation.
+- Sampark reuses the authoritative screens, APIs, article dossier, counted
+  reactions, private follow/hide, interest wizard, profile modal, and Settings.
+  Its role-key login/logout uses the existing HttpOnly privileged session.
+  Network access grants remain server-enforced; no corpus/profile split.
+- All News exposes search and region/category/source/date filters above the
+  briefing, plus optional signal/freshness/coverage/image/keyword/vertical and
+  review-status facets. Sampark applies filters to its hero, stream and grid.
+  The stream heading is `Briefing Stream`.
+- Appearance persists under `sampark-theme`, separate from the original UI.
+  The local browser Korean translator completed live article translation and
+  English rollback was verified. The installed Marian fallback is preserved.
+- Fixed unchanged-name saves during legacy IP-to-browser profile migration;
+  uniqueness remains enforced against other browsers. Current IP is returned
+  only in the requesting viewer's profile response.
+- Verified: 113 frontend tests, 212 backend tests, production build, FastAPI
+  production entry, desktop light/dark and 390px QA, counted reactions across
+  routes, follow/unfollow, private hide/restore, interest save and profile save.
+- User next requested: publish this checkpoint to the already-public GitHub
+  repository, then start Sampark Samsung Internal. Research and Create remain
+  excluded from that next visual pass.

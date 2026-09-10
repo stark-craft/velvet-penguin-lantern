@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 
 const BACKEND = 'http://127.0.0.1:8000';
 
@@ -45,8 +46,26 @@ const proxy = Object.fromEntries(
   ])
 );
 
+const samparkEntry = {
+  name: 'sampark-entry',
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      if (req.method === 'GET' && String(req.headers.accept || '').includes('text/html') && /^\/sampark(?:\/|\?|$)/.test(req.url || '')) req.url = '/sampark/index.html';
+      next();
+    });
+  },
+};
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), samparkEntry],
+  build: {
+    rollupOptions: {
+      input: {
+        original: fileURLToPath(new URL('./index.html', import.meta.url)),
+        sampark: fileURLToPath(new URL('./sampark/index.html', import.meta.url)),
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy,

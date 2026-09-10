@@ -12,6 +12,21 @@ from tests.asgi_harness import request as asgi_request
 
 
 class FrontendDeploymentTests(unittest.TestCase):
+    def test_sampark_deep_links_use_separate_entry_and_do_not_replace_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            dist = Path(directory)
+            (dist / "index.html").write_text("original", encoding="utf-8")
+            (dist / "sampark").mkdir()
+            sampark_index = dist / "sampark" / "index.html"
+            sampark_index.write_text("sampark", encoding="utf-8")
+            with patch.object(composition, "abs_frontend_path", str(dist)):
+                for path in ("sampark", "sampark/for-you", "sampark/index.html"):
+                    response = composition.serve_react_app(path)
+                    self.assertEqual(Path(response.path), sampark_index)
+                    self.assertIn("no-cache", response.headers["cache-control"])
+                self.assertEqual(Path(composition.serve_root().path), dist / "index.html")
+                self.assertEqual(Path(composition.serve_react_app("research").path), dist / "index.html")
+
     def test_frontend_dist_auto_detects_source_and_portable_layouts(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

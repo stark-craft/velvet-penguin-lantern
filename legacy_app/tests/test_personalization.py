@@ -1,6 +1,7 @@
 import datetime as dt
 import tempfile
 import unittest
+from unittest.mock import patch
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -133,7 +134,9 @@ class PersonalizationTests(unittest.TestCase):
                     for index in range(80)
                 ]
                 self.assertTrue(all(future.result() for future in futures))
-            summary = service.summary("viewer-a", "default")
+            # Read the concurrent events at their fixture clock, before retention expires.
+            with patch("news_scrapper.personalization._utcnow", return_value=NOW + dt.timedelta(seconds=80)):
+                summary = service.summary("viewer-a", "default")
 
         self.assertEqual(summary["event_count"], 80)
 

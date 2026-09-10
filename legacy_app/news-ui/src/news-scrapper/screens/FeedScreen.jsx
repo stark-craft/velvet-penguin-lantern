@@ -11,22 +11,9 @@ import useAutoplayState, { autoplayDelay } from '../hooks/useAutoplayState.js';
 import { correctRegion, getLatestBriefing, getSharedBriefing, getViewerHidden, getViewerReactions, getViewerSaved, getWorkflow, hideArticleForViewer, rejectArticle, removeSavedArticle, saveArticleForLater, selectWorkflow, setViewerReaction } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
 import { articleActivityDetail, trackAction } from '../utils/tracking.js';
-import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, matchesKeyword, publishedTime, reactionIdentity, scoreOf } from '../utils/intelligence.js';
+import { articleKey, briefingLensOptions, groupedByDatePreservingOrder, keywordOptions, matchesBriefingLens, publishedTime, reactionIdentity, scoreOf } from '../utils/intelligence.js';
 import '../styles/home-refinement.css';
-const emptyFilters = {
-  query: '',
-  scope: 'all',
-  region: 'all',
-  category: 'all',
-  source: 'all',
-  date: 'all',
-  signal: 'all',
-  fresh: 'all',
-  cluster: 'all',
-  image: 'all',
-  selected: 'all',
-  keyword: 'all'
-};
+import { emptyFilters, applyFilters } from './briefingFilters.js';
 const HERO_FEED_LIMIT = 5;
 function resolveArticleImage(item) {
   if (!item || typeof item !== 'object') {
@@ -84,81 +71,6 @@ function getHeroFeed(items) {
     .filter(item => !used.has(stableSignalKey(item)))
     .slice(0, HERO_FEED_LIMIT - globalLeaders.length - personalLeaders.length);
   return [...globalLeaders, ...personalLeaders, ...remainder].slice(0, HERO_FEED_LIMIT);
-}
-function matchesQuery(item, query) {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const haystack = [item.title, item.summary, item.src, item.source, item.category, item.region, ...(item.keywords_found || []), ...(item.keywords || [])].join(' ').toLowerCase();
-  return haystack.includes(q);
-}
-function articleScopes(item) {
-  const values = [
-    item.vertical,
-    item.legacy_profile,
-    item.profile,
-    ...(Array.isArray(item.verticals) ? item.verticals : []),
-  ].map(value => String(value || '').trim().toLowerCase()).filter(Boolean);
-  const category = String(item.category || '').toLowerCase();
-  const scopes = new Set();
-  if (values.some(value => value.includes('broadcast')) || /broadcast|cable|dth|television|media distribution/.test(category)) {
-    scopes.add('broadcast');
-  }
-  if (values.some(value => value === 'technology' || value === 'default' || value === 'tech')) {
-    scopes.add('technology');
-  }
-  if (!scopes.size) scopes.add('technology');
-  return scopes;
-}
-function applyFilters(items, filters, selectedIds) {
-  return items.filter(item => {
-    if (!matchesQuery(item, filters.query)) {
-      return false;
-    }
-    if (filters.scope !== 'all' && !articleScopes(item).has(filters.scope)) {
-      return false;
-    }
-    if (filters.region !== 'all' && item.region !== filters.region) {
-      return false;
-    }
-    if (filters.category !== 'all' && item.category !== filters.category) {
-      return false;
-    }
-    if (filters.source !== 'all' && (item.src || item.source) !== filters.source) {
-      return false;
-    }
-    if (filters.date !== 'all' && item.date !== filters.date) {
-      return false;
-    }
-    if (filters.signal === 'high' && scoreOf(item) < 80) {
-      return false;
-    }
-    if (filters.signal === 'normal' && scoreOf(item) >= 80) {
-      return false;
-    }
-    if (filters.fresh === 'fresh' && !item.is_fresh) {
-      return false;
-    }
-    if (filters.cluster === 'multi' && (item.source_count || 1) <= 1) {
-      return false;
-    }
-    if (filters.image === 'with' && !item.image_url) {
-      return false;
-    }
-    if (filters.image === 'without' && item.image_url) {
-      return false;
-    }
-    if (!matchesKeyword(item, filters.keyword)) {
-      return false;
-    }
-    const isSelected = selectedIds.has(item.id) || selectedIds.has(item.title) || item.selected_by;
-    if (filters.selected === 'selected' && !isSelected) {
-      return false;
-    }
-    if (filters.selected === 'unselected' && isSelected) {
-      return false;
-    }
-    return true;
-  });
 }
 function topKeywords(items, limit = 5) {
   const map = new Map();
@@ -329,7 +241,7 @@ function BriefingStream({
   const stream = sortByDate(articles).slice(0, 10);
   return <aside aria-label="Briefing Stream" className="briefing-stream-panel briefing-wire">
     <header>
-      <h2>Live briefing</h2>
+      <h2>Briefing Stream</h2>
       <i aria-hidden="true" />
     </header>
     <div className="briefing-wire-window">
@@ -453,7 +365,8 @@ function SearchLoadedBriefing({
   setFilters,
   options,
   count,
-  total
+  total,
+  extended = false
 }) {
   const update = (key, value) => {
     setFilters(previous => ({
@@ -472,16 +385,28 @@ function SearchLoadedBriefing({
 </div>
 <button className="btn-dark-secondary h-9" onClick={reset} type="button">          Reset filters        </button>
 </div>
+{extended && <label className="sp-filter-search">Search this briefing<input className="dark-input" type="search" value={filters.query} onChange={event => update('query', event.target.value)} placeholder="Headline, source or topic" /></label>}
 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-<select className="dark-input" value={filters.region} onChange={event => update('region', event.target.value)}>
+<select aria-label="Region" className="dark-input" value={filters.region} onChange={event => update('region', event.target.value)}>
 <option value="all">            All Regions          </option>          {options.regions.map(region => <option key={region} value={region}>              {region}            </option>)}        </select>
-<select className="dark-input" value={filters.category} onChange={event => update('category', event.target.value)}>
+<select aria-label="Category" className="dark-input" value={filters.category} onChange={event => update('category', event.target.value)}>
 <option value="all">            All Categories          </option>          {options.categories.map(category => <option key={category} value={category}>              {category}            </option>)}        </select>
-<select className="dark-input" value={filters.source} onChange={event => update('source', event.target.value)}>
+<select aria-label="Source" className="dark-input" value={filters.source} onChange={event => update('source', event.target.value)}>
 <option value="all">            All Sources          </option>          {options.sources.map(source => <option key={source} value={source}>              {source}            </option>)}        </select>
-<select className="dark-input" value={filters.date} onChange={event => update('date', event.target.value)}>
+<select aria-label="Date" className="dark-input" value={filters.date} onChange={event => update('date', event.target.value)}>
 <option value="all">            All Dates          </option>          {options.dates.map(date => <option key={date} value={date}>              {date}            </option>)}        </select>
 </div>
+{extended && <details className="sp-more-filters"><summary>More filters</summary><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+{[
+ ['scope', 'Content vertical', [['all','All verticals'],['technology','Technology'],['broadcast','Broadcast']]],
+ ['signal', 'Signal strength', [['all','All strengths'],['high','High signal'],['normal','Standard signal']]],
+ ['fresh', 'Freshness', [['all','All stories'],['fresh','Newly discovered']]],
+ ['cluster', 'Coverage', [['all','Any coverage'],['multi','Multiple sources']]],
+ ['image', 'Images', [['all','Any imagery'],['with','With image'],['without','Without image']]],
+ ['selected', 'Review status', [['all','Any status'],['selected','Selected for review'],['unselected','Not selected']]],
+ ['keyword', 'Matched keyword', [['all','All keywords'], ...options.keywords.map(({value, count}) => [value,`${value} (${count})`])]],
+].map(([key,label,values]) => <label key={key}>{label}<select aria-label={label} className="dark-input" value={filters[key]} onChange={event => update(key,event.target.value)}>{values.map(([value,text]) => <option key={value} value={value}>{text}</option>)}</select></label>)}
+</div></details>}
 </section>;
 }
 function ImageFeedCard({
@@ -540,7 +465,7 @@ function ImageFeedCard({
 </div>
 </article>;
 }
-export default function FeedScreen({ capabilities = [] }) {
+export default function FeedScreen({ capabilities = [], presentation = 'original' }) {
   const capabilitySet = useMemo(() => new Set(capabilities), [capabilities]);
   const reviewAllowed = capabilitySet.has('review.news.submit');
   const workflowVisible = reviewAllowed || capabilitySet.has('review.news.view') || capabilitySet.has('review.news.approve') || capabilitySet.has('approved.view');
@@ -671,7 +596,8 @@ export default function FeedScreen({ capabilities = [] }) {
   const lenses = useMemo(() => briefingLensOptions(articles), [articles]);
   const lensArticles = useMemo(() => articles.filter(item => matchesBriefingLens(item, activeLens)), [activeLens, articles]);
   const filteredArticles = useMemo(() => applyFilters(lensArticles, filters, selectedIds), [filters, lensArticles, selectedIds]);
-  const heroFeed = useMemo(() => getHeroFeed(lensArticles), [lensArticles]);
+  const stageArticles = presentation === 'sampark' ? filteredArticles : lensArticles;
+  const heroFeed = useMemo(() => getHeroFeed(stageArticles), [stageArticles]);
   const heroFeedKeys = useMemo(() => new Set(heroFeed.map(stableSignalKey).filter(Boolean)), [heroFeed]);
   const groups = useMemo(() => groupedByDatePreservingOrder(filteredArticles), [filteredArticles]);
   const selectedBatch = useMemo(() => articles.filter(item => checked[articleKey(item)]), [articles, checked]);
@@ -993,17 +919,18 @@ export default function FeedScreen({ capabilities = [] }) {
 {actionFeedback && <div className={actionFeedback.type === 'error' ? 'error-banner' : 'personal-notice'} role={actionFeedback.type === 'error' ? 'alert' : 'status'}><span>{actionFeedback.message}</span>{actionFeedback.action && <button className="ml-3 underline" onClick={actionFeedback.action} type="button">{actionFeedback.actionLabel}</button>}<button aria-label="Dismiss message" className="ml-3" onClick={() => setActionFeedback(null)} type="button"><Icon name="x" size={13} /></button></div>}
 {Object.values(supportingState).includes('error') && <div className="error-banner" role="status"><span>Some personal state could not be verified. Save or Review Queue actions stay disabled where their current state is unknown.</span><button className="ml-3 underline" onClick={retrySupportingState} type="button">Retry personal state</button></div>}
 {['error', 'stale'].includes(reactionState.status) && <div className="error-banner" role="status"><span>{reactionState.status === 'stale' ? 'Showing last-known reaction totals while the count service reconnects.' : `${reactionState.error} Counts are hidden rather than shown as zero.`}</span><button className="ml-3 underline" onClick={() => setReactionLoadAttempt((current) => current + 1)} type="button">Retry reaction totals</button></div>}
+{presentation === 'sampark' && <SearchLoadedBriefing extended filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={lensArticles.length} />}
 <section className="briefing-stage grid gap-4 2xl:gap-5">
 <div className="briefing-top-row briefing-hero-row grid min-h-0 gap-4 2xl:gap-5">
 <div className="briefing-hero-stack">
 <TopClusterCarousel articles={heroFeed} onOpen={openDossier} />
 <BriefingLensRail activeLens={activeLens} lenses={lenses} onLens={selectLens} />
 </div>
-<BriefingStream articles={lensArticles} onOpen={openDossier} navigate={navigate} />
+<BriefingStream articles={stageArticles} onOpen={openDossier} navigate={navigate} />
 </div>
-<LatestDaySignals articles={lensArticles} excludeKeys={heroFeedKeys} onOpen={openDossier} />
+<LatestDaySignals articles={stageArticles} excludeKeys={heroFeedKeys} onOpen={openDossier} />
 </section>
-<SearchLoadedBriefing filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={lensArticles.length} />
+{presentation !== 'sampark' && <SearchLoadedBriefing filters={filters} setFilters={setFilters} options={options} count={filteredArticles.length} total={lensArticles.length} />}
 <section className="space-y-8">        {Object.entries(groups).map(([day, items]) => <div key={day} className="space-y-4">
 <div className="flex items-center gap-4">
 <h2 className="text-lg font-semibold text-white">                  {day}                </h2>

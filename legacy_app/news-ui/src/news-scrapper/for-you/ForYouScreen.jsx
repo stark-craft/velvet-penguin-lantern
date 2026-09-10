@@ -17,11 +17,12 @@ import ForYouCard from './ForYouCard.jsx';
 import InterestSetup from './InterestSetup.jsx';
 import SinceLastVisit from './SinceLastVisit.jsx';
 import useRecommendationEvents from './useRecommendationEvents.js';
+import { filterFeedItems } from './filterFeedItems.js';
 import './for-you.css';
 
 const migrationDismissKey = 'for-you-migration-dismissed';
 
-export default function ForYouScreen({ onWorkspaceMeta }) {
+export default function ForYouScreen({ onWorkspaceMeta, searchQuery = '', resetPath = '/for-you' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [status, setStatus] = useState(null);
@@ -300,7 +301,7 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
     setControlBusy('reset');
     try {
       await resetRecommendationProfile();
-      window.location.assign('/for-you');
+      window.location.assign(resetPath);
     } catch (nextError) {
       setError(nextError?.message || 'Could not reset this desk.');
       controlLocks.current.delete('reset');
@@ -383,6 +384,8 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
     onImpression: (target, context) => record('qualified_impression', target, context),
   });
 
+  const searchItems = filterFeedItems(items, searchQuery);
+
   if (loading) return <div className="fy-state"><span className="fy-loader" /><h1>Preparing your intelligence mix</h1><p>Balancing freshness, evidence, relevance and useful surprise.</p></div>;
   if (error && !feed) return <div className="fy-state is-error" role="alert"><Icon name="warning" size={28} /><h1>We could not tune this edition</h1><p>{error}</p><button onClick={() => { setError(''); setLoading(true); setLoadAttempt((current) => current + 1); }} type="button">Try again</button></div>;
   if (status && !status.enabled) return <div className="fy-state"><Icon name="sparkle" size={28} /><h1>For You is ready for its pilot</h1><p>The recommendation service is installed but disabled by configuration. Your shared Briefing remains unchanged.</p><button onClick={() => navigate('/home')} type="button">Open Briefing</button></div>;
@@ -398,7 +401,7 @@ export default function ForYouScreen({ onWorkspaceMeta }) {
           <div><button disabled={Boolean(controlBusy)} onClick={acceptMigration} type="button">{controlBusy === 'migration' ? 'Continuing…' : 'Continue this desk'}</button><button disabled={Boolean(controlBusy)} onClick={dismissMigration} type="button">Not now</button></div>
         </section>
       )}
-      {items.length ? <>
+      {searchQuery.trim() ? <section className="fy-section"><header><div><span>Search your loaded feed</span><h2>Matching stories</h2></div></header><div className="fy-card-grid">{searchItems.map((item, index) => <ForYouCard {...cardProps(item, index, 'search')} item={item} key={item.article_id || item.id} />)}</div>{!searchItems.length && <p role="status">No loaded stories match this search. Try another topic or clear the search.</p>}</section> : items.length ? <>
         <ExecutiveScan items={sections.scan} reviewed={reviewed.size} cardProps={cardProps} />
         <SinceLastVisit items={sections.since} cardProps={cardProps} />
         <FollowedUpdates items={sections.followed} cardProps={cardProps} />

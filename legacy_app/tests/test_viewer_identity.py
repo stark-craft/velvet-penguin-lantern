@@ -157,6 +157,27 @@ class ViewerIdentityTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 409)
         self.assertIn("already in use", raised.exception.detail)
 
+    def test_browser_can_retain_legacy_name_but_second_browser_cannot_claim_it(self):
+        legacy_key = main.get_viewer_key("10.0.0.25")
+        self.profiles.write_text(json.dumps({legacy_key: {"display_name": "Explorer"}}))
+        first = request_from()
+        first.state.private_viewer_key = "browser-first"
+        second = request_from()
+        second.state.private_viewer_key = "browser-second"
+        self.assertEqual(main.read_viewer_profile(first)["display_name"], "Explorer")
+        result = main.update_viewer_profile(first, {"display_name": "Explorer", "email": ""})
+        self.assertEqual(result["display_name"], "Explorer")
+        # Saving an unchanged profile remains idempotent after migration.
+        main.update_viewer_profile(first, {"display_name": "Explorer", "email": ""})
+        self.assertEqual(main.read_viewer_profile(second)["display_name"], "")
+        with self.assertRaises(HTTPException) as raised:
+            main.update_viewer_profile(second, {"display_name": "Explorer", "email": ""})
+        self.assertEqual(raised.exception.status_code, 409)
+        main.update_viewer_profile(second, {"display_name": "Another Explorer", "email": ""})
+        main.update_viewer_profile(first, {"display_name": "Explorer", "email": ""})
+        self.assertIn(legacy_key, json.loads(self.profiles.read_text()))
+        self.assertEqual(main.read_viewer_profile(first)["ip"], "10.0.0.25")
+
     def test_hidden_signals_are_private_and_do_not_train_the_bouncer(self):
         owner_request = request_from("10.0.0.25")
         other_request = request_from("10.0.0.30")

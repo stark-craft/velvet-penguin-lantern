@@ -6673,10 +6673,18 @@ def read_viewer_profile(request: Request):
     ip = get_client_ip(request)
     principal = get_private_viewer_key(request)
     profiles = load_viewer_profiles()
-    viewer = profiles.get(principal) or profiles.get(get_viewer_key(ip)) or {}
+    legacy_key = get_viewer_key(ip)
+    legacy = profiles.get(legacy_key) or {}
+    claimed_elsewhere = any(
+        key not in {principal, legacy_key}
+        and profile.get("legacy_ip_principal") == legacy_key
+        for key, profile in profiles.items()
+    )
+    viewer = profiles.get(principal) or ({} if claimed_elsewhere else legacy)
     return {
         "status": "success",
-        "display_name": viewer.get("display_name", get_team_owner_for_ip(ip) or ""),
+        "ip": ip,
+        "display_name": viewer.get("display_name", "" if claimed_elsewhere else get_team_owner_for_ip(ip) or ""),
         "email": viewer.get("email", ""),
         "principal": principal,
     }
@@ -6695,7 +6703,25 @@ def update_viewer_profile(request: Request, payload: dict = Body(...)):
         profiles = load_viewer_profiles()
         previous = profiles.get(viewer_key) or profiles.get(legacy_viewer_key) or {}
         previous_name = str(previous.get("display_name", "")).strip()
-        duplicate = next((profile for key, profile in profiles.items() if key != viewer_key and str(profile.get("display_name", "")).casefold() == display_name.casefold()), None)
+        # A browser may retain the name it inherited from its legacy IP profile.
+        # Keep that rollback row, but another browser's claimed name still wins
+        # the uniqueness check, including browsers behind the same NAT.
+        owned_keys = {viewer_key}
+        legacy = profiles.get(legacy_viewer_key) or {}
+        if (
+            legacy_viewer_key != viewer_key
+            and str(legacy.get("display_name", "")).strip().casefold() == display_name.casefold()
+            and (
+                (profiles.get(viewer_key) or {}).get("legacy_ip_principal") == legacy_viewer_key
+                or not any(
+                    key not in {viewer_key, legacy_viewer_key}
+                    and profile.get("legacy_ip_principal") == legacy_viewer_key
+                    for key, profile in profiles.items()
+                )
+            )
+        ):
+            owned_keys.add(legacy_viewer_key)
+        duplicate = next((profile for key, profile in profiles.items() if key not in owned_keys and str(profile.get("display_name", "")).casefold() == display_name.casefold()), None)
         if duplicate:
             raise HTTPException(status_code=409, detail="That display name is already in use. Please choose another one.")
         profiles[viewer_key] = {

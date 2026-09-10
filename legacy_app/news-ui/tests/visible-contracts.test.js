@@ -207,8 +207,8 @@ test('briefing nests five mapped lenses with the carousel and applies them to ev
   assert.ok(streamPosition < latestPosition);
   assert.ok(latestPosition < searchPosition);
   assert.match(feedSource, /<div className="briefing-hero-stack">[\s\S]*<TopClusterCarousel[\s\S]*<BriefingLensRail/);
-  assert.match(feedSource, /<BriefingStream articles=\{lensArticles\}/);
-  assert.match(feedSource, /<LatestDaySignals articles=\{lensArticles\}/);
+  assert.match(feedSource, /<BriefingStream articles=\{stageArticles\}/);
+  assert.match(feedSource, /<LatestDaySignals articles=\{stageArticles\}/);
   assert.match(feedSource, /applyFilters\(lensArticles, filters, selectedIds\)/);
   assert.match(feedSource, /setFilters\(emptyFilters\)/);
   assert.doesNotMatch(feedSource, /<BriefingKeywordRibbon/);
@@ -217,8 +217,8 @@ test('briefing nests five mapped lenses with the carousel and applies them to ev
 
 test('the unified Briefing keeps scope metadata but presents only the four useful archive filters', () => {
   const feedSource = readFileSync(new URL('../src/news-scrapper/screens/FeedScreen.jsx', import.meta.url), 'utf8');
-  assert.match(feedSource, /scope:\s*'all'/);
-  assert.match(feedSource, /articleScopes\(item\)\.has\(filters\.scope\)/);
+  assert.match(readFileSync(new URL('../src/news-scrapper/screens/briefingFilters.js', import.meta.url), 'utf8'), /scope:\s*'all'/);
+  assert.match(readFileSync(new URL('../src/news-scrapper/screens/briefingFilters.js', import.meta.url), 'utf8'), /articleScopes\(item\)\.has\(filters\.scope\)/);
   assert.match(feedSource, /All Regions/);
   assert.match(feedSource, /All Categories/);
   assert.match(feedSource, /All Sources/);

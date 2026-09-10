@@ -361,6 +361,8 @@ function TranslationFailureNotice({ ui, onRetry, onReturnToEnglish }) {
 
 export default function TopBar({
   manualScan,
+  settingsOnly = false,
+  settingsExtra = null,
   theme,
   onToggleTheme,
   viewer,
@@ -441,7 +443,7 @@ export default function TopBar({
       document.querySelector(".premium-header-identity"),
       document.querySelector(".premium-command-nav"),
       document.querySelector(".premium-theme-toggle"),
-    ].filter(Boolean);
+    ].filter((element) => element && !settingsDialogRef.current?.contains(element));
     const mainWasInert = main?.hasAttribute("inert");
     const previousMainAria = main?.getAttribute("aria-hidden");
     const previousHeaderState = backgroundHeaderItems.map((element) => ({
@@ -508,12 +510,13 @@ export default function TopBar({
         "design-header premium-command-header fixed inset-x-0 top-0 z-40 w-full",
         isBroadcast ? "is-broadcast" : "is-default",
         `nav-style-${NEWS_SCRAPPER_NAV_STYLE}`,
+        settingsOnly ? "is-settings-only" : "",
       ].join(" ")}
       data-navigation-style={NEWS_SCRAPPER_NAV_STYLE}
       data-no-translate
     >
       <div className="command-header-inner premium-command-inner">
-        <div className="header-identity premium-header-identity">
+        {!settingsOnly && <div className="header-identity premium-header-identity">
           <button
             aria-label={language === "ko" ? "For You로 이동" : "Go to For You"}
             className="news-wordmark premium-wordmark"
@@ -523,9 +526,9 @@ export default function TopBar({
             <span className="news-word">Samsung</span>
             <span className="scrapper-word">TechScout</span>
           </button>
-        </div>
+        </div>}
 
-        <nav aria-label={ui.primaryNavigation} className="command-nav premium-command-nav">
+        {!settingsOnly && <nav aria-label={ui.primaryNavigation} className="command-nav premium-command-nav">
           {visibleMainNav.map((item) => (
             <NavLink
               key={item.to}
@@ -542,10 +545,10 @@ export default function TopBar({
               )}
             </NavLink>
           ))}
-        </nav>
+        </nav>}
 
         <div className="header-actions premium-header-actions">
-          <ThemeToggle language={language} theme={theme} onToggle={onToggleTheme} />
+          {!settingsOnly && <ThemeToggle language={language} theme={theme} onToggle={onToggleTheme} />}
 
           {contributionAllowed && <NotificationBell />}
 
@@ -630,6 +633,8 @@ export default function TopBar({
                   </div>
                 </section>
 
+                {settingsOnly && <section className="sp-settings-theme"><span>Appearance</span><ThemeToggle language={language} theme={theme} onToggle={onToggleTheme} /></section>}
+                {settingsExtra}
                 <section className="premium-language-panel" aria-labelledby="premium-language-heading">
                   <div className="premium-language-status">
                     <span id="premium-language-heading">{ui.language}</span>

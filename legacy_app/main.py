@@ -84,10 +84,10 @@ API_ROUTES = {
 }
 
 
-def frontend_index_response():
+def frontend_index_response(entry: str = "index.html"):
     """Serve the current SPA shell without caching a stale deployment."""
 
-    index_path = os.path.join(abs_frontend_path, "index.html")
+    index_path = os.path.join(abs_frontend_path, entry)
     if os.path.exists(index_path):
         return FileResponse(
             index_path,
@@ -112,4 +112,6 @@ def serve_react_app(catchall: str):
     root = catchall.split("/")[0]
     if root in API_ROUTES:
         raise HTTPException(status_code=404, detail="Not Found")
+    if root == "sampark":
+        return frontend_index_response(os.path.join("sampark", "index.html"))
     return frontend_index_response()
