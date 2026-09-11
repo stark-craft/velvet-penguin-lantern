@@ -362,9 +362,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .sampark-history-card small { color: var(--faint); font-size: 11px; }
 .sampark-history-card strong { font-size: 13px; line-height: 1.4; }
 .sampark-voc-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.sampark-voc-team { display: grid; gap: 12px; margin-bottom: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.sampark-voc-team-head { display: grid; gap: 4px; }
+.sampark-voc-kicker { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.sampark-voc-team-head h2 { margin: 0; font-size: 18px; }
+.sampark-voc-team-head p { margin: 0; color: var(--muted); font-size: 13px; }
+.sampark-voc-team-grid { display: grid; gap: 12px; }
+.sampark-voc-member { display: flex; gap: 12px; padding: 12px; border-radius: 10px; background: var(--surface-soft); border: 1px solid var(--line); }
+.sampark-voc-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+.sampark-voc-member h3 { margin: 0; font-size: 15px; }
+.sampark-voc-member strong { color: var(--muted); font-size: 13px; font-weight: 500; }
+.sampark-voc-member p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .sampark-voc-card { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); display: grid; gap: 8px; }
 .sampark-voc-card h3 { margin: 0; display: flex; gap: 8px; align-items: center; font-size: 14px; }
 .sampark-voc-card p { margin: 0; color: var(--muted); font-size: 13px; }
+.sampark-voc-form { margin-top: 12px; }
+.sampark-voc-success { padding: 12px; border-radius: 8px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; font-size: 13px; display: grid; gap: 6px; }
+.sampark-voc-themes { display: grid; gap: 8px; margin-top: 8px; }
+.sampark-voc-theme { padding: 10px; border-radius: 8px; background: var(--surface-soft); border: 1px solid var(--line); font-size: 13px; }
+.sampark-voc-note { margin: 8px 0 0; color: var(--faint); font-size: 11px; }
 .sampark-workspace-note { padding: 10px 12px; border-radius: 8px; background: #f8f9ff; border: 1px solid #e0e7ff; color: var(--muted); font-size: 13px; display: flex; gap: 8px; align-items: center; }
 .sampark-review-summary { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 8px; background: var(--surface-soft); }
 .sampark-review-count { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--primary); }

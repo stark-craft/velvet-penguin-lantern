@@ -8,9 +8,9 @@ export default function SamparkAnalytics({ capabilities = [] }) {
   const [state, setState] = useState({ status: 'loading', error: '', data: null });
 
   useEffect(() => {
-    if (!hasAccess) { setState({ status: 'ready', error: '' }); return; }
-    setState({ status: 'loading', error: '' });
-    getAnalytics().then((res) => setState({ status: 'ready', error: '', data: res })).catch((e) => setState({ status: 'error', error: e?.message || 'Analytics could not be loaded.' }));
+    if (!hasAccess) { setState({ status: 'ready', error: '', data: null }); return; }
+    setState({ status: 'loading', error: '', data: null });
+    getAnalytics().then((res) => setState({ status: 'ready', error: '', data: res })).catch((e) => setState({ status: 'error', error: e?.message || 'Analytics could not be loaded.', data: null }));
   }, [hasAccess]);
 
   if (!hasAccess) return <SamparkWorkspaceShell title="Analytics" description="Articles processed, kept/dropped, source performance, recommendation engagement." error="You don’t have access to this workspace. Requires analytics.view." />;

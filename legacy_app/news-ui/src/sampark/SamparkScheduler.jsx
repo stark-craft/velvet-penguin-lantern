@@ -19,7 +19,7 @@ export default function SamparkScheduler({ capabilities = [] }) {
     }
   };
 
-  useEffect(() => { if (canView) load(); else setState({ status: 'ready', error: '' }); }, [canView]);
+  useEffect(() => { if (canView) load(); else setState({ status: 'ready', error: '', data: null }); }, [canView]);
 
   const runNow = async () => {
     if (!canControl) return;

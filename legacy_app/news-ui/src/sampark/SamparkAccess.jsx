@@ -8,9 +8,9 @@ export default function SamparkAccess({ capabilities = [] }) {
   const [state, setState] = useState({ status: 'loading', error: '', data: [] });
 
   useEffect(() => {
-    if (!hasAccess) { setState({ status: 'ready', error: '' }); return; }
-    setState({ status: 'loading', error: '' });
-    getAccessPrincipals().then((res) => setState({ status: 'ready', error: '', data: res?.items || [] })).catch((e) => setState({ status: 'error', error: e?.message || 'Access principals could not be loaded.' }));
+    if (!hasAccess) { setState({ status: 'ready', error: '', data: [] }); return; }
+    setState({ status: 'loading', error: '', data: [] });
+    getAccessPrincipals().then((res) => setState({ status: 'ready', error: '', data: res?.items || [] })).catch((e) => setState({ status: 'error', error: e?.message || 'Access principals could not be loaded.', data: [] }));
   }, [hasAccess]);
 
   if (!hasAccess) return <SamparkWorkspaceShell title="Access Management" description="Principals, known IPs, granted capabilities — privileged." error="You don’t have access to this workspace. Requires access.manage." />;
@@ -20,7 +20,7 @@ export default function SamparkAccess({ capabilities = [] }) {
   return (
     <SamparkWorkspaceShell title="Access Management" description="Principals, known IPs, granted capabilities — privileged. Standalone/development-era access system.">
       <div className="sampark-access-list">
-        <small>{state.data.length} principals — capability grants remain server-side, no secrets exposed.</small>
+        <small>{(state.data || []).length} principals — capability grants remain server-side, no secrets exposed.</small>
       </div>
       <div className="sampark-workspace-note">Clearly distinguishes user/profile identity, network/IP principal, capability grants. Mutations require access.manage and confirmation.</div>
     </SamparkWorkspaceShell>

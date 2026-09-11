@@ -1,43 +1,62 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Icon from '../news-scrapper/components/Icon.jsx';
-import { getTrendsAccess } from '../news-scrapper/api.js';
+import { TEAM_DIRECTORY } from '../news-scrapper/data/teamDirectory.js';
+import { FeedbackForm } from '../components/VocFeedback.jsx';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
 
 export default function SamparkVoc() {
-  const [state, setState] = useState({ status: 'loading', error: '', data: null });
-
-  const load = async () => {
-    setState({ status: 'loading', error: '', data: null });
-    try {
-      const res = await fetch('/voc', { headers: { Accept: 'application/json' } }).then(r => r.json()).catch(() => null);
-      // Fallback to trends access check
-      const trends = await getTrendsAccess().catch(() => null);
-      setState({ status: 'ready', error: '', data: { voc: res, trends } });
-    } catch (e) {
-      setState({ status: 'error', error: e?.message || 'VOC could not be loaded.' });
-    }
-  };
-
-  useEffect(() => { load(); }, []);
-
-  if (state.status === 'loading') return <SamparkWorkspaceShell title="VOC — Voice of Customer" description="Customer feedback, trend intelligence and sentiment signals." loading />;
-  if (state.status === 'error') return <SamparkWorkspaceShell title="VOC — Voice of Customer" description="Customer feedback and trend intelligence." error={state.error} onRetry={load} />;
+  const [complete, setComplete] = useState(false);
 
   return (
     <SamparkWorkspaceShell title="VOC — Voice of Customer" description="Customer feedback, trend intelligence and sentiment signals. Feedback submission remains private to your workspace.">
+      <section className="sampark-voc-team" aria-label="TechScout team">
+        <header className="sampark-voc-team-head">
+          <span className="sampark-voc-kicker">Team & Feedback</span>
+          <h2>Meet the TechScout Team</h2>
+          <p>The people shaping a faster, clearer daily intelligence experience.</p>
+        </header>
+        <div className="sampark-voc-team-grid">
+          {TEAM_DIRECTORY.map((member) => (
+            <article key={member.id} className="sampark-voc-member">
+              <span className="sampark-voc-avatar" aria-hidden="true">{member.initials}</span>
+              <div>
+                <small>TechScout team</small>
+                <h3>{member.name}</h3>
+                <strong>{member.role}</strong>
+                <p>{member.note}</p>
+              </div>
+              <Icon name="sparkle" size={18} />
+            </article>
+          ))}
+        </div>
+      </section>
+
       <div className="sampark-voc-grid">
         <div className="sampark-voc-card">
-          <h3><Icon name="note" size={16} /> Feedback Overview</h3>
-          <p>Share feedback and review Voice-of-Customer signals. Original VOC trends and categories are preserved via existing backend contracts.</p>
-          <small>Backend: /voc, /trends — no fake analytics.</small>
+          <span className="sampark-voc-kicker">Voice of Customer</span>
+          <h3>Share Feedback</h3>
+          <p>Tell the team what makes the intelligence experience stronger or slower. Your feedback is stored via the existing <code>/voc</code> endpoint and remains private where original behavior is private.</p>
+          {complete ? (
+            <div className="sampark-voc-success" role="status">
+              <strong>Feedback captured.</strong>
+              <p>Thank you for improving TechScout.</p>
+              <button className="btn-secondary" onClick={() => setComplete(false)} type="button">Send another note</button>
+            </div>
+          ) : (
+            <div className="sampark-voc-form">
+              <FeedbackForm onComplete={() => setComplete(true)} />
+            </div>
+          )}
         </div>
         <div className="sampark-voc-card">
-          <h3><Icon name="trend" size={16} /> Trends</h3>
-          <p>Trends and counts are derived from actual stored feedback where available. No decorative graphs.</p>
+          <span className="sampark-voc-kicker">Feedback Themes</span>
+          <div className="sampark-voc-themes">
+            {['Signal quality and ranking', 'Review and approval flow', 'Search and source coverage', 'Export and archive clarity'].map((topic) => (
+              <div className="sampark-voc-theme" key={topic}>{topic}</div>
+            ))}
+          </div>
+          <p className="sampark-voc-note">Themes are static guidance; actual trends are derived from stored feedback where backend aggregation exists. No fake graphs.</p>
         </div>
-      </div>
-      <div className="sampark-workspace-note">
-        <Icon name="shield" size={14} /> VOC submission is private to your viewer where original behavior is private; aggregated trends are shared where original is shared.
       </div>
     </SamparkWorkspaceShell>
   );
