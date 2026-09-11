@@ -57,7 +57,7 @@ function AllNewsDossier({ item, onClose, saved, onSave, onHide, onReact }){
 }
 
 export default function AllNewsPage(){
-  const { articles, published, loading, error, retry } = useBriefingFeed();
+  const { articles, loading, error, retry } = useBriefingFeed();
   const [activeLens, setActiveLens] = useState('all');
   const [draftFilters, setDraftFilters] = useState({ region:'all', category:'all', source:'all', date:'all' });
   const [appliedFilters, setAppliedFilters] = useState({ region:'all', category:'all', source:'all', date:'all' });
@@ -71,9 +71,10 @@ export default function AllNewsPage(){
 
   const options = useMemo(()=> deriveFilterOptions(articles), [articles]);
 
-  // single briefing dataset -> filtered by lens + applied filters + hidden + published
+  // single briefing dataset -> filtered by lens + applied filters + hidden (no Samsung Internal merge)
   const filtered = useMemo(()=>{
-    let base = articles.filter(it=> {
+    return articles.filter(it=> {
+      if(!it) return false;
       if(hiddenKeys.has(articleKey(it))) return false;
       if(!matchesBriefingLens(it, activeLens)) return false;
       if(appliedFilters.region!=='all' && it.region!==appliedFilters.region) return false;
@@ -82,25 +83,7 @@ export default function AllNewsPage(){
       if(appliedFilters.date!=='all' && it.date!==appliedFilters.date) return false;
       return true;
     });
-    const isDefault = activeLens==='all' && appliedFilters.region==='all' && appliedFilters.category==='all' && appliedFilters.source==='all' && appliedFilters.date==='all' && hiddenKeys.size===0;
-    if(published && isDefault){
-      const pubAs={
-        title: published.title,
-        summary: published.summary || published.body || '',
-        category: published.category || 'Internal',
-        region: 'Internal',
-        source: published.author || published.ownerName || 'Samsung Internal',
-        src: published.author || 'Samsung Internal',
-        date: published.publishedAt ? String(published.publishedAt).slice(0,10) : new Date().toISOString().slice(0,10),
-        source_count: 1,
-        image_url: published.cover?.url || '',
-        link: '',
-        _published:true,
-      };
-      if(!base.some(b=> b.title===pubAs.title)) base=[pubAs, ...base];
-    }
-    return base;
-  },[articles, activeLens, appliedFilters, published, hiddenKeys]);
+  },[articles, activeLens, appliedFilters, hiddenKeys]);
 
   const featured = useMemo(()=> selectFeatured(filtered, 5), [filtered]);
   const railItems = useMemo(()=> selectAllNewsRail(filtered, 10), [filtered]);

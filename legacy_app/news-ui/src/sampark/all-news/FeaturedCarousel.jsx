@@ -29,13 +29,11 @@ export default function FeaturedCarousel({ items=[], onOpen }){
 
   return (
     <section aria-label="Featured News" className="tsan-featured" onMouseEnter={()=> setPaused(true)} onMouseLeave={()=> setPaused(false)}>
-      <div className="tsan-featured-media" style={image ? { backgroundImage:`url("${image}")`} : undefined}>
-        {!image && <div className="tsan-featured-fallback"><Icon name="globe" size={48} /></div>}
-        <div className="tsan-featured-gradient" aria-hidden="true" />
-        <div className="tsan-featured-overlay">
-          <span className="tsan-featured-kicker">{source} · {time}</span>
-          <button className="tsan-featured-title" onClick={()=> onOpen?.(item)} type="button"><h3>{item.title}</h3></button>
-        </div>
+      {image ? <img alt="" className="tsan-featured-media" src={image} /> : <div className="tsan-featured-fallback"><Icon name="globe" size={48} /></div>}
+      <div className="tsan-featured-gradient" aria-hidden="true" />
+      <div className="tsan-featured-overlay">
+        <span className="tsan-featured-kicker">{source} · {time}</span>
+        <button className="tsan-featured-title" onClick={()=> onOpen?.(item)} type="button"><h3>{item.title}</h3></button>
       </div>
       {safeItems.length>1 && (
         <>

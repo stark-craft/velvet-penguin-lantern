@@ -55,11 +55,11 @@ export function selectLatestToday(articles, todayISO){
   return safe.filter(a=> String(a?.date||'').slice(0,10)===today);
 }
 
-export function applyArticleFilters(articles, filters, publishedHero=null){
+export function applyArticleFilters(articles, filters){
   const safe=(articles||[]).filter(Boolean);
   // filters: {category:'all'|'ai'..., region, source, date }
   // category is lens
-  let base=safe.filter(item=>{
+  return safe.filter(item=>{
     if(!item) return false;
     if(filters.category && filters.category!=='all' && !matchesCategoryLens(item, filters.category)) return false;
     if(filters.region && filters.region!=='all' && item.region!==filters.region) return false;
@@ -67,27 +67,6 @@ export function applyArticleFilters(articles, filters, publishedHero=null){
     if(filters.date && filters.date!=='all' && item.date!==filters.date) return false;
     return true;
   });
-  // published insertion when default
-  const isDefault = (!filters.category||filters.category==='all') && (!filters.region||filters.region==='all') && (!filters.source||filters.source==='all') && (!filters.date||filters.date==='all');
-  if(publishedHero && isDefault){
-    const pubAs={
-      title: publishedHero.title,
-      summary: publishedHero.summary || publishedHero.body || '',
-      category: publishedHero.category || 'Internal',
-      region: 'Internal',
-      source: publishedHero.author || publishedHero.ownerName || 'Samsung Internal',
-      src: publishedHero.author || 'Samsung Internal',
-      date: publishedHero.publishedAt ? String(publishedHero.publishedAt).slice(0,10) : new Date().toISOString().slice(0,10),
-      source_count: 1,
-      image_url: publishedHero.cover?.url || '',
-      top_image: publishedHero.cover?.url || '',
-      link: '',
-      _published:true,
-      _id: publishedHero.id,
-    };
-    if(!base.some(b=> b.title===pubAs.title)) base=[pubAs, ...base];
-  }
-  return base;
 }
 
 // day-wise grouping preserving order (already sorted)
