@@ -2,12 +2,13 @@ import React from 'react';
 import NewsCard from './NewsCard.jsx';
 
 export default function DayWiseNews({ grouped, onOpen }){
-  if(!grouped?.length){
+  const safeGrouped = (grouped || []).filter(Boolean).map(([d, its])=> [d, (its||[]).filter(Boolean)]).filter(([,its])=> its.length);
+  if(!safeGrouped.length){
     return <p className="tsan-empty">No news matches these filters.</p>;
   }
   return (
     <div className="tsan-daywise">
-      {grouped.map(([date, items])=>(
+      {safeGrouped.map(([date, items])=>(
         <section key={date} className="tsan-day-section" aria-label={`News for ${date}`}>
           <header className="tsan-day-header">
             <h3>News</h3>
@@ -16,7 +17,7 @@ export default function DayWiseNews({ grouped, onOpen }){
             <span className="tsan-day-count">({items.length} News)</span>
           </header>
           <div className="tsan-day-grid">
-            {items.map(item=> <NewsCard key={item.title + (item.date||'') + (item.link||'')} item={item} onOpen={onOpen} />)}
+            {items.map(item=> <NewsCard key={(item.title || '') + (item.date||'') + (item.link||'')} item={item} onOpen={onOpen} />)}
           </div>
         </section>
       ))}

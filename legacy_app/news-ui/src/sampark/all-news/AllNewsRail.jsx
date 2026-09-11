@@ -3,16 +3,17 @@ import Icon from '../../news-scrapper/components/Icon.jsx';
 import { scoreOf } from '../../news-scrapper/utils/intelligence.js';
 
 export default function AllNewsRail({ items=[], onOpen }){
+  const safeItems = (items || []).filter(Boolean);
   const [paused, setPaused] = useState(false);
   const listRef = useRef(null);
   const trackRef = useRef(null);
 
   // duplicate content for seamless loop if enough items
-  const display = items.length ? [...items, ...items] : [];
+  const display = safeItems.length ? [...safeItems, ...safeItems] : [];
 
   useEffect(()=>{
     const el = trackRef.current;
-    if(!el || paused || !items.length) return undefined;
+    if(!el || paused || !safeItems.length) return undefined;
     let raf;
     let offset = 0;
     const speed = 0.3; // px per frame ~18px/s
@@ -30,7 +31,7 @@ export default function AllNewsRail({ items=[], onOpen }){
     return ()=> window.cancelAnimationFrame(raf);
   },[paused, items.length]);
 
-  if(!items.length){
+  if(!safeItems.length){
     return (
       <aside className="tsan-rail" aria-label="All News">
         <h3 className="tsan-rail-title">All News</h3>
@@ -46,16 +47,16 @@ export default function AllNewsRail({ items=[], onOpen }){
         <div className="tsan-rail-track" ref={trackRef}>
           {display.map((item, idx)=>(
             <button
-              key={`${item.title}-${idx}`}
-              aria-hidden={idx >= items.length ? 'true' : undefined}
-              tabIndex={idx >= items.length ? -1 : 0}
+              key={`${item?.title || 'item'}-${idx}`}
+              aria-hidden={idx >= safeItems.length ? 'true' : undefined}
+              tabIndex={idx >= safeItems.length ? -1 : 0}
               className="tsan-rail-item"
-              onClick={()=> onOpen?.(item)}
+              onClick={()=> item && onOpen?.(item)}
               type="button"
             >
-              <span className="tsan-rail-category">{item.category || 'Technology'}</span>
-              <strong className="tsan-rail-headline">{item.title}</strong>
-              <span className="tsan-rail-meta">{item.src || item.source || 'TechScout'} · {item.date || 'Latest'} · Score {scoreOf(item)}</span>
+              <span className="tsan-rail-category">{item?.category || 'Technology'}</span>
+              <strong className="tsan-rail-headline">{item?.title || ''}</strong>
+              <span className="tsan-rail-meta">{item?.src || item?.source || 'TechScout'} · {item?.date || 'Latest'} · Score {item ? scoreOf(item) : 0}</span>
             </button>
           ))}
         </div>

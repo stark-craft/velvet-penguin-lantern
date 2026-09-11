@@ -3,13 +3,14 @@ import Icon from '../../news-scrapper/components/Icon.jsx';
 import NewsCard from './NewsCard.jsx';
 
 export default function LatestNews({ items=[], onOpen }){
+  const safeItems = (items || []).filter(Boolean);
   const scrollerRef = useRef(null);
 
-  if(!items.length) return null;
+  if(!safeItems.length) return null;
 
   // header date is today's date from first item
-  const today = String(items[0]?.date || new Date().toISOString().slice(0,10)).slice(0,10);
-  const count = items.length;
+  const today = String(safeItems[0]?.date || new Date().toISOString().slice(0,10)).slice(0,10);
+  const count = safeItems.length;
 
   const scroll = (dir)=>{
     const el = scrollerRef.current;
@@ -27,7 +28,7 @@ export default function LatestNews({ items=[], onOpen }){
         </div>
       </header>
       <div className="tsan-latest-scroll" ref={scrollerRef}>
-        {items.map(item=> <NewsCard key={item.title + item.date} item={item} onOpen={onOpen} />)}
+        {safeItems.map(item=> <NewsCard key={(item.title || '') + (item.date || '')} item={item} onOpen={onOpen} />)}
       </div>
     </section>
   );

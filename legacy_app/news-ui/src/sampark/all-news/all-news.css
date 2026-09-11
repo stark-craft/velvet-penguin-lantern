@@ -3,6 +3,16 @@
   display: grid;
   gap: 24px;
   padding: 4px 0 24px;
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.tsan-page > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Category tabs */
@@ -29,11 +39,21 @@
   border-bottom-color: #1428a0;
 }
 
-/* Featured + Rail 70/30 */
+/* Featured + Rail 70/30 — contained, not overflowing */
 .tsan-featured-rail {
   display: flex;
   gap: 20px;
-  height: 480px;
+  height: 400px;
+  max-width: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.tsan-featured-rail > * {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 .tsan-featured {
   flex: 0 0 70%;
@@ -42,6 +62,8 @@
   overflow: hidden;
   background: #eef2ff;
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  height: 100%;
+  max-width: 100%;
 }
 .tsan-featured-media {
   position: absolute;

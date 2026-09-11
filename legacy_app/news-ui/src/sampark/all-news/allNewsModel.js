@@ -11,10 +11,11 @@ function uniqueSorted(values){
 }
 
 export function deriveFilterOptions(articles){
-  const regions=uniqueSorted(articles.map(a=>a.region));
-  const categories=uniqueSorted(articles.map(a=>a.category));
-  const sources=uniqueSorted(articles.map(a=>a.src || a.source));
-  const dates=uniqueSorted(articles.map(a=>a.date)).sort().reverse();
+  const safe=(articles||[]).filter(Boolean);
+  const regions=uniqueSorted(safe.map(a=>a?.region));
+  const categories=uniqueSorted(safe.map(a=>a?.category));
+  const sources=uniqueSorted(safe.map(a=>a?.src || a?.source));
+  const dates=uniqueSorted(safe.map(a=>a?.date)).sort().reverse();
   return { regions, categories, sources, dates };
 }
 
@@ -24,14 +25,15 @@ export function matchesCategoryLens(item, lens){
 
 // hero ranking: prefer strong/multi-source stories where appropriate, signal/importance, recency, image
 export function selectFeatured(articles, limit=5){
-  if(!articles?.length) return [];
+  const safe=(articles||[]).filter(Boolean);
+  if(!safe.length) return [];
   // sort by source_count, score, image, recency as in original FeedScreen sortForCarousel
-  const sorted=[...articles].sort((a,b)=>{
-    const cov=(b.source_count||1)-(a.source_count||1);
+  const sorted=[...safe].sort((a,b)=>{
+    const cov=(b?.source_count||1)-(a?.source_count||1);
     if(cov) return cov;
     const sc=scoreOf(b)-scoreOf(a);
     if(sc) return sc;
-    const img=(b.image_url?1:0)-(a.image_url?1:0);
+    const img=(b?.image_url?1:0)-(a?.image_url?1:0);
     if(img) return img;
     return publishedTime(b)-publishedTime(a);
   });
@@ -40,21 +42,25 @@ export function selectFeatured(articles, limit=5){
 }
 
 export function selectAllNewsRail(articles, limit=10){
+  const safe=(articles||[]).filter(Boolean);
   // same briefing data, top 10 appropriate (recency + score)
-  const sorted=[...articles].sort((a,b)=> publishedTime(b)-publishedTime(a) || scoreOf(b)-scoreOf(a));
+  const sorted=[...safe].sort((a,b)=> publishedTime(b)-publishedTime(a) || scoreOf(b)-scoreOf(a));
   return sorted.slice(0,limit);
 }
 
 // Latest News = today's articles only
 export function selectLatestToday(articles, todayISO){
+  const safe=(articles||[]).filter(Boolean);
   const today = todayISO || new Date().toISOString().slice(0,10);
-  return articles.filter(a=> String(a.date||'').slice(0,10)===today);
+  return safe.filter(a=> String(a?.date||'').slice(0,10)===today);
 }
 
 export function applyArticleFilters(articles, filters, publishedHero=null){
+  const safe=(articles||[]).filter(Boolean);
   // filters: {category:'all'|'ai'..., region, source, date }
   // category is lens
-  let base=articles.filter(item=>{
+  let base=safe.filter(item=>{
+    if(!item) return false;
     if(filters.category && filters.category!=='all' && !matchesCategoryLens(item, filters.category)) return false;
     if(filters.region && filters.region!=='all' && item.region!==filters.region) return false;
     if(filters.source && filters.source!=='all' && (item.src||item.source)!==filters.source) return false;
@@ -86,8 +92,10 @@ export function applyArticleFilters(articles, filters, publishedHero=null){
 
 // day-wise grouping preserving order (already sorted)
 export function groupByDatePreservingOrder(articles){
+  const safe=(articles||[]).filter(Boolean);
   const map=new Map();
-  for(const it of articles){
+  for(const it of safe){
+    if(!it) continue;
     const key=String(it.date||'Unknown').slice(0,10);
     if(!map.has(key)) map.set(key, []);
     map.get(key).push(it);
