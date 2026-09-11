@@ -52,7 +52,8 @@ test('Sampark shell mounts only allowed Search/Settings integrations and viewer 
   assert.doesNotMatch(app, /TopBar|theme-toggle|setTheme/);
   assert.doesNotMatch(app, /fetch\(|https?:\/\//);
   // Final surfaces replace lightweight shell placeholders with real implementations
-  assert.match(read('../src/sampark/SamparkAllNews.jsx'), /getSharedBriefing|getLatestBriefing/);
+  assert.match(read('../src/sampark/all-news/AllNewsPage.jsx'), /getSharedBriefing|getLatestBriefing|useBriefingFeed/);
+  assert.match(read('../src/sampark/all-news/data/useBriefingFeed.js'), /getSharedBriefing|getLatestBriefing/);
   assert.match(read('../src/sampark/SamparkResearch.jsx'), /searchExtractedIntelligence/);
   assert.match(read('../src/sampark/SamparkSamsungNews.jsx'), /getSamsungInternalFeed|getPublishedInternalContent/);
   assert.match(read('../src/sampark/SamparkCreate.jsx'), /createContributionDraft|submitContributionDraft/);
@@ -278,22 +279,22 @@ test('Sampark fresh viewer onboarding, search isolation, privacy and persistent 
 test('Sampark All News is functional with real briefing APIs and Sampark-native presentation', () => {
   const app = read('../src/sampark/SamparkApp.jsx');
   assert.match(app, /path="\/all-news"/);
-  assert.match(app, /SamparkAllNews/);
-  const allNews = read('../src/sampark/SamparkAllNews.jsx');
-  assert.match(allNews, /getSharedBriefing|getLatestBriefing/);
-  assert.match(allNews, /getPublishedInternalContent/);
-  assert.match(allNews, /Briefing Stream|Latest News|Apply Filter/);
-  assert.match(allNews, /emptyFilters|options\.categories|category-filters/);
-  assert.match(allNews, /carousel-news-container|featured-carousel|live-news-sidebar/);
-  assert.match(allNews, /latest-news-section|latest-news-scroll|filtered-news-grid|filter-view-section/);
-  assert.match(allNews, /visibleCount|Load more/);
-  assert.match(allNews, /SamparkAllNewsDossier|sampark-dossier/);
-  assert.match(allNews, /setViewerReaction|saveArticleForLater|hideArticleForViewer/);
-  assert.match(allNews, /sampark-all-news|tab-content active/);
-  assert.match(allNews, /object-fit:\s*cover|sampark-dossier/);
-  assert.doesNotMatch(allNews, /FeedScreen|fetch\(.*briefing\/shared/);
-  assert.doesNotMatch(allNews, /sampark-all-news-hero-grid|sampark-all-news-media--featured/);
-  assert.match(read('../src/sampark/sampark.css'), /sampark-all-news|carousel-news-container/);
+  assert.match(app, /AllNewsPage|SamparkAllNews/);
+  const allNewsPage = read('../src/sampark/all-news/AllNewsPage.jsx');
+  const allNewsModel = read('../src/sampark/all-news/allNewsModel.js');
+  const useFeed = read('../src/sampark/all-news/data/useBriefingFeed.js');
+  assert.match(allNewsPage, /getSharedBriefing|getLatestBriefing|useBriefingFeed/);
+  assert.match(useFeed, /getSharedBriefing|getLatestBriefing/);
+  assert.match(allNewsModel, /selectFeatured|selectAllNewsRail|selectLatestToday|deriveFilterOptions/);
+  assert.match(allNewsPage, /CategoryTabs|FeaturedCarousel|AllNewsRail|LatestNews|FilterPanel|DayWiseNews/);
+  assert.match(allNewsPage, /tsan-page|tsan-category-tabs|tsan-featured-rail|tsan-rail|tsan-latest|tsan-filter-panel|tsan-daywise/);
+  assert.match(allNewsPage, /sampark-dossier|useModalFocus/);
+  assert.match(allNewsPage, /getViewerReactions|saveArticleForLater|hideArticleForViewer|setViewerReaction/);
+  // ensure isolated tsan-* namespace, not old classes
+  assert.match(read('../src/sampark/all-news/all-news.css'), /\.tsan-/);
+  assert.doesNotMatch(allNewsPage, /FeedScreen/);
+  assert.doesNotMatch(allNewsPage, /sampark-foryou-grid|SamparkForYouCard/);
+  assert.doesNotMatch(allNewsPage, /fetch\(.*briefing\/shared/);
 });
 
 test('Sampark Research is Sampark-native archive search with real intelligence APIs', () => {

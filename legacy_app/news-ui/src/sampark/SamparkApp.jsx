@@ -7,7 +7,7 @@ import { useSamparkAuth } from './auth/SamparkAuthContext.jsx';
 import SamparkSearchResults from './SamparkSearchResults.jsx';
 import SamparkSettingsModal, { readSamparkSettings } from './SamparkSettingsModal.jsx';
 import SamparkForYou from './SamparkForYou.jsx';
-import SamparkAllNews from './SamparkAllNews.jsx';
+import SamparkAllNews from './all-news/AllNewsPage.jsx';
 import SamparkResearch from './SamparkResearch.jsx';
 import SamparkSamsungNews from './SamparkSamsungNews.jsx';
 import SamparkCreate from './SamparkCreate.jsx';
