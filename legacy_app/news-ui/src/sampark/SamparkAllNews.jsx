@@ -4,7 +4,6 @@ import {
   getLatestBriefing,
   getPublishedInternalContent,
   getSharedBriefing,
-  getViewerHidden,
   getViewerReactions,
   getViewerSaved,
   hideArticleForViewer,
@@ -15,30 +14,20 @@ import {
 import { articleKey, reactionIdentity, scoreOf } from '../news-scrapper/utils/intelligence.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
-
-const CATEGORIES = ['All', 'AI', 'Devices', 'Compute', 'Robotics', 'Media'];
+import { emptyFilters } from '../news-scrapper/screens/briefingFilters.js';
 
 function imageOf(item) {
-  return item?.image_url || item?.imageUrl || item?.thumbnail_url || item?.og_image || item?.top_image || '';
+  return item?.image_url || item?.imageUrl || item?.thumbnail_url || item?.og_image || item?.top_image || item?.image || '';
 }
 
-function resolveImage(item) {
-  const candidates = [
-    item?.image_url, item?.imageUrl, item?.thumbnail_url, item?.og_image, item?.top_image,
-    item?.image, item?.thumbnail, item?.article_image_url,
-  ];
-  const match = candidates.find((v) => typeof v === 'string' && v.trim() && v.trim() !== '#');
-  return match ? match.trim() : '';
-}
-
-function SamparkAllNewsDossier({ item, onClose, saved, onSave, onHide, onReact, onSourceOpen }) {
+function SamparkAllNewsDossier({ item, onClose, saved, onSave, onHide, onReact }) {
   const dialogRef = useModalFocus(Boolean(item), onClose);
   if (!item) return null;
   const image = imageOf(item);
   const reactions = item.reactions || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
   const lead = item.summary_lead || item.summary || item.master_summary || '';
   const points = Array.isArray(item.summary_points) ? item.summary_points : [];
-  const whyMatters = item.why_matters || item.why_it_matters || item.attention_hook || '';
+  const whyMatters = item.why_matters || item.why_it_matters || '';
   const sourceLink = item.link || item.url || '';
   return (
     <div className="sampark-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -46,30 +35,25 @@ function SamparkAllNewsDossier({ item, onClose, saved, onSave, onHide, onReact, 
         <header className="sampark-dossier-header">
           <div>
             <div className="sampark-dossier-kicker">{item.category || 'Intelligence'} · {item.src || item.source || 'TechScout'} · {item.date || 'Latest'}</div>
-            <div className="sampark-dossier-subtitle">{item.region || 'Global'} · {item.source_count || 1} source{(item.source_count||1)===1?'':'s'} · {item.mins_read || 1} min read</div>
+            <div className="sampark-dossier-subtitle">{item.region || 'Global'} · {item.source_count || 1} source{(item.source_count||1)===1?'':'s'} · Score {scoreOf(item)}</div>
           </div>
           <button aria-label="Close dossier" className="sampark-dossier-close" onClick={onClose} type="button"><Icon name="x" size={18} /></button>
         </header>
         <div className="sampark-dossier-scroll">
-          {image ? (
-            <div className="sampark-dossier-media"><img alt="" className="sampark-dossier-img" src={image} /></div>
-          ) : (
-            <div className="sampark-dossier-media is-placeholder"><Icon name="globe" size={42} /></div>
-          )}
+          {image ? <div className="sampark-dossier-media"><img alt="" className="sampark-dossier-img" src={image} /></div> : <div className="sampark-dossier-media is-placeholder"><Icon name="globe" size={42} /></div>}
           <div className="sampark-dossier-body">
             <h2 id="sampark-allnews-dossier-title" className="sampark-dossier-title">{item.title}</h2>
             {lead && <p className="sampark-dossier-summary">{lead}</p>}
             {points.length ? <ul className="sampark-dossier-points">{points.slice(0,5).map((p,i)=><li key={i}>{p}</li>)}</ul> : null}
-            {sourceLink ? <a className="sampark-dossier-link" href={sourceLink} onClick={() => onSourceOpen?.(item)} rel="noreferrer" target="_blank">Open original source <Icon name="external" size={14} /></a> : null}
+            {sourceLink ? <a className="sampark-dossier-link" href={sourceLink} rel="noreferrer" target="_blank">Open original source <Icon name="external" size={14} /></a> : null}
             {whyMatters ? <div className="sampark-dossier-insight"><strong>Why this matters</strong><p>{whyMatters}</p></div> : null}
-            {item.keywords?.length ? <div className="sampark-dossier-keywords">{item.keywords.slice(0,8).map((kw)=><span key={kw} className="sampark-keyword">{kw}</span>)}</div> : null}
           </div>
         </div>
         <footer className="sampark-dossier-actions">
-          <button className={`sampark-action-btn${reactions.viewer_reaction === 'like' ? ' is-active' : ''}`} onClick={() => onReact(item, 'like')} type="button"><Icon name="thumbsUp" size={16} /> {reactions.like_count || 0} Like</button>
-          <button className={`sampark-action-btn${reactions.viewer_reaction === 'dislike' ? ' is-active' : ''}`} onClick={() => onReact(item, 'dislike')} type="button"><Icon name="thumbsDown" size={16} /> {reactions.dislike_count || 0}</button>
-          <button className={`sampark-action-btn${saved ? ' is-active' : ''}`} onClick={() => onSave(item)} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={16} /> {saved ? 'Following' : 'Follow'}</button>
-          <button className="sampark-action-btn" onClick={() => onHide(item)} type="button"><Icon name="eye" size={16} /> Hide</button>
+          <button className={`sampark-action-btn${reactions.viewer_reaction==='like'?' is-active':''}`} onClick={()=>onReact(item,'like')} type="button"><Icon name="thumbsUp" size={16} /> {reactions.like_count||0} Like</button>
+          <button className={`sampark-action-btn${reactions.viewer_reaction==='dislike'?' is-active':''}`} onClick={()=>onReact(item,'dislike')} type="button"><Icon name="thumbsDown" size={16} /> {reactions.dislike_count||0}</button>
+          <button className={`sampark-action-btn${saved?' is-active':''}`} onClick={()=>onSave(item)} type="button"><Icon name={saved?'check':'bookmark'} size={16} /> {saved?'Following':'Follow'}</button>
+          <button className="sampark-action-btn" onClick={()=>onHide(item)} type="button"><Icon name="eye" size={16} /> Hide</button>
           <span className="sampark-dossier-spacer" />
           <button className="sampark-action-btn sampark-action-close" onClick={onClose} type="button">Close</button>
         </footer>
@@ -78,320 +62,290 @@ function SamparkAllNewsDossier({ item, onClose, saved, onSave, onHide, onReact, 
   );
 }
 
-function categoryMatches(item, active) {
-  if (active === 'All') return true;
-  const hay = `${item.category || ''} ${item.region || ''} ${(item.keywords || []).join(' ')} ${item.title || ''}`.toLowerCase();
-  const term = active.toLowerCase();
-  if (term === 'ai') return hay.includes('ai') || hay.includes('artificial');
-  if (term === 'devices') return hay.includes('device') || hay.includes('display') || hay.includes('galaxy') || hay.includes('phone');
-  if (term === 'compute') return hay.includes('compute') || hay.includes('chip') || hay.includes('semiconductor') || hay.includes('cloud');
-  if (term === 'robotics') return hay.includes('robot');
-  if (term === 'media') return hay.includes('media') || hay.includes('broadcast') || hay.includes('content');
-  return hay.includes(term);
-}
+function uniqueSorted(values){ return [...new Set(values.filter(Boolean))].sort((a,b)=> String(a).localeCompare(String(b))); }
 
-function briefingSort(a, b) {
-  const coverage = (b.source_count || 1) - (a.source_count || 1);
-  if (coverage) return coverage;
-  const score = scoreOf(b) - scoreOf(a);
-  if (score) return score;
-  return (b.published_at || b.date || '').localeCompare(a.published_at || a.date || '');
-}
-
-function SamparkAllNewsCard({ item, featured, saved, busy, onOpen, onSave, onHide, onReact }) {
-  const image = resolveImage(item);
-  const reactions = item.reactions || {};
-  const likeActive = reactions.viewer_reaction === 'like';
-  const dislikeActive = reactions.viewer_reaction === 'dislike';
+function NewsTile({ item, vote, saved, disabled, onOpen, onVote, onSave, onHide }){
+  const image = imageOf(item);
+  const reactions = vote || item.reactions || {};
   return (
-    <article className={featured ? 'sampark-all-news-featured-card' : 'sampark-all-news-card'}>
-      <button aria-label={`Open dossier for ${item.title}`} className={featured ? 'sampark-all-news-media sampark-all-news-media--featured' : 'sampark-all-news-media'} onClick={() => onOpen(item)} type="button">
-        {image ? <img alt="" className="sampark-card-img" src={image} loading="lazy" /> : <span className="sampark-card-img-placeholder"><Icon name="globe" size={28} /></span>}
-        <span className="sampark-card-source-badge">{item.src || item.source || 'TechScout'}</span>
-      </button>
-      <div className="sampark-all-news-body">
-        <div className="sampark-all-news-kicker">{item.category || 'News'} · {item.region || 'Global'} · {item.source_count || 1} source{(item.source_count||1)===1?'':'s'}</div>
-        <button className="sampark-all-news-title-btn" onClick={() => onOpen(item)} type="button"><h4>{item.title}</h4></button>
-        <p className="sampark-all-news-summary">{item.summary || item.master_summary || 'Open the dossier for the full summary.'}</p>
-        <div className="sampark-all-news-footer">
-          <span className="sampark-card-meta"><Icon name="clock" size={12} /> {item.date || 'Latest'}</span>
-          <div className="sampark-card-actions">
-            <button aria-label={`Like ${item.title}`} className={`sampark-card-action${likeActive ? ' is-active' : ''}`} disabled={Boolean(busy)} onClick={() => onReact(item, 'like')} type="button"><Icon name="thumbsUp" size={14} /><span>{reactions.like_count || 0}</span></button>
-            <button aria-label={`Dislike ${item.title}`} className={`sampark-card-action${dislikeActive ? ' is-active' : ''}`} disabled={Boolean(busy)} onClick={() => onReact(item, 'dislike')} type="button"><Icon name="thumbsDown" size={14} /></button>
-            <button aria-label={`${saved ? 'Unfollow' : 'Follow'} ${item.title}`} className={`sampark-card-action${saved ? ' is-active' : ''}`} disabled={Boolean(busy)} onClick={() => onSave(item)} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={14} /></button>
-            <button aria-label={`Hide ${item.title}`} className="sampark-card-action" disabled={Boolean(busy)} onClick={() => onHide(item)} type="button"><Icon name="eye" size={14} /></button>
-          </div>
-        </div>
+    <article className="latest-news-card">
+      <button aria-label={`Open dossier for ${item.title}`} className="lnc-image" onClick={()=>onOpen(item)} style={image ? { backgroundImage: `url("${image}")` } : undefined} type="button">{!image && <Icon name="globe" size={30} />}</button>
+      <div className="lnc-tags">{item.source_count || 1} Source{(item.source_count||1)===1?'':'s'} | {item.region || 'Global'} | {item.category || 'News'}</div>
+      <button className="lnc-title" onClick={()=>onOpen(item)} type="button">{item.title}</button>
+      <div className="sampark-card-actions" style={{padding:'8px 12px 12px'}}>
+        <button aria-label={`Like ${item.title}`} className={`sampark-card-action${reactions.viewer_reaction==='like'?' is-active':''}`} disabled={disabled} onClick={()=>onVote(item, reactions.viewer_reaction==='like'?'neutral':'like')} type="button"><Icon name="thumbsUp" size={14} /><span>{reactions.like_count||0}</span></button>
+        <button aria-label={`Dislike ${item.title}`} className={`sampark-card-action${reactions.viewer_reaction==='dislike'?' is-active':''}`} disabled={disabled} onClick={()=>onVote(item, reactions.viewer_reaction==='dislike'?'neutral':'dislike')} type="button"><Icon name="thumbsDown" size={14} /></button>
+        <button aria-label={`${saved?'Unfollow':'Follow'} ${item.title}`} className={`sampark-card-action${saved?' is-active':''}`} disabled={disabled} onClick={()=>onSave(item)} type="button"><Icon name={saved?'check':'bookmark'} size={14} /></button>
+        <button aria-label={`Hide ${item.title}`} className="sampark-card-action" disabled={disabled} onClick={()=>onHide(item)} type="button"><Icon name="eye" size={14} /></button>
       </div>
     </article>
   );
 }
 
-export default function SamparkAllNews() {
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [filterQuery, setFilterQuery] = useState('');
+function FeaturedCarousel({ items, getActions, onOpen }){
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  useEffect(()=>{ if(paused || items.length<2) return undefined; const t=window.setTimeout(()=> setIndex(v=> (v+1)%items.length), 7000); return ()=> window.clearTimeout(t); }, [index, items.length, paused]);
+  useEffect(()=>{ if(index>=items.length) setIndex(0); }, [index, items.length]);
+  const item = items[index];
+  if(!item) return <div className="featured-carousel sampark-empty">No featured news matches these filters.</div>;
+  const image = imageOf(item);
+  const actions = getActions(item);
+  return (
+    <section aria-label="Featured news" className="featured-carousel" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)}>
+      <div className="carousel-slides" style={image ? { backgroundImage: `url("${image}")`, backgroundSize:'cover', backgroundPosition:'center' } : undefined}>
+        {!image && <div style={{display:'grid',placeItems:'center',height:'100%',color:'rgba(255,255,255,.6)'}}><Icon name="globe" size={48} /></div>}
+        <div className="slide-overlay">
+          <span className="slide-source">{item.src || item.source || 'TechScout'} · {item.date || 'Latest'} · Score {scoreOf(item)}</span>
+          <button className="featured-story-title" onClick={()=>actions.onOpen(item)} type="button" style={{background:'transparent',textAlign:'left',padding:0}}><h3>{item.title}</h3></button>
+          <div className="slide-actions">
+            <button className={`action-btn${actions.vote?.viewer_reaction==='like'?' active':''}`} disabled={actions.disabled} onClick={()=>actions.onVote(item, 'like')} type="button"><Icon name="thumbsUp" size={14} /> {actions.vote?.like_count||0}</button>
+            <button className={`action-btn${actions.vote?.viewer_reaction==='dislike'?' active':''}`} disabled={actions.disabled} onClick={()=>actions.onVote(item,'dislike')} type="button"><Icon name="thumbsDown" size={14} /></button>
+            <button className={`action-btn${actions.saved?' active':''}`} disabled={actions.disabled} onClick={()=>actions.onSave(item)} type="button"><Icon name={actions.saved?'check':'bookmark'} size={14} /></button>
+            <button className="action-btn" disabled={actions.disabled} onClick={()=>actions.onHide(item)} type="button"><Icon name="eye" size={14} /></button>
+            <button className="action-btn" onClick={()=>onOpen(item)} type="button"><Icon name="file" size={14} /> Open</button>
+          </div>
+        </div>
+      </div>
+      {items.length>1 && <>
+        <button aria-label="Previous featured story" className="carousel-arrow prev" onClick={()=> setIndex(v=> (v+items.length-1)%items.length)} type="button"><Icon name="chevL" size={17} /></button>
+        <button aria-label="Next featured story" className="carousel-arrow next" onClick={()=> setIndex(v=> (v+1)%items.length)} type="button"><Icon name="chevR" size={17} /></button>
+        <div className="carousel-dots" role="tablist" aria-label="Featured stories">{items.map((slide,i)=> <button key={articleKey(slide)||i} aria-label={`Show featured story ${i+1}`} aria-selected={i===index} className={`dot${i===index?' active':''}`} onClick={()=>setIndex(i)} role="tab" type="button" />)}</div>
+      </>}
+    </section>
+  );
+}
+
+export default function SamparkAllNews(){
   const [articles, setArticles] = useState([]);
-  const [publishedHero, setPublishedHero] = useState(null);
+  const [published, setPublished] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [visibleCount, setVisibleCount] = useState(20);
-  const [openArticle, setOpenArticle] = useState(null);
-  const [savedKeys, setSavedKeys] = useState(new Set());
-  const [savedReady, setSavedReady] = useState(false);
-  const [busy, setBusy] = useState({});
-  const [notice, setNotice] = useState('');
   const [retryKey, setRetryKey] = useState(0);
-  const actionLocks = useRef(new Set());
+  const [filters, setFilters] = useState(emptyFilters);
+  const [votes, setVotes] = useState({});
+  const [savedKeys, setSavedKeys] = useState(new Set());
+  const [busy, setBusy] = useState({});
+  const [openArticle, setOpenArticle] = useState(null);
+  const [notice, setNotice] = useState('');
+  const [visibleCount, setVisibleCount] = useState(24);
+  const latestRef = useRef(null);
+  const locks = useRef(new Set());
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await getSharedBriefing().catch(() => getLatestBriefing());
+  const load = useCallback(async()=>{
+    setLoading(true); setError('');
+    try{
+      const data = await getSharedBriefing().catch(()=> getLatestBriefing());
       const raw = data?.result || data?.results || data?.articles || data || [];
-      const normalized = normalizeList(raw).map((it) => ({ ...it, image_url: resolveImage(it) }));
-      // try to pull one published record for hero (non-faked, real)
-      try {
-        const published = await getPublishedInternalContent();
-        if (Array.isArray(published) && published.length) {
-          // use most recent published as hero supplement, but do NOT duplicate feed
-          const latestPub = published[0];
-          setPublishedHero(latestPub);
-        } else setPublishedHero(null);
-      } catch { setPublishedHero(null); }
+      const normalized = normalizeList(raw).map(it=> ({...it, image_url: imageOf(it)}));
       setArticles(normalized);
-      setVisibleCount(20);
-    } catch (e) {
-      setError(e?.message || 'Could not load briefing.');
-    } finally {
-      setLoading(false);
-    }
-  }, [retryKey]);
+      try{
+        const pub = await getPublishedInternalContent();
+        if(Array.isArray(pub) && pub.length) setPublished(pub[0]); else setPublished(null);
+      }catch{ setPublished(null); }
+    }catch(e){ setError(e?.message||'Could not load briefing.'); }
+    finally{ setLoading(false); }
+  },[retryKey]);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    let cancelled = false;
-    getViewerSaved().then((r) => {
-      if (cancelled) return;
-      setSavedKeys(new Set(normalizeList(r?.items || []).map(articleKey)));
-      setSavedReady(true);
-    }).catch(() => { if (!cancelled) setSavedReady(false); });
-    return () => { cancelled = true; };
-  }, [retryKey]);
+  useEffect(()=>{ load(); },[load]);
+  useEffect(()=>{
+    let cancelled=false;
+    getViewerSaved().then(r=>{
+      if(cancelled) return;
+      setSavedKeys(new Set(normalizeList(r?.items||[]).map(articleKey)));
+    }).catch(()=>{});
+    return ()=>{ cancelled=true; };
+  },[retryKey]);
 
-  // reactions sync
-  const reactionSignature = useMemo(() => articles.map(reactionIdentity).filter(Boolean).join('|'), [articles]);
-  useEffect(() => {
-    if (!reactionSignature) return;
-    let cancelled = false;
-    const sync = async () => {
-      if (document.visibilityState !== 'visible') return;
-      try {
-        const res = await getViewerReactions(reactionSignature.split('|'));
-        if (cancelled) return;
-        const snapshots = res?.reactions || {};
-        const apply = (c) => {
-          const id = reactionIdentity(c);
-          return snapshots[id] ? { ...c, reactions: snapshots[id] } : c;
-        };
-        setArticles((cur) => cur.map(apply));
-        setOpenArticle((cur) => cur ? apply(cur) : cur);
-      } catch {}
+  const reactionSig = useMemo(()=> articles.map(reactionIdentity).filter(Boolean).join('|'), [articles]);
+  useEffect(()=>{
+    if(!reactionSig) return undefined;
+    let cancelled=false;
+    const sync=async()=>{
+      if(document.visibilityState!=='visible') return;
+      try{
+        const res=await getViewerReactions(reactionSig.split('|'));
+        if(cancelled) return;
+        const snaps=res?.reactions||{};
+        setVotes(prev=>{
+          const n={...prev};
+          articles.forEach(it=>{
+            const s=snaps[reactionIdentity(it)];
+            if(s) n[articleKey(it)]=s;
+          });
+          return n;
+        });
+        setOpenArticle(cur=> cur && snaps[reactionIdentity(cur)] ? {...cur, reactions: snaps[reactionIdentity(cur)]} : cur);
+      }catch{}
     };
-    const iv = setInterval(sync, 12000);
+    sync();
+    const iv=window.setInterval(sync,12000);
     window.addEventListener('focus', sync);
-    return () => { clearInterval(iv); window.removeEventListener('focus', sync); };
-  }, [reactionSignature]);
+    return ()=>{ window.clearInterval(iv); window.removeEventListener('focus', sync); };
+  },[articles, reactionSig]);
 
-  const filtered = useMemo(() => {
-    const q = filterQuery.trim().toLowerCase();
-    return articles.filter((it) => {
-      if (!categoryMatches(it, activeCategory)) return false;
-      if (q && !`${it.title} ${it.summary || ''} ${(it.keywords || []).join(' ')} ${it.source || ''}`.toLowerCase().includes(q)) return false;
+  const options = useMemo(()=>{
+    const regs = uniqueSorted(articles.map(a=>a.region));
+    const cats = uniqueSorted(articles.map(a=>a.category));
+    const srcs = uniqueSorted(articles.map(a=>a.src || a.source));
+    const dates = uniqueSorted(articles.map(a=>a.date)).reverse();
+    return { regions: regs, categories: cats, sources: srcs, dates };
+  },[articles]);
+
+  // apply filters like original briefingFilters
+  const filtered = useMemo(()=>{
+    // published hero insertion when no filter
+    const base = articles.filter(it=>{
+      if(filters.region!=='all' && it.region!==filters.region) return false;
+      if(filters.category!=='all' && it.category!==filters.category) return false;
+      if(filters.source!=='all' && (it.src||it.source)!==filters.source) return false;
+      if(filters.date!=='all' && it.date!==filters.date) return false;
+      if(filters.query && !`${it.title} ${it.summary||''}`.toLowerCase().includes(filters.query.toLowerCase())) return false;
+      // extended filters default all, so ignore
       return true;
     });
-  }, [articles, activeCategory, filterQuery]);
-
-  const hero = useMemo(() => {
-    // hero includes published if available as first slide, otherwise briefing sorted
-    const sorted = [...filtered].sort(briefingSort);
-    if (publishedHero && activeCategory === 'All' && !filterQuery.trim()) {
-      // present published as featured if it passes category? keep simple: always show as first hero when no filter
-      const pubAsArticle = {
-        title: publishedHero.title,
-        summary: publishedHero.summary || publishedHero.body || '',
-        category: publishedHero.category || 'Internal',
+    // if published and no filter except all, prepend
+    const isDefault = filters.region==='all' && filters.category==='all' && filters.source==='all' && filters.date==='all' && !filters.query;
+    if(published && isDefault){
+      const pubAs = {
+        title: published.title,
+        summary: published.summary || published.body || '',
+        category: published.category || 'Internal',
         region: 'Internal',
-        source: publishedHero.author || publishedHero.ownerName || 'Samsung Internal',
-        src: publishedHero.author || 'Samsung Internal',
-        date: publishedHero.publishedAt ? String(publishedHero.publishedAt).slice(0,10) : 'Latest',
+        source: published.author || published.ownerName || 'Samsung Internal',
+        src: published.author || 'Samsung Internal',
+        date: published.publishedAt ? String(published.publishedAt).slice(0,10) : 'Latest',
         source_count: 1,
-        image_url: publishedHero.cover?.url || '',
-        top_image: publishedHero.cover?.url || '',
+        image_url: published.cover?.url || '',
+        top_image: published.cover?.url || '',
         link: '',
-        keywords: [],
-        _published: true,
-        _id: publishedHero.id,
+        _published:true,
       };
-      // avoid duplicate title
-      const withoutDup = sorted.filter((it) => it.title !== pubAsArticle.title);
-      return [pubAsArticle, ...withoutDup].slice(0, 5);
+      if(!base.some(b=>b.title===pubAs.title)) return [pubAs, ...base];
     }
-    return sorted.slice(0, 5);
-  }, [filtered, publishedHero, activeCategory, filterQuery]);
+    return base;
+  },[articles, filters, published]);
 
-  const stream = useMemo(() => [...filtered].sort((a,b) => (b.published_at || b.date || '').localeCompare(a.published_at || a.date || '')).slice(0, 8), [filtered]);
-  const latest = useMemo(() => {
-    const sorted = [...filtered].sort((a,b) => (b.date || '').localeCompare(a.date || ''));
-    const latestDate = sorted[0]?.date || '';
-    return sorted.filter((it) => it.date === latestDate).slice(0, 6);
-  }, [filtered]);
-  const feed = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const hero = useMemo(()=> filtered.slice(0,5), [filtered]);
+  const latest = useMemo(()=> filtered.slice(5,17), [filtered]);
+  const stream = useMemo(()=> filtered.slice(0,8), [filtered]);
+  const visibleFiltered = useMemo(()=> filtered.slice(0, visibleCount), [filtered, visibleCount]);
   const hasMore = filtered.length > visibleCount;
 
-  const runAction = async (key, work) => {
-    if (actionLocks.current.has(key)) return;
-    actionLocks.current.add(key);
-    setBusy((c) => ({ ...c, [key]: true }));
-    try { return await work(); } finally { actionLocks.current.delete(key); setBusy((c) => { const n={...c}; delete n[key]; return n; }); }
+  const runAction = async(key, work)=>{
+    if(locks.current.has(key)) return;
+    locks.current.add(key);
+    setBusy(c=>({...c,[key]:true}));
+    try{ return await work(); } finally{ locks.current.delete(key); setBusy(c=>{const n={...c}; delete n[key]; return n;});}
   };
 
-  const openDossier = (item) => setOpenArticle(item);
-  const closeDossier = () => setOpenArticle(null);
-
-  const handleSave = async (item) => {
-    if (item._published) { setNotice('Internal story — already published.'); return; }
-    const key = articleKey(item);
-    return runAction(key, async () => {
-      const saved = savedKeys.has(key);
-      if (saved) await removeSavedArticle(item);
-      else await saveArticleForLater(item);
-      setSavedKeys((cur) => { const n=new Set(cur); if(saved) n.delete(key); else n.add(key); return n; });
-      setNotice(saved ? 'Removed from followed.' : 'Following privately.');
+  const handleSave = (item)=>{
+    if(item._published) { setNotice('Internal story — already published.'); return; }
+    const key=articleKey(item);
+    return runAction(key, async()=>{
+      const saved=savedKeys.has(key);
+      if(saved) await removeSavedArticle(item); else await saveArticleForLater(item);
+      setSavedKeys(cur=>{ const n=new Set(cur); if(saved) n.delete(key); else n.add(key); return n; });
+      setNotice(saved?'Removed from followed.':'Following privately.');
     });
   };
-  const handleHide = async (item) => {
-    if (item._published) { setNotice('Published internal content cannot be hidden.'); return; }
-    const key = articleKey(item);
-    return runAction(key, async () => {
+  const handleHide = (item)=>{
+    if(item._published) { setNotice('Published internal content cannot be hidden.'); return; }
+    const key=articleKey(item);
+    return runAction(key, async()=>{
       await hideArticleForViewer(item);
-      setArticles((cur) => cur.filter((it) => articleKey(it) !== key));
+      setArticles(cur=> cur.filter(it=> articleKey(it)!==key));
       setNotice('Hidden from your feed.');
     });
   };
-  const handleReact = async (item, reaction) => {
-    if (item._published) { setNotice('Reactions are for briefing signals.'); return; }
-    const key = articleKey(item);
-    return runAction(key, async () => {
-      const curReac = item.reactions?.viewer_reaction || 'neutral';
-      const next = curReac === reaction ? 'neutral' : reaction;
+  const handleVote = (item, reaction)=>{
+    if(item._published) { setNotice('Reactions are for briefing signals.'); return; }
+    const key=articleKey(item);
+    return runAction(key, async()=>{
+      const cur = votes[key]?.viewer_reaction || item.reactions?.viewer_reaction || 'neutral';
+      const next = cur===reaction ? 'neutral' : reaction;
       const resp = await setViewerReaction(item, next);
-      const snap = { like_count: resp.like_count, dislike_count: resp.dislike_count, viewer_reaction: resp.viewer_reaction };
-      setArticles((cur) => cur.map((it) => articleKey(it)===key ? { ...it, reactions: snap } : it));
-      setOpenArticle((cur) => cur && articleKey(cur)===key ? { ...cur, reactions: snap } : cur);
-      setNotice(next === 'neutral' ? 'Reaction removed.' : `Your ${next} was counted.`);
+      const snap={ like_count:resp.like_count, dislike_count:resp.dislike_count, viewer_reaction:resp.viewer_reaction };
+      setVotes(prev=> ({...prev, [key]: snap}));
+      setOpenArticle(cur=> cur && articleKey(cur)===key ? {...cur, reactions:snap} : cur);
+      setNotice(next==='neutral'?'Reaction removed.':`Your ${next} was counted.`);
     });
   };
 
-  if (loading) return <div className="sampark-all-news-page"><div className="sampark-all-news-loading" role="status"><span className="sampark-spinner" /> Loading All News briefing…</div></div>;
-  if (error) return <div className="sampark-all-news-page"><div className="sampark-all-news-error" role="alert"><Icon name="warning" size={20} /><p>{error}</p><button className="btn-primary" onClick={() => setRetryKey((k)=>k+1)} type="button">Retry</button></div></div>;
+  const update = (key, value)=> {
+    setFilters(cur=> ({...cur, [key]: value}));
+    setVisibleCount(24);
+  };
+
+  if(loading) return <div className="sampark-all-news"><div className="sampark-all-news-loading" role="status"><span className="sampark-spinner" /> Loading All News briefing…</div></div>;
+  if(error) return <div className="sampark-all-news"><div className="sampark-all-news-error" role="alert"><Icon name="warning" size={20} /><p>{error}</p><button className="btn-primary" onClick={()=>setRetryKey(k=>k+1)} type="button">Retry</button></div></div>;
+
+  const categories = ['all', ...options.categories.slice(0,5)];
+  const common = (item)=> ({ vote: votes[articleKey(item)] || item.reactions, saved: savedKeys.has(articleKey(item)), disabled: Boolean(busy[articleKey(item)]), onOpen:setOpenArticle, onVote:handleVote, onSave:handleSave, onHide:handleHide });
 
   return (
-    <div className="sampark-all-news-page">
+    <div className="tab-content active sampark-all-news">
       {notice && <div className="sampark-for-you-feedback" role="status"><span>{notice}</span><button aria-label="Dismiss" onClick={()=>setNotice('')} type="button"><Icon name="x" size={14} /></button></div>}
-      <nav aria-label="All News categories" className="category-filters">
-        {CATEGORIES.map((cat) => (
-          <button key={cat} aria-pressed={activeCategory===cat} className={`cat-filter${activeCategory===cat ? ' active' : ''}`} onClick={() => { setActiveCategory(cat); setVisibleCount(20); }} type="button">{cat}</button>
-        ))}
+      <nav aria-label="News categories" className="category-filters">
+        {categories.map(cat=> <button key={cat} className={`cat-filter${filters.category===cat ? ' active' : ''}`} onClick={()=>update('category', cat)} type="button">{cat==='all'?'All':cat}</button>)}
       </nav>
 
-      <div className="sampark-all-news-layout">
-        <div className="sampark-all-news-primary">
-          {/* Featured News */}
-          <section aria-labelledby="sampark-featured-title" className="sampark-all-news-featured">
-            <header className="sampark-all-news-section-head"><h2 id="sampark-featured-title">Featured News</h2><span className="sampark-all-news-count">{hero.length} stories</span></header>
-            {hero.length ? (
-              <div className="sampark-all-news-hero-grid">
-                {hero[0] && <SamparkAllNewsCard featured busy={busy[articleKey(hero[0])]} item={hero[0]} onHide={handleHide} onOpen={openDossier} onReact={handleReact} onSave={handleSave} saved={savedKeys.has(articleKey(hero[0]))} />}
-                <div className="sampark-all-news-hero-side">
-                  {hero.slice(1,5).map((it) => (
-                    <SamparkAllNewsCard key={articleKey(it)||it.title} busy={busy[articleKey(it)]} item={it} onHide={handleHide} onOpen={openDossier} onReact={handleReact} onSave={handleSave} saved={savedKeys.has(articleKey(it))} />
-                  ))}
-                </div>
-              </div>
-            ) : <div className="sampark-all-news-empty"><Icon name="inbox" size={24} /><p>No featured stories match <strong>{activeCategory}</strong>{filterQuery ? ` · “${filterQuery}”` : ''}.</p><button className="btn-secondary" onClick={() => { setActiveCategory('All'); setFilterQuery(''); }} type="button">Clear filters</button></div>}
-          </section>
-
-          {/* Briefing Stream */}
-          <section aria-labelledby="sampark-stream-title" className="sampark-all-news-stream">
-            <header className="sampark-all-news-section-head"><h2 id="sampark-stream-title">Briefing Stream</h2><span className="sampark-all-news-live">Live</span></header>
-            {stream.length ? (
-              <div className="sampark-all-news-stream-list">
-                {stream.map((it) => (
-                  <button key={articleKey(it)} className="sampark-all-news-stream-item" onClick={() => openDossier(it)} type="button">
-                    <span className="sampark-stream-category">{it.category || 'Intelligence'}</span>
-                    <strong className="sampark-stream-title">{it.title}</strong>
-                    <small className="sampark-stream-meta">{it.src || it.source || 'Briefing'} · {it.date || 'Latest'} · Score {scoreOf(it)}</small>
-                  </button>
-                ))}
-              </div>
-            ) : <p className="sampark-all-news-empty-text">The briefing stream will populate after the next scheduler run.</p>}
-          </section>
+      <div className="news-layout">
+        <div className="carousel-news-container">
+          <FeaturedCarousel items={hero} getActions={common} onOpen={setOpenArticle} />
+          <aside className="live-news-sidebar">
+            <h3 className="sidebar-title">Briefing Stream</h3>
+            <div className="live-news-list">
+              {stream.map(item=>(
+                <button key={articleKey(item)} className="live-news-item" onClick={()=>setOpenArticle(item)} type="button">
+                  <span className="ln-category ai">{item.category || 'Technology'}</span>
+                  <p className="ln-headline">{item.title}</p>
+                  <span className="ln-meta">{item.src || item.source} | {item.date} | Score {item.importance_score || scoreOf(item)}</span>
+                </button>
+              ))}
+              {!stream.length && <p style={{color:'var(--text-light)',fontSize:13}}>The briefing stream will populate after the next scheduler run.</p>}
+            </div>
+          </aside>
         </div>
 
-        <aside className="sampark-all-news-sidebar" aria-label="Latest News">
-          <section className="sampark-all-news-latest">
-            <h2>Latest News</h2>
-            {latest.length ? (
-              <div className="sampark-all-news-latest-list">
-                {latest.map((it) => {
-                  const img = resolveImage(it);
-                  return (
-                    <button key={articleKey(it)} className="sampark-all-news-latest-item" onClick={() => openDossier(it)} type="button">
-                      <span className={`sampark-all-news-latest-thumb${img ? '' : ' is-empty'}`}>{img ? <img alt="" src={img} loading="lazy" /> : <Icon name="globe" size={18} />}</span>
-                      <span className="sampark-all-news-latest-copy"><strong>{it.title}</strong><small>{it.source || it.src} · {it.date}</small></span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : <p className="sampark-all-news-empty-text">No latest stories in this filter.</p>}
-          </section>
-
-          <section className="sampark-all-news-filters">
-            <h2>Apply Filter & Customize View</h2>
-            <label className="sampark-all-news-search"><Icon name="search" size={14} /><input aria-label="Filter All News" placeholder="Filter this briefing" value={filterQuery} onChange={(e)=>{ setFilterQuery(e.target.value); setVisibleCount(20); }} type="search" />{filterQuery && <button aria-label="Clear filter" onClick={()=>setFilterQuery('')} type="button"><Icon name="x" size={12} /></button>}</label>
-            <div className="sampark-all-news-filter-meta">
-              <span>{filtered.length} of {articles.length} signals visible</span>
-              {(activeCategory!=='All' || filterQuery) && <button className="sampark-all-news-clear" onClick={()=>{ setActiveCategory('All'); setFilterQuery(''); }} type="button">Reset</button>}
+        <section className="latest-news-section">
+          <div className="latest-news-header">
+            <h3>Latest News | {articles[0]?.date || 'Latest'} <span className="news-count">({filtered.length} News)</span></h3>
+            <div className="scroll-controls">
+              <button aria-label="Scroll latest news left" onClick={()=> latestRef.current?.scrollBy({left:-383, behavior:'smooth'})} type="button"><Icon name="chevL" size={15} /></button>
+              <button aria-label="Scroll latest news right" onClick={()=> latestRef.current?.scrollBy({left:383, behavior:'smooth'})} type="button"><Icon name="chevR" size={15} /></button>
             </div>
-          </section>
-        </aside>
+          </div>
+          {latest.length ? (
+            <div className="latest-news-scroll" ref={latestRef}>
+              {latest.map(item=> <NewsTile key={articleKey(item)} item={item} {...common(item)} />)}
+            </div>
+          ) : <p className="sampark-empty" style={{padding:12}}>No latest stories for this filter.</p>}
+        </section>
+
+        <section className="filter-view-section">
+          <div className="filter-view-header"><h3>Apply Filter & Customize View</h3></div>
+          <div className="filter-bar">
+            <label className="filter-dropdown">Region<select className="filter-select" aria-label="Region" value={filters.region} onChange={e=>update('region', e.target.value)}><option value="all">All Regions</option>{options.regions.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
+            <label className="filter-dropdown">Category<select className="filter-select" aria-label="Category" value={filters.category} onChange={e=>update('category', e.target.value)}><option value="all">All Categories</option>{options.categories.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
+            <label className="filter-dropdown">Source<select className="filter-select" aria-label="Source" value={filters.source} onChange={e=>update('source', e.target.value)}><option value="all">All Sources</option>{options.sources.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
+            <label className="filter-dropdown">Date<select className="filter-select" aria-label="Date" value={filters.date} onChange={e=>update('date', e.target.value)}><option value="all">All Dates</option>{options.dates.map(v=><option key={v} value={v}>{v}</option>)}</select></label>
+            <button className="filter-reset-btn" onClick={()=>{ setFilters({...emptyFilters}); setVisibleCount(24); }} type="button"><Icon name="refresh" size={14} /> Reset</button>
+          </div>
+          <div className="latest-news-header"><h3>News <span className="news-count">({filtered.length} News)</span></h3></div>
+          {filtered.length ? (
+            <>
+              <div className="filtered-news-grid">
+                {visibleFiltered.map(item=> <NewsTile key={articleKey(item)} item={item} {...common(item)} />)}
+              </div>
+              {hasMore && <div style={{display:'flex',gap:12,alignItems:'center',marginTop:14}}><button className="btn-primary" onClick={()=>setVisibleCount(c=>c+24)} type="button">Load more · {filtered.length-visibleCount} remaining</button><span style={{color:'var(--text-light)',fontSize:13}}>{visibleCount} of {filtered.length} shown</span></div>}
+              {!hasMore && filtered.length>24 && <p style={{color:'var(--text-light)',fontSize:12,textAlign:'center',marginTop:12}}>You have reached the end of this briefing.</p>}
+            </>
+          ) : <p className="sampark-empty">No news matches these filters.</p>}
+        </section>
       </div>
 
-      {/* All News feed */}
-      <section aria-labelledby="sampark-all-news-feed-title" className="sampark-all-news-feed">
-        <header className="sampark-all-news-section-head"><h2 id="sampark-all-news-feed-title">All News</h2><span className="sampark-all-news-count">{filtered.length} stories · {visibleCount >= filtered.length ? 'all visible' : `${filtered.length - visibleCount} more`}</span></header>
-        {filtered.length ? (
-          <>
-            <div className="sampark-all-news-grid">
-              {feed.map((it) => (
-                <SamparkAllNewsCard key={articleKey(it)} busy={busy[articleKey(it)]} item={it} onHide={handleHide} onOpen={openDossier} onReact={handleReact} onSave={handleSave} saved={savedKeys.has(articleKey(it))} />
-              ))}
-            </div>
-            {hasMore && (
-              <div className="sampark-all-news-loadmore">
-                <button className="btn-primary" onClick={()=>setVisibleCount((c)=>c+20)} type="button">Load more · {filtered.length - visibleCount} remaining</button>
-                <span className="sampark-load-hint">{visibleCount} of {filtered.length} shown</span>
-              </div>
-            )}
-            {!hasMore && filtered.length > 20 && <p className="sampark-all-news-footnote">You have reached the end of this briefing. Adjust filters to discover more.</p>}
-          </>
-        ) : (
-          <div className="sampark-all-news-empty"><Icon name="search" size={22} /><p>No stories match this filter. Try another category or clear the search.</p><button className="btn-secondary" onClick={()=>{ setActiveCategory('All'); setFilterQuery(''); }} type="button">Clear filters</button></div>
-        )}
-      </section>
-
-      <SamparkAllNewsDossier item={openArticle} onClose={closeDossier} onHide={async (it)=>{ closeDossier(); await handleHide(it); }} onReact={handleReact} onSave={handleSave} onSourceOpen={()=>{}} saved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} />
+      <SamparkAllNewsDossier item={openArticle} onClose={()=>setOpenArticle(null)} onHide={async it=>{ setOpenArticle(null); await handleHide(it); }} onReact={handleVote} onSave={handleSave} saved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} />
     </div>
   );
 }

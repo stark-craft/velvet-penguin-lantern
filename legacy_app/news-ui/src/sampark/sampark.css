@@ -453,64 +453,70 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .sampark-dossier-img { max-height: 260px; }
 }
 
-/* ========== SAMPARK ALL NEWS (Phase A) ========== */
-.sampark-all-news-page { display: grid; gap: 18px; }
+/* ========== SAMPARK ALL NEWS — BRIEFING-STYLE (Design-Team Correction) ========== */
+.sampark-all-news { display: grid; gap: 20px; }
 .sampark-all-news-loading, .sampark-all-news-error { display: grid; place-items: center; gap: 10px; min-height: 240px; padding: 32px 20px; border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
 .sampark-all-news-error { background: var(--surface); border: 1px solid var(--line); }
-.sampark-all-news-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
-.sampark-all-news-primary { display: grid; gap: 18px; }
-.sampark-all-news-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--primary); }
-.sampark-all-news-section-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
-.sampark-all-news-count { color: var(--faint); font-size: 12px; }
-.sampark-all-news-live { padding: 2px 8px; border-radius: 12px; background: #ecfdf5; color: #065f46; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.sampark-all-news-hero-grid { display: grid; grid-template-columns: 1.35fr .9fr; gap: 16px; align-items: stretch; }
-.sampark-all-news-hero-side { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.sampark-all-news-featured-card, .sampark-all-news-card { overflow: hidden; border-radius: 12px; background: var(--surface); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); display: flex; flex-direction: column; }
-.sampark-all-news-featured-card { min-height: 420px; }
-.sampark-all-news-media { position: relative; display: grid; place-items: center; width: 100%; border: 0; padding: 0; overflow: hidden; background: #f0f2f8; height: 148px; }
-.sampark-all-news-media--featured { height: auto; flex: 1 1 auto; min-height: 260px; aspect-ratio: 16/10; }
-.sampark-all-news-body { padding: 14px 16px; display: flex; flex-direction: column; flex: 1; }
-.sampark-all-news-kicker { color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 6px; }
-.sampark-all-news-title-btn { background: transparent; text-align: left; padding: 0; width: 100%; }
-.sampark-all-news-title-btn h4 { margin: 0 0 6px; font-size: 16px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.sampark-all-news-featured-card .sampark-all-news-title-btn h4 { font-size: 19px; line-height: 1.3; -webkit-line-clamp: 3; }
-.sampark-all-news-summary { display: -webkit-box; overflow: hidden; margin: 0 0 10px; color: var(--muted); font-size: 14px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.sampark-all-news-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
-.sampark-all-news-stream { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; }
-.sampark-all-news-stream-list { display: grid; gap: 10px; max-height: 460px; overflow-y: auto; padding-right: 4px; }
-.sampark-all-news-stream-item { display: grid; gap: 3px; text-align: left; padding: 10px 12px; border-radius: 8px; background: var(--surface-soft); border: 1px solid transparent; }
-.sampark-all-news-stream-item:hover { border-color: var(--primary); background: #f8f9ff; }
-.sampark-stream-category { color: var(--primary); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.sampark-stream-title { font-size: 14px; font-weight: 600; line-height: 1.35; color: var(--text); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.sampark-stream-meta { color: var(--faint); font-size: 12px; }
-.sampark-all-news-sidebar { display: grid; gap: 16px; align-content: start; }
-.sampark-all-news-latest, .sampark-all-news-filters { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 16px; }
-.sampark-all-news-latest h2, .sampark-all-news-filters h2 { margin: 0 0 12px; font-size: 14px; font-weight: 600; }
-.sampark-all-news-latest-list { display: grid; gap: 10px; }
-.sampark-all-news-latest-item { display: flex; gap: 10px; text-align: left; padding: 8px; border-radius: 8px; background: var(--surface-soft); border: 1px solid transparent; }
-.sampark-all-news-latest-item:hover { border-color: var(--primary); background: #f8f9ff; }
-.sampark-all-news-latest-thumb { width: 64px; height: 64px; border-radius: 8px; overflow: hidden; background: #f0f2f8; display: grid; place-items: center; flex: none; }
-.sampark-all-news-latest-thumb img { width: 100%; height: 100%; object-fit: contain; background: #f0f2f8; }
-.sampark-all-news-latest-thumb.is-empty { color: var(--faint); }
-.sampark-all-news-latest-copy { display: grid; gap: 2px; min-width: 0; }
-.sampark-all-news-latest-copy strong { font-size: 13px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.sampark-all-news-latest-copy small { color: var(--faint); font-size: 11px; }
-.sampark-all-news-search { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
-.sampark-all-news-search input { flex: 1; border: 0; outline: 0; background: transparent; font-size: 14px; }
-.sampark-all-news-search button { background: transparent; color: var(--faint); display: grid; place-items: center; }
-.sampark-all-news-filter-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--faint); }
-.sampark-all-news-clear { background: transparent; color: var(--primary); font-weight: 600; font-size: 12px; }
-.sampark-all-news-feed { display: grid; gap: 12px; }
-.sampark-all-news-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 16px; }
-.sampark-all-news-loadmore { display: flex; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
-.sampark-all-news-empty { display: grid; place-items: center; gap: 10px; padding: 32px 16px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-soft); color: var(--muted); text-align: center; }
-.sampark-all-news-empty-text { color: var(--muted); font-size: 13px; text-align: center; padding: 12px; }
-.sampark-all-news-footnote { color: var(--faint); font-size: 12px; text-align: center; }
-@media (max-width: 1100px) {
-  .sampark-all-news-layout { grid-template-columns: 1fr; }
-  .sampark-all-news-hero-grid { grid-template-columns: 1fr; }
-  .sampark-all-news-hero-side { grid-template-columns: 1fr 1fr; }
-  .sampark-all-news-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+.sampark-all-news .category-filters { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); padding-bottom: 0; overflow-x: auto; }
+.sampark-all-news .cat-filter { background: transparent; color: var(--muted); padding: 8px 16px; font-size: 14px; font-weight: 500; border-bottom: 2px solid transparent; white-space: nowrap; }
+.sampark-all-news .cat-filter.active { color: var(--primary); border-bottom-color: var(--primary); }
+.sampark-all-news .news-layout { display: flex; flex-direction: column; gap: 20px; }
+.sampark-all-news .carousel-news-container { display: flex; gap: 20px; height: 500px; }
+.sampark-all-news .carousel-news-container .featured-carousel { flex: 0 0 70%; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); position: relative; background: #eef2ff; }
+.sampark-all-news .featured-carousel .carousel-slides { position: relative; height: 100%; background-size: cover; background-position: center; display: grid; place-items: end start; }
+.sampark-all-news .slide-overlay { position: absolute; bottom: 0; left: 0; width: 100%; padding: 24px 28px; background: linear-gradient(to top, rgba(0,0,0,.75) 0%, rgba(0,0,0,.4) 60%, transparent 100%); display: flex; flex-direction: column; gap: 8px; color: #fff; }
+.sampark-all-news .slide-source { font-size: 12px; color: rgba(255,255,255,.85); }
+.sampark-all-news .featured-story-title h3 { font-size: 20px; font-weight: 700; line-height: 1.3; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.4); margin: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; text-align: left; }
+.sampark-all-news .slide-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sampark-all-news .slide-actions .action-btn { width: auto; padding: 0 12px; border-radius: 20px; background: rgba(255,255,255,.2); color: #fff; font-size: 12px; gap: 6px; backdrop-filter: blur(4px); height: 32px; }
+.sampark-all-news .slide-actions .action-btn:hover { background: rgba(255,255,255,.35); }
+.sampark-all-news .slide-actions .action-btn.active { background: #fff; color: var(--primary); }
+.sampark-all-news .carousel-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.9); color: var(--text); display: grid; place-items: center; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+.sampark-all-news .carousel-arrow.prev { left: 12px; }
+.sampark-all-news .carousel-arrow.next { right: 12px; }
+.sampark-all-news .carousel-dots { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 10; }
+.sampark-all-news .carousel-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,.5); }
+.sampark-all-news .carousel-dots .dot.active { background: #fff; width: 24px; border-radius: 4px; }
+.sampark-all-news .live-news-sidebar { flex: 0 0 calc(30% - 20px); height: 500px; overflow-y: auto; background: var(--surface); border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); position: static; }
+.sampark-all-news .sidebar-title { font-size: 14px; font-weight: 600; color: var(--text); margin: 0 0 14px; padding-bottom: 10px; border-bottom: 2px solid var(--primary); display: flex; align-items: center; gap: 8px; }
+.sampark-all-news .sidebar-title::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: pulse 2s infinite; }
+.sampark-all-news .live-news-list { display: flex; flex-direction: column; gap: 12px; }
+.sampark-all-news .live-news-item { padding: 12px; border-radius: 8px; background: var(--surface-soft); text-align: left; border-left: 3px solid transparent; display: grid; gap: 4px; }
+.sampark-all-news .live-news-item:hover { background: #eef0f3; border-left-color: var(--primary); }
+.sampark-all-news .ln-category { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: #e3f2fd; color: #1565c0; }
+.sampark-all-news .ln-category.ai { background: #e8f5e9; color: #2e7d32; }
+.sampark-all-news .ln-headline { font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.4; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-all-news .ln-meta { font-size: 11px; color: var(--faint); }
+.sampark-all-news .latest-news-section { background: var(--surface-soft); border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.sampark-all-news .latest-news-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sampark-all-news .latest-news-header h3 { font-size: 14px; font-weight: 600; color: var(--text); }
+.sampark-all-news .news-count { font-weight: 400; color: var(--faint); font-size: 12px; }
+.sampark-all-news .scroll-controls { display: flex; gap: 4px; }
+.sampark-all-news .scroll-controls button { width: 30px; height: 30px; border-radius: 50%; background: var(--surface); color: var(--muted); display: grid; place-items: center; border: 1px solid var(--line); }
+.sampark-all-news .latest-news-scroll { display: flex; gap: 14px; overflow-x: auto; scroll-behavior: smooth; padding-bottom: 8px; }
+.sampark-all-news .latest-news-card { min-width: 369px; max-width: 369px; background: var(--surface); border-radius: 10px; overflow: hidden; flex-shrink: 0; cursor: pointer; border: 1px solid var(--line); }
+.sampark-all-news .lnc-image { height: 120px; display: grid; place-items: center; background: #f0f2f8; background-size: cover; background-position: center; border: 0; width: 100%; }
+.sampark-all-news .lnc-tags { padding: 8px 12px 4px; font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .04em; }
+.sampark-all-news .lnc-title { padding: 0 12px 12px; font-size: 13px; font-weight: 500; color: var(--text); line-height: 1.4; background: transparent; text-align: left; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.sampark-all-news .filter-view-section { background: var(--surface-soft); border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.sampark-all-news .filter-view-header h3 { font-size: 14px; font-weight: 600; margin: 0 0 14px; }
+.sampark-all-news .filter-bar { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.sampark-all-news .filter-dropdown { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.sampark-all-news .filter-select { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; min-width: 140px; font-size: 13px; }
+.sampark-all-news .filter-reset-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+.sampark-all-news .filtered-news-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.sampark-all-news .filtered-news-grid .latest-news-card { min-width: 0; max-width: none; }
+.sampark-all-news .sampark-empty { display: grid; place-items: center; gap: 8px; padding: 24px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); text-align: center; }
+@media (max-width: 1200px) {
+  .sampark-all-news .carousel-news-container { flex-direction: column; height: auto; }
+  .sampark-all-news .carousel-news-container .featured-carousel { flex: 1 1 100%; height: 340px; }
+  .sampark-all-news .live-news-sidebar { flex: 1 1 100%; height: auto; max-height: 500px; }
+  .sampark-all-news .filtered-news-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 900px) {
+  .sampark-all-news .filtered-news-grid { grid-template-columns: repeat(2, 1fr); }
+  .sampark-all-news .latest-news-scroll { gap: 10px; }
+  .sampark-all-news .latest-news-card { min-width: 280px; max-width: 280px; }
 }
 
 /* ========== SAMPARK RESEARCH (Phase B) ========== */

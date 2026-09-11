@@ -282,15 +282,18 @@ test('Sampark All News is functional with real briefing APIs and Sampark-native 
   const allNews = read('../src/sampark/SamparkAllNews.jsx');
   assert.match(allNews, /getSharedBriefing|getLatestBriefing/);
   assert.match(allNews, /getPublishedInternalContent/);
-  assert.match(allNews, /Featured News|Briefing Stream|Latest News|All News/);
-  assert.match(allNews, /categoryMatches|CATEGORIES/);
+  assert.match(allNews, /Briefing Stream|Latest News|Apply Filter/);
+  assert.match(allNews, /emptyFilters|options\.categories|category-filters/);
+  assert.match(allNews, /carousel-news-container|featured-carousel|live-news-sidebar/);
+  assert.match(allNews, /latest-news-section|latest-news-scroll|filtered-news-grid|filter-view-section/);
   assert.match(allNews, /visibleCount|Load more/);
   assert.match(allNews, /SamparkAllNewsDossier|sampark-dossier/);
   assert.match(allNews, /setViewerReaction|saveArticleForLater|hideArticleForViewer/);
-  assert.match(allNews, /sampark-all-news-page|sampark-all-news-hero-grid/);
-  assert.match(allNews, /object-fit:\s*contain|sampark-card-img/);
+  assert.match(allNews, /sampark-all-news|tab-content active/);
+  assert.match(allNews, /object-fit:\s*cover|sampark-dossier/);
   assert.doesNotMatch(allNews, /FeedScreen|fetch\(.*briefing\/shared/);
-  assert.match(read('../src/sampark/sampark.css'), /sampark-all-news-page/);
+  assert.doesNotMatch(allNews, /sampark-all-news-hero-grid|sampark-all-news-media--featured/);
+  assert.match(read('../src/sampark/sampark.css'), /sampark-all-news|carousel-news-container/);
 });
 
 test('Sampark Research is Sampark-native archive search with real intelligence APIs', () => {
