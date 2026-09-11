@@ -54,7 +54,7 @@ test('Sampark shell mounts only allowed Search/Settings integrations and viewer 
   // Final surfaces replace lightweight shell placeholders with real implementations
   assert.match(read('../src/sampark/all-news/AllNewsPage.jsx'), /getSharedBriefing|getLatestBriefing|useBriefingFeed/);
   assert.match(read('../src/sampark/all-news/data/useBriefingFeed.js'), /getSharedBriefing|getLatestBriefing/);
-  assert.match(read('../src/sampark/SamparkResearch.jsx'), /searchExtractedIntelligence/);
+  assert.match(read('../src/sampark/SamparkResearch.jsx') + read('../src/sampark/research/ResearchArchiveSearch.jsx'), /searchExtractedIntelligence/);
   assert.match(read('../src/sampark/SamparkSamsungNews.jsx'), /getSamsungInternalFeed|getPublishedInternalContent/);
   assert.match(read('../src/sampark/SamparkCreate.jsx'), /createContributionDraft|submitContributionDraft/);
   assert.match(read('../src/sampark/SamparkSearchResults.jsx'), /searchExtractedIntelligence/);
@@ -301,15 +301,24 @@ test('Sampark Research is Sampark-native archive search with real intelligence A
   const app = read('../src/sampark/SamparkApp.jsx');
   assert.match(app, /path="\/research"/);
   assert.match(app, /SamparkResearch/);
+  assert.match(app, /path="\/research\/\*"/);
   const research = read('../src/sampark/SamparkResearch.jsx');
-  assert.match(research, /searchExtractedIntelligence/);
-  assert.match(research, /Research.*extracted intelligence|Investigate the retained archive/);
-  assert.match(research, /From|To|Source filter|target_sites/);
-  assert.match(research, /sampark-research-page|sampark-research-grid/);
-  assert.match(research, /SamparkResearchDossier|sampark-dossier/);
-  assert.match(research, /setViewerReaction|saveArticleForLater|hideArticleForViewer/);
-  assert.doesNotMatch(research, /ResearchScreen|getVentureDiscovery|venture-lens/);
-  assert.match(read('../src/sampark/sampark.css'), /sampark-research-page/);
+  assert.match(research, /getVentureDiscovery|venture-lens\/discovery/);
+  assert.match(research, /Research.*Intelligence|technical artifacts.*evidence/);
+  assert.match(research, /ResearchNavigation|ResearchOverview|ResearchArchiveSearch/);
+  assert.match(research, /sampark-research-workspace|sampark-research-discovery-grid/);
+  assert.match(research, /ResearchArtifactCard|ResearchArtifactDetail/);
+  assert.match(research, /provider|stale|starter_snapshot/);
+  assert.match(research, /Watchlist|Compare|Briefs|Archive Search/);
+  assert.match(research, /ResearchArchiveSearch|searchExtractedIntelligence/);
+  // Archive search remains as explicit secondary tool
+  const archive = read('../src/sampark/research/ResearchArchiveSearch.jsx');
+  assert.match(archive, /searchExtractedIntelligence/);
+  assert.match(archive, /From|To|Source filter|target_sites/);
+  assert.match(archive, /sampark-research-grid|sampark-dossier/);
+  assert.match(archive, /setViewerReaction|saveArticleForLater|hideArticleForViewer/);
+  assert.match(read('../src/sampark/research/research.css'), /sampark-research-discovery-grid/);
+  assert.match(read('../src/sampark/research/research.css'), /repeat\(3.*minmax\(0, 1fr\)/);
 });
 
 test('Sampark Samsung News uses real Samsung feed and published internal content', () => {
