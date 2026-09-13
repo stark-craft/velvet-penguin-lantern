@@ -39,6 +39,7 @@ ALL_CAPABILITIES = frozenset(
         "scheduler.control",
         "gatekeeper.review",
         "analytics.view",
+        "voc.review",
         "region.correct",
         "model.train",
         "crawl.run",
@@ -236,6 +237,29 @@ def revoke_privileged_session(request: Request, response: Response) -> None:
     with _SESSION_LOCK:
         _SESSIONS.pop(token, None)
     response.delete_cookie(PRIVILEGED_COOKIE, path="/")
+
+
+def session_info(request: Request) -> dict:
+    """Coarse privileged-session state for truthful UI (no secrets)."""
+    token = str(request.cookies.get(PRIVILEGED_COOKIE, "") or "")
+    if not token:
+        return {"active": False, "role": ""}
+    with _SESSION_LOCK:
+        _prune_sessions()
+        session = _SESSIONS.get(token)
+        if not session:
+            return {"active": False, "role": ""}
+        return {"active": True, "role": str(session.get("role") or "")}
+
+
+def capability_sources(request: Request, response: Response | None = None) -> dict:
+    """Coarse capability provenance without secrets: session/network/principal."""
+    principal, ip = resolve_principal(request, response)
+    return {
+        "session": sorted(session_capabilities(request)),
+        "network": sorted(network_capabilities(ip) | bootstrap_capabilities_for_ip(ip)),
+        "principal": sorted(dynamic_capabilities(principal)),
+    }
 
 
 def resolve_principal(request: Request, response: Response | None = None) -> tuple[str, str]:

@@ -4,11 +4,13 @@ import test from 'node:test';
 
 const read = (file) => readFileSync(new URL(file, import.meta.url), 'utf8');
 
-test('Sampark remains an independent light-only frontend entry', () => {
+test('Sampark remains an independent frontend entry with persisted theme preference', () => {
   const entry = read('../src/sampark/main.jsx');
   assert.match(read('../vite.config.js'), /sampark\/index\.html/);
   assert.match(entry, /basename="\/sampark"/);
-  assert.match(entry, /dataset\.theme = 'light'/);
+  assert.match(entry, /applySamparkTheme|theme\.js/);
+  assert.match(read('../src/sampark/theme.js'), /sampark-theme/);
+  assert.match(read('../src/sampark/theme.js'), /dark/);
   assert.doesNotMatch(read('../src/main.jsx'), /sampark/);
   assert.doesNotMatch(entry, /GuidePetProvider|ui-polish|index\.css/);
   assert.match(read('../sampark/index.html'), /data-theme="light"/);
@@ -77,14 +79,14 @@ test('Sampark For You uses real recommendation APIs and Sampark-native presentat
   assert.match(forYou, /articleKey|reactionIdentity/);
   assert.match(forYou, /normalizeList/);
   assert.match(forYou, /sampark-preferences-bar|sampark-metrics-grid|sampark-foryou-grid|sampark-news-card/);
-  assert.match(forYou, /SamparkPreferencesModal|SamparkArticleModal|SamparkForYouCard/);
+  assert.match(forYou, /SamparkPreferencesModal|SamparkArticleDossier|SamparkForYouCard/);
   assert.match(forYou, /sampark-card-media|sampark-card-img/);
-  assert.match(forYou, /object-fit:\s*contain|sampark-dossier-img/);
+  assert.match(read('../src/sampark/shared/SamparkArticleDossier.jsx'), /object-fit|sampark-dossier-img/);
   assert.doesNotMatch(forYou, /ForYouScreen|presentation="sampark"/);
   assert.doesNotMatch(forYou, /fetch\(|https?:\/\/|127\.0\.0\.1/);
   assert.match(read('../src/sampark/sampark.css'), /sampark-for-you-page|sampark-foryou-grid|sampark-metrics-grid/);
   assert.match(read('../src/sampark/sampark.css'), /object-fit:\s*contain/);
-  assert.match(forYou, /SamparkArticleModal[\s\S]*why_matters|why_it_matters|summary_points/);
+  assert.match(forYou, /onWhyOpen|why_matters|why_it_matters|summary_points/);
 });
 
 test('Sampark For You featured layout is five-card composition and feed beyond five is preserved with pagination', () => {
@@ -185,8 +187,8 @@ test('Sampark header, auth and settings remain standalone and SSO-ready without 
   assert.match(app, /Search Technologies News/);
   assert.match(app, /lang-btn/);
   assert.doesNotMatch(app, /sampark-header|sampark-nav/);
-  assert.match(app, /create-news-btn/);
-  assert.doesNotMatch(app, /Create News.*workflow|contribution.*create.*modal/i);
+  assert.match(app, /to="\/create".*Create/s);
+  assert.match(app, /main-tabs.*Create/s);
   const login = read('../src/sampark/SamparkLogin.jsx');
   assert.match(login, /useSamparkAuth|login\(role/);
   assert.match(login, /Access TechScout|Samsung Sampark SSO will be used/);
@@ -236,8 +238,8 @@ test('Sampark secondary workspaces are Sampark-native under /sampark with real A
   assert.match(app, /SamparkReview|SamparkApproved|SamparkGatekeeper/);
   assert.doesNotMatch(app, /href="\/rejected"|href="\/history"|href="\/voc"[^"]/);
   const settings = read('../src/sampark/SamparkSettingsModal.jsx');
-  assert.match(settings, /href="\/sampark\/following/);
-  assert.match(settings, /href="\/sampark\/hidden/);
+  assert.match(settings, /to="\/following"/);
+  assert.match(settings, /to="\/hidden"/);
   assert.doesNotMatch(settings, /href="\/rejected"/);
   const following = read('../src/sampark/SamparkFollowing.jsx');
   assert.match(following, /getFollowingThreads/);
@@ -288,7 +290,8 @@ test('Sampark All News is functional with real briefing APIs and Sampark-native 
   assert.match(allNewsModel, /selectFeatured|selectAllNewsRail|selectLatestToday|deriveFilterOptions/);
   assert.match(allNewsPage, /CategoryTabs|FeaturedCarousel|AllNewsRail|LatestNews|FilterPanel|DayWiseNews/);
   assert.match(allNewsPage, /tsan-page|tsan-category-tabs|tsan-featured-rail|tsan-rail|tsan-latest|tsan-filter-panel|tsan-daywise/);
-  assert.match(allNewsPage, /sampark-dossier|useModalFocus/);
+  assert.match(allNewsPage, /SamparkArticleDossier/);
+  assert.match(read('../src/sampark/shared/SamparkArticleDossier.jsx'), /sampark-dossier|useModalFocus/);
   assert.match(allNewsPage, /getViewerReactions|saveArticleForLater|hideArticleForViewer|setViewerReaction/);
   // ensure isolated tsan-* namespace, not old classes
   assert.match(read('../src/sampark/all-news/all-news.css'), /\.tsan-/);
@@ -373,6 +376,6 @@ test('Sampark routing stays inside /sampark and four primary tabs remain', () =>
   assert.match(app, /to="\/all-news".*All News/s);
   assert.match(app, /to="\/research".*Research/s);
   assert.match(app, /to="\/samsung-news".*Samsung News/s);
-  assert.match(app, /create-news-btn/);
+  assert.match(app, /to="\/create".*Create/s);
   assert.doesNotMatch(app, /SamparkForYouView|SamparkBriefingView|SamsungNewsScreen/);
 });

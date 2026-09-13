@@ -1,7 +1,7 @@
 export function scoreOf(item) {
-  const raw = Number(item?.importance ?? item?.conf ?? 0.72);
+  const raw = Number(item?.importance_score ?? item?.score ?? item?.importance ?? item?.conf ?? 0.72);
   if (Number.isNaN(raw)) return 72;
-  if (raw <= 1) return Math.round(raw * 100);
+  if (raw <= 1 && raw > 0) return Math.round(raw * 100);
   return Math.max(0, Math.min(100, Math.round(raw)));
 }
 

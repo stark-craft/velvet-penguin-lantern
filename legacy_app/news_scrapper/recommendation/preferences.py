@@ -61,6 +61,8 @@ ALLOWED_EVENTS = {
     "why_this_story_open",
     "interest_edit",
     "feed_refresh",
+    "search_intent",
+    "search",
 }
 MEANINGFUL_EVENTS = ALLOWED_EVENTS - {"qualified_impression", "feed_refresh"}
 
@@ -79,6 +81,7 @@ def empty_state() -> dict[str, Any]:
             "regions": ["balanced"],
             "surprise_me": True,
             "completed_at": "",
+            "remember_search_history": True,
         },
         "events": [],
         "served": {},
@@ -87,6 +90,8 @@ def empty_state() -> dict[str, Any]:
         "personalization_paused": False,
         "reaction_events": {},
         "migration": {},
+        "search_history": [],
+        "search_history_updated_at": "",
     }
 
 
@@ -106,14 +111,24 @@ def sanitize_preferences(payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(values, list):
             return []
         return list(dict.fromkeys(str(value) for value in values if str(value) in allowed))
-    regions = keep(payload.get("regions"), REGIONS) or ["balanced"]
-    return {
-        "topics": keep(payload.get("topics"), TOPICS),
-        "outcomes": keep(payload.get("outcomes"), OUTCOMES),
-        "source_families": keep(payload.get("source_families"), SOURCE_FAMILIES),
-        "regions": regions,
-        "surprise_me": bool(payload.get("surprise_me", True)),
-    }
+    base: dict[str, Any] = {}
+    if "topics" in payload:
+        base["topics"] = keep(payload.get("topics"), TOPICS)
+    if "outcomes" in payload:
+        base["outcomes"] = keep(payload.get("outcomes"), OUTCOMES)
+    if "source_families" in payload:
+        base["source_families"] = keep(payload.get("source_families"), SOURCE_FAMILIES)
+    if "regions" in payload:
+        regions = keep(payload.get("regions"), REGIONS) or ["balanced"]
+        base["regions"] = regions
+    if "surprise_me" in payload:
+        base["surprise_me"] = bool(payload.get("surprise_me"))
+    # remember_search_history is server-authoritative, default true
+    if "remember_search_history" in payload:
+        base["remember_search_history"] = bool(payload.get("remember_search_history"))
+    elif "rememberSearchHistory" in payload:
+        base["remember_search_history"] = bool(payload.get("rememberSearchHistory"))
+    return base
 
 
 class ViewerRepository:
@@ -149,11 +164,50 @@ class ViewerRepository:
         def updater(state: dict[str, Any]) -> dict[str, Any]:
             current = {**empty_state(), **(state if isinstance(state, dict) else {})}
             previous = current.get("preferences") if isinstance(current.get("preferences"), dict) else {}
+            prev_remember = bool(previous.get("remember_search_history", True))
+            # merge only provided fields, preserve omitted
             current["preferences"] = {**previous, **cleaned, "updated_at": now}
             if complete is True:
                 current["preferences"]["completed_at"] = now
             elif complete is False:
                 current["preferences"]["completed_at"] = ""
+            # Turning off must purge search-derived events and history; turning back on must not resurrect
+            new_remember = bool(current["preferences"].get("remember_search_history", True))
+            if prev_remember and not new_remember:
+                current["search_history"] = []
+                current["search_history_updated_at"] = now
+                events = current.get("events") if isinstance(current.get("events"), list) else []
+                current["events"] = [e for e in events if str(e.get("action") or "") not in {"search_intent", "search"}]
+            return current
+        return self._store(viewer_key).update(updater)
+
+    def record_search_query(self, viewer_key: str, query: str) -> dict[str, Any]:
+        clean = " ".join(str(query or "").strip().split())[:120]
+        if not clean or len(clean) < 2:
+            return self.read(viewer_key)
+        now = utcnow().isoformat(timespec="seconds")
+        lower = clean.casefold()
+        def updater(state: dict[str, Any]) -> dict[str, Any]:
+            current = {**empty_state(), **(state if isinstance(state, dict) else {})}
+            prefs = current.get("preferences") if isinstance(current.get("preferences"), dict) else {}
+            if not bool(prefs.get("remember_search_history", True)):
+                return current
+            history = current.get("search_history") if isinstance(current.get("search_history"), list) else []
+            # normalize, length-limit, deduplicate, bound 12 unique
+            filtered = [h for h in history if str(h.get("query") or "").casefold() != lower]
+            entry = {"query": clean, "saved_at": now}
+            filtered.insert(0, entry)
+            current["search_history"] = filtered[:12]
+            current["search_history_updated_at"] = now
+            return current
+        return self._store(viewer_key).update(updater)
+
+    def clear_search_history(self, viewer_key: str) -> dict[str, Any]:
+        now = utcnow().isoformat(timespec="seconds")
+        def updater(state: dict[str, Any]) -> dict[str, Any]:
+            current = {**empty_state(), **(state if isinstance(state, dict) else {})}
+            current["search_history"] = []
+            current["search_history_updated_at"] = now
             return current
         return self._store(viewer_key).update(updater)
 
@@ -253,9 +307,66 @@ class ViewerRepository:
                 if action == "qualified_impression" and impression_key in qualified_impressions:
                     duplicates += 1
                     continue
+                # Private search history check: if remember is off, drop search-derived events
+                if action in {"search_intent", "search"}:
+                    prefs = state.get("preferences") if isinstance(state.get("preferences"), dict) else {}
+                    if not bool(prefs.get("remember_search_history", True)):
+                        rejected += 1
+                        continue
+                    # normalize query, length-limit
+                    detail = event.get("detail") if isinstance(event.get("detail"), dict) else {}
+                    q = " ".join(str(detail.get("query") or "").split())[:120]
+                    if len(q) < 2:
+                        q = " ".join(str(event.get("query") or "").split())[:120]
+                    lower = q.casefold() if q else ""
+                    # deduplicate rapid repeats within 60s, bound per query
+                    now_dt = None
+                    try:
+                        now_dt = dt.datetime.fromisoformat(str(event.get("occurred_at") or "").replace("Z", "+00:00"))
+                        if now_dt.tzinfo is None:
+                            now_dt = now_dt.replace(tzinfo=dt.timezone.utc)
+                    except Exception:
+                        now_dt = utcnow()
+                    # count existing search events for same query and check recent
+                    recent_same = 0
+                    for existing in retained:
+                        if str(existing.get("action") or "") not in {"search_intent", "search"}:
+                            continue
+                        ed = existing.get("detail") if isinstance(existing.get("detail"), dict) else {}
+                        eq = " ".join(str(ed.get("query") or "").split())[:120].casefold()
+                        if eq == lower and lower:
+                            recent_same += 1
+                            try:
+                                occ = dt.datetime.fromisoformat(str(existing.get("occurred_at") or "").replace("Z", "+00:00"))
+                                if occ.tzinfo is None:
+                                    occ = occ.replace(tzinfo=dt.timezone.utc)
+                                if abs((now_dt - occ).total_seconds()) < 60:
+                                    # rapid repeat deduplicate
+                                    raise StopIteration
+                            except StopIteration:
+                                duplicates += 1
+                                # skip this event entirely
+                                lower = None
+                                break
+                            except Exception:
+                                pass
+                    if lower is None:
+                        continue
+                    if recent_same >= 5:
+                        rejected += 1
+                        continue
+                    # also bound total search events over time to prevent dominance
+                    total_search = sum(1 for e in retained if str(e.get("action") or "") in {"search_intent", "search"})
+                    if total_search >= 50:
+                        # drop oldest search event to keep bounded, but still accept new
+                        # remove oldest search to keep memory bounded
+                        for idx, ev in enumerate(retained):
+                            if str(ev.get("action") or "") in {"search_intent", "search"}:
+                                retained.pop(idx)
+                                break
                 article_id = str(event.get("article_id") or "")
                 authorized = authorized_article_ids or set()
-                if action not in {"interest_edit", "feed_refresh"} and (
+                if action not in {"interest_edit", "feed_refresh", "search_intent", "search"} and (
                     not article_id
                     or (
                         article_id not in (state.get("served") or {})

@@ -6,6 +6,7 @@ import json
 import os
 import datetime as dt
 import hashlib
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, Body, HTTPException, Query, Request, Response
@@ -112,6 +113,193 @@ def _resolve(request: Request, response: Response) -> tuple[str, bool, str]:
     return key, created, profile
 
 
+# Engagement-eligible pool: briefing + retained history + published internal contributions
+# Bounded cache with invalidation when retained files or published content changes
+_ENGAGEMENT_RAW_CACHE: list[dict] | None = None
+_ENGAGEMENT_RAW_SIGNATURE: tuple | None = None
+_ENGAGEMENT_RAW_LOCK = threading.RLock()
+
+
+def _engagement_pool_signature() -> tuple:
+    legacy = _legacy()
+    try:
+        # History files signature
+        if UNIFIED_CORPUS_ENABLED:
+            history_files = legacy.get_profile_history_files(legacy.DEFAULT_PROFILE)
+        else:
+            # legacy profile routing: collect for current? Use unified as fallback for engagement
+            history_files = legacy.get_profile_history_files(legacy.DEFAULT_PROFILE)
+        history_sig = []
+        for path in sorted(history_files):
+            try:
+                p = Path(path)
+                stat = p.stat()
+                history_sig.append((str(p.resolve()), stat.st_mtime_ns, stat.st_size))
+            except OSError:
+                history_sig.append((str(path), 0, 0))
+        history_sig = tuple(history_sig)
+    except Exception:
+        history_sig = ()
+    # Published internal contributions signature – use file metadata only, avoid parsing store for cache hit
+    try:
+        from news_scrapper.internal_content import storage as _internal_storage
+        pub_path = Path(_internal_storage.CONTRIBUTIONS_FILE)
+        try:
+            stat = pub_path.stat()
+            pub_sig = (stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            pub_sig = (0, 0)
+    except Exception:
+        pub_sig = (0, 0)
+    return (history_sig, pub_sig)
+
+
+def _load_raw_engagement_pool() -> list[dict]:
+    global _ENGAGEMENT_RAW_CACHE, _ENGAGEMENT_RAW_SIGNATURE
+    sig = _engagement_pool_signature()
+    with _ENGAGEMENT_RAW_LOCK:
+        if _ENGAGEMENT_RAW_CACHE is not None and _ENGAGEMENT_RAW_SIGNATURE == sig:
+            return _ENGAGEMENT_RAW_CACHE
+    # Build pool outside lock to avoid blocking, then store under lock if still current
+    legacy = _legacy()
+    raw_pool: list[dict] = []
+    # 1. Retained briefing history (includes latest) – sorted newest first, prefer newest on duplicate
+    try:
+        if UNIFIED_CORPUS_ENABLED:
+            history_files = legacy.get_profile_history_files(legacy.DEFAULT_PROFILE)
+        else:
+            history_files = legacy.get_profile_history_files(legacy.DEFAULT_PROFILE)
+        # Sort newest first by mtime (fallback to filename)
+        def _file_sort_key(p):
+            try:
+                return Path(p).stat().st_mtime_ns
+            except OSError:
+                return 0
+        history_files = sorted(history_files, key=_file_sort_key, reverse=True)
+        for path in history_files:
+            try:
+                with open(path, "r", encoding="utf-8") as handle:
+                    payload = json.load(handle)
+                if not isinstance(payload, list):
+                    continue
+                for raw in payload:
+                    if isinstance(raw, dict) and str(raw.get("title") or "").strip():
+                        copied = dict(raw)
+                        raw_pool.append(copied)
+            except (OSError, json.JSONDecodeError):
+                continue
+    except Exception:
+        pass
+    # 2. Published internal contributions (Samsung News)
+    try:
+        from news_scrapper.internal_content import service as _internal_service
+        published = _internal_service.list_published()
+        for rec in published:
+            if not isinstance(rec, dict):
+                continue
+            title = str(rec.get("title") or "").strip()
+            if not title:
+                continue
+            # Convert to article-like dict for engagement
+            article = {
+                "title": title,
+                "summary": str(rec.get("summary") or rec.get("body") or "")[:2000],
+                "master_summary": str(rec.get("summary") or rec.get("body") or "")[:2000],
+                "snippet": str(rec.get("summary") or "")[:2000],
+                "source": str(rec.get("author") or rec.get("owner_name") or "Samsung Internal"),
+                "src": str(rec.get("author") or rec.get("owner_name") or "Samsung Internal"),
+                "category": str(rec.get("category") or "Internal"),
+                "region": "Global",
+                "vertical": "technology",
+                "audiences": ["all"],
+                "source_count": 1,
+                "importance_score": 80,
+                "is_published_internal": True,
+                "published_id": str(rec.get("id") or ""),
+                "id": str(rec.get("id") or ""),
+                "canonical_link": f"internal://{rec.get('id')}",
+                "link": f"internal://{rec.get('id')}",
+                "url": f"internal://{rec.get('id')}",
+                # preserve original record for debugging
+                "_published_record": rec,
+            }
+            raw_pool.append(article)
+    except Exception:
+        pass
+    # Deduplicate by article_id to avoid uncontrolled growth, keep first occurrence
+    # Use article_id to dedup, but preserve order: history first, then published
+    deduped: dict[str, dict] = {}
+    for art in raw_pool:
+        key = article_id(art)
+        if not key:
+            continue
+        if key not in deduped:
+            deduped[key] = art
+    result = list(deduped.values())
+    with _ENGAGEMENT_RAW_LOCK:
+        # Re-check signature before committing to avoid race
+        current_sig = _engagement_pool_signature()
+        if current_sig == sig:
+            _ENGAGEMENT_RAW_CACHE = result
+            _ENGAGEMENT_RAW_SIGNATURE = sig
+    return result
+
+
+def _engagement_candidates_for_request(request: Request) -> list[dict]:
+    raw_pool = _load_raw_engagement_pool()
+    legacy = _legacy()
+    # For test compatibility and to ensure patched _profile_and_articles is honored, merge its articles
+    try:
+        _, profile_articles = _profile_and_articles(request)
+        # Add any profile articles not already in raw pool (deduplicate later via collect_candidates)
+        if profile_articles:
+            raw_pool = raw_pool + profile_articles
+    except Exception:
+        pass
+    # Split into history/briefing vs published for hidden handling
+    history_like = [a for a in raw_pool if not a.get("is_published_internal")]
+    published_like = [a for a in raw_pool if a.get("is_published_internal")]
+    # Apply hidden filtering to history/briefing articles per viewer, preserve published
+    try:
+        if UNIFIED_CORPUS_ENABLED:
+            visible_history = legacy.filter_viewer_hidden(history_like, request, "default")
+            visible_history = legacy.filter_viewer_hidden(visible_history, request, "broadcast")
+            # Apply learned regions to history as well for consistency
+            visible_history = legacy.apply_learned_regions(visible_history, legacy.DEFAULT_PROFILE)
+        else:
+            profile = legacy.get_profile_for_request(request)
+            visible_history = legacy.filter_viewer_hidden(history_like, request, profile)
+            visible_history = legacy.apply_learned_regions(visible_history, profile)
+    except Exception:
+        visible_history = history_like
+    merged = visible_history + published_like
+    # Retain every distinct article_id; do NOT apply cluster deduplication (feed diversity) to engagement validation
+    entitled = {"all", "technology", "default", "broadcast"}
+    candidates: list[dict] = []
+    seen_ids: set[str] = set()
+    for raw in merged:
+        if not isinstance(raw, dict) or not str(raw.get("title") or "").strip():
+            continue
+        if raw.get("removed") or raw.get("globally_removed"):
+            continue
+        audiences = raw.get("audiences") or raw.get("audience") or ["all"]
+        if isinstance(audiences, str):
+            audiences = [audiences]
+        norm_aud = {str(v).strip().casefold() for v in audiences if str(v).strip()}
+        if "all" not in norm_aud and not (norm_aud & entitled):
+            continue
+        # Deduplicate by canonical article identity only, keep first (newest due to sorted raw_pool)
+        aid = article_id(raw)
+        if not aid or aid in seen_ids:
+            continue
+        seen_ids.add(aid)
+        c = dict(raw)
+        c["article_id"] = aid
+        c["cluster_id"] = c.get("cluster_id") or aid
+        candidates.append(c)
+    return candidates
+
+
 SHARED_EVENT_ACTIONS = {
     "dossier_open",
     "dossier_dwell",
@@ -144,30 +332,56 @@ TRACK_ACTION_MAP = {
 
 def _article_aliases(item: dict) -> set[str]:
     aliases = {article_id(item)}
-    for key in ("article_id", "id", "canonical_link", "link", "url", "title"):
+    for key in ("article_id", "id", "canonical_link", "link", "url", "_publishedId", "published_id", "internal_id"):
         value = str(item.get(key) or "").strip()
         if value:
             aliases.add(value.casefold())
+        if key == "id" and isinstance(item.get("_published_record"), dict):
+            nested = str(item["_published_record"].get("id") or "").strip()
+            if nested:
+                aliases.add(nested.casefold())
     return aliases
 
+def _title_alias(item: dict) -> str:
+    t = str(item.get("title") or "").strip()
+    return t.casefold() if t else ""
 
 def _resolve_shared_article(request: Request, detail: dict) -> dict | None:
-    _, articles = _profile_and_articles(request)
-    candidates = collect_candidates(
-        articles,
-        entitled_audiences={"all", "technology", "default", "broadcast"},
-    )
-    requested = {
-        str(detail.get(key) or "").strip().casefold()
-        for key in ("article_id", "id", "canonical_link", "link", "url", "title")
-        if str(detail.get(key) or "").strip()
-    }
-    requested_id = article_id(detail)
-    if requested_id:
-        requested.add(requested_id.casefold())
-    for candidate in candidates:
-        if requested & _article_aliases(candidate):
-            return candidate
+    candidates = _engagement_candidates_for_request(request)
+    # Prefer exact canonical identifiers; title fallback only when unambiguous and no explicit exact was provided
+    exact_requested: set[str] = set()
+    has_explicit_exact = False
+    for key in ("article_id", "id", "canonical_link", "link", "url", "_publishedId", "published_id", "internal_id"):
+        v = str(detail.get(key) or "").strip()
+        if v:
+            exact_requested.add(v.casefold())
+            has_explicit_exact = True
+    # Exact match via explicit identifiers or article_id hash (if detail had any explicit, the hash is also considered)
+    # Only add article_id hash if detail had at least one explicit exact identifier, to avoid title-hash polluting
+    if has_explicit_exact:
+        rid = article_id(detail)
+        if rid:
+            exact_requested.add(rid.casefold())
+        for candidate in candidates:
+            if exact_requested & _article_aliases(candidate):
+                return candidate
+        # Explicit exact was provided but didn't match – do not silently fallback to title
+        return None
+    # No explicit exact – try exact via article_id hash? For title-only detail, article_id hash is title hash, but candidate may be hash of link
+    # So we should not rely on hash; instead try title fallback directly
+    # Also try exact via article_id hash as fallback if it matches (covers case where both use same hashing)
+    rid = article_id(detail)
+    if rid:
+        for candidate in candidates:
+            if rid.casefold() == article_id(candidate).casefold():
+                return candidate
+    # Title fallback – only when unambiguous
+    detail_title = _title_alias(detail)
+    if not detail_title:
+        return None
+    title_matches = [c for c in candidates if _title_alias(c) == detail_title]
+    if len(title_matches) == 1:
+        return title_matches[0]
     return None
 
 
@@ -272,7 +486,7 @@ def recommendation_status(request: Request, response: Response):
     key, created, profile = _resolve(request, response)
     legacy = _legacy()
     state = REPOSITORY.read(key)
-    legacy_profile = legacy.get_viewer_profile(legacy.get_client_ip(request))
+    legacy_profile = legacy.get_signed_migration_source(request)
     return {
         "status": "success",
         "enabled": FOR_YOU_ENABLED,
@@ -312,7 +526,13 @@ def read_preferences(request: Request, response: Response):
 @router.put("/viewer/preferences")
 def update_preferences(payload: ViewerPreferences, request: Request, response: Response):
     key, _, _ = _resolve(request, response)
-    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    if hasattr(payload, "model_dump"):
+        try:
+            data = payload.model_dump(exclude_unset=True)
+        except TypeError:
+            data = payload.model_dump()
+    else:
+        data = payload.dict(exclude_unset=True)
     state = REPOSITORY.update_preferences(key, data)
     return {"status": "success", "preferences": state.get("preferences")}
 
@@ -320,7 +540,13 @@ def update_preferences(payload: ViewerPreferences, request: Request, response: R
 @router.post("/viewer/preferences/complete")
 def complete_preferences(payload: ViewerPreferences, request: Request, response: Response):
     key, _, _ = _resolve(request, response)
-    data = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+    if hasattr(payload, "model_dump"):
+        try:
+            data = payload.model_dump(exclude_unset=True)
+        except TypeError:
+            data = payload.model_dump()
+    else:
+        data = payload.dict(exclude_unset=True)
     state = REPOSITORY.update_preferences(key, data, complete=True)
     return {"status": "success", "preferences": state.get("preferences"), "mode": "configured"}
 
@@ -331,7 +557,7 @@ def confirm_legacy_migration(request: Request, response: Response, confirmed: bo
     legacy = _legacy()
     client_ip = legacy.get_client_ip(request)
     legacy_key = legacy.get_viewer_key(client_ip)
-    legacy_profile = legacy.get_viewer_profile(client_ip)
+    legacy_profile = legacy.get_signed_migration_source(request)
     if not confirmed:
         return {"status": "success", "migrated": False}
     if not str(legacy_profile.get("display_name") or "").strip():
@@ -684,6 +910,7 @@ def for_you(
     response: Response,
     cursor: str = Query(default=""),
     limit: int = Query(default=20, ge=1, le=50),
+    include_sections: bool = Query(default=True),
 ):
     if not FOR_YOU_ENABLED:
         raise HTTPException(status_code=404, detail="For You is not enabled for this deployment.")
@@ -696,14 +923,13 @@ def for_you(
             *legacy.get_viewer_saved_items(request, "default"),
             *legacy.get_viewer_saved_items(request, "broadcast"),
         ]
-    viewer = legacy.get_viewer_profile(legacy.get_client_ip(request))
     result = SERVICE.build_feed(
         key,
         articles,
         saved,
         cursor=cursor,
         limit=limit,
-        viewer_name=str(viewer.get("display_name") or ""),
+        viewer_name=str(legacy.get_signed_viewer_display_name(request) or ""),
         entitled_audiences={"all", "technology", "default", "broadcast"},
     )
     reaction_map = REACTIONS.snapshots(key, [article_id(item) for item in result.get("items") or []])
@@ -711,5 +937,16 @@ def for_you(
         item["reactions"] = reaction_map.get(article_id(item), {
             "like_count": 0, "dislike_count": 0, "viewer_reaction": "neutral",
         })
+        # Card-list payload: drop full bodies (dossier uses summary) and avoid
+        # duplicating identical key_points alongside summary_points.
+        item.pop("full_contents", None)
+        item.pop("full_content", None)
+        try:
+            if item.get("key_points") and item.get("key_points") == item.get("summary_points"):
+                item.pop("key_points", None)
+        except Exception:
+            pass
+    if not include_sections:
+        result.pop("sections", None)
     result.update({"enabled": True, "profile": serving_profile})
     return result

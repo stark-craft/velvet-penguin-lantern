@@ -48,11 +48,31 @@ export function selectAllNewsRail(articles, limit=10){
   return sorted.slice(0,limit);
 }
 
-// Latest News = today's articles only
+// Latest = newest valid publication/archive date present in filtered result set
 export function selectLatestToday(articles, todayISO){
   const safe=(articles||[]).filter(Boolean);
-  const today = todayISO || new Date().toISOString().slice(0,10);
-  return safe.filter(a=> String(a?.date||'').slice(0,10)===today);
+  if(!safe.length) return [];
+  const valid = [];
+  const invalid = [];
+  for(const a of safe){
+    const raw = String(a?.date || a?.archive_date || '').trim();
+    const iso = raw.slice(0,10);
+    const parsed = iso ? new Date(iso) : null;
+    const isValid = iso && /^\d{4}-\d{2}-\d{2}$/.test(iso) && parsed && !isNaN(parsed.getTime());
+    if(isValid) valid.push({ item: a, iso });
+    else invalid.push(a);
+  }
+  if(!valid.length){
+    // no valid date, return empty (or could return invalid after but spec says invalid goes after valid, so for Latest we show no section)
+    return [];
+  }
+  // sort valid by iso descending to find newest
+  valid.sort((a,b)=> b.iso.localeCompare(a.iso));
+  const latestISO = valid[0].iso;
+  const latest = valid.filter(v=> v.iso===latestISO).map(v=> v.item);
+  // invalid goes after valid, but Latest section only shows newest valid date, so return only latest valid
+  // If todayISO provided and differs, we still use latestISO per spec (not browser UTC)
+  return latest;
 }
 
 export function applyArticleFilters(articles, filters){

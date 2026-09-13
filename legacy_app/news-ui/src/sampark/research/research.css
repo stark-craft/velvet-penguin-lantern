@@ -1,5 +1,5 @@
-/* Sampark Research workspace — light, rounded, Samsung blue accents */
-.sampark-research-workspace { display: grid; gap: 16px; max-width: 1120px; margin: 0 auto; }
+/* Sampark Research workspace — occupies same usable width as For You / All News / Samsung News */
+.sampark-research-workspace { display: grid; gap: 16px; width: 100%; min-width: 0; margin: 0; padding: 0 16px; box-sizing: border-box; }
 
 /* Navigation */
 .sampark-research-nav { overflow: hidden; border-radius: 12px; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,.06); }

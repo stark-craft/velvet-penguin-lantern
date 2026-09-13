@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../news-scrapper/components/Icon.jsx';
 import {
   getLatestBriefing,
@@ -12,51 +12,32 @@ import {
   activeLeadership,
   buildHeroSlides,
   coverUrl,
+  findPublishedFocusRecord,
   isSamsungSignal,
   rankTrending,
   resolveInternalImage,
-  signalScope,
   splitByScope,
 } from '../news-scrapper/internal/samsungInternalModel.js';
-import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
+import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
+import { useArticleEngagement } from './shared/useArticleEngagement.js';
 
 function imageOf(item) {
   return resolveInternalImage(item) || item?.image_url || item?.top_image || '';
 }
 
 function SamparkSamsungDossier({ item, onClose }) {
-  const dialogRef = useModalFocus(Boolean(item), onClose);
+  const engagement = useArticleEngagement(item || {}, { surface: 'samsung_news' });
+  const handleClose = () => { engagement.onDossierClose(); onClose(); };
+  const articleId = item ? (item.canonical_link || item.link || item.url || item.id || item.title || '') : '';
+  React.useEffect(()=>{ if(item && articleId) engagement.onDossierOpen(item); }, [articleId]);
   if (!item) return null;
-  const image = imageOf(item);
-  const title = item.title || 'Samsung signal';
-  const source = item.source || item.src || 'Samsung';
-  const link = item.link || item.url || '';
-  const summary = item.summary || item.master_summary || item.snippet || '';
   return (
-    <div className="sampark-modal-overlay" onMouseDown={(e)=>{ if(e.target===e.currentTarget) onClose(); }}>
-      <section aria-labelledby="sampark-samsung-dossier-title" aria-modal="true" className="sampark-dossier sampark-dossier--large" ref={dialogRef} role="dialog" tabIndex={-1}>
-        <header className="sampark-dossier-header">
-          <div>
-            <div className="sampark-dossier-kicker">{item.category || 'Samsung'} · {source} · {item.date || item.published_at || 'Latest'}</div>
-            <div className="sampark-dossier-subtitle">{signalScope(item)} · {item.source_count || 1} source{(item.source_count||1)===1?'':'s'}</div>
-          </div>
-          <button aria-label="Close dossier" className="sampark-dossier-close" onClick={onClose} type="button"><Icon name="x" size={18} /></button>
-        </header>
-        <div className="sampark-dossier-scroll">
-          {image ? <div className="sampark-dossier-media"><img alt="" className="sampark-dossier-img" src={image} /></div> : <div className="sampark-dossier-media is-placeholder"><Icon name="layers" size={42} /></div>}
-          <div className="sampark-dossier-body">
-            <h2 id="sampark-samsung-dossier-title" className="sampark-dossier-title">{title}</h2>
-            {summary && <p className="sampark-dossier-summary">{summary}</p>}
-            {item.keywords?.length ? <div className="sampark-dossier-keywords">{item.keywords.slice(0,8).map((kw)=><span key={kw} className="sampark-keyword">{kw}</span>)}</div> : null}
-            {link ? <a className="sampark-dossier-link" href={link} rel="noreferrer" target="_blank">Open original source <Icon name="external" size={14} /></a> : null}
-          </div>
-        </div>
-        <footer className="sampark-dossier-actions">
-          <span className="sampark-dossier-spacer" />
-          <button className="sampark-action-btn sampark-action-close" onClick={onClose} type="button">Close</button>
-        </footer>
-      </section>
-    </div>
+    <SamparkArticleDossier
+      item={item}
+      onClose={handleClose}
+      onSourceOpen={() => engagement.onSourceOpen()}
+      titleId="sampark-samsung-dossier-title"
+    />
   );
 }
 
@@ -96,8 +77,10 @@ const CHANNELS = [
   { id: 'global', label: 'Global' },
 ];
 
+// Samsung News uses shared engagement contract: dossier_open, dossier_dwell >=5000, source_open, pause while document.visibilityState hidden, avoid duplicate, not training Gatekeeper
 export default function SamparkSamsungNews() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [tab, setTab] = useState('internal');
   const [channels, setChannels] = useState({ global: [], local: [], inside: [] });
   const [published, setPublished] = useState([]);
@@ -106,6 +89,8 @@ export default function SamparkSamsungNews() {
   const [publishedError, setPublishedError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
   const [openArticle, setOpenArticle] = useState(null);
+  const [focusMissed, setFocusMissed] = useState('');
+  const handledFocusRef = React.useRef('');
 
   useEffect(() => {
     let cancelled=false;
@@ -139,33 +124,78 @@ export default function SamparkSamsungNews() {
     const global = rankTrending(channels.global);
     const local = rankTrending(channels.local);
     const inside = rankTrending(channels.inside);
-    // published stories as colleague stories
+    // Normalized published shapes: retain full body separate from summary.
     const colleagueStories = published.filter((r)=> (r.contentType==='story' || r.contentType==='document_import') && r.status==='published');
-    // announcements not used here directly
-    return { leadership, global, local, inside, colleagueStories };
+    const announcements = published.filter((r)=> r.contentType==='announcement' && r.status==='published');
+    return { leadership, global, local, inside, colleagueStories, announcements };
   }, [channels, published]);
+
+  const toSignal = (r)=>({
+    title: r.title,
+    summary: r.summary || '',
+    body: r.body || '',
+    category: r.category || 'Internal',
+    contentType: r.contentType || '',
+    source: r.author || r.ownerName || 'Samsung Internal',
+    src: r.author || 'Samsung Internal',
+    author: r.author || r.ownerName || '',
+    team: r.team || '',
+    date: r.publishedAt ? String(r.publishedAt).slice(0,10) : 'Latest',
+    published_at: r.publishedAt,
+    source_count: 1,
+    image_url: r.cover?.url || '',
+    top_image: r.cover?.url || '',
+    link: '',
+    url: '',
+    id: r.id,
+    canonical_link: `internal://${r.id}`,
+    _publishedId: r.id,
+    _isStory: true,
+    audiences: ['all'],
+  });
 
   const selected = useMemo(()=>{
     if (tab==='global') return model.global;
     if (tab==='local') return model.local;
     // internal: combine inside signals + colleague stories (as articles)
-    const storiesAsSignals = model.colleagueStories.map((r)=>({
-      title: r.title,
-      summary: r.summary || r.body || '',
-      category: r.category || 'Internal',
-      source: r.author || r.ownerName || 'Samsung Internal',
-      src: r.author || 'Samsung Internal',
-      date: r.publishedAt ? String(r.publishedAt).slice(0,10) : 'Latest',
-      published_at: r.publishedAt,
-      source_count: 1,
-      image_url: r.cover?.url || '',
-      top_image: r.cover?.url || '',
-      link: '',
-      _publishedId: r.id,
-      _isStory: true,
-    }));
+    const storiesAsSignals = model.colleagueStories.map(toSignal);
     return [...model.inside, ...storiesAsSignals].sort((a,b)=> (b.published_at||b.date||'').localeCompare(a.published_at||a.date||''));
   }, [tab, model]);
+
+  const announcementSignals = useMemo(()=> model.announcements.map(toSignal), [model]);
+  const leadershipSignal = useMemo(()=> (model.leadership ? toSignal(model.leadership) : null), [model]);
+  const sridCount = model.inside.length + model.colleagueStories.length + model.announcements.length + (model.leadership ? 1 : 0);
+
+  // Direct linking: /samsung-news?focus=<recordId> opens the exact public item
+  // across every surfaced contribution type (story, document import,
+  // announcement, leadership) plus internal briefing signals by fallback id.
+  // An unresolvable focus after loading shows one inline message instead of
+  // silently ignoring the parameter. Never exposes archived/private records:
+  // only currently published or visible channel items can resolve.
+  useEffect(()=>{
+    const params = new URLSearchParams(location.search || '');
+    const focus = params.get('focus');
+    if (!focus || openArticle || handledFocusRef.current === `${location.search}`) return;
+    if (loading) return;
+    const match = findPublishedFocusRecord(published, focus);
+    if (match) {
+      setFocusMissed('');
+      handledFocusRef.current = `${location.search}`;
+      if (tab !== 'internal') setTab('internal');
+      setOpenArticle(toSignal(match));
+      return;
+    }
+    const signal = [...model.inside, ...model.global, ...model.local].find((s)=> String(s.id || s.canonical_link || s.link || s.title)===String(focus));
+    if (signal) {
+      setFocusMissed('');
+      handledFocusRef.current = `${location.search}`;
+      setOpenArticle(signal);
+      return;
+    }
+    // Data finished loading and nothing public matches: explain once.
+    setFocusMissed(focus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search, loading, model.colleagueStories, model.announcements, model.leadership, published]);
 
   const stream = useMemo(()=> selected.slice(0,8), [selected]);
 
@@ -177,15 +207,21 @@ export default function SamparkSamsungNews() {
   return (
     <div className="sampark-samsung-page">
       {publishedError && <div className="sampark-samsung-notice" role="alert"><Icon name="warning" size={14} /> {publishedError}</div>}
+      {focusMissed && !loading && (
+        <div className="sampark-samsung-notice" role="status">
+          <Icon name="warning" size={14} /> This item is no longer published or is unavailable.
+          {' '}<button className="btn-secondary" onClick={() => { setFocusMissed(''); navigate('/samsung-news'); }} type="button">Return to Samsung News</button>
+        </div>
+      )}
 
       <nav aria-label="Samsung News channels" className="sampark-samsung-tabs">
         {CHANNELS.map((ch)=>(
-          <button key={ch.id} aria-pressed={tab===ch.id} className={`sampark-samsung-tab${tab===ch.id ? ' is-active' : ''}`} onClick={()=>setTab(ch.id)} type="button">{ch.label} <small>· {ch.id==='internal' ? model.inside.length + model.colleagueStories.length : ch.id==='local' ? model.local.length : model.global.length}</small></button>
+          <button key={ch.id} aria-pressed={tab===ch.id} className={`sampark-samsung-tab${tab===ch.id ? ' is-active' : ''}`} onClick={()=>setTab(ch.id)} type="button">{ch.label} <small>· {ch.id==='internal' ? sridCount : ch.id==='local' ? model.local.length : model.global.length}</small></button>
         ))}
       </nav>
 
-      {leadership && (
-        <LeadershipCard record={leadership} onOpen={()=> setOpenArticle({ title: leadership.title, summary: leadership.summary || leadership.body || '', category: leadership.category || 'Leadership', source: leadership.author || 'Leadership', date: leadership.publishedAt ? String(leadership.publishedAt).slice(0,10) : 'Latest', image_url: coverUrl(leadership), link: '', _leadership: true })} />
+      {leadership && leadershipSignal && (
+        <LeadershipCard record={leadership} onOpen={()=> setOpenArticle(leadershipSignal)} />
       )}
 
       <div className="sampark-samsung-hero">
@@ -224,6 +260,17 @@ export default function SamparkSamsungNews() {
           </div>
         ) : <div className="sampark-empty"><Icon name="inbox" size={20} /><p>Nothing in {tab} yet. The next unified archive run may bring fresh Samsung coverage.</p></div>}
       </section>
+
+      {tab==='internal' && announcementSignals.length > 0 && (
+        <section className="sampark-samsung-latest" aria-labelledby="sampark-samsung-announcements-title">
+          <header><h3 id="sampark-samsung-announcements-title">Announcements <span className="sampark-samsung-count">({announcementSignals.length})</span></h3><span className="sampark-samsung-hint">Notices from colleagues</span></header>
+          <div className="sampark-samsung-latest-scroll">
+            {announcementSignals.map((it)=>(
+              <SamparkSamsungTile key={`ann-${it.id}`} item={it} onOpen={(item)=> setOpenArticle(item)} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {tab==='internal' && (
         <div className="sampark-samsung-contribute">

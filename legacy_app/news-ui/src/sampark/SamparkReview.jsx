@@ -11,9 +11,10 @@ export default function SamparkReview({ capabilities = [] }) {
   const hasPublish = capabilities.includes('review.contributions.publish') || capabilities.includes('review.news.approve');
   const [workflowState, setWorkflowState] = useState({ status: 'loading', error: '', data: null });
   const [internalState, setInternalState] = useState({ status: 'probing', error: '', items: [], unlocked: null, keyDraft: '', notice: '' });
-  const [busyId, setBusyId] = useState('');
+  const [busyIds, setBusyIds] = useState({});
   const [confirmReject, setConfirmReject] = useState('');
   const [noteDraft, setNoteDraft] = useState({}); // id -> note
+  const [rowErrors, setRowErrors] = useState({}); // id -> error
 
   const loadWorkflow = async () => {
     if (!hasWorkflowAccess) { setWorkflowState({ status: 'ready', error: '', data: { selected: [] } }); return; }
@@ -59,8 +60,13 @@ export default function SamparkReview({ capabilities = [] }) {
   };
 
   const decide = async (record, action)=>{
-    if(busyId) return;
-    setBusyId(record.id);
+    if (busyIds[record.id]) return;
+    if (action==='changes' && !String(noteDraft[record.id]||'').trim()) {
+      setRowErrors((cur)=>({ ...cur, [record.id]: 'Add a short note so the author knows what to change.' }));
+      return;
+    }
+    setBusyIds((cur)=>({ ...cur, [record.id]: true }));
+    setRowErrors((cur)=>{ const n={...cur}; delete n[record.id]; return n; });
     setInternalState((s)=>({ ...s, error: '', notice: '' }));
     try{
       if(action==='publish') await publishInternalContent(record.id);
@@ -68,8 +74,9 @@ export default function SamparkReview({ capabilities = [] }) {
       if(action==='reject') await rejectInternalContent(record.id, noteDraft[record.id] || '');
       setInternalState((s)=>({ ...s, items: s.items.filter((it)=>it.id!==record.id), notice: action==='publish' ? `"${record.title}" is live on Samsung Internal.` : action==='changes' ? `Change request sent for "${record.title}".` : `"${record.title}" was archived.` }));
       setConfirmReject('');
-    }catch(err){ setInternalState((s)=>({ ...s, error: err?.message || 'Decision could not be recorded.' })); }
-    finally{ setBusyId(''); }
+      setNoteDraft((cur)=>{ const n={...cur}; delete n[record.id]; return n; });
+    }catch(err){ setRowErrors((cur)=>({ ...cur, [record.id]: err?.message || 'Decision could not be recorded.' })); }
+    finally{ setBusyIds((cur)=>{ const n={...cur}; delete n[record.id]; return n; }); }
   };
 
   const workflowCount = workflowState.data?.selected?.length || 0;
@@ -90,7 +97,7 @@ export default function SamparkReview({ capabilities = [] }) {
       {workflowState.status==='ready' && (
         <div className="sampark-review-section">
           <h3>Briefing Review Queue</h3>
-          <div className="sampark-review-summary"><span className="sampark-review-count"><Icon name="layers" size={14} /> {workflowCount} signals awaiting review</span><small>Original workflow — capability <code>review.news.view</code></small></div>
+          <div className="sampark-review-summary"><span className="sampark-review-count"><Icon name="layers" size={14} /> {workflowCount} signals awaiting review</span></div>
           {workflowCount===0 && <p className="sampark-review-empty">No briefing signals in the review queue.</p>}
           {workflowState.data?.selected?.slice(0,3).map((it)=>(
             <div key={it.title||it.id} className="sampark-hidden-card"><strong>{it.title}</strong><small>{it.source || it.src} · {it.category}</small></div>
@@ -103,7 +110,7 @@ export default function SamparkReview({ capabilities = [] }) {
         <div className="sampark-review-internal-head">
           <div>
             <h3>Internal Contributions</h3>
-            <p>Colleague stories, leadership messages and announcements awaiting decision. Original contribution workflow — capability <code>review.contributions.view / publish</code> or editor key.</p>
+            <p>Colleague stories, leadership messages and announcements awaiting decision. Approval requires editor access.</p>
           </div>
           <div className="sampark-review-actions">
             <button className="btn-secondary" disabled={internalState.status==='loading'} onClick={loadInternal} type="button"><Icon name="refresh" size={14} /> Refresh</button>
@@ -142,23 +149,25 @@ export default function SamparkReview({ capabilities = [] }) {
                       <time>{formatDate(rec.submitted_at)}</time>
                     </div>
                     <h4>{rec.title}</h4>
-                    {rec.summary && <p className="sampark-review-summary-text">{rec.summary}</p>}
-                    <p className="sampark-review-excerpt">{String(rec.body||'').slice(0,180)}{String(rec.body||'').length>180?'…':''}</p>
-                    <div className="sampark-review-meta"><Icon name="eye" size={12} /> {rec.author || 'Unnamed author'} · {rec.owner_name || ''}</div>
-                    {rec.cover && <div className="sampark-review-cover-hint"><Icon name="eye" size={12} /> Cover attached ✓</div>}
+                    {rec.summary && <p className="sampark-review-summary-text"><strong>Summary: </strong>{rec.summary}</p>}
+                    {rec.body && <div className="sampark-review-full-body" style={{ maxHeight: 220, overflowY: 'auto', border: '1px solid var(--line)', borderRadius: 8, padding: 8, marginTop: 8 }}><strong>Full submission</strong><p style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>{rec.body}</p></div>}
+                    <div className="sampark-review-meta"><Icon name="eye" size={12} /> {rec.author || 'Unnamed author'}{rec.team ? ` · ${rec.team}` : ''}{rec.owner_name ? ` · ${rec.owner_name}` : ''} · {rec.content_type || ''}{rec.category ? ` · ${rec.category}` : ''}</div>
+                    {rec.source_document?.name && <div className="sampark-review-meta"><small>Imported document: {rec.source_document.name}{rec.source_document.page_count ? ` · ${rec.source_document.page_count} pages` : ''}</small></div>}
+                    {rec.cover && <div className="sampark-review-cover" style={{ marginTop: 8 }}>{rec.cover?.url || rec.id ? <img alt={`Cover for ${rec.title}`} src={rec.cover?.url || `/internal-content/${rec.id}/cover`} style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8 }} /> : <span><Icon name="eye" size={12} /> Cover attached ✓</span>}</div>}
+                    {rowErrors[rec.id] && <div className="sampark-review-error" role="alert" style={{ color: '#b91c1c', fontSize: 13, marginTop: 6 }}>{rowErrors[rec.id]}</div>}
                     <div className="sampark-review-note">
                       <label>
-                        <span>Note to author (for Send Back)</span>
+                        <span>Note to author (required for Send Back, helpful for Reject)</span>
                         <textarea aria-label={`Note for ${rec.title}`} placeholder="What should change before this can be published?" rows={2} value={noteDraft[rec.id]||''} onChange={(e)=>setNoteDraft((cur)=>({ ...cur, [rec.id]: e.target.value }))} />
                       </label>
                     </div>
                     <div className="sampark-review-card-actions">
-                      <button aria-busy={busyId===rec.id} className="btn-primary" disabled={Boolean(busyId)} onClick={()=>decide(rec,'publish')} type="button"><Icon name="check2" size={14} /> Approve & publish</button>
-                      <button aria-busy={busyId===rec.id} className="btn-secondary" disabled={Boolean(busyId)} onClick={()=>decide(rec,'changes')} type="button">Send Back</button>
+                      <button aria-busy={Boolean(busyIds[rec.id])} className="btn-primary" disabled={Boolean(busyIds[rec.id])} onClick={()=>decide(rec,'publish')} type="button"><Icon name="check2" size={14} /> Approve & publish</button>
+                      <button aria-busy={Boolean(busyIds[rec.id])} className="btn-secondary" disabled={Boolean(busyIds[rec.id])} onClick={()=>decide(rec,'changes')} type="button">Send Back</button>
                       {confirmReject===rec.id ? (
-                        <button aria-busy={busyId===rec.id} className="btn-secondary" disabled={Boolean(busyId)} onClick={()=>decide(rec,'reject')} type="button">Confirm Reject?</button>
+                        <button aria-busy={Boolean(busyIds[rec.id])} className="btn-secondary" disabled={Boolean(busyIds[rec.id])} onClick={()=>decide(rec,'reject')} type="button">Confirm Reject?</button>
                       ) : (
-                        <button className="btn-secondary" disabled={Boolean(busyId)} onClick={()=>setConfirmReject(rec.id)} type="button">Reject</button>
+                        <button className="btn-secondary" disabled={Boolean(busyIds[rec.id])} onClick={()=>setConfirmReject(rec.id)} type="button">Reject</button>
                       )}
                     </div>
                   </article>

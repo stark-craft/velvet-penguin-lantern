@@ -5,15 +5,38 @@ import { scoreOf } from '../../news-scrapper/utils/intelligence.js';
 export default function AllNewsRail({ items=[], onOpen }){
   const safeItems = (items || []).filter(Boolean);
   const [paused, setPaused] = useState(false);
+  const [inView, setInView] = useState(true);
+  const [docHidden, setDocHidden] = useState(false);
   const listRef = useRef(null);
   const trackRef = useRef(null);
 
   // duplicate content for seamless loop if enough items
   const display = safeItems.length ? [...safeItems, ...safeItems] : [];
+  const itemSig = safeItems.map((it)=> it?.title || '').join('|');
+
+  const reducedMotion = () => {
+    try { return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+  };
+  const shouldAnimate = safeItems.length > 0 && !paused && inView && !docHidden && !reducedMotion();
+
+  useEffect(()=>{
+    try { setDocHidden(document.visibilityState === 'hidden'); } catch {}
+    const onVis = () => { try { setDocHidden(document.visibilityState === 'hidden'); } catch {} };
+    document.addEventListener?.('visibilitychange', onVis);
+    return () => document.removeEventListener?.('visibilitychange', onVis);
+  }, []);
+
+  useEffect(()=>{
+    const el = listRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const obs = new IntersectionObserver((entries)=>{ setInView(Boolean(entries[0]?.isIntersecting)); }, { threshold: 0 });
+    obs.observe(el);
+    return ()=> obs.disconnect();
+  }, []);
 
   useEffect(()=>{
     const el = trackRef.current;
-    if(!el || paused || !safeItems.length) return undefined;
+    if(!el || !shouldAnimate) return undefined;
     let raf;
     let offset = 0;
     const speed = 0.3; // px per frame ~18px/s
@@ -29,7 +52,7 @@ export default function AllNewsRail({ items=[], onOpen }){
     };
     raf = window.requestAnimationFrame(step);
     return ()=> window.cancelAnimationFrame(raf);
-  },[paused, items.length]);
+  },[shouldAnimate, itemSig]);
 
   if(!safeItems.length){
     return (
@@ -41,7 +64,7 @@ export default function AllNewsRail({ items=[], onOpen }){
   }
 
   return (
-    <aside className="tsan-rail" aria-label="All News" onMouseEnter={()=> setPaused(true)} onMouseLeave={()=> setPaused(false)}>
+    <aside className="tsan-rail" aria-label="All News" onMouseEnter={()=> setPaused(true)} onMouseLeave={()=> setPaused(false)} onFocus={()=> setPaused(true)} onBlur={()=> setPaused(false)}>
       <h3 className="tsan-rail-title">All News</h3>
       <div className="tsan-rail-window" ref={listRef}>
         <div className="tsan-rail-track" ref={trackRef}>

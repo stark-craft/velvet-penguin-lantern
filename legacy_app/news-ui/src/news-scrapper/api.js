@@ -23,33 +23,78 @@ function selectedProfileOverride() {
   return value === 'broadcast' || value === 'default' ? value : '';
 }
 
+// Same-request coalescing for idempotent GET reads only. Simultaneous mounts
+// (including StrictMode replay) share one network request; mutations are never
+// coalesced. Scoped to this browser session (one signed viewer at a time).
+// A mutation epoch guards the read caches: a GET that began before a
+// successful mutation resolves must not repopulate caches with pre-mutation
+// data. Aborting one waiter's shared read never cancels the underlying request
+// for other waiters (see abortableSharedPromise's race).
+const JSON_IN_FLIGHT = new Map();
+let mutationEpoch = 0;
+
 async function jsonFetch(url, opts = {}) {
   const profileOverride = selectedProfileOverride();
   const { timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS, ...fetchOptions } = opts;
-  const res = await fetchWithTimeout(BASE + url, {
-    ...fetchOptions,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(profileOverride ? { 'X-Sense-Profile': profileOverride } : {}),
-      ...(fetchOptions.headers || {}),
-    },
-  }, timeoutMs);
-  const body = await readApiResponse(res);
-  if (String(fetchOptions.method || 'GET').toUpperCase() !== 'GET') {
-    GET_CACHE.clear();
+  const method = String(fetchOptions.method || 'GET').toUpperCase();
+  // Coalesce key includes the resolved profile override and explicit headers
+  // so different principals/overrides never share one request. Caller abort
+  // signals are intentionally excluded: one caller aborting its wait must not
+  // cancel the shared underlying request for other callers.
+  const { signal: callerSignal, ...sharedOptions } = fetchOptions;
+  const cacheKey = method === 'GET'
+    ? `${method} ${url} ${profileOverride} ${JSON.stringify(sharedOptions.headers || {})}`
+    : '';
+  if (cacheKey && JSON_IN_FLIGHT.has(cacheKey)) {
+    return abortableSharedPromise(JSON_IN_FLIGHT.get(cacheKey).promise, callerSignal);
   }
-  return body;
+  const epochAtStart = mutationEpoch;
+  const request = (async () => {
+    const res = await fetchWithTimeout(BASE + url, {
+      ...sharedOptions,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(profileOverride ? { 'X-Sense-Profile': profileOverride } : {}),
+        ...(sharedOptions.headers || {}),
+      },
+    }, timeoutMs);
+    const body = await readApiResponse(res);
+    if (method !== 'GET') {
+      mutationEpoch += 1;
+      GET_CACHE.clear();
+      GET_IN_FLIGHT.clear();
+      JSON_IN_FLIGHT.clear();
+    }
+    return body;
+  })();
+  if (cacheKey) {
+    JSON_IN_FLIGHT.set(cacheKey, { promise: request, epoch: epochAtStart });
+    // Cleanup detaches only this exact promise and drops its abort listener,
+    // so a newer same-key request is never removed and settled callers leak
+    // no listeners. The wrapper below (not this await) is what each caller
+    // receives, so aborting settles that caller immediately.
+    request.then(
+      () => { if (JSON_IN_FLIGHT.get(cacheKey)?.promise === request) JSON_IN_FLIGHT.delete(cacheKey); },
+      () => { if (JSON_IN_FLIGHT.get(cacheKey)?.promise === request) JSON_IN_FLIGHT.delete(cacheKey); },
+    );
+    return abortableSharedPromise(request, callerSignal);
+  }
+  return request;
 }
 
 function abortableSharedPromise(promise, signal) {
   if (!signal) return promise;
   if (signal.aborted) return Promise.reject(new DOMException('Request aborted', 'AbortError'));
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      signal.addEventListener('abort', () => reject(new DOMException('Request aborted', 'AbortError')), { once: true });
-    }),
-  ]);
+  let onAbort;
+  const aborter = new Promise((_, reject) => {
+    onAbort = () => reject(new DOMException('Request aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  // Detach the abort listener once either side settles so resolved/rejected
+  // callers retain no listeners.
+  const detach = () => signal.removeEventListener('abort', onAbort);
+  promise.then(detach, detach);
+  return Promise.race([promise, aborter]);
 }
 
 /**
@@ -64,17 +109,23 @@ async function cachedJsonFetch(url, { staleMs = 30_000, maxStaleMs = 5 * 60_000,
   if (cached && age <= staleMs) return cached.data;
 
   const refresh = () => {
-    if (GET_IN_FLIGHT.has(url)) return GET_IN_FLIGHT.get(url);
+    if (GET_IN_FLIGHT.has(url)) return GET_IN_FLIGHT.get(url).promise;
+    const epochAtStart = mutationEpoch;
     const request = jsonFetch(url)
       .then((data) => {
+        // Never repopulate the cache with pre-mutation data: if a mutation
+        // succeeded while this read was in flight, drop the result from cache
+        // (the awaiting caller still receives it; component request tokens
+        // guard UI reconciliation).
+        if (epochAtStart !== mutationEpoch) return data;
         GET_CACHE.set(url, { data, savedAt: Date.now() });
         if (typeof window !== 'undefined' && typeof CustomEvent !== 'undefined') {
           window.dispatchEvent(new CustomEvent('sense-api-cache-update', { detail: { url, data } }));
         }
         return data;
       })
-      .finally(() => GET_IN_FLIGHT.delete(url));
-    GET_IN_FLIGHT.set(url, request);
+      .finally(() => { if (GET_IN_FLIGHT.get(url)?.promise === request) GET_IN_FLIGHT.delete(url); });
+    GET_IN_FLIGHT.set(url, { promise: request, epoch: epochAtStart });
     return request;
   };
 
@@ -170,6 +221,14 @@ export function searchExtractedIntelligence(params, signal) {
   if (params.offset) u.set('offset', String(params.offset));
   if (params.sort) u.set('sort', params.sort);
   return jsonFetch(`/archive/search?${u.toString()}`, { signal });
+}
+
+export function getArchiveArticle({ link, url, title } = {}, signal) {
+  const u = new URLSearchParams();
+  if (link) u.set('link', link);
+  if (url) u.set('url', url);
+  if (title) u.set('title', title);
+  return jsonFetch(`/archive/article?${u.toString()}`, { signal });
 }
 
 // ---------- Train / votes ----------
@@ -280,11 +339,13 @@ export const pauseViewerPersonalization = (paused) =>
 export const resetRecommendationProfile = () =>
   jsonFetch('/viewer/preferences/reset', { method: 'POST' });
 export function getForYou({ cursor = '', limit = 20 } = {}) {
-  const params = new URLSearchParams({ limit: String(limit) });
+  const params = new URLSearchParams({ limit: String(limit), include_sections: 'false' });
   if (cursor) params.set('cursor', cursor);
   // Keep the JSON request under /viewer so Vite can proxy it without taking
   // ownership of the browser's /for-you SPA deep link. The backend retains
   // GET /for-you as a documented API alias for non-browser clients.
+  // Sampark renders from canonical items only; sections are omitted to avoid
+  // serializing every record twice.
   return jsonFetch(`/viewer/for-you?${params.toString()}`);
 }
 export const sendRecommendationEvents = (feedRequestId, events, options = {}) =>
@@ -340,6 +401,8 @@ export const removeWorkflow = (title, list_type) =>
 // ---------- Sources ----------
 export const getSites = () => jsonFetch('/sites');
 export const addSite  = (site) => jsonFetch('/sites', { method:'POST', body: JSON.stringify(site) });
+export const updateSite = (sourceId, payload) => jsonFetch(`/sites/${encodeURIComponent(String(sourceId||'').trim())}`, { method:'PUT', body: JSON.stringify(payload || {}) });
+export const deleteSite = (sourceId) => jsonFetch(`/sites/${encodeURIComponent(String(sourceId||'').trim())}`, { method:'DELETE' });
 
 // ---------- History ----------
 export function getHistoryList() {
@@ -669,6 +732,7 @@ const fromBackendRecord = (record) => ({
       }
     : null,
   status: record.status || 'draft',
+  reviewNote: record.review_note || '',
   createdAt: record.created_at || '',
   updatedAt: record.updated_at || '',
   submittedAt: record.submitted_at || null,
@@ -679,6 +743,12 @@ export const getMyContributions = async () => {
   const response = await jsonFetch('/internal-content/mine');
   return (response?.items || []).map(fromBackendRecord);
 };
+
+export const getOwnedContribution = async (id) =>
+  fromBackendRecord(await jsonFetch(`/internal-content/${encodeURIComponent(id)}`));
+
+export const withdrawContribution = async (id) =>
+  fromBackendRecord(await jsonFetch(`/internal-content/${encodeURIComponent(id)}/withdraw`, { method: 'POST' }));
 
 // Future Samsung Internal contract: only records already marked published.
 export const getPublishedInternalContent = async () => {

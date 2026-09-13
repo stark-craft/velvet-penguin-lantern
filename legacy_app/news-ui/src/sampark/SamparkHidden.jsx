@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import Icon from '../news-scrapper/components/Icon.jsx';
-import { getViewerHidden, restoreArticleForViewer } from '../news-scrapper/api.js';
+import { getViewerHidden, restoreArticleForViewer, trackEvent } from '../news-scrapper/api.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import { articleKey } from '../news-scrapper/utils/intelligence.js';
+import { sanitizeExternalUrl } from './shared/safeLink.js';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
 
 export default function SamparkHidden() {
   const [items, setItems] = useState([]);
   const [state, setState] = useState({ status: 'loading', error: '' });
   const [busy, setBusy] = useState('');
+
+  const handleSourceOpen = useCallback((item) => {
+    try { trackEvent(undefined, 'source_open', item); } catch {}
+  }, []);
 
   const load = async () => {
     setState({ status: 'loading', error: '' });
@@ -57,7 +62,7 @@ export default function SamparkHidden() {
             <h3 className="sampark-hidden-title">{item.title}</h3>
             {item.summary && <p className="sampark-hidden-summary">{item.summary}</p>}
             <div className="sampark-hidden-actions">
-              {item.link && <a className="btn-secondary" href={item.link} target="_blank" rel="noreferrer">Open source <Icon name="external" size={14} /></a>}
+              {sanitizeExternalUrl(item.link || item.url) && <a className="btn-secondary" href={sanitizeExternalUrl(item.link || item.url)} target="_blank" rel="noreferrer noopener" onClick={() => handleSourceOpen(item)}>Open source <Icon name="external" size={14} /></a>}
               <button className="btn-primary" disabled={busy === articleKey(item)} onClick={() => restore(item)} type="button">{busy === articleKey(item) ? 'Restoring…' : 'Restore'}</button>
             </div>
           </article>

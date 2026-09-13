@@ -18,6 +18,10 @@ import { articleKey, reactionIdentity } from '../news-scrapper/utils/intelligenc
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
 import useRecommendationEvents from '../news-scrapper/for-you/useRecommendationEvents.js';
+import SamparkTooltip from './shared/SamparkTooltip.jsx';
+import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
+import { hideOptimistic, hideRollback, findNeighbors } from './shared/hideHelper.js';
+// per-article per-action optimistic with ref-based deduplication (no stale closure)
 import { readSamparkSettings } from './SamparkSettingsModal.jsx';
 
 function imageOf(item) {
@@ -30,77 +34,6 @@ function metaLabels(status, preferences) {
     .slice(0, 5)
     .map((id) => options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' '));
   return labels.length ? labels : ['Balanced mix'];
-}
-
-// ========== Article Dossier Modal — premium, full-image, no crop ==========
-function SamparkArticleModal({ item, onClose, saved, onSave, onHide, onReact, onSourceOpen, onWhyOpen }) {
-  const dialogRef = useModalFocus(Boolean(item), onClose);
-  if (!item) return null;
-  const image = imageOf(item);
-  const reactions = item.reactions || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
-  // Authoritative dossier fields already produced by the backend pipeline
-  // (BART/Samsung Chat summary + FLAN-T5 why_matters). Sampark consumes them;
-  // it does not generate its own summary/points.
-  const lead = item.summary_lead || item.summary || item.master_summary || '';
-  const points = Array.isArray(item.summary_points) ? item.summary_points : [];
-  const whyMatters = item.why_matters || item.why_it_matters || item.attention_hook || '';
-  const sourceLink = item.link || item.url || '';
-
-  return (
-    <div className="sampark-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <section aria-labelledby="sampark-dossier-title" aria-modal="true" className="sampark-dossier sampark-dossier--large" ref={dialogRef} role="dialog" tabIndex={-1}>
-        <header className="sampark-dossier-header">
-          <div>
-            <div className="sampark-dossier-kicker">{item.category || 'Intelligence'} · {item.src || item.source || 'TechScout'} · {item.date || 'Latest'}</div>
-            <div className="sampark-dossier-subtitle">{item.region || 'Global'} · {item.source_count || 1} source{(item.source_count||1)===1?'':'s'} · {item.mins_read || 1} min read</div>
-          </div>
-          <button aria-label="Close dossier" className="sampark-dossier-close" onClick={onClose} type="button"><Icon name="x" size={18} /></button>
-        </header>
-
-        <div className="sampark-dossier-scroll">
-          {image ? (
-            <div className="sampark-dossier-media">
-              {/* object-fit: contain, neutral letterbox, never cropped */}
-              <img alt="" className="sampark-dossier-img" src={image} />
-            </div>
-          ) : (
-            <div className="sampark-dossier-media is-placeholder"><Icon name="globe" size={42} /></div>
-          )}
-
-          <div className="sampark-dossier-body">
-            <h2 id="sampark-dossier-title" className="sampark-dossier-title">{item.title}</h2>
-            {lead && <p className="sampark-dossier-summary">{lead}</p>}
-            {points.length ? (
-              <ul className="sampark-dossier-points">
-                {points.slice(0, 5).map((point, idx) => <li key={idx}>{point}</li>)}
-              </ul>
-            ) : null}
-            {sourceLink ? <a className="sampark-dossier-link" href={sourceLink} onClick={() => onSourceOpen?.(item)} rel="noreferrer" target="_blank">Open original source <Icon name="external" size={14} /></a> : null}
-            {whyMatters ? (
-              <button className="sampark-dossier-insight sampark-why-btn" onClick={() => onWhyOpen?.(item)} type="button">
-                <strong>Why this matters</strong>
-                <p>{whyMatters}</p>
-              </button>
-            ) : null}
-            {item.keywords?.length ? (
-              <div className="sampark-dossier-keywords">
-                {item.keywords.slice(0, 8).map((kw) => <span key={kw} className="sampark-keyword">{kw}</span>)}
-              </div>
-            ) : null}
-          </div>
-        </div>
-
-        <footer className="sampark-dossier-actions">
-          <button className={`sampark-action-btn${reactions.viewer_reaction === 'like' ? ' is-active' : ''}`} onClick={() => onReact(item, 'like')} type="button"><Icon name="thumbsUp" size={16} /> {reactions.like_count || 0} Like</button>
-          <button className={`sampark-action-btn${reactions.viewer_reaction === 'dislike' ? ' is-active' : ''}`} onClick={() => onReact(item, 'dislike')} type="button"><Icon name="thumbsDown" size={16} /> {reactions.dislike_count || 0}</button>
-          <button className={`sampark-action-btn${saved ? ' is-active' : ''}`} onClick={() => onSave(item)} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={16} /> {saved ? 'Following' : 'Follow'}</button>
-          <button className="sampark-action-btn" onClick={() => onHide(item)} type="button"><Icon name="eye" size={16} /> Hide</button>
-          <span className="sampark-dossier-spacer" />
-          <button className="sampark-action-btn sampark-action-close" onClick={onClose} type="button">Close</button>
-        </footer>
-      </section>
-    </div>
-  );
 }
 
 // ========== 3-Step Preferences Wizard — Sampark-native, behavior matches original InterestSetup ==========
@@ -335,8 +268,11 @@ function SamparkFollowingModal({ open, onClose, threads, loading, error, onRetry
 }
 
 // ========== Card — clean language, image never cropped (contain + letterbox) ==========
-function SamparkForYouCard({ item, large, saved, savedReady, busy, onOpen, onSave, onHide, onReact }) {
+function SamparkForYouCard({ item, large, saved, savedReady, busy, isPending, onOpen, onSave, onHide, onReact }) {
   const image = imageOf(item);
+  const busyReaction = isPending ? isPending(item, 'reaction') : busy;
+  const busySave = isPending ? isPending(item, 'save') : busy;
+  const busyHide = isPending ? isPending(item, 'hide') : busy;
   return (
     <article className={large ? 'sampark-news-card-large' : 'sampark-news-card'}>
       <button aria-label={`Open dossier for ${item.title}`} className={large ? 'sampark-card-media' : 'sampark-card-media-sm'} onClick={() => onOpen(item)} type="button">
@@ -349,10 +285,10 @@ function SamparkForYouCard({ item, large, saved, savedReady, busy, onOpen, onSav
         <div className="sampark-card-footer">
           <span className="sampark-card-meta"><Icon name="clock" size={12} /> {item.date || 'Latest'} · {item.category || 'Intelligence'}</span>
           <div className="sampark-card-actions">
-            <ReactionButton disabled={busy} item={item} onReact={onReact} reaction="like" />
-            <ReactionButton disabled={busy} item={item} onReact={onReact} reaction="dislike" />
-            <button aria-label={`${saved ? 'Stop following' : 'Follow'} ${item.title}`} className={`sampark-card-action${saved ? ' is-active' : ''}`} disabled={busy || !savedReady} onClick={() => onSave(item)} title={saved ? 'Stop following' : 'Follow and save'} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={14} /></button>
-            <button aria-label={`Hide ${item.title}`} className="sampark-card-action" disabled={busy} onClick={() => onHide(item)} title="Hide from your feed" type="button"><Icon name="eye" size={14} /></button>
+            <SamparkTooltip label="Like"><span><ReactionButton disabled={busyReaction} item={item} onReact={onReact} reaction="like" /></span></SamparkTooltip>
+            <SamparkTooltip label="Dislike"><span><ReactionButton disabled={busyReaction} item={item} onReact={onReact} reaction="dislike" /></span></SamparkTooltip>
+            <SamparkTooltip label={saved ? 'Unfollow' : 'Follow'}><button aria-label={`${saved ? 'Stop following' : 'Follow'} ${item.title}`} className={`sampark-card-action${saved ? ' is-active' : ''}`} disabled={busySave || !savedReady} onClick={() => onSave(item)} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={14} /></button></SamparkTooltip>
+            <SamparkTooltip label="Hide"><button aria-label={`Hide ${item.title}`} className="sampark-card-action" disabled={busyHide} onClick={() => onHide(item)} type="button"><Icon name="eye" size={14} /></button></SamparkTooltip>
           </div>
         </div>
       </div>
@@ -534,10 +470,11 @@ export default function SamparkForYou() {
   }, [reactionSignature]);
 
   const runItemAction = async (action, item, work) => {
-    const key = articleKey(item);
+    const baseKey = articleKey(item);
+    const key = `${baseKey}::${action}`;
     if (actionLocks.current.has(key)) return;
     actionLocks.current.add(key);
-    setBusyActions((current) => ({ ...current, [key]: action }));
+    setBusyActions((current) => ({ ...current, [key]: true }));
     setError('');
     try {
       return await work();
@@ -549,6 +486,14 @@ export default function SamparkForYou() {
         return next;
       });
     }
+  };
+  const isPending = (item, action) => {
+    const base = articleKey(item);
+    return Boolean(busyActions[`${base}::${action}`]);
+  };
+  const isBusy = (item) => {
+    const base = articleKey(item);
+    return Boolean(busyActions[`${base}::reaction`] || busyActions[`${base}::save`] || busyActions[`${base}::hide`]);
   };
 
   const shouldRecordPassive = () => {
@@ -601,29 +546,56 @@ export default function SamparkForYou() {
       setError('Following status must be verified before it can be changed.');
       return;
     }
+    const key = articleKey(item);
+    if (actionLocks.current.has(`${key}::save`)) return;
+    const wasSaved = savedKeys.has(key);
+    // optimistic immediate update
+    setSavedKeys((current) => {
+      const next = new Set(current);
+      if (wasSaved) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setActionNotice({ message: wasSaved ? 'Removed from followed stories.' : 'Saved and followed privately.' });
     return runItemAction('save', item, async () => {
-      const key = articleKey(item);
-      const saved = savedKeys.has(key);
-      if (saved) await removeSavedArticle(item);
-      else await saveArticleForLater(item);
-      setSavedKeys((current) => {
-        const next = new Set(current);
-        if (saved) next.delete(key);
-        else next.add(key);
-        return next;
-      });
-      setActionNotice({ message: saved ? 'Removed from followed stories.' : 'Saved and followed privately.' });
-      setTimeout(() => loadActivity(), 700);
+      try {
+        if (wasSaved) await removeSavedArticle(item);
+        else await saveArticleForLater(item);
+        setTimeout(() => loadActivity(), 700);
+      } catch (e) {
+        // precise rollback
+        setSavedKeys((current) => {
+          const next = new Set(current);
+          if (wasSaved) next.add(key);
+          else next.delete(key);
+          return next;
+        });
+        setActionNotice({ message: e?.message || 'Follow action failed' });
+        throw e;
+      }
     });
   };
 
-  const hide = async (item) => runItemAction('hide', item, async () => {
-    await hideArticleForViewer(item);
-    setItems((current) => current.filter((candidate) => articleKey(candidate) !== articleKey(item)));
-    record('hide', item);
+  const hide = async (item) => {
+    const key = articleKey(item);
+    if (actionLocks.current.has(`${key}::hide`)) return;
+    const captured = item;
+    const { prevKey, nextKey, idx: capturedIndex } = findNeighbors(items, key);
+    // optimistic immediate hide via pure helper
+    setItems((current) => hideOptimistic(current, key));
     setActionNotice({ message: 'Hidden only from your feed.' });
-    setTimeout(() => loadActivity(), 700);
-  });
+    return runItemAction('hide', item, async () => {
+      try {
+        await hideArticleForViewer(item);
+        record('hide', item);
+        setTimeout(() => loadActivity(), 700);
+      } catch (e) {
+        setItems((current) => hideRollback(current, captured, prevKey, nextKey, capturedIndex));
+        setActionNotice({ message: e?.message || 'Hide failed' });
+        throw e;
+      }
+    });
+  };
 
   const handleSourceOpen = (item) => { if (shouldRecordPassive()) record('source_open', item, { section: 'dossier' }); };
   const handleWhyOpen = (item) => { if (shouldRecordPassive()) record('why_this_story_open', item, { section: 'dossier' }); };
@@ -648,18 +620,45 @@ export default function SamparkForYou() {
     }
   };
 
-  const react = async (item, reaction) => runItemAction('reaction', item, async () => {
-    const current = item.reactions?.viewer_reaction || 'neutral';
-    const nextReaction = current === reaction ? 'neutral' : reaction;
-    const response = await setViewerReaction(item, nextReaction);
-    const apply = (candidate) => articleKey(candidate) === articleKey(item)
-      ? { ...candidate, reactions: { like_count: response.like_count, dislike_count: response.dislike_count, viewer_reaction: response.viewer_reaction } }
-      : candidate;
-    setItems((currentItems) => currentItems.map(apply));
-    setOpenArticle((currentArticle) => currentArticle && articleKey(currentArticle) === articleKey(item) ? apply(currentArticle) : currentArticle);
-    setActionNotice({ message: nextReaction === 'neutral' ? 'Reaction removed.' : `Your ${nextReaction} was counted.` });
-    setTimeout(() => loadActivity(), 700);
-  });
+  const react = async (item, reaction) => {
+    const key = articleKey(item);
+    if (actionLocks.current.has(`${key}::reaction`)) return;
+    const prevSnap = item.reactions || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
+    const cur = prevSnap.viewer_reaction || 'neutral';
+    const nextReaction = cur === reaction ? 'neutral' : reaction;
+    const optimistic = (() => {
+      let lc = Number(prevSnap.like_count || 0);
+      let dc = Number(prevSnap.dislike_count || 0);
+      if (cur === 'like') lc = Math.max(0, lc - 1);
+      if (cur === 'dislike') dc = Math.max(0, dc - 1);
+      if (nextReaction === 'like') lc += 1;
+      if (nextReaction === 'dislike') dc += 1;
+      return { like_count: lc, dislike_count: dc, viewer_reaction: nextReaction };
+    })();
+    const applyOptimistic = (candidate) => articleKey(candidate) === key ? { ...candidate, reactions: optimistic } : candidate;
+    // optimistic immediate update with correct counts for neutral→like, like→neutral, like→dislike, etc.
+    setItems((currentItems) => currentItems.map(applyOptimistic));
+    setOpenArticle((currentArticle) => currentArticle && articleKey(currentArticle) === key ? applyOptimistic(currentArticle) : currentArticle);
+    return runItemAction('reaction', item, async () => {
+      try {
+        const response = await setViewerReaction(item, nextReaction);
+        const snap = { like_count: response.like_count, dislike_count: response.dislike_count, viewer_reaction: response.viewer_reaction };
+        const applyServer = (candidate) => articleKey(candidate) === key ? { ...candidate, reactions: snap } : candidate;
+        // reconcile with authoritative server response
+        setItems((currentItems) => currentItems.map(applyServer));
+        setOpenArticle((currentArticle) => currentArticle && articleKey(currentArticle) === key ? applyServer(currentArticle) : currentArticle);
+        setActionNotice({ message: nextReaction === 'neutral' ? 'Reaction removed.' : `Your ${nextReaction} was counted.` });
+        setTimeout(() => loadActivity(), 700);
+      } catch (e) {
+        // precise rollback
+        const rollback = (candidate) => articleKey(candidate) === key ? { ...candidate, reactions: prevSnap } : candidate;
+        setItems((currentItems) => currentItems.map(rollback));
+        setOpenArticle((currentArticle) => currentArticle && articleKey(currentArticle) === key ? rollback(currentArticle) : currentArticle);
+        setActionNotice({ message: e?.message || 'Reaction failed' });
+        throw e;
+      }
+    });
+  };
 
   // Five is a layout number, not a feed cap. Backend dictates count (limit 20 + cursor).
   // We keep the stable snapshot; pagination can extend far beyond 20 when cursor permits.
@@ -760,7 +759,7 @@ export default function SamparkForYou() {
             {/* ONE composition: 1 large + 2×2 beside it — five together, no vertical scroll */}
             <div className="sampark-foryou-grid">
               <SamparkForYouCard
-                busy={Boolean(busyActions[articleKey(featured[0])])}
+                isPending={isPending}
                 item={featured[0]}
                 large
                 onHide={hide}
@@ -773,7 +772,7 @@ export default function SamparkForYou() {
               <div className="sampark-news-card-small-grid">
                 {featured.slice(1).map((item) => (
                   <SamparkForYouCard
-                    busy={Boolean(busyActions[articleKey(item)])}
+                    isPending={isPending}
                     item={item}
                     key={articleKey(item)}
                     onHide={hide}
@@ -793,7 +792,7 @@ export default function SamparkForYou() {
                 <div className="sampark-for-you-more-grid">
                   {remaining.map((item) => (
                     <SamparkForYouCard
-                      busy={Boolean(busyActions[articleKey(item)])}
+                      isPending={isPending}
                       item={item}
                       key={articleKey(item)}
                       onHide={hide}
@@ -840,7 +839,7 @@ export default function SamparkForYou() {
         open={followingOpen}
         threads={followingThreads}
       />
-      <SamparkArticleModal
+      <SamparkArticleDossier
         item={openArticle}
         onClose={closeDossier}
         onHide={async (item) => { closeDossier(); await hide(item); }}
@@ -848,7 +847,11 @@ export default function SamparkForYou() {
         onSave={toggleSave}
         onSourceOpen={handleSourceOpen}
         onWhyOpen={handleWhyOpen}
+        trailingMeta={openArticle && openArticle.mins_read ? `${openArticle.mins_read} min read` : ''}
         saved={openArticle ? savedKeys.has(articleKey(openArticle)) : false}
+        savedHydrated={savedState.status === 'ready'}
+        reactionsHydrated
+        titleId="sampark-dossier-title"
       />
     </div>
   );

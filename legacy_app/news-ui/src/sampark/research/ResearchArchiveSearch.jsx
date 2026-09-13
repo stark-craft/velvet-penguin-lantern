@@ -44,7 +44,7 @@ function SamparkResearchDossier({ item, onClose, saved, onSave, onHide, onReact 
             {lead && <p className="sampark-dossier-summary">{lead}</p>}
             {points.length ? <ul className="sampark-dossier-points">{points.slice(0, 5).map((p, i) => <li key={i}>{p}</li>)}</ul> : null}
             {item.matched_terms?.length ? <div className="sampark-dossier-keywords">{item.matched_terms.slice(0, 6).map((kw) => <span key={kw} className="sampark-keyword">{kw}</span>)}</div> : null}
-            {sourceLink ? <a className="sampark-dossier-link" href={sourceLink} rel="noreferrer" target="_blank">Open original source <Icon name="external" size={14} /></a> : null}
+            {sourceLink ? <a className="sampark-dossier-link" href={sourceLink} rel="noreferrer noopener" target="_blank">Open original source <Icon name="external" size={14} /></a> : null}
           </div>
         </div>
         <footer className="sampark-dossier-actions">

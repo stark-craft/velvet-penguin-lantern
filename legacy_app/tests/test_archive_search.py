@@ -137,6 +137,30 @@ class ExtractedArchiveSearchTests(unittest.TestCase):
         self.assertFalse(result["crawler_started"])
         history_files.assert_not_called()
 
+    def test_warm_local_query_measures_request_count_and_elapsed_time(self):
+        import time
+        # First cold query (parses file), second warm (cached) should be faster and not re-parse
+        with patch.object(main, "get_profile_history_files", return_value=[self.archive_path]):
+            # Clear cache
+            main._archive_search_cache.clear()
+            start_cold = time.perf_counter()
+            r1 = main.search_extracted_intelligence("default", "Samsung", None, None, None, limit=10)
+            elapsed_cold = (time.perf_counter() - start_cold) * 1000
+            # Record request count: we count via cache hits/misses
+            misses_before = main._archive_search_cache_misses
+            hits_before = main._archive_search_cache_hits
+            start_warm = time.perf_counter()
+            r2 = main.search_extracted_intelligence("default", "Samsung", None, None, None, limit=10)
+            elapsed_warm = (time.perf_counter() - start_warm) * 1000
+            self.assertEqual(r1["count"], r2["count"])
+            self.assertEqual(r1["results"][0]["title"], r2["results"][0]["title"])
+            # Warm should be faster or at least not slower than cold by large margin, and should hit cache
+            self.assertGreater(main._archive_search_cache_hits, hits_before)
+            # Record request count and elapsed time (for manual verification, not strict threshold due to CI variance)
+            # We assert warm is reasonably fast (<50ms) and request count is 1 archive file
+            self.assertLess(elapsed_warm, 50, f"warm query took {elapsed_warm:.1f}ms, expected <50ms")
+            self.assertEqual(r2["archive_files_searched"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

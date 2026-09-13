@@ -19,6 +19,7 @@ def _role_key(role: str) -> str:
         "gatekeeper": os.environ.get("GATEKEEPER_KEY", ""),
         "analytics": os.environ.get("ANALYTICS_KEY", ""),
         "editor": os.environ.get("INTERNAL_EDITOR_KEY", ""),
+        "executive": os.environ.get("EXECUTIVE_KEY", ""),
     }
     return str(keys.get(role, "") or "")
 
@@ -28,6 +29,7 @@ ROLE_CAPABILITIES = {
     "gatekeeper": {"gatekeeper.review", "model.train", "region.correct"},
     "analytics": {"analytics.view"},
     "editor": {"review.contributions.view", "review.contributions.publish"},
+    "executive": service.ALL_CAPABILITIES,
 }
 
 
@@ -35,11 +37,15 @@ ROLE_CAPABILITIES = {
 def capabilities(request: Request, response: Response):
     principal, ip = service.resolve_principal(request, response)
     values = sorted(service.effective_capabilities(request, response))
+    session = service.session_info(request)
     return {
         "status": "success",
         "principal": principal,
         "ip": ip,
         "capabilities": values,
+        "privileged_session_active": session["active"],
+        "session_role": session["role"],
+        "capability_sources": service.capability_sources(request, response),
     }
 
 

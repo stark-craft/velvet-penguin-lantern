@@ -1,65 +1,256 @@
-import React, { useEffect, useState } from 'react';
-import { searchExtractedIntelligence } from '../news-scrapper/api.js';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { getArchiveArticle, getViewerPreferences, searchExtractedIntelligence } from '../news-scrapper/api.js';
 import { articleKey, groupedByDate } from '../news-scrapper/utils/intelligence.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import Icon from '../news-scrapper/components/Icon.jsx';
+import { useArticleEngagement } from './shared/useArticleEngagement.js';
+import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
+import { sanitizeExternalUrl } from './shared/safeLink.js';
+import { shouldStartSearch } from './shared/searchHelper.js';
 
 function sourceLink(item) {
-  const candidate = String(item?.link || item?.url || '').trim();
-  return /^https?:\/\//i.test(candidate) ? candidate : '';
+  return sanitizeExternalUrl(item?.link || item?.url || '');
 }
 
-export default function SamparkSearchResults({ query }) {
-  const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState({ query: '', items: [], total: 0, loading: false, error: '' });
+function normalizeQuery(value) {
+  return String(value || '').trim().slice(0, 200);
+}
+
+export default function SamparkSearchResults({ query: initialQuery }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const params = new URLSearchParams(location.search);
+  const qParam = params.get('q') || initialQuery || '';
+  const fromParam = params.get('from') || '';
+  const toParam = params.get('to') || '';
+  const sourceParam = params.get('source') || '';
+  const sortParam = params.get('sort') || 'relevance';
+
+  const [draftQ, setDraftQ] = useState(qParam);
+  const [draftFrom, setDraftFrom] = useState(fromParam);
+  const [draftTo, setDraftTo] = useState(toParam);
+  const [draftSource, setDraftSource] = useState(sourceParam);
+  const [draftSort, setDraftSort] = useState(sortParam === 'newest' ? 'newest' : 'relevance');
+  const [dateError, setDateError] = useState('');
+  const [state, setState] = useState({ items: [], total: 0, loading: false, error: '', has_more: false });
+  const [rememberHistory, setRememberHistory] = useState(true);
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
+  const abortRef = useRef(null);
+  const hasSearchedRef = useRef(false);
 
   useEffect(() => {
-    const cleanQuery = String(query || '').trim();
-    const controller = new AbortController();
-    if (!cleanQuery) {
-      setState({ query: '', items: [], total: 0, loading: false, error: '' });
-      return () => controller.abort();
-    }
+    setDraftQ(qParam);
+    setDraftFrom(fromParam);
+    setDraftTo(toParam);
+    setDraftSource(sourceParam);
+    setDraftSort(sortParam === 'newest' ? 'newest' : 'relevance');
+  }, [qParam, fromParam, toParam, sourceParam, sortParam]);
 
-    setState((current) => ({ ...current, query: cleanQuery, loading: true, error: '' }));
-    const timer = window.setTimeout(async () => {
-      try {
-        let offset = 0;
-        let total = 0;
-        let items = [];
-        do {
-          const response = await searchExtractedIntelligence({ query: cleanQuery, sort: 'date_desc', limit: 500, offset }, controller.signal);
-          if (response?.status === 'error') throw new Error(response.message || 'Search could not be completed.');
-          const batch = normalizeList((response?.results || []).map((item) => ({ ...item, date: item.archive_date || item.date })));
-          items = [...items, ...batch];
-          total = Number(response?.total ?? items.length);
-          offset = items.length;
-          if (!response?.has_more || !batch.length) break;
-        } while (offset < total);
-        if (!controller.signal.aborted) setState({ query: cleanQuery, items, total, loading: false, error: '' });
-      } catch (error) {
-        if (!controller.signal.aborted) setState((current) => ({ ...current, loading: false, error: error?.message || 'Search could not be completed.' }));
+  useEffect(() => {
+    let cancelled = false;
+    // Fetch preferences concurrently for privacy panel only; must not delay search
+    getViewerPreferences().then((r) => {
+      if (cancelled) return;
+      const pref = r?.preferences || {};
+      if (typeof pref.remember_search_history === 'boolean') {
+        setRememberHistory(pref.remember_search_history);
+      } else if (typeof pref.rememberSearchHistory === 'boolean') {
+        setRememberHistory(pref.rememberSearchHistory);
       }
-    }, 250);
+      setPrefsLoaded(true);
+    }).catch(() => { if(!cancelled) setPrefsLoaded(true); });
+    return () => { cancelled = true; };
+  }, []);
 
+  const validateDates = (from, to) => {
+    if (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) return 'From date must be YYYY-MM-DD';
+    if (to && !/^\d{4}-\d{2}-\d{2}$/.test(to)) return 'To date must be YYYY-MM-DD';
+    if (from && to && from > to) return 'From date must be before To date';
+    return '';
+  };
+
+  useEffect(() => {
+    // Search starts immediately from route query/filters; preference loading is concurrent and never delays/cancels/duplicates search (uses production helper)
+    const cleanQuery = normalizeQuery(qParam);
+    if (!shouldStartSearch(cleanQuery, true)) {
+      setState({ items: [], total: 0, loading: false, error: '', has_more: false });
+      return;
+    }
+    const from = fromParam.trim();
+    const to = toParam.trim();
+    const source = sourceParam.trim();
+    const sort = sortParam === 'newest' ? 'newest' : 'relevance';
+    const validation = validateDates(from, to);
+    if (validation) {
+      setDateError(validation);
+      setState((c) => ({ ...c, loading: false, error: validation }));
+      return;
+    }
+    setDateError('');
+    setState((c) => ({ ...c, loading: true, error: '' }));
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const timer = setTimeout(async () => {
+      try {
+        const apiSort = sort === 'newest' ? 'date_desc' : 'relevance';
+        const response = await searchExtractedIntelligence({ query: cleanQuery, from_date: from || undefined, to_date: to || undefined, target_sites: source || undefined, sort: apiSort, limit: 100, offset: 0 }, controller.signal);
+        if (controller.signal.aborted) return;
+        if (response?.status === 'error') throw new Error(response.message || 'Search could not be completed.');
+        const batch = normalizeList((response?.results || []).map((item) => ({ ...item, date: item.archive_date || item.date })));
+        const total = Number(response?.total ?? batch.length);
+        const has_more = Boolean(response?.has_more) || total > batch.length;
+        setState({ items: batch.slice(0, 100), total, loading: false, error: '', has_more });
+        hasSearchedRef.current = true;
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setState({ items: [], total: 0, loading: false, error: error?.message || 'Search could not be completed.', has_more: false });
+      }
+    }, 150);
     return () => {
-      window.clearTimeout(timer);
+      clearTimeout(timer);
       controller.abort();
     };
-  }, [query, attempt]);
+  }, [qParam, fromParam, toParam, sourceParam, sortParam]);
 
-  const visibleItems = state.query === String(query || '').trim() ? state.items : [];
+  const visibleItems = useMemo(()=>{
+    let list = state.items;
+    // Date filtering over rendered result space without bypassing backend contract (backend already filtered, this ensures display consistency)
+    const from = fromParam.trim();
+    const to = toParam.trim();
+    if(from || to){
+      list = list.filter(it=>{
+        const d = String(it.date || it.archive_date || '').slice(0,10);
+        if(!d) return true;
+        if(from && d < from) return false;
+        if(to && d > to) return false;
+        return true;
+      });
+    }
+    return list;
+  }, [state.items, fromParam, toParam]);
   const groups = groupedByDate(visibleItems);
+  const [openArticle, setOpenArticle] = useState(null);
+  const [dossierDetail, setDossierDetail] = useState(null);
+  const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierError, setDossierError] = useState('');
+  const [dossierRetry, setDossierRetry] = useState(0);
+  const dossierEngagement = useArticleEngagement(dossierDetail || openArticle || {}, { surface: 'search_results' });
+  const handleCloseDossier = () => { dossierEngagement.onDossierClose(); setOpenArticle(null); setDossierDetail(null); setDossierError(''); };
+  const openArticleId = openArticle ? articleKey(openArticle) : '';
+  useEffect(()=>{ if(openArticle && openArticleId) dossierEngagement.onDossierOpen(openArticle); }, [openArticleId]);
+  // On-demand full record: the list payload stays compact; the dossier loads
+  // the complete retained article (hidden-filtered, viewer-scoped).
+  useEffect(()=>{
+    if (!openArticle) return undefined;
+    let cancelled = false;
+    const controller = new AbortController();
+    setDossierDetail(null);
+    setDossierError('');
+    setDossierLoading(true);
+    getArchiveArticle({ link: openArticle.link, url: openArticle.url, title: openArticle.title }, controller.signal)
+      .then((res)=>{
+        if (cancelled || controller.signal.aborted) return;
+        setDossierDetail(res?.article || null);
+        if (!res?.article) setDossierError('This article is no longer available in the retained archive.');
+      })
+      .catch((e)=>{
+        if (cancelled || controller.signal.aborted) return;
+        setDossierError(e?.message || 'The full article could not be loaded.');
+      })
+      .finally(()=>{ if (!cancelled) setDossierLoading(false); });
+    return ()=>{ cancelled = true; controller.abort(); };
+  }, [openArticleId, dossierRetry]);
+
+  const handleSubmit = (e) => {
+    e?.preventDefault();
+    const clean = normalizeQuery(draftQ);
+    const err = validateDates(draftFrom.trim(), draftTo.trim());
+    if (err) { setDateError(err); return; }
+    if (!clean && !draftFrom && !draftTo && !draftSource) {
+      navigate('/search');
+      return;
+    }
+    const next = new URLSearchParams();
+    if (clean) next.set('q', clean);
+    if (draftFrom.trim()) next.set('from', draftFrom.trim());
+    if (draftTo.trim()) next.set('to', draftTo.trim());
+    if (draftSource.trim()) next.set('source', draftSource.trim());
+    if (draftSort) next.set('sort', draftSort);
+    navigate(`/search?${next.toString()}`);
+  };
+
+  const handleClear = () => {
+    setDraftQ('');
+    setDraftFrom('');
+    setDraftTo('');
+    setDraftSource('');
+    setDraftSort('relevance');
+    setDateError('');
+    navigate('/search');
+  };
+
+  const handleManageSettings = () => {
+    // dispatch event for SamparkApp to open settings and focus Remember Search History
+    window.dispatchEvent(new CustomEvent('sampark-open-settings', { detail: { focus: 'remember_search_history' } }));
+    // fallback: try to set flag for settings modal to scroll
+    try { window.localStorage.setItem('sampark-settings-focus', 'remember_search_history'); } catch {}
+  };
 
   return <section aria-busy={state.loading} className="search-results-page">
     <header className="search-results-header">
-      <div><span>Search the news archive</span><h1>Results for “{String(query || '').trim()}”</h1><p>Every retained matching story, grouped by date and ordered newest first.</p></div>
+      <div>
+        <span>Search the news archive</span>
+        <h1>Results for “{normalizeQuery(qParam) || 'archived news'}”</h1>
+        <p>This is the retained TechScout news archive — scheduler-extracted briefing stories kept for 30 days. It does not search the current tab, live Venture Lens providers, drafts, private contributions, or the public web. For technical artifacts use Research Discovery; for retained briefing evidence use Archive Search.</p>
+        {state.total > 100 && !state.loading && <p>Showing 100 of {state.total} matches — narrow filters to see more.</p>}
+      </div>
       <strong>{state.loading ? 'Searching…' : `${state.total} stories`}</strong>
     </header>
 
-    {state.error && <div className="search-state is-error" role="alert"><span>{state.error}</span><button onClick={() => setAttempt((value) => value + 1)} type="button">Try again</button></div>}
-    {state.loading && !visibleItems.length && <div className="search-state" role="status"><span className="search-spinner" />Searching every retained briefing…</div>}
-    {!state.loading && !state.error && !visibleItems.length && <div className="search-state"><Icon name="search" size={22} /><span>No matching stories. Try another company, technology, or keyword.</span></div>}
+    <div className="sampark-search-privacy-panel" role="note" style={{ marginBottom: 12, padding: 12, border: '1px solid var(--line)', borderRadius: 8, background: 'var(--surface-soft)' }}>
+      <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>
+        {!prefsLoaded ? 'Loading search preferences…' : rememberHistory ? 'Searches help tune your For You briefing.' : 'Search history is off. This search will not affect For You.'}
+        {' '}
+        <button type="button" onClick={handleManageSettings} style={{ color: 'var(--primary)', textDecoration: 'underline', background: 'transparent', border: 0, cursor: 'pointer', fontSize: 13 }}>Manage Settings</button>
+      </p>
+    </div>
+
+    <form className="sampark-search-refinement" onSubmit={handleSubmit} role="search" aria-label="Refine archived news search">
+        <div className="sampark-search-field">
+          <label htmlFor="sampark-search-q">Query</label>
+          <input id="sampark-search-q" value={draftQ} onChange={(e) => setDraftQ(e.target.value)} placeholder="Search all archived news" aria-label="Search all archived news" />
+        </div>
+        <div className="sampark-search-field">
+          <label htmlFor="sampark-search-from">From date</label>
+          <input id="sampark-search-from" type="date" value={draftFrom} onChange={(e) => setDraftFrom(e.target.value)} />
+        </div>
+        <div className="sampark-search-field">
+          <label htmlFor="sampark-search-to">To date</label>
+          <input id="sampark-search-to" type="date" value={draftTo} onChange={(e) => setDraftTo(e.target.value)} />
+        </div>
+        <div className="sampark-search-field">
+          <label htmlFor="sampark-search-source">Source</label>
+          <input id="sampark-search-source" value={draftSource} onChange={(e) => setDraftSource(e.target.value)} placeholder="Source" aria-label="Source" />
+        </div>
+        <div className="sampark-search-field">
+          <label htmlFor="sampark-search-sort">Sort</label>
+          <select id="sampark-search-sort" value={draftSort} onChange={(e) => setDraftSort(e.target.value)}>
+            <option value="relevance">relevance</option>
+            <option value="newest">newest</option>
+          </select>
+        </div>
+        <button className="btn-primary" type="submit">Search</button>
+        <button className="btn-secondary" type="button" onClick={handleClear}>Clear</button>
+        {dateError && <p role="alert" style={{ color: '#b91c1c', fontSize: 12 }}>{dateError}</p>}
+      </form>
+
+    {state.error && <div className="search-state is-error" role="alert"><span>{state.error}</span><button onClick={handleSubmit} type="button">Try again</button></div>}
+    {state.loading && <div className="search-state" role="status"><span className="search-spinner" />{visibleItems.length ? 'Updating results…' : 'Searching every retained briefing…'}</div>}
+    {!state.loading && !state.error && !visibleItems.length && !qParam.trim() && !fromParam.trim() && !toParam.trim() && !sourceParam.trim() && <div className="search-state"><Icon name="search" size={22} /><span>Enter a search query above, then choose Search. Filters refine a query.</span></div>}
+    {!state.loading && !state.error && !visibleItems.length && !qParam.trim() && (fromParam.trim() || toParam.trim() || sourceParam.trim()) && <div className="search-state"><Icon name="search" size={22} /><span>Archive search needs a query — add one above. Date, source, and sort refine results but cannot run alone.</span></div>}
+    {!state.loading && !state.error && !visibleItems.length && qParam.trim() && <div className="search-state"><Icon name="search" size={22} /><span>No matching stories. Try another company, technology, or keyword.</span></div>}
 
     <div className="search-date-groups">
       {Object.entries(groups).map(([date, items]) => <section className="search-date-group" key={date}>
@@ -69,12 +260,35 @@ export default function SamparkSearchResults({ query }) {
             const href = sourceLink(item);
             const title = item.title || 'Untitled news item';
             const content = <><span className="search-result-source">{item.source || item.src || 'TechScout'}<i aria-hidden="true" />{item.category || 'News'}</span><strong>{title}</strong>{item.summary && <p>{item.summary}</p>}</>;
-            return href
-              ? <a className="search-result-row" href={href} key={articleKey(item)} rel="noreferrer" target="_blank">{content}<Icon name="external" size={16} /></a>
-              : <article className="search-result-row" key={articleKey(item)}>{content}</article>;
+            // Dossier opens on click, external link inside dossier tracks source_open via same engagement mechanism
+            return <button key={articleKey(item)} className="search-result-row" type="button" onClick={()=> setOpenArticle(item)} style={{ textAlign:'left', width:'100%', background:'transparent', border:0, cursor:'pointer' }}>{content}{href && <Icon name="external" size={16} />}</button>;
           })}
         </div>
       </section>)}
     </div>
+    {openArticle && (
+      dossierLoading ? (
+        <div className="sampark-modal-overlay" onMouseDown={e=>{ if(e.target===e.currentTarget) handleCloseDossier(); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="search-dossier-title" aria-busy="true" className="sampark-dossier sampark-dossier--large" tabIndex={-1}>
+            <header className="sampark-dossier-header"><h2 id="search-dossier-title" style={{ fontSize: 16, fontWeight: 600 }}>Loading article…</h2><button aria-label="Close dossier" onClick={handleCloseDossier} type="button"><Icon name="x" size={18} /></button></header>
+            <div className="sampark-dossier-body" role="status"><span className="search-spinner" /> Loading the complete article…</div>
+          </section>
+        </div>
+      ) : dossierError && !dossierDetail ? (
+        <div className="sampark-modal-overlay" onMouseDown={e=>{ if(e.target===e.currentTarget) handleCloseDossier(); }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="search-dossier-title" className="sampark-dossier sampark-dossier--large" tabIndex={-1}>
+            <header className="sampark-dossier-header"><h2 id="search-dossier-title" style={{ fontSize: 16, fontWeight: 600 }}>Article unavailable</h2><button aria-label="Close dossier" onClick={handleCloseDossier} type="button"><Icon name="x" size={18} /></button></header>
+            <div className="sampark-dossier-body" role="alert"><p>{dossierError}</p><button className="btn-secondary" onClick={() => setDossierRetry((k) => k + 1)} type="button">Retry</button></div>
+          </section>
+        </div>
+      ) : (
+        <SamparkArticleDossier
+          item={dossierDetail || openArticle}
+          onClose={handleCloseDossier}
+          onSourceOpen={() => dossierEngagement.onSourceOpen()}
+          titleId="search-dossier-title"
+        />
+      )
+    )}
   </section>;
 }

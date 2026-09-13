@@ -4,6 +4,8 @@ import { getHistoryList, getHistoryFile } from '../news-scrapper/api.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import { articleKey } from '../news-scrapper/utils/intelligence.js';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
+import { useArticleEngagement } from './shared/useArticleEngagement.js';
+import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
 
 export default function SamparkHistory() {
   const [runs, setRuns] = useState([]);
@@ -26,14 +28,37 @@ export default function SamparkHistory() {
 
   useEffect(() => { load(); }, []);
 
+  const [detailError, setDetailError] = useState('');
+  const [openArticle, setOpenArticle] = useState(null);
+  const engagement = useArticleEngagement(openArticle || {}, { surface: 'history_archive' });
+  const handleCloseDossier = () => { engagement.onDossierClose(); setOpenArticle(null); };
+  const openArticleId = openArticle ? articleKey(openArticle) : '';
+  useEffect(()=>{ if(openArticle && openArticleId) engagement.onDossierOpen(openArticle); }, [openArticleId]);
   const openRun = async (run) => {
     setSelected(run);
     setLoadingItems(true);
+    setDetailError('');
     try {
       const data = await getHistoryFile(run.filename || run.name || '');
-      const list = normalizeList(Array.isArray(data) ? data : data?.items || data?.result || []);
+      // Backend contract: { status: "success", results: [...] } ; keep compat with items/result for legacy
+      const raw = data?.results ?? data?.items ?? data?.result ?? (Array.isArray(data) ? data : []);
+      if (Array.isArray(data) && data.length === 0 && data?.status === 'success') {
+        // empty success
+      }
+      if (data?.status === 'error' || data?.detail) throw new Error(data?.detail || data?.message || 'Archive could not be loaded');
+      const list = normalizeList(Array.isArray(raw) ? raw : []);
       setItems(list);
+      if (!list.length && data?.status === 'success') {
+        // genuine empty
+        setDetailError('');
+      }
     } catch (e) {
+      const status = e?.status;
+      if (status === 404) setDetailError('Archive not found (404).');
+      else if (status === 403) setDetailError('Permission denied.');
+      else if (e?.message?.includes('malformed') || e?.message?.includes('JSON')) setDetailError('Malformed archive.');
+      else if (e?.message?.includes('Network') || status === 0) setDetailError('Network failure.');
+      else setDetailError(e?.message || 'Archive could not be loaded.');
       setItems([]);
     } finally {
       setLoadingItems(false);
@@ -56,16 +81,23 @@ export default function SamparkHistory() {
           ))}
         </div>
         <div className="sampark-history-detail">
-          {!selected ? <p className="sampark-history-hint">Select an archive date to view its briefing.</p> : loadingItems ? <div className="sampark-workspace-loading"><span className="sampark-spinner" /> Loading archive…</div> : !items.length ? <p>No stories in this archive.</p> : (
+          {!selected ? <p className="sampark-history-hint">Select an archive date to view its briefing.</p> : loadingItems ? <div className="sampark-workspace-loading"><span className="sampark-spinner" /> Loading archive…</div> : detailError ? <div role="alert" className="sampark-workspace-empty is-error"><Icon name="warning" size={20} /><p>{detailError}</p><button className="btn-secondary" onClick={()=> selected && openRun(selected)} type="button">Retry</button></div> : !items.length ? <p>No stories</p> : (
             <div className="sampark-history-grid">
               {items.slice(0, 30).map((item) => (
-                <article key={articleKey(item)} className="sampark-history-card">
+                <button key={articleKey(item)} className="sampark-history-card" type="button" onClick={()=> setOpenArticle(item)} style={{ textAlign:'left', cursor:'pointer' }}>
                   <small>{item.src || item.source || 'Source'} · {item.date || ''}</small>
                   <strong>{item.title}</strong>
-                  {item.link && <a href={item.link} target="_blank" rel="noreferrer">Open <Icon name="external" size={12} /></a>}
-                </article>
+                </button>
               ))}
             </div>
+          )}
+          {openArticle && (
+            <SamparkArticleDossier
+              item={openArticle}
+              onClose={handleCloseDossier}
+              onSourceOpen={() => engagement.onSourceOpen()}
+              titleId="history-dossier-title"
+            />
           )}
         </div>
       </div>

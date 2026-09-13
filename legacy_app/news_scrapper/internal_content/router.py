@@ -389,6 +389,29 @@ def get_cover(record_id: str, request: Request, response: Response):
     )
 
 
+@router.delete("/{record_id}/cover")
+def delete_cover(record_id: str, request: Request, response: Response):
+    access.require_contributor_ip(request)
+    owner = _owner(request, response)
+    try:
+        record = service.get_owned(owner, record_id)
+    except LookupError as error:
+        raise _fail(error) from error
+    cover = record.get("cover") if isinstance(record.get("cover"), dict) else None
+    if not cover or not cover.get("file"):
+        raise HTTPException(status_code=404, detail="No cover to delete")
+    # remove file and clear persistence
+    import datetime as _dt
+    storage.remove_quietly(storage.COVERS_DIR / str(cover.get("file")))
+    with storage.mutation_lock:
+        items = storage.load_records()
+        if record_id in items:
+            items[record_id]["cover"] = None
+            items[record_id]["updated_at"] = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+            storage.write_records(items)
+    return {"status": "success", "removed": True}
+
+
 @router.get("/{record_id}/document")
 def get_document(record_id: str, request: Request, response: Response):
     try:

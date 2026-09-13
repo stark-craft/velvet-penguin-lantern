@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Icon from '../news-scrapper/components/Icon.jsx';
+import { applySamparkTheme, readSamparkTheme, saveSamparkTheme } from './theme.js';
 import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
 import {
+  getViewerPreferences,
   logoutCapabilitySession,
   pauseViewerPersonalization,
   unlockCapabilitySession,
+  updateViewerPreferences,
   updateViewerProfile,
 } from '../news-scrapper/api.js';
 
@@ -23,11 +27,11 @@ export function readSamparkSettings() {
   }
 }
 
-function ToggleRow({ checked, children, onChange }) {
-  return <div className="settings-row"><span>{children}</span><label className="settings-toggle"><input checked={checked} onChange={(event) => onChange(event.target.checked)} type="checkbox" /><span className="toggle-slider" /></label></div>;
+function ToggleRow({ checked, children, onChange, focusKey }) {
+  return <div className="settings-row" data-focus={focusKey || undefined}><span>{children}</span><label className="settings-toggle"><input aria-label={typeof children === 'string' ? children : undefined} checked={checked} onChange={(event) => onChange(event.target.checked)} type="checkbox" /><span className="toggle-slider" /></label></div>;
 }
 
-export default function SamparkSettingsModal({ capabilities, onAccessChanged, onClose, onSaved, open, settings, viewer }) {
+export default function SamparkSettingsModal({ capabilities, privilegedSessionActive, sessionRole, onAccessChanged, onClose, onSaved, open, settings, viewer }) {
   const [draft, setDraft] = useState(settings);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -36,21 +40,56 @@ export default function SamparkSettingsModal({ capabilities, onAccessChanged, on
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [fieldError, setFieldError] = useState('');
-  const dialogRef = useModalFocus(open, onClose);
+  const [theme, setTheme] = useState(() => { try { return readSamparkTheme(); } catch { return 'light'; } });
+  const [openingTheme, setOpeningTheme] = useState('light');
+  const themeSavedRef = React.useRef(false);
+  const [sectionStatus, setSectionStatus] = useState({ profile: '', feed: '', history: '' });
+  // Theme previews immediately but persists only with Save Settings; Cancel,
+  // Escape, and overlay close restore the opening theme.
+  const cancelWithoutSave = () => {
+    if (!themeSavedRef.current) {
+      setTheme(openingTheme);
+      applySamparkTheme(openingTheme);
+      try { window.localStorage.setItem('sampark-theme', openingTheme); } catch {}
+    }
+    onClose();
+  };
+  const dialogRef = useModalFocus(open, cancelWithoutSave);
 
   useEffect(() => {
     if (!open) return;
     setDraft(settings);
+    setTheme(readSamparkTheme());
+    setOpeningTheme(readSamparkTheme());
+    themeSavedRef.current = false;
     setName(viewer?.display_name || '');
     setEmail(viewer?.email || '');
     setKey('');
     setMessage('');
     setFieldError('');
+    // sync from server authority on open
+    getViewerPreferences().then((r) => {
+      const pref = r?.preferences || {};
+      const serverRemember = typeof pref.remember_search_history === 'boolean' ? pref.remember_search_history : typeof pref.rememberSearchHistory === 'boolean' ? pref.rememberSearchHistory : null;
+      if (serverRemember !== null && serverRemember !== settings.saveSearchHistory) {
+        setDraft((c) => ({ ...c, saveSearchHistory: serverRemember }));
+      }
+    }).catch(() => {});
+    // focus requested Remember Search History if flagged
+    const focus = (() => { try { return window.localStorage.getItem('sampark-settings-focus'); } catch { return null; }})();
+    if (focus === 'remember_search_history') {
+      try { window.localStorage.removeItem('sampark-settings-focus'); } catch {}
+      setTimeout(() => {
+        const el = document.querySelector('[data-focus="remember_search_history"] input');
+        if (el) el.focus();
+      }, 120);
+    }
   }, [open, settings, viewer]);
 
-  // Do not infer exact role from effective capabilities (union of IP + session)
-  const hasPrivilegedSession = Boolean(capabilities?.length);
-  const accessStatusLabel = hasPrivilegedSession ? 'Privileged session active' : 'Standard access — IP/network permissions';
+  // Server-authoritative session truth: capabilities alone never prove a
+  // privileged session (network/principal grants also contribute).
+  const hasPrivilegedSession = Boolean(privilegedSessionActive);
+  const accessStatusLabel = hasPrivilegedSession ? `Privileged session active${sessionRole ? ` · ${sessionRole}` : ''}` : 'Standard access — IP/network permissions';
 
   if (!open) return null;
   const setOption = (option, value) => setDraft((current) => ({ ...current, [option]: value }));
@@ -75,6 +114,8 @@ export default function SamparkSettingsModal({ capabilities, onAccessChanged, on
     setBusy('save');
     setMessage('');
     setFieldError('');
+    setSectionStatus({ profile: '', feed: '', history: '' });
+    const parts = { profile: '', feed: '', history: '' };
     try {
       let nextViewer = viewer;
       const cleanName = name.trim();
@@ -89,6 +130,7 @@ export default function SamparkSettingsModal({ capabilities, onAccessChanged, on
           const response = await updateViewerProfile({ display_name: cleanName, email: cleanEmail });
           if (response?.status !== 'success') throw new Error(response?.detail || response?.message || 'Profile could not be saved.');
           nextViewer = { ...viewer, ...response, display_name: cleanName, email: cleanEmail };
+          parts.profile = 'saved';
         } catch (profileError) {
           const status = profileError?.status;
           const msg = profileError?.message || '';
@@ -97,24 +139,82 @@ export default function SamparkSettingsModal({ capabilities, onAccessChanged, on
             setFieldError(inline);
             throw new Error(inline);
           }
+          parts.profile = `failed: ${msg || 'could not be saved'}`;
           throw profileError;
         }
+      } else {
+        parts.profile = 'unchanged';
       }
-      if (draft.personalizedFeed !== settings.personalizedFeed) await pauseViewerPersonalization(!draft.personalizedFeed);
-      // Privacy: when search history is turned OFF, clear existing history immediately
-      if (!draft.saveSearchHistory) {
-        window.localStorage.removeItem('sampark-search-history-v1');
+      if (draft.personalizedFeed !== settings.personalizedFeed) {
+        try {
+          await pauseViewerPersonalization(!draft.personalizedFeed);
+          parts.feed = 'saved';
+        } catch (feedError) {
+          parts.feed = `failed: ${feedError?.message || 'could not be saved'}`;
+          throw feedError;
+        }
+      } else {
+        parts.feed = 'unchanged';
       }
+      // Server-authoritative Remember Search History: mirror to server, localStorage is cache only; do not pretend success on failure
+      if (draft.saveSearchHistory !== settings.saveSearchHistory) {
+        let ok = false;
+        let lastError = null;
+        try {
+          await updateViewerPreferences({ remember_search_history: draft.saveSearchHistory });
+          ok = true;
+        } catch (e) {
+          lastError = e;
+          try { await updateViewerPreferences({ rememberSearchHistory: draft.saveSearchHistory }); ok = true; lastError = null; } catch (e2) { lastError = e2; }
+        }
+        if (!ok) {
+          parts.history = `failed: ${lastError?.message || 'could not be saved'}`;
+          throw lastError || new Error('Could not save search-history preference');
+        }
+        parts.history = 'saved';
+        if (!draft.saveSearchHistory) {
+          window.localStorage.removeItem('sampark-search-history-v1');
+          try {
+            const principal = String(viewer?.principal || '').trim();
+            if (principal) window.localStorage.removeItem(`sampark-search-history-v1:${principal.slice(0,8)}`);
+          } catch {}
+        }
+      } else {
+        parts.history = 'unchanged';
+      }
+      setSectionStatus(parts);
+      themeSavedRef.current = true;
+      saveSamparkTheme(theme);
       window.localStorage.setItem(SAMPARK_SETTINGS_KEY, JSON.stringify(draft));
+      // re-read server to ensure authoritative state
+      try {
+        const refreshed = await getViewerPreferences();
+        const pref = refreshed?.preferences || {};
+        const serverRemember = typeof pref.remember_search_history === 'boolean' ? pref.remember_search_history : null;
+        if (serverRemember !== null && serverRemember !== draft.saveSearchHistory) {
+          const corrected = { ...draft, saveSearchHistory: serverRemember };
+          window.localStorage.setItem(SAMPARK_SETTINGS_KEY, JSON.stringify(corrected));
+          onSaved(corrected, nextViewer);
+          onClose();
+          return;
+        }
+      } catch {
+        setMessage('Saved, but the verification read failed — please reopen Settings to confirm.');
+        onSaved(draft, nextViewer);
+        return;
+      }
       onSaved(draft, nextViewer);
       onClose();
     } catch (error) {
+      setSectionStatus(parts);
       const msg = error?.message || 'Settings could not be saved. Please try again.';
       if (/already taken|at least 2/i.test(msg)) {
         // inline already set, keep modal open
         if (!document.querySelector('.sampark-field-error')) setFieldError(msg);
       } else {
-        setMessage(msg);
+        const saved = Object.entries(parts).filter(([, v]) => v === 'saved').map(([k]) => k).join(', ');
+        const failed = Object.entries(parts).filter(([, v]) => String(v).startsWith('failed')).map(([k]) => k).join(', ');
+        setMessage(`${msg}${saved ? ` Saved: ${saved}.` : ''}${failed ? ` Failed: ${failed} — retry that section.` : ''}`);
       }
     } finally {
       setBusy('');
@@ -129,9 +229,9 @@ export default function SamparkSettingsModal({ capabilities, onAccessChanged, on
         ? 'Personalized ranking paused — search history still remembered.'
         : 'Personalization active — search history remembered.';
 
-  return <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div className="modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) cancelWithoutSave(); }}>
     <section aria-labelledby="settings-title" aria-modal="true" className="settings-modal" ref={dialogRef} role="dialog" tabIndex={-1}>
-      <header className="modal-header"><h2 id="settings-title">Settings</h2><button aria-label="Close settings" onClick={onClose} type="button"><Icon name="x" size={18} /></button></header>
+      <header className="modal-header"><h2 id="settings-title">Settings</h2><button aria-label="Close settings" onClick={cancelWithoutSave} type="button"><Icon name="x" size={18} /></button></header>
       <div className="modal-body">
         <section className="settings-section"><h3><Icon name="user" size={16} />Profile</h3>
           <label className="settings-field"><span>Display name</span><input aria-describedby={fieldError ? 'display-name-error' : undefined} aria-invalid={Boolean(fieldError)} autoComplete="nickname" maxLength={80} onChange={(event) => { setName(event.target.value); if (fieldError) setFieldError(''); }} value={name} /></label>
@@ -139,17 +239,28 @@ export default function SamparkSettingsModal({ capabilities, onAccessChanged, on
           <label className="settings-field"><span>Email <small>optional</small></span><input autoComplete="email" onChange={(event) => setEmail(event.target.value)} type="email" value={email} /></label>
         </section>
         <section className="settings-section"><h3><Icon name="shield" size={16} />Privacy</h3>
-          <ToggleRow checked={draft.saveSearchHistory} onChange={(value) => setOption('saveSearchHistory', value)}>Remember Search History</ToggleRow>
-          <p className="settings-note">Save searches on this browser for quicker access later. Stored in this browser only.</p>
+          <ToggleRow checked={draft.saveSearchHistory} focusKey="remember_search_history" onChange={(value) => setOption('saveSearchHistory', value)}>Remember Search History</ToggleRow>
+          <p className="settings-note">When on, your recent searches (up to 12 unique queries, length-limited and deduplicated) are kept privately for your browser and may lightly tune your For You briefing. Stored per signed viewer, never in shared analytics or global Gatekeeper data.</p>
           <ToggleRow checked={draft.personalizedFeed} onChange={(value) => setOption('personalizedFeed', value)}>Personalized For You</ToggleRow>
           <p className="settings-note">Allow TechScout to adapt For You from your preferences and activity. Turn off to pause ranking.</p>
           <div className="sampark-privacy-status" role="status"><strong>Privacy status</strong><span>{privacyStatus}</span></div>
         </section>
-        <section className="settings-section" data-no-translate><h3><Icon name="key" size={16} />Login & access</h3><p className="settings-note">Network permissions apply automatically. A role key adds protected tools. {accessStatusLabel}.</p><label className="settings-field"><span>Role to unlock</span><select onChange={(event) => setRole(event.target.value)} value={role}><option value="director">Director</option><option value="gatekeeper">Gatekeeper</option><option value="analytics">Analytics</option><option value="editor">Editor</option></select></label><label className="settings-field"><span>Access key</span><input autoComplete="current-password" onChange={(event) => setKey(event.target.value)} type="password" value={key} /></label><div className="settings-inline-actions"><button disabled={busy === 'access' || !key.trim()} onClick={() => changeAccess(false)} type="button">Log in</button><button disabled={busy === 'access'} onClick={() => changeAccess(true)} type="button">Log out role session</button></div><p className="settings-note">{capabilities?.length || 0} permissions active · {hasPrivilegedSession ? 'Privileged session' : 'Standard/network'}</p></section>
-        <section className="settings-section"><h3><Icon name="layers" size={16} />Workspaces</h3><div className="settings-links"><a href="/sampark/following" onClick={onClose}>Saved & Following</a><a href="/sampark/hidden" onClick={onClose}>Hidden News</a><a href="/sampark/history" onClick={onClose}>Briefing Archives</a><a href="/sampark/voc" onClick={onClose}>Feedback</a>{capabilities?.includes('review.news.view') && <a href="/sampark/review" onClick={onClose}>Review Queue</a>}{capabilities?.includes('approved.view') && <a href="/sampark/approved" onClick={onClose}>Approved Briefing</a>}{capabilities?.includes('gatekeeper.review') && <a href="/sampark/gatekeeper" onClick={onClose}>Gatekeeper Review</a>}{capabilities?.includes('sources.view') && <a href="/sampark/sources" onClick={onClose}>Source Control</a>}{capabilities?.includes('scheduler.view') && <a href="/sampark/scheduler" onClick={onClose}>Scheduler</a>}{capabilities?.includes('analytics.view') && <a href="/sampark/analytics" onClick={onClose}>Analytics</a>}{capabilities?.includes('access.manage') && <a href="/sampark/access" onClick={onClose}>Access Management</a>}</div></section>
-        {message && <p className="settings-message" role={message.includes('could not') || message.startsWith('Enter') ? 'alert' : 'status'}>{message}</p>}
+        <section className="settings-section" data-no-translate><h3><Icon name="key" size={16} />Login & access</h3><p className="settings-note">Network permissions apply automatically. A role key adds protected tools. {accessStatusLabel}.</p><label className="settings-field"><span>Role to unlock</span><select onChange={(event) => setRole(event.target.value)} value={role}><option value="director">Director</option><option value="gatekeeper">Gatekeeper</option><option value="analytics">Analytics</option><option value="editor">Editor</option><option value="executive">Executive Control</option></select></label><label className="settings-field"><span>Access key</span><input autoComplete="current-password" onChange={(event) => setKey(event.target.value)} type="password" value={key} /></label><div className="settings-inline-actions"><button disabled={busy === 'access' || !key.trim()} onClick={() => changeAccess(false)} type="button">Log in</button><button disabled={busy === 'access'} onClick={() => changeAccess(true)} type="button">Log out role session</button></div><p className="settings-note">{capabilities?.length || 0} permissions active · {hasPrivilegedSession ? 'Privileged session' : 'Standard/network'}</p></section>
+        <section className="settings-section"><h3><Icon name="layers" size={16} />Appearance</h3>
+          <label className="settings-field"><span>Theme (preview now, keep with Save Settings)</span><select aria-label="Color theme" onChange={(event) => { const next = event.target.value; setTheme(next); applySamparkTheme(next); }} value={theme}><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select></label>
+          <p className="settings-note">Applies to dialogs, cards, tables, and controls on this browser. Choosing a theme previews it; Cancel restores the previous theme.</p>
+        </section>
+        <section className="settings-section"><h3><Icon name="layers" size={16} />Workspaces</h3><div className="settings-links"><Link to="/following" onClick={cancelWithoutSave}>Saved & Following</Link><Link to="/hidden" onClick={cancelWithoutSave}>Hidden News</Link><Link to="/history" onClick={cancelWithoutSave}>Briefing Archives</Link><Link to="/voc" onClick={cancelWithoutSave}>Feedback</Link>{capabilities?.includes('review.news.view') && <Link to="/review" onClick={cancelWithoutSave}>Review Queue</Link>}{capabilities?.includes('approved.view') && <Link to="/approved" onClick={cancelWithoutSave}>Approved Briefing</Link>}{capabilities?.includes('gatekeeper.review') && <Link to="/gatekeeper" onClick={cancelWithoutSave}>Gatekeeper Review</Link>}{capabilities?.includes('sources.view') && <Link to="/sources" onClick={cancelWithoutSave}>Source Control</Link>}{capabilities?.includes('scheduler.view') && <Link to="/scheduler" onClick={cancelWithoutSave}>Scheduler</Link>}{capabilities?.includes('analytics.view') && <Link to="/analytics" onClick={cancelWithoutSave}>Analytics</Link>}{capabilities?.includes('access.manage') && <Link to="/access" onClick={cancelWithoutSave}>Access Management</Link>}</div></section>
+        {message && <p className="settings-message" role={message.includes('could not') || message.startsWith('Enter') || message.includes('Failed') ? 'alert' : 'status'}>{message}</p>}
+        {(sectionStatus.profile || sectionStatus.feed || sectionStatus.history) && (
+          <ul className="settings-section-status" aria-label="Per-section save status">
+            {sectionStatus.profile && <li>Profile: {sectionStatus.profile}</li>}
+            {sectionStatus.feed && <li>Personalized feed: {sectionStatus.feed}</li>}
+            {sectionStatus.history && <li>Search history: {sectionStatus.history}</li>}
+          </ul>
+        )}
       </div>
-      <footer className="modal-footer"><button className="btn-secondary" disabled={Boolean(busy)} onClick={onClose} type="button">Cancel</button><button className="btn-primary" disabled={Boolean(busy)} onClick={save} type="button">{busy === 'save' ? 'Saving…' : 'Save Settings'}</button></footer>
+      <footer className="modal-footer"><button className="btn-secondary" disabled={Boolean(busy)} onClick={cancelWithoutSave} type="button">Cancel</button><button className="btn-primary" disabled={Boolean(busy)} onClick={save} type="button">{busy === 'save' ? 'Saving…' : 'Save Settings'}</button></footer>
     </section>
   </div>;
 }

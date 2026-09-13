@@ -13,6 +13,7 @@ class ViewerPreferences(BaseModel):
     source_families: list[str] = Field(default_factory=list)
     regions: list[str] = Field(default_factory=lambda: ["balanced"])
     surprise_me: bool = True
+    remember_search_history: bool = True
 
 
 class PauseRequest(BaseModel):

@@ -1,5 +1,7 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../../news-scrapper/components/Icon.jsx';
+import { isCompareSupported, isWatchSupported } from './researchCapabilities.js';
 
 const KIND_ICON = {
   repository: 'terminal',
@@ -38,6 +40,39 @@ export default function ResearchArtifactCard({ artifact, onOpen, onWatch, onComp
   const momentum = artifact.momentum;
   const isStarter = artifact.starter_snapshot;
   const hasImage = false; // Venture artifacts have no real images — use icon block per spec, never stock
+  const navigate = useNavigate();
+  const canWatch = isWatchSupported(kind);
+  const canCompare = isCompareSupported(kind);
+  const showWatch = canWatch && Boolean(onWatch);
+  const showCompare = canCompare && Boolean(onCompare);
+
+  function isExternalUrl(url) {
+    return /^https?:\/\//i.test(String(url || '').trim());
+  }
+  function isInternalSynthesized(url) {
+    const u = String(url || '').trim();
+    if (!u) return false;
+    if (isExternalUrl(u)) return false;
+    // Synthesized relative URLs like /venturelens/radar?... or /research/radar
+    return u.startsWith('/') && (u.includes('/venturelens') || u.includes('/radar') || u.includes('/research'));
+  }
+  function handleSourceClick(e) {
+    const url = artifact.url;
+    if (!url) return;
+    if (isExternalUrl(url)) return; // let anchor handle external
+    if (isInternalSynthesized(url)) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Preserve useful query state, route to /research/radar inside Sampark
+      try {
+        const urlObj = new URL(url, window.location.origin);
+        const search = urlObj.search || '';
+        navigate(`/research/radar${search}`);
+      } catch {
+        navigate('/research/radar');
+      }
+    }
+  }
 
   return (
     <article className={`sampark-research-artifact is-${kind}`}>
@@ -65,11 +100,24 @@ export default function ResearchArtifactCard({ artifact, onOpen, onWatch, onComp
         {artifact.summary && <p className="sampark-research-artifact-summary">{artifact.summary}</p>}
         <div className="sampark-research-artifact-meta">
           <span>{formatMetric(kind, artifact.metrics)}</span>
-          {artifact.url && <a href={artifact.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>Source <Icon name="external" size={12} /></a>}
+          {artifact.url && isExternalUrl(artifact.url) && (
+            <a href={artifact.url} target="_blank" rel="noreferrer noopener" onClick={(e) => e.stopPropagation()}>
+              Source <Icon name="external" size={12} />
+            </a>
+          )}
+          {artifact.url && isInternalSynthesized(artifact.url) && (
+            <button
+              type="button"
+              className="sampark-research-source-internal"
+              onClick={(e) => { e.stopPropagation(); handleSourceClick(e); }}
+            >
+              View in Research <Icon name="external" size={12} />
+            </button>
+          )}
         </div>
-        {(onWatch || onCompare) && (
+        {(showWatch || showCompare) && (
           <div className="sampark-research-artifact-actions">
-            {onWatch && (
+            {showWatch && (
               <button
                 type="button"
                 className={`sampark-research-mini-action${watched ? ' is-active' : ''}`}
@@ -80,7 +128,7 @@ export default function ResearchArtifactCard({ artifact, onOpen, onWatch, onComp
                 <Icon name={watched ? 'check' : 'bookmark'} size={14} /> {watched ? 'Watching' : 'Watch'}
               </button>
             )}
-            {onCompare && (
+            {showCompare && (
               <button
                 type="button"
                 className={`sampark-research-mini-action${compared ? ' is-active' : ''}`}

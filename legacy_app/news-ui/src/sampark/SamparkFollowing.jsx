@@ -4,28 +4,22 @@ import { getFollowingThreads, removeSavedArticle } from '../news-scrapper/api.js
 import { articleKey } from '../news-scrapper/utils/intelligence.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import SamparkWorkspaceShell, { WorkspaceEmpty } from './shared/SamparkWorkspaceShell.jsx';
-import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
+import { useArticleEngagement } from './shared/useArticleEngagement.js';
+import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
 
 function ArticleDossier({ item, onClose }) {
-  const ref = useModalFocus(Boolean(item), onClose);
+  const engagement = useArticleEngagement(item || {}, { surface: 'following' });
+  const handleClose = () => { engagement.onDossierClose(); onClose(); };
+  const articleId = item ? articleKey(item) : '';
+  useEffect(() => { if (item && articleId) engagement.onDossierOpen(item); }, [articleId]);
   if (!item) return null;
   return (
-    <div className="sampark-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <section className="sampark-dossier sampark-dossier--large" ref={ref} role="dialog" aria-modal="true">
-        <header className="sampark-dossier-header">
-          <div className="sampark-dossier-kicker">{item.category || 'Intelligence'} · {item.src || item.source || 'TechScout'}</div>
-          <button onClick={onClose} type="button"><Icon name="x" size={18} /></button>
-        </header>
-        <div className="sampark-dossier-scroll">
-          <div className="sampark-dossier-body">
-            <h2>{item.title}</h2>
-            <p className="sampark-dossier-summary">{item.summary || item.master_summary || ''}</p>
-            {item.link && <a className="sampark-dossier-link" href={item.link} target="_blank" rel="noreferrer">Open source <Icon name="external" size={14} /></a>}
-          </div>
-        </div>
-        <footer className="sampark-dossier-actions"><button className="btn-secondary" onClick={onClose} type="button">Close</button></footer>
-      </section>
-    </div>
+    <SamparkArticleDossier
+      item={item}
+      onClose={handleClose}
+      onSourceOpen={() => engagement.onSourceOpen()}
+      titleId="sampark-following-dossier-title"
+    />
   );
 }
 

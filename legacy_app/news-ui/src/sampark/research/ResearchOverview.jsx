@@ -1,7 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 import ResearchArtifactCard from './ResearchArtifactCard.jsx';
+import { refreshVentureLens } from '../../venture-lens/api.js';
+import { createSingleFlight } from '../shared/researchHelper.js';
 
 function ProviderStatus({ providers }) {
   if (!providers) return null;
@@ -25,7 +27,7 @@ function ProviderStatus({ providers }) {
   );
 }
 
-export default function ResearchOverview({ discovery, discoveryError, discoveryLoading, onRetry, onOpen, providersStale, watchMap, pendingWatch, onWatch, compareMap, onCompare }) {
+export default function ResearchOverview({ discovery, discoveryError, discoveryLoading, intelligenceError, onRetry, onOpen, providersStale, watchMap, pendingWatch, onWatch, compareMap, onCompare, onDiscoveryReload }) {
   const navigate = useNavigate();
   const featured = discovery?.featured || [];
   const stream = discovery?.stream || [];
@@ -33,6 +35,49 @@ export default function ResearchOverview({ discovery, discoveryError, discoveryL
   const providers = discovery?.providers || null;
 
   const hasContent = featured.length > 0 || stream.length > 0;
+  const [refreshState, setRefreshState] = useState({ status: 'idle', message: '', providerErrors: null });
+  const isRefreshing = refreshState.status === 'starting' || refreshState.status === 'running';
+  // Production single-flight guard: prevents duplicate refresh requests when
+  // the button is double-clicked before React state flushes.
+  const refreshGuardRef = useRef(null);
+  if (!refreshGuardRef.current) refreshGuardRef.current = createSingleFlight();
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  const handleRefresh = async () => {
+    if (isRefreshing) return;
+    if (!refreshGuardRef.current.tryStart()) return;
+    setRefreshState({ status: 'starting', message: 'Starting refresh…', providerErrors: null });
+    try {
+      setRefreshState({ status: 'running', message: 'Refreshing providers…', providerErrors: null });
+      const result = await refreshVentureLens();
+      const errors = result?.provider_errors || result?.errors || null;
+      const hasErrors = errors && (Array.isArray(errors) ? errors.length > 0 : Object.keys(errors).length > 0);
+      // One refresh + one reload: await the parent's discovery-reload callback before showing success
+      try {
+        if (!onDiscoveryReload) throw new Error('Discovery reload unavailable');
+        await onDiscoveryReload();
+      } catch (reloadError) {
+        setRefreshState({ status: 'failure', message: reloadError?.message || 'Discovery reload failed after refresh.', providerErrors: errors });
+        return;
+      }
+      if (hasErrors) {
+        setRefreshState({ status: 'partial', message: 'Refresh completed with some provider errors.', providerErrors: errors });
+      } else {
+        setRefreshState({ status: 'success', message: 'Research refreshed successfully.', providerErrors: null });
+        window.setTimeout(() => { if (mountedRef.current) setRefreshState((s) => s.status === 'success' ? { status: 'idle', message: '', providerErrors: null } : s); }, 3000);
+      }
+    } catch (e) {
+      const msg = e?.message || 'Refresh failed.';
+      const providerErrors = e?.payload?.provider_errors || e?.provider_errors || null;
+      setRefreshState({ status: 'failure', message: msg, providerErrors });
+    } finally {
+      refreshGuardRef.current.finish();
+    }
+  };
 
   if (discoveryLoading && !hasContent) {
     return <div className="sampark-workspace-loading" role="status"><span className="sampark-spinner" /> Opening Research Intelligence…</div>;
@@ -57,17 +102,29 @@ export default function ResearchOverview({ discovery, discoveryError, discoveryL
           <h1>Research Intelligence</h1>
           <p>This space covers technical artifacts and evidence — papers, repositories, models, datasets, patents, and the Technology Radar — not ordinary news. Signals are cached from Venture Lens providers and preserved through provider failures; stale or starter data is labeled where the backend marks it.</p>
           {providers && <ProviderStatus providers={providers} />}
-          {providersStale && <small className="sampark-research-freshness-note"><Icon name="clock" size={12} /> Some providers are serving a cached snapshot. Use Retry on the affected lane to refresh.</small>}
+          {providersStale && <small className="sampark-research-freshness-note"><Icon name="clock" size={12} /> Some providers are serving a cached snapshot. Use Refresh Research to update.</small>}
+          {intelligenceError && <div className="sampark-workspace-note is-warning" role="status"><Icon name="warning" size={14} /> Watchlist and radar details could not be refreshed. <button className="btn-secondary" onClick={onRetry} type="button" style={{ marginLeft: 8 }}>Retry intelligence</button></div>}
+          {refreshState.status !== 'idle' && (
+            <div role="status" aria-live="polite" className={`sampark-refresh-status is-${refreshState.status}`}>
+              <span>{refreshState.status === 'starting' ? 'Starting…' : refreshState.status === 'running' ? 'Refreshing…' : refreshState.message}</span>
+              {refreshState.providerErrors && <small> · {Array.isArray(refreshState.providerErrors) ? refreshState.providerErrors.join(', ') : JSON.stringify(refreshState.providerErrors).slice(0, 120)}</small>}
+              {refreshState.status === 'partial' && <button className="btn-secondary" onClick={handleRefresh} type="button" style={{ marginLeft: 8 }}>Retry</button>}
+              {refreshState.status === 'failure' && <button className="btn-secondary" onClick={handleRefresh} type="button" style={{ marginLeft: 8 }}>Retry</button>}
+            </div>
+          )}
         </div>
         <div className="sampark-research-intro-actions">
-          <button className="btn-primary" onClick={() => navigate('/research/archive')} type="button"><Icon name="archive" size={14} /> Go to Archive Search</button>
+          <button className="btn-primary" disabled={isRefreshing} onClick={handleRefresh} type="button" aria-busy={isRefreshing}>
+            <Icon name="refresh" size={14} /> {isRefreshing ? 'Refreshing…' : 'Refresh Research'}
+          </button>
+          <button className="btn-secondary" onClick={() => navigate('/research/archive')} type="button"><Icon name="archive" size={14} /> Go to Archive Search</button>
           <small>Discovery = Venture Lens providers · Archive = retained briefing evidence</small>
         </div>
       </header>
 
       {discoveryError && hasContent && (
         <div className="sampark-workspace-note is-warning" role="status">
-          <Icon name="warning" size={14} /> Discovery partially loaded. Some providers failed — retry the affected lane. <button className="btn-secondary" onClick={onRetry} type="button">Retry discovery</button>
+          <Icon name="warning" size={14} /> Discovery partially loaded. Some providers failed — use Refresh Research. <button className="btn-secondary" disabled={isRefreshing} onClick={handleRefresh} type="button">{isRefreshing ? 'Refreshing…' : 'Refresh Research'}</button>
         </div>
       )}
 

@@ -823,6 +823,47 @@ opinion_lock = threading.Lock()
 insight_cache_lock = threading.Lock()
 gatekeeper_queue_lock = threading.Lock()
 insight_cache = {}
+# Archive search cache: bounded process-local, single-worker safe
+_archive_search_cache: dict[str, tuple[float, list[dict], list[dict]]] = {}
+_archive_search_cache_lock = threading.RLock()
+_archive_search_cache_hits = 0
+_archive_search_cache_misses = 0
+
+def _archive_cache_get(file_path: str):
+    """Return cached (articles, searchable) if mtime matches, else None."""
+    global _archive_search_cache_hits, _archive_search_cache_misses
+    try:
+        mtime = os.path.getmtime(file_path)
+    except OSError:
+        with _archive_search_cache_lock:
+            _archive_search_cache.pop(file_path, None)
+        return None
+    with _archive_search_cache_lock:
+        entry = _archive_search_cache.get(file_path)
+        if entry and entry[0] == mtime:
+            _archive_search_cache_hits += 1
+            return entry[1], entry[2]
+        _archive_search_cache_misses += 1
+    return None
+
+def _archive_cache_set(file_path: str, articles: list[dict], searchable: list[dict]):
+    try:
+        mtime = os.path.getmtime(file_path)
+    except OSError:
+        return
+    with _archive_search_cache_lock:
+        # bound memory: keep at most 200 files (30 days retention makes this safe)
+        if len(_archive_search_cache) >= 200 and file_path not in _archive_search_cache:
+            # evict oldest
+            oldest = next(iter(_archive_search_cache))
+            _archive_search_cache.pop(oldest, None)
+        _archive_search_cache[file_path] = (mtime, articles, searchable)
+
+def _archive_cache_invalidate_removed(current_files: set[str]):
+    with _archive_search_cache_lock:
+        for key in list(_archive_search_cache.keys()):
+            if key not in current_files:
+                _archive_search_cache.pop(key, None)
 
 CLOSE_FDS = platform.system() != "Windows"
 
@@ -2916,6 +2957,57 @@ def save_viewer_profiles(data):
     os.replace(temp_file, VIEWER_PROFILES_FILE)
 
 
+def get_signed_viewer_display_name(request: Request) -> str:
+    """Display name for the signed browser viewer, never another browser's legacy row.
+
+    Uses the signed principal profile; falls back to the IP legacy row only
+    when no other signed principal has claimed it (claimed-elsewhere protection).
+    Team-owner fallback is IP-derived and identical for browsers behind one NAT.
+    """
+    principal = get_private_viewer_key(request)
+    ip = get_client_ip(request)
+    profiles = load_viewer_profiles()
+    legacy_key = get_viewer_key(ip)
+    if principal in profiles and isinstance(profiles[principal], dict):
+        return str(profiles[principal].get("display_name") or "")
+    try:
+        claims = PRIVATE_VIEWER_CLAIMS.read()
+    except Exception:
+        claims = {}
+    owner = (claims or {}).get(legacy_key) if isinstance(claims, dict) else None
+    if owner is not None and owner != principal:
+        return ""
+    claimed_elsewhere = any(
+        key not in {principal, legacy_key}
+        and profile.get("legacy_ip_principal") == legacy_key
+        for key, profile in profiles.items()
+    )
+    viewer = profiles.get(principal) or ({} if claimed_elsewhere else profiles.get(legacy_key) or {})
+    return str(viewer.get("display_name") or "")
+
+
+def get_signed_migration_source(request: Request) -> dict:
+    """Legacy IP profile visible to this signed browser, or {} if claimed elsewhere.
+
+    Prevents a second browser behind one NAT from seeing another browser's
+    claimed legacy display name in migration offers. Event/preference stores
+    are never merged; this only gates the offer source.
+    """
+    principal = get_private_viewer_key(request)
+    ip = get_client_ip(request)
+    legacy_key = get_viewer_key(ip)
+    try:
+        claims = PRIVATE_VIEWER_CLAIMS.read()
+    except Exception:
+        claims = {}
+    owner = (claims or {}).get(legacy_key) if isinstance(claims, dict) else None
+    if owner is not None and owner != principal:
+        return {}
+    profiles = load_viewer_profiles()
+    source = profiles.get(legacy_key) or {}
+    return source if isinstance(source, dict) else {}
+
+
 def get_viewer_profile(ip):
     return load_viewer_profiles().get(get_viewer_key(ip), {})
 
@@ -4787,14 +4879,9 @@ def get_latest_briefing(request: Request):
                         profile,
                         get_viewer_saved_items(request, profile),
                     )
-                    profiles = load_viewer_profiles()
-                    viewer = (
-                        profiles.get(viewer_key)
-                        or profiles.get(get_viewer_key(client_ip))
-                        or {}
-                    )
+                    signed_name = get_signed_viewer_display_name(request)
                     personalization["viewer_name"] = (
-                        viewer.get("display_name")
+                        signed_name
                         or get_team_owner_for_ip(client_ip)
                         or ""
                     )
@@ -5083,12 +5170,61 @@ def search_extracted_intelligence(
         if os.path.basename(file_path).startswith("briefing_")
     ]
     archive_files.sort(key=os.path.getmtime, reverse=True)
+    _archive_cache_invalidate_removed(set(archive_files))
 
     matches = {}
     scanned_articles = 0
     searchable_files = 0
     for file_path in archive_files:
         file_date = _archive_file_date(file_path)
+        cached = _archive_cache_get(file_path)
+        if cached is not None:
+            payload, searchable_entries = cached
+            searchable_files += 1
+            # payload is already list of articles, searchable_entries is parallel list of precomputed searchable fields
+            for idx, raw_article in enumerate(payload):
+                if not isinstance(raw_article, dict):
+                    continue
+                scanned_articles += 1
+                entry = searchable_entries[idx] if idx < len(searchable_entries) else None
+                if entry is None:
+                    continue
+                article_date = _article_archive_date(raw_article, file_date)
+                if start and (article_date is None or article_date < start):
+                    continue
+                if end and (article_date is None or article_date > end):
+                    continue
+                if requested_sources and not requested_sources.intersection(entry["normalized_sources"]):
+                    continue
+                matched_terms = [term for term in terms if term in entry["full_text"]]
+                if not matched_terms:
+                    continue
+                score = 0
+                whole_query = str(query or "").strip().casefold()
+                if whole_query and whole_query in entry["title_text"]:
+                    score += 18
+                for term in matched_terms:
+                    if term in entry["title_text"]:
+                        score += 9
+                    if term in entry["keyword_text"]:
+                        score += 7
+                    if term in entry["summary_text"]:
+                        score += 3
+                    else:
+                        score += 1
+                score += min(int(raw_article.get("source_count") or len(entry["source_names"]) or 1), 5)
+                score += min(int(raw_article.get("importance_score") or 0) // 20, 5)
+                article = apply_learned_region(dict(raw_article), profile)
+                article["search_score"] = score
+                article["matched_terms"] = matched_terms
+                article["archive_file"] = os.path.basename(file_path)
+                article["archive_date"] = article_date.isoformat() if article_date else None
+                article["search_scope"] = "extracted_archives_only"
+                stable_key = str(article.get("link") or article.get("url") or entry["title"] or "").strip().casefold()
+                existing = matches.get(stable_key)
+                if existing is None or score > existing.get("search_score", 0):
+                    matches[stable_key] = article
+            continue
         try:
             with open(file_path, "r", encoding="utf-8") as file_obj:
                 payload = json.load(file_obj)
@@ -5097,21 +5233,18 @@ def search_extracted_intelligence(
         if not isinstance(payload, list):
             continue
         searchable_files += 1
+        # Build searchable entries for caching
+        searchable_entries = []
         for raw_article in payload:
             if not isinstance(raw_article, dict):
+                searchable_entries.append(None)
                 continue
             scanned_articles += 1
             article_date = _article_archive_date(raw_article, file_date)
-            if start and (article_date is None or article_date < start):
-                continue
-            if end and (article_date is None or article_date > end):
-                continue
-
+            # We still need to apply filters; but for caching we store searchable strings unfiltered
+            # Compute fields for cache
             source_names = _article_source_names(raw_article)
             normalized_sources = {name.casefold() for name in source_names}
-            if requested_sources and not requested_sources.intersection(normalized_sources):
-                continue
-
             title = str(raw_article.get("title") or "")
             keywords = raw_article.get("keywords_found") or raw_article.get("keywords") or []
             if not isinstance(keywords, list):
@@ -5134,36 +5267,64 @@ def search_extracted_intelligence(
             title_text = title.casefold()
             keyword_text = " ".join(str(value) for value in keywords).casefold()
             summary_text = summary.casefold()
-            matched_terms = [term for term in terms if term in full_text]
+            searchable_entries.append({
+                "source_names": source_names,
+                "normalized_sources": normalized_sources,
+                "title": title,
+                "title_text": title_text,
+                "keyword_text": keyword_text,
+                "summary_text": summary_text,
+                "full_text": full_text,
+            })
+        # Store cache but preserve authoritative payload
+        _archive_cache_set(file_path, payload, searchable_entries)
+        # Now process this file's articles with filters (need to recount scanned_articles already incremented, so adjust logic)
+        # Reset scanned_articles for this file to avoid double count? For first load we already counted, but we double counted above in cached path?
+        # For non-cached path we counted inside searchable building; now we need to process matching again without double counting.
+        # Instead, re-iterate for matching using same searchable_entries but without double counting scanned_articles (already counted)
+        # To avoid complexity, we will process matching for this file after caching without incrementing scanned_articles again.
+        for idx, raw_article in enumerate(payload):
+            if not isinstance(raw_article, dict):
+                continue
+            entry = searchable_entries[idx] if idx < len(searchable_entries) else None
+            if entry is None:
+                continue
+            article_date = _article_archive_date(raw_article, file_date)
+            if start and (article_date is None or article_date < start):
+                continue
+            if end and (article_date is None or article_date > end):
+                continue
+            if requested_sources and not requested_sources.intersection(entry["normalized_sources"]):
+                continue
+            matched_terms = [term for term in terms if term in entry["full_text"]]
             if not matched_terms:
                 continue
-
             score = 0
             whole_query = str(query or "").strip().casefold()
-            if whole_query and whole_query in title_text:
+            if whole_query and whole_query in entry["title_text"]:
                 score += 18
             for term in matched_terms:
-                if term in title_text:
+                if term in entry["title_text"]:
                     score += 9
-                if term in keyword_text:
+                if term in entry["keyword_text"]:
                     score += 7
-                if term in summary_text:
+                if term in entry["summary_text"]:
                     score += 3
                 else:
                     score += 1
-            score += min(int(raw_article.get("source_count") or len(source_names) or 1), 5)
+            score += min(int(raw_article.get("source_count") or len(entry["source_names"]) or 1), 5)
             score += min(int(raw_article.get("importance_score") or 0) // 20, 5)
-
             article = apply_learned_region(dict(raw_article), profile)
             article["search_score"] = score
             article["matched_terms"] = matched_terms
             article["archive_file"] = os.path.basename(file_path)
             article["archive_date"] = article_date.isoformat() if article_date else None
             article["search_scope"] = "extracted_archives_only"
-            stable_key = str(article.get("link") or article.get("url") or title).strip().casefold()
+            stable_key = str(article.get("link") or article.get("url") or entry["title"] or "").strip().casefold()
             existing = matches.get(stable_key)
             if existing is None or score > existing.get("search_score", 0):
                 matches[stable_key] = article
+        continue
 
     results = list(matches.values())
     results.sort(
@@ -5218,10 +5379,122 @@ def search_archive(
         ), reverse=True)
     offset = max(0, offset)
     result["total"] = len(visible_results)
-    result["results"] = visible_results[offset:offset + limit]
+    page = visible_results[offset:offset + limit]
+    # Projected list payload: only fields the list/dossier render. Full bodies
+    # stay out of the 100-card payload; the dossier shows summary text.
+    projected = []
+    for article in page:
+        if not isinstance(article, dict):
+            continue
+        projected.append({
+            "title": article.get("title"),
+            "summary": article.get("summary"),
+            "master_summary": article.get("master_summary"),
+            "snippet": article.get("snippet"),
+            "link": article.get("link"),
+            "url": article.get("url"),
+            "canonical_link": article.get("canonical_link"),
+            "source": article.get("source"),
+            "src": article.get("src"),
+            "date": article.get("date"),
+            "archive_date": article.get("archive_date"),
+            "category": article.get("category"),
+            "region": article.get("region"),
+            "source_count": article.get("source_count"),
+            "importance_score": article.get("importance_score"),
+            "score": article.get("score"),
+            "signal_score": article.get("signal_score"),
+            "keywords_found": article.get("keywords_found"),
+            "search_score": article.get("search_score"),
+            "matched_terms": article.get("matched_terms"),
+            "archive_file": article.get("archive_file"),
+            "search_scope": article.get("search_scope"),
+        })
+    result["results"] = projected
     result["count"] = len(result["results"])
     result["has_more"] = offset + result["count"] < result["total"]
+    # Authoritative search-history recording and low-strength intent signal
+    try:
+        from news_scrapper.recommendation.router import REPOSITORY
+        from news_scrapper.recommendation.scoring import article_outcomes, article_topics, source_family
+        viewer_key = get_private_viewer_key(request)
+        state = REPOSITORY.read(viewer_key)
+        remember = bool(state.get("preferences", {}).get("remember_search_history", True))
+        if remember and result["count"] > 0 and visible_results:
+            # record history (deduplicated, bounded, length-limited)
+            REPOSITORY.record_search_query(viewer_key, query)
+            # only on first page (offset 0) to avoid duplicate per pagination
+            if offset == 0:
+                top = visible_results[:5]
+                topics = []
+                outcomes = []
+                families = []
+                for art in top:
+                    try:
+                        topics.extend(article_topics(art))
+                    except Exception:
+                        pass
+                    try:
+                        outcomes.extend(article_outcomes(art))
+                    except Exception:
+                        pass
+                    try:
+                        families.append(source_family(art))
+                    except Exception:
+                        pass
+                # deduplicate and bound
+                topics = list(dict.fromkeys(topics))[:4]
+                outcomes = list(dict.fromkeys(outcomes))[:3]
+                families = list(dict.fromkeys([f for f in families if f]))[:2]
+                if topics or outcomes:
+                    import hashlib, datetime
+                    clean_q = " ".join(str(query).strip().split())[:120].casefold()
+                    # Use repository's deduplication (60s) via append_events
+                    event_id = hashlib.sha256(f"search_intent:{clean_q}:{viewer_key}".encode()).hexdigest()[:32]
+                    # Use a fresh event_id with timestamp to allow deduplication window to handle rapid repeats
+                    import time
+                    event_id = hashlib.sha256(f"{clean_q}:{time.time() // 60:.0f}:{viewer_key}".encode()).hexdigest()[:32]
+                    detail = {"query": clean_q, "topics": topics, "outcomes": outcomes, "source_family": families[0] if families else "tech_press", "source_families": families}
+                    # Use an article_id from top result to satisfy served check exemption for search_intent (now exempted)
+                    aid = ""
+                    try:
+                        from news_scrapper.recommendation.candidates import article_id as cand_id
+                        aid = cand_id(top[0]) if top else clean_q
+                    except Exception:
+                        aid = clean_q
+                    REPOSITORY.append_events(viewer_key, [{"event_id": event_id, "action": "search_intent", "article_id": aid, "occurred_at": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"), "detail": detail}])
+    except Exception:
+        pass
     return result
+
+
+@app.get("/archive/article")
+def archive_article(
+    request: Request,
+    link: str = Query(None),
+    url: str = Query(None),
+    title: str = Query(None),
+):
+    """Bounded on-demand detail for one retained archive record.
+
+    The list response stays projected; dossiers fetch the complete record here.
+    Resolution reuses the engagement candidate pool, so viewer-hidden items and
+    out-of-corpus forgeries resolve to 404 under the signed viewer scope.
+    """
+    detail = {}
+    if link:
+        detail["link"] = link
+    if url:
+        detail["url"] = url
+    if title:
+        detail["title"] = title
+    if not detail:
+        raise HTTPException(status_code=400, detail="Provide link, url, or title.")
+    from news_scrapper.recommendation.router import _resolve_shared_article
+    article = _resolve_shared_article(request, detail)
+    if article is None:
+        raise HTTPException(status_code=404, detail="This article is no longer available in the retained archive.")
+    return {"status": "success", "article": article}
 
 
 # ==========================================
@@ -5324,17 +5597,54 @@ async def submit_voc_feedback(request: Request):
     message = str(payload.get("message", "")).strip()
     if not message:
         return {"status": "error", "message": "Feedback message is required"}
+    rating = payload.get("rating")
+    focus = str(payload.get("focus") or payload.get("category") or payload.get("type") or "general").strip()
+    # mandatory fields: rating and focus must be present per Sampark spec where used
+    # but we allow backward compat: if missing, store as provided
     profile = get_active_profile_name(request)
+    # Use signed browser viewer identity, avoid storing raw IP where private key sufficient
+    viewer_key = get_private_viewer_key(request)
+    # Store irreversible pseudonymous identifier for correlation, do not expose full viewer_key
+    import hashlib as _hashlib
+    pseudonym = _hashlib.sha256((viewer_key or "anon").encode()).hexdigest()[:16] if viewer_key else "anon"
+    safe_label = pseudonym[:8] if pseudonym else "anon"
+    # Resolve display identity using signed browser viewer rather than IP
+    display_name = "anonymous"
+    try:
+        # try private viewer key first, fallback to IP-based profile for legacy
+        private_profiles = load_viewer_profiles()
+        # private key may have entry keyed by viewer_key (hashed cookie) via viewer_profiles if previously saved as legacy migration? Check both
+        candidate = private_profiles.get(viewer_key) or {}
+        if candidate.get("display_name"):
+            display_name = str(candidate.get("display_name")).strip() or "anonymous"
+        else:
+            # fallback legacy IP profile
+            ip_profile = get_viewer_profile(get_client_ip(request))
+            display_name = str(ip_profile.get("display_name") or "").strip() or "anonymous"
+    except Exception:
+        display_name = "anonymous"
     feedback_item = {
         "id": str(uuid.uuid4()),
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-        "name": str(payload.get("name", "anonymous")).strip() or "anonymous",
-        "type": str(payload.get("type", "ui_feedback")).strip(),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+        "name": str(payload.get("name", display_name)).strip() or "anonymous",
+        "type": focus or "general",
+        "focus": focus,
+        "category": focus,
+        "rating": int(rating) if str(rating).isdigit() else rating if rating is not None else None,
         "message": message,
-        "page": str(payload.get("page", "unknown")).strip(),
+        "page": str(payload.get("page", payload.get("surface", "unknown"))).strip() or "unknown",
+        "surface": str(payload.get("surface", payload.get("page", "unknown"))).strip() or "unknown",
         "profile": profile,
-        "viewer_ip_hash": get_viewer_key(get_client_ip(request)),
-        "viewer_name": get_viewer_profile(get_client_ip(request)).get("display_name", "anonymous"),
+        "viewer_pseudonym": pseudonym,
+        "viewer_label": safe_label,
+        "viewer_ip_hash": pseudonym,
+        "viewer_name": display_name,
+        "status": "open",
+        "safe_metadata": {
+            "page": str(payload.get("page", "unknown")).strip(),
+            "focus": focus,
+            "rating": rating,
+        },
     }
     with voc_lock:
         items = []
@@ -5351,7 +5661,94 @@ async def submit_voc_feedback(request: Request):
             f.flush()
             os.fsync(f.fileno())
         os.replace(temp_file, VOC_FEEDBACK_FILE)
-    return {"status": "success", "message": "Feedback saved", "item": feedback_item}
+    return {"status": "success", "message": "Feedback saved", "item": feedback_item, "receipt_id": feedback_item["id"]}
+
+
+@app.get("/voc/review")
+def voc_review_list(request: Request):
+    # Protected: voc.review capability, with analytics.view as fallback; do not catch unrelated exceptions
+    from fastapi import HTTPException as _HTTP
+    has_access = False
+    last_exc = None
+    for cap in ("voc.review", "analytics.view"):
+        try:
+            capability_service.require_capability(request, cap)
+            has_access = True
+            break
+        except _HTTP as e:
+            if e.status_code != 403:
+                raise
+            last_exc = e
+            continue
+    if not has_access:
+        raise last_exc or _HTTP(status_code=403, detail="You do not have access to this operation.")
+    with voc_lock:
+        items = []
+        if os.path.exists(VOC_FEEDBACK_FILE):
+            try:
+                with open(VOC_FEEDBACK_FILE, "r", encoding="utf-8") as f:
+                    items = json.load(f)
+            except Exception:
+                items = []
+        # Do not expose full signed viewer key; return sanitized records with pseudonym only
+        sanitized = []
+        for it in items:
+            copy = dict(it)
+            copy.pop("viewer_key", None)
+            # ensure viewer_pseudonym present for correlation, viewer_label for display
+            sanitized.append(copy)
+        # Build theme/count summaries from actual data
+        themes = {}
+        for it in sanitized:
+            key = str(it.get("focus") or it.get("type") or "general")
+            themes[key] = themes.get(key, 0) + 1
+        return {"status": "success", "items": sanitized, "themes": themes, "count": len(sanitized)}
+
+
+@app.post("/voc/{feedback_id}/status")
+def voc_update_status(feedback_id: str, request: Request, payload: dict = Body(...)):
+    from fastapi import HTTPException as _HTTP
+    has_access = False
+    last_exc = None
+    for cap in ("voc.review", "analytics.view"):
+        try:
+            capability_service.require_capability(request, cap)
+            has_access = True
+            break
+        except _HTTP as e:
+            if e.status_code != 403:
+                raise
+            last_exc = e
+            continue
+    if not has_access:
+        raise last_exc or _HTTP(status_code=403, detail="You do not have access to this operation.")
+    new_status = str(payload.get("status") or "").strip().lower()
+    if new_status not in {"open", "acknowledged", "resolved"}:
+        raise HTTPException(status_code=400, detail="Status must be open, acknowledged, or resolved")
+    with voc_lock:
+        items = []
+        if os.path.exists(VOC_FEEDBACK_FILE):
+            try:
+                with open(VOC_FEEDBACK_FILE, "r", encoding="utf-8") as f:
+                    items = json.load(f)
+            except Exception:
+                items = []
+        updated = None
+        for it in items:
+            if str(it.get("id")) == str(feedback_id):
+                it["status"] = new_status
+                it["updated_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+                updated = it
+                break
+        if not updated:
+            raise HTTPException(status_code=404, detail="Feedback not found")
+        temp_file = f"{VOC_FEEDBACK_FILE}.{secrets.token_hex(6)}.tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(items, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_file, VOC_FEEDBACK_FILE)
+        return {"status": "success", "item": updated}
 
 
 # ==========================================
@@ -5461,11 +5858,18 @@ def gatekeeper_dropped(
             ).casefold()
         ]
     items.sort(key=lambda item: item.get("updated_at") or item.get("timestamp") or "", reverse=True)
+    matched = len(items)
+    page = items[offset : offset + limit]
     return {
         "status": "success",
-        "items": items[offset : offset + limit],
+        "items": page,
         "counts": counts,
-        "has_more": offset + limit < len(items),
+        "total": len(scoped_items),
+        "matched": matched,
+        "count": len(page),
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(page) < matched,
     }
 
 

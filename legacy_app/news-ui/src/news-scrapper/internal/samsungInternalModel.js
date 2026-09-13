@@ -145,6 +145,18 @@ export function colleagueStoriesOf(publishedRecords) {
     .sort((a, b) => stampOf(b).localeCompare(stampOf(a)));
 }
 
+// Exact record-id resolution for ?focus= deep links across every surfaced
+// contribution type: leadership first, then stories, then announcements.
+export function findPublishedFocusRecord(publishedRecords, focusId) {
+  const id = String(focusId || '').trim();
+  if (!id) return null;
+  const list = publishedRecords || [];
+  const leadership = activeLeadership(list);
+  if (leadership && String(leadership.id) === id) return leadership;
+  const owned = [...colleagueStoriesOf(list), ...announcementsOf(list)];
+  return owned.find((r) => String(r.id) === id) || null;
+}
+
 export function coverUrl(record) {
   if (!record?.cover) return '';
   if (typeof record.cover?.url === 'string' && record.cover.url.trim()) {

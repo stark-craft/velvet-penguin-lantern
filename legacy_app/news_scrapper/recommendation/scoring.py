@@ -119,6 +119,8 @@ def _event_affinities(events: list[dict[str, Any]]) -> tuple[Counter, Counter, i
         "select": 3.0,
         "approve": 4.0,
         "interested": 4.0,
+        "search_intent": 0.6,
+        "search": 0.6,
     }
     negative_weights = {
         "hide": 3.0,
@@ -238,6 +240,18 @@ def score_candidates(
         if saved_affinity:
             codes.append("saved_follow_up")
             reasons.append("Related to a story you saved")
+        # search affinity: weak private intent signal
+        search_match = False
+        for ev in events:
+            if str(ev.get("action") or "") in {"search_intent", "search"}:
+                d = ev.get("detail") if isinstance(ev.get("detail"), dict) else {}
+                s_topics = d.get("topics") if isinstance(d.get("topics"), list) else []
+                if set(topics) & set(map(str, s_topics)):
+                    search_match = True
+                    break
+        if search_match:
+            codes.append("search_intent")
+            reasons.append("Related to a recent search")
         if item.get("is_fresh") or _freshness(item, now) > 0.9:
             codes.append("fresh")
             reasons.append("New since your recent visit")

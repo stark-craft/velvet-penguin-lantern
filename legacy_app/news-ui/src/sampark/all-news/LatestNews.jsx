@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
+import { articleKey } from '../../news-scrapper/utils/intelligence.js';
 import NewsCard from './NewsCard.jsx';
 
-export default function LatestNews({ items=[], onOpen }){
+export default function LatestNews({ items=[], onOpen, onLike, onDislike, onFollow, onHide, onSourceOpen, votes={}, savedKeys, busyMap={}, savedHydrated, reactionsHydrated }){
   const safeItems = (items || []).filter(Boolean);
   const scrollerRef = useRef(null);
 
@@ -15,7 +16,10 @@ export default function LatestNews({ items=[], onOpen }){
   const scroll = (dir)=>{
     const el = scrollerRef.current;
     if(!el) return;
-    el.scrollBy({ left: dir * 383, behavior: 'smooth' });
+    const card = el.querySelector('.tsan-news-card');
+    const gap = 14;
+    const step = card ? card.offsetWidth + gap : 314;
+    el.scrollBy({ left: dir * step, behavior: 'smooth' });
   };
 
   return (
@@ -28,7 +32,16 @@ export default function LatestNews({ items=[], onOpen }){
         </div>
       </header>
       <div className="tsan-latest-scroll" ref={scrollerRef}>
-        {safeItems.map(item=> <NewsCard key={(item.title || '') + (item.date || '')} item={item} onOpen={onOpen} />)}
+        {safeItems.map(item=> {
+          const key = articleKey(item);
+          const v = (votes && votes[key]) || item.reactions || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
+          const busyReaction = busyMap?.[`${key}::reaction`];
+          const busySave = busyMap?.[`${key}::save`];
+          const busyHide = busyMap?.[`${key}::hide`];
+          const reactionReady = Boolean(reactionsHydrated || (votes && votes[key]) || item.reactions);
+          const saveReady = Boolean(savedHydrated);
+          return <NewsCard key={key} item={item} onOpen={onOpen} onLike={onLike} onDislike={onDislike} onFollow={onFollow} onHide={onHide} onSourceOpen={onSourceOpen} isFollowing={savedKeys?.has(key)} likeActive={v.viewer_reaction==='like'} dislikeActive={v.viewer_reaction==='dislike'} busyReaction={busyReaction} busySave={busySave} busyHide={busyHide} savedHydrated={saveReady} reactionsHydrated={reactionReady} />;
+        })}
       </div>
     </section>
   );

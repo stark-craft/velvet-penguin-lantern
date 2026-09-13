@@ -12,6 +12,8 @@ export function SamparkAuthProvider({ children }) {
   const [viewerLoading, setViewerLoading] = useState(true);
   const [capabilities, setCapabilities] = useState([]);
   const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
+  const [privilegedSessionActive, setPrivilegedSessionActive] = useState(false);
+  const [sessionRole, setSessionRole] = useState('');
   const [error, setError] = useState('');
 
   const refresh = useCallback(async () => {
@@ -19,10 +21,14 @@ export function SamparkAuthProvider({ children }) {
     try {
       const cap = await getAccessCapabilities();
       setCapabilities(Array.isArray(cap?.capabilities) ? cap.capabilities : []);
+      setPrivilegedSessionActive(Boolean(cap?.privileged_session_active));
+      setSessionRole(String(cap?.session_role || ''));
       setError('');
     } catch (e) {
       setError(e?.message || 'Access could not be verified.');
       setCapabilities([]);
+      setPrivilegedSessionActive(false);
+      setSessionRole('');
     } finally {
       setCapabilitiesLoading(false);
     }
@@ -58,8 +64,10 @@ export function SamparkAuthProvider({ children }) {
     viewerLoading,
     capabilities,
     capabilitiesLoading,
+    privilegedSessionActive,
+    sessionRole,
     error,
-    isPrivileged: capabilities.length > 0,
+    isPrivileged: privilegedSessionActive,
     refresh,
     login,
     logout,

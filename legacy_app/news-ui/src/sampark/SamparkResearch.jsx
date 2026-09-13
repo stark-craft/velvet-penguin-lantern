@@ -7,6 +7,7 @@ import ResearchArtifactCard from './research/ResearchArtifactCard.jsx';
 import ResearchArtifactDetail from './research/ResearchArtifactDetail.jsx';
 import ResearchArchiveSearch from './research/ResearchArchiveSearch.jsx';
 import { apiRequest } from '../shared/api/client.js';
+import { evaluateReloadResult } from './shared/researchHelper.js';
 import './research/research.css';
 
 // Light wrappers around venture-lens endpoints — same-origin, no hard-coded host
@@ -77,7 +78,8 @@ export default function SamparkResearch() {
   const [discovery, setDiscovery] = useState(null);
   const [intelligence, setIntelligence] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [discoveryError, setDiscoveryError] = useState('');
+  const [intelligenceError, setIntelligenceError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
 
   const [dossier, setDossier] = useState(null);
@@ -85,6 +87,7 @@ export default function SamparkResearch() {
   const [dossierLoading, setDossierLoading] = useState(false);
   const [dossierError, setDossierError] = useState('');
   const [dossierRequest, setDossierRequest] = useState(null);
+  const [notice, setNotice] = useState('');
 
   const [watchlist, setWatchlist] = useState([]);
   const [pendingWatchKeys, setPendingWatchKeys] = useState(() => new Set());
@@ -95,37 +98,72 @@ export default function SamparkResearch() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setDiscoveryError('');
+    setIntelligenceError('');
     try {
       const [disc, intel] = await Promise.allSettled([getVentureDiscovery(), getVentureIntelligence()]);
       if (disc.status === 'fulfilled') setDiscovery(disc.value);
-      else setError(disc.reason?.message || 'Discovery could not be loaded.');
+      else setDiscoveryError(disc.reason?.message || 'Discovery could not be loaded.');
       if (intel.status === 'fulfilled') {
         setIntelligence(intel.value);
         setWatchlist(intel.value?.watchlist || []);
+      } else {
+        setIntelligenceError(intel.reason?.message || 'Intelligence could not be loaded.');
       }
-      if (disc.status === 'rejected' && intel.status === 'rejected') throw disc.reason;
     } catch (e) {
-      setError(e?.message || 'Research workspace could not be loaded.');
+      setDiscoveryError((cur) => cur || e?.message || 'Research workspace could not be loaded.');
     } finally { setLoading(false); }
+  }, []);
+
+  const reloadDiscovery = useCallback(async () => {
+    setLoading(true);
+    setDiscoveryError('');
+    setIntelligenceError('');
+    try {
+      const [disc, intel] = await Promise.allSettled([getVentureDiscovery(), getVentureIntelligence()]);
+      let discoveryError = null;
+      let intelligenceError = null;
+      if (disc.status === 'fulfilled') {
+        setDiscovery(disc.value);
+      } else {
+        discoveryError = disc.reason;
+        setDiscoveryError(disc.reason?.message || 'Discovery reload failed after refresh.');
+      }
+      if (intel.status === 'fulfilled') {
+        setIntelligence(intel.value);
+        setWatchlist(intel.value?.watchlist || []);
+      } else {
+        intelligenceError = intel.reason;
+        setIntelligenceError(intel.reason?.message || 'Intelligence reload failed after refresh.');
+      }
+      const evalRes = evaluateReloadResult(disc.status, intel.status, discoveryError, intelligenceError);
+      if (evalRes.status !== 'success') {
+        throw discoveryError || intelligenceError || new Error(evalRes.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load, retryKey]);
   useEffect(() => { window.sessionStorage.setItem(COMPARISON_KEY, JSON.stringify(compareItems)); }, [compareItems]);
   useEffect(() => () => dossierRef.current.controller?.abort(), []);
 
-  // Sync dossier from ?focus= param inside sampark shell
+  // Sync dossier from ?focus= param inside sampark shell. Kind resolves from
+  // the current section so the same focus value opens the correct artifact
+  // in overview, radar, papers, repositories, and provider lanes.
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const focus = params.get('focus');
     if (!focus) return;
-    const kindMap = { radar: 'technology', repositories: 'repository', research: 'paper', papers: 'paper', models: 'model', datasets: 'dataset', patents: 'patent' };
-    const kind = kindMap[section] || 'paper';
-    // only auto-open if not already open
-    if (dossierRequest && dossierRequest.id === focus) return;
+    const kindMap = { radar: 'technology', overview: 'technology', repositories: 'repository', papers: 'paper', models: 'model', datasets: 'dataset', patents: 'patent', archive: 'paper', watchlist: '', compare: '', briefs: 'technology' };
+    const kind = kindMap[section] || 'technology';
+    if (!kind) return;
+    // Re-resolve when section or focus changes, not only on first open.
+    if (dossierRequest && dossierRequest.id === focus && dossierRequest.kind === kind) return;
     openDossier(kind, focus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
+  }, [location.search, location.pathname]);
 
   const watchMap = useMemo(() => new Set(watchlist.map((i) => i.key || `${i.kind}:${i.id}`)), [watchlist]);
   const compareMap = useMemo(() => new Set(compareItems.map((i) => `${i.kind}:${i.id}`)), [compareItems]);
@@ -145,8 +183,10 @@ export default function SamparkResearch() {
     const artifact = (discovery?.stream || []).find((a) => a.kind === kind && String(a.id) === String(id)) ||
       (discovery?.featured || []).find((a) => a.kind === kind && String(a.id) === String(id)) ||
       Object.values(discovery?.lanes || {}).flat().find((a) => a.kind === kind && String(a.id) === String(id)) ||
-      (intelligence?.radar || []).find((r) => kind === 'technology' && String(r.id) === String(id) && (r.kind = 'technology', true));
-    setDossier(artifact ? { ...artifact, kind, id } : { kind, id, title: id, source: kind });
+      (intelligence?.radar || []).find((r) => kind === 'technology' && String(r.id) === String(id));
+    const base = artifact ? { ...artifact } : {};
+    if (kind === 'technology' && base && !base.kind) base.kind = 'technology';
+    setDossier(artifact ? { ...base, kind, id } : { kind, id, title: id, source: kind });
     setDossierRequest({ kind, id });
     setDossierDetail(null);
     setDossierError('');
@@ -185,7 +225,7 @@ export default function SamparkResearch() {
       setWatchlist(res.items || []);
       const intel = await getVentureIntelligence().catch(() => null);
       if (intel) setIntelligence(intel);
-    } catch (e) { setError(e?.message || 'Watchlist update failed.'); }
+    } catch (e) { setNotice(e?.message || 'Watchlist update failed.'); }
     finally { setPendingWatchKeys((cur) => { const n = new Set(cur); n.delete(key); return n; }); }
   };
 
@@ -197,9 +237,9 @@ export default function SamparkResearch() {
     setComparison(null);
     setCompareItems((cur) => {
       if (cur.some((i) => `${i.kind}:${i.id}` === key)) return cur.filter((i) => `${i.kind}:${i.id}` !== key);
-      if (cur.length && cur[0].kind !== kind) { setError(`Compare ${kind} with ${kind} only — clear the current ${cur[0].kind} selection first.`); return cur; }
-      if (cur.length >= 4) { setError('A comparison can contain at most four signals. Remove one before adding another.'); return cur; }
-      setError('');
+      if (cur.length && cur[0].kind !== kind) { setNotice(`Compare ${kind} with ${kind} only — clear the current ${cur[0].kind} selection first.`); return cur; }
+      if (cur.length >= 4) { setNotice('A comparison can contain at most four signals. Remove one before adding another.'); return cur; }
+      setNotice('');
       return [...cur, { kind, id, label }];
     });
   };
@@ -207,16 +247,16 @@ export default function SamparkResearch() {
   const runComparison = async () => {
     if (compareItems.length < 2) return;
     setComparing(true);
-    setError('');
-    try { setComparison(await compareVentureSignals(compareItems)); } catch (e) { setError(e?.message || 'Comparison failed.'); } finally { setComparing(false); }
+    setNotice('');
+    try { setComparison(await compareVentureSignals(compareItems)); } catch (e) { setNotice(e?.message || 'Comparison failed.'); } finally { setComparing(false); }
   };
 
   const renderSection = () => {
     if (section === 'archive') return <ResearchArchiveSearch />;
 
-    if (loading && !discovery) return <div className="sampark-workspace-loading" role="status"><span className="sampark-spinner" /> Opening Research Intelligence…</div>;
-    if (error && !discovery && !intelligence) {
-      return <div className="sampark-workspace-empty" role="alert"><Icon name="warning" size={20} /><h3>Research unavailable</h3><p>{error}</p><button className="btn-primary" onClick={() => setRetryKey((k) => k + 1)} type="button">Retry</button></div>;
+    if (loading && !discovery && !intelligence) return <div className="sampark-workspace-loading" role="status"><span className="sampark-spinner" /> Opening Research Intelligence…</div>;
+    if (discoveryError && intelligenceError && !discovery && !intelligence) {
+      return <div className="sampark-workspace-empty" role="alert"><Icon name="warning" size={20} /><h3>Research unavailable</h3><p>{discoveryError}</p><button className="btn-primary" onClick={() => setRetryKey((k) => k + 1)} type="button">Retry</button></div>;
     }
 
     const lanes = discovery?.lanes || {};
@@ -259,7 +299,7 @@ export default function SamparkResearch() {
         <section className="sampark-research-watch-grid">
           {watchlist.map((item) => (
             <div key={item.key} className="sampark-research-watch-item">
-              <div><span style={{ fontSize: 11, textTransform: 'uppercase', color: '#6b7280' }}>{item.kind}</span><strong style={{ display: 'block' }}>{item.label}</strong><small>Watching since {String(item.saved_at || '').slice(0, 10)}</small></div>
+              <div><span style={{ fontSize: 11, textTransform: 'uppercase', color: 'var(--muted)' }}>{item.kind}</span><strong style={{ display: 'block' }}>{item.label}</strong><small>Watching since {String(item.saved_at || '').slice(0, 10)}</small></div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="btn-secondary" onClick={() => openDossier(item.kind, item.id)} type="button">Open</button>
                 <button className="btn-secondary" disabled={pendingWatchKeys.has(item.key)} onClick={() => handleWatch({ kind: item.kind, id: item.id, title: item.label })} type="button">Remove</button>
@@ -273,7 +313,7 @@ export default function SamparkResearch() {
       return (
         <section className="sampark-research-compare">
           <header className="sampark-research-section-head"><h2>Compare · like-for-like only</h2><small>{compareItems.length} selected · comparison stays within one kind</small></header>
-          <p style={{ color: '#6b7280', fontSize: 13 }}>Comparison must remain like-for-like; unrelated artifact types are never mixed in the same metric table. Stars, citations, and technology momentum are distinct measures.</p>
+          <p style={{ color: 'var(--muted)', fontSize: 13 }}>Comparison must remain like-for-like; unrelated artifact types are never mixed in the same metric table. Stars, citations, and technology momentum are distinct measures.</p>
           <div className="sampark-research-compare-grid">
             {compareItems.length ? compareItems.map((it, idx) => (
               <article key={`${it.kind}:${it.id}`} className="sampark-research-compare-card"><span>0{idx + 1} · {it.kind}</span><strong>{it.label}</strong><button onClick={() => handleCompareToggle(it)} type="button">Remove</button></article>
@@ -284,7 +324,7 @@ export default function SamparkResearch() {
             {compareItems.length > 0 && <button className="btn-secondary" onClick={() => { setCompareItems([]); setComparison(null); }} type="button">Clear</button>}
           </div>
           {comparison && (
-            <div className="sampark-research-comparison-result" style={{ marginTop: 16, border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, background: '#fff' }}>
+            <div className="sampark-research-comparison-result" style={{ marginTop: 16, border: '1px solid var(--line)', borderRadius: 12, padding: 16, background: 'var(--surface)' }}>
               <h3>{comparison.kind} decision matrix · {comparison.items.length} signals</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -311,10 +351,10 @@ export default function SamparkResearch() {
             {briefs.map((b, idx) => (
               <article key={b.id} className="sampark-research-artifact">
                 <div className="sampark-research-artifact-body">
-                  <span style={{ fontSize: 11, color: '#1428a0', fontWeight: 700 }}>0{idx + 1} · {b.type}</span>
+                  <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700 }}>0{idx + 1} · {b.type}</span>
                   <h4>{b.title}</h4>
-                  <p style={{ color: '#6b7280', fontSize: 13 }}>{b.summary}</p>
-                  <ul style={{ margin: '8px 0 8px 18px', color: '#6b7280', fontSize: 13 }}>{(b.actions || []).map((a) => <li key={a}>{a}</li>)}</ul>
+                  <p style={{ color: 'var(--muted)', fontSize: 13 }}>{b.summary}</p>
+                  <ul style={{ margin: '8px 0 8px 18px', color: 'var(--muted)', fontSize: 13 }}>{(b.actions || []).map((a) => <li key={a}>{a}</li>)}</ul>
                   <button className="btn-primary" onClick={() => { if (b.technology_id) openDossier('technology', b.technology_id); else if (b.repository_id) openDossier('repository', b.repository_id); else if (b.paper_id) openDossier('paper', b.paper_id); }} type="button">Open supporting intelligence</button>
                 </div>
               </article>
@@ -324,8 +364,8 @@ export default function SamparkResearch() {
       );
     }
 
-    // overview default
-    return <ResearchOverview discovery={discovery} discoveryError={error} discoveryLoading={loading} onRetry={() => setRetryKey((k) => k + 1)} onOpen={(a) => openDossier(a.kind, a.id)} providersStale={providersStale} watchMap={watchMap} pendingWatch={pendingWatchKeys} onWatch={handleWatch} compareMap={compareMap} onCompare={handleCompareToggle} />;
+    // overview default — provide one awaited discovery-reload callback, remove unused fresh fallback
+    return <ResearchOverview discovery={discovery} discoveryError={discoveryError} discoveryLoading={loading} intelligenceError={intelligenceError} onRetry={() => setRetryKey((k) => k + 1)} onDiscoveryReload={reloadDiscovery} onOpen={(a) => openDossier(a.kind, a.id)} providersStale={providersStale} watchMap={watchMap} pendingWatch={pendingWatchKeys} onWatch={handleWatch} compareMap={compareMap} onCompare={handleCompareToggle} />;
   };
 
   return (
@@ -333,14 +373,15 @@ export default function SamparkResearch() {
       <header className="sampark-research-header">
         <div>
           <span className="sampark-research-kicker">Research · technical artifacts and evidence</span>
-          <h1>Research or Research Intelligence</h1>
-          <p>This space covers technical artifacts and evidence, not ordinary news. Discovery shows Venture Lens provider signals; Archive Search is the retained briefing evidence. Provider and freshness status is shown where available.</p>
+          <h1>Research Intelligence</h1>
+          <p>Technical artifacts and evidence — papers, repositories, models, datasets, patents, and the technology radar.</p>
         </div>
       </header>
 
       <ResearchNavigation />
 
-      {error && discovery && <div className="sampark-workspace-note is-warning" role="status"><Icon name="warning" size={14} /> {error} <button className="btn-secondary" onClick={() => setError('')} type="button">Dismiss</button></div>}
+      {notice && <div className="sampark-workspace-note is-warning" role="status"><Icon name="warning" size={14} /> {notice} <button className="btn-secondary" onClick={() => setNotice('')} type="button">Dismiss</button></div>}
+      {intelligenceError && intelligence && <div className="sampark-workspace-note is-warning" role="status"><Icon name="warning" size={14} /> Intelligence could not be refreshed: {intelligenceError} <button className="btn-secondary" onClick={() => setRetryKey((k) => k + 1)} type="button">Retry intelligence</button></div>}
 
       <div className="sampark-research-content">
         {renderSection()}
