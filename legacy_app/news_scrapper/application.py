@@ -3983,11 +3983,11 @@ async def export_ppt(http_request: Request, request: ExportRequest):
             detail="PowerPoint export is disabled for Broadcast profile.",
         )
     safe_filename = sanitize_filename(request.filename)
-    TEMPLATE_PATH = "template.pptx"
-    if not os.path.exists(TEMPLATE_PATH):
+    template_path = PROJECT_ROOT / "template.pptx"
+    if not template_path.exists():
         raise HTTPException(status_code=404, detail="template.pptx not found")
 
-    prs = Presentation(TEMPLATE_PATH)
+    prs = Presentation(template_path)
     cover_layout = None
     news_layout = None
     for layout in prs.slide_layouts:

@@ -5,7 +5,7 @@ import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import { articleKey } from '../news-scrapper/utils/intelligence.js';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
-import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
+import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
 
 export default function SamparkHistory() {
   const [runs, setRuns] = useState([]);
@@ -92,11 +92,10 @@ export default function SamparkHistory() {
             </div>
           )}
           {openArticle && (
-            <SamparkArticleDossier
+            <ArticleModal
               item={openArticle}
               onClose={handleCloseDossier}
               onSourceOpen={() => engagement.onSourceOpen()}
-              titleId="history-dossier-title"
             />
           )}
         </div>

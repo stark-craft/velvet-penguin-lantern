@@ -32,15 +32,15 @@ test('B: search helper starts from query, decoupled from prefs', () => {
 
 test('B: production search effect debounces, aborts, and ignores Remember toggle', () => {
   const src = readFileSync(new URL('../src/sampark/SamparkSearchResults.jsx', import.meta.url), 'utf8');
+  const runner = readFileSync(new URL('../src/sampark/searchRunner.js', import.meta.url), 'utf8');
   assert.match(src, /shouldStartSearch/);
-  // Real 150 ms debounce lifecycle
-  assert.match(src, /setTimeout/);
-  assert.match(src, /150/);
-  assert.match(src, /clearTimeout/);
-  // AbortController request lifecycle: abort prior, new controller, abort on cleanup
-  assert.match(src, /AbortController/);
-  assert.match(src, /abortRef\.current.*abort/);
-  assert.match(src, /controller\.abort/);
+  assert.match(src, /createSearchRunner/);
+  assert.match(src, /retrySearch/);
+  // Real 150 ms debounce lifecycle lives in the shared runner.
+  assert.match(runner, /150/);
+  assert.match(runner, /clearTimeout/);
+  assert.match(runner, /AbortController/);
+  assert.match(runner, /\.abort\(\)/);
   // Search effect deps are route/filters only; toggling Remember must not refetch
   assert.match(src, /\[qParam, fromParam, toParam, sourceParam, sortParam\]/);
   assert.doesNotMatch(src, /\[qParam, fromParam, toParam, sourceParam, sortParam, rememberHistory/);
@@ -923,4 +923,407 @@ test('Dossier drops source rows duplicating the primary external link', async ()
   assert.equal(view.externalLink, 'https://example.com/x');
   assert.equal(view.sourceList.length, 1);
   assert.equal(view.sourceList[0].name, 'Other');
+});
+
+// Distinct texts render exactly once: lead never erases a distinct summary
+test('Dossier keeps a distinct summary alongside its lead', async () => {
+  const { resolveDossierView } = await import('../src/sampark/shared/dossierModel.js');
+  const view = resolveDossierView({
+    title: 'T',
+    summary_lead: 'Lead sentence.',
+    summary: 'A distinct strategic paragraph that should remain visible.',
+  });
+  assert.equal(view.summaryLead, 'Lead sentence.');
+  assert.equal(view.summary, 'A distinct strategic paragraph that should remain visible.');
+});
+
+// Equality with a hidden field cannot suppress the only visible copy — and a
+// duplicate of visible text still collapses to a single rendering
+test('Dossier keeps master summary equal to a hidden summary', async () => {
+  const { resolveDossierView } = await import('../src/sampark/shared/dossierModel.js');
+  const view = resolveDossierView({
+    title: 'T',
+    summary_lead: 'Lead sentence.',
+    summary: 'A distinct strategic paragraph that should remain visible.',
+    master_summary: 'A distinct strategic paragraph that should remain visible.',
+  });
+  assert.equal(view.summary, 'A distinct strategic paragraph that should remain visible.');
+  assert.equal(view.masterSummary, '');
+});
+
+// Full body keeps new paragraphs after a repeated lead and bullets
+test('Dossier strips only the repeated body prefix and keeps continuations', async () => {
+  const { resolveDossierView } = await import('../src/sampark/shared/dossierModel.js');
+  const view = resolveDossierView({
+    title: 'T',
+    summary_lead: 'Lead sentence.',
+    summary_points: ['First supporting point.'],
+    full_contents: 'Lead sentence. First supporting point. A brand-new third paragraph with fresh reporting.',
+  });
+  assert.ok(view.fullBody.includes('brand-new third paragraph'));
+  assert.ok(!view.fullBody.includes('Lead sentence'));
+});
+
+// Identical and empty bodies stay hidden
+test('Dossier hides identical or empty full bodies', async () => {
+  const { resolveDossierView } = await import('../src/sampark/shared/dossierModel.js');
+  assert.equal(resolveDossierView({ title: 'T', summary: 'Same text.', body: 'Same text.' }).fullBody, '');
+  assert.equal(resolveDossierView({ title: 'T', body: '' }).fullBody, '');
+  assert.equal(resolveDossierView({ title: 'T', body: null }).fullBody, '');
+  assert.equal(resolveDossierView({ title: 'T' }).fullBody, '');
+});
+
+// Source dedup: shared rows, identical primary/alt, labels, unsafe mix
+test('Dossier deduplicates source URLs while keeping useful labels', async () => {
+  const { resolveDossierView } = await import('../src/sampark/shared/dossierModel.js');
+  const shared = resolveDossierView({
+    title: 'T',
+    link: 'https://example.com/x',
+    sources: [
+      { name: 'Wire', link: 'https://example.com/x' },
+      { name: 'Wire Mirror', link: 'https://example.com/x/' },
+      { name: 'Other', link: 'https://other.test/y' },
+    ],
+  });
+  assert.equal(shared.sourceList.length, 1);
+  assert.equal(shared.sourceList[0].name, 'Other');
+  const identical = resolveDossierView({ title: 'T', link: 'https://example.com/x', url: 'https://example.com/x/' });
+  assert.equal(identical.externalLink, 'https://example.com/x');
+  assert.equal(identical.externalLinkAlt, '');
+  const labels = resolveDossierView({
+    title: 'T',
+    sources: [{ name: 'Wire', link: 'https://a.test/1' }, { name: 'Wire', link: 'https://b.test/2' }],
+  });
+  assert.equal(labels.sourceList.length, 2);
+  const mixed = resolveDossierView({
+    title: 'T',
+    sources: [{ name: 'Bad', link: 'javascript:alert(1)' }, { name: 'Good', link: 'https://good.test/' }],
+  });
+  const bad = mixed.sourceList.find((s) => s.name === 'Bad');
+  assert.equal(bad.url, '');
+  assert.ok(mixed.sourceList.some((s) => s.url === 'https://good.test/'));
+});
+
+// Search retry performs a real second request without navigation or duplicates
+test('Search runner retries failed requests exactly once', async () => {
+  const { createSearchRunner, SEARCH_DEBOUNCE_MS } = await import('../src/sampark/searchRunner.js');
+  assert.equal(SEARCH_DEBOUNCE_MS, 150);
+  let now = 0;
+  const timers = [];
+  const fakeTimers = {
+    setTimeout: (fn, ms) => { const id = timers.length + 1; timers.push({ id, fn, at: now + ms, cleared: false }); return id; },
+    clearTimeout: (id) => { const t = timers.find((x) => x.id === id); if (t) t.cleared = true; },
+  };
+  const advance = async (ms) => {
+    now += ms;
+    const due = timers.filter((t) => !t.cleared && !t.fired && t.at <= now);
+    for (const t of due) { t.fired = true; await t.fn(); }
+  };
+  let calls = 0;
+  let failNext = true;
+  const states = [];
+  const runner = createSearchRunner({
+    timers: fakeTimers,
+    fetchPage: async () => {
+      calls += 1;
+      if (failNext) { failNext = false; throw new Error('Search could not be completed.'); }
+      return { items: [{ title: 'Hit' }], total: 1, has_more: false };
+    },
+    onState: (patch) => states.push(patch),
+  });
+  // Initial route-driven request rejects after debounce.
+  runner.run({ query: 'Samsung' });
+  assert.equal(calls, 0);
+  await advance(150);
+  assert.equal(calls, 1);
+  assert.ok(states.some((s) => s.error));
+  // Try again without changing anything starts exactly one new request.
+  runner.retry({ query: 'Samsung' });
+  assert.equal(calls, 2);
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(calls, 2);
+  const last = states[states.length - 1];
+  assert.equal(last.loading, false);
+  assert.equal(last.error, '');
+  assert.equal(last.items.length, 1);
+  // Concurrent retries collapse into a single in-flight request.
+  let release;
+  let secondCalls = 0;
+  const runner2 = createSearchRunner({
+    timers: fakeTimers,
+    fetchPage: () => { secondCalls += 1; return new Promise((res) => { release = () => res({ items: [], total: 0, has_more: false }); }); },
+    onState: () => {},
+  });
+  runner2.retry({ query: 'Samsung' });
+  runner2.retry({ query: 'Samsung' });
+  assert.equal(secondCalls, 1);
+  release();
+  await Promise.resolve();
+  runner.dispose();
+  runner2.dispose();
+});
+
+// Gatekeeper cursor: 50 -> Show more at 100 -> refresh covers 100 -> next at 100
+test('Gatekeeper page requests track the loaded window exactly', async () => {
+  const { pageRequest, mergeGatekeeperItems } = await import('../src/sampark/gatekeeperModel.js');
+  assert.deepEqual(pageRequest(0, { append: false }), { offset: 0, limit: 50 });
+  assert.deepEqual(pageRequest(50, { append: true }), { offset: 50, limit: 50 });
+  assert.deepEqual(pageRequest(100, { append: false }), { offset: 0, limit: 100 });
+  assert.deepEqual(pageRequest(100, { append: true }), { offset: 100, limit: 50 });
+  // Full sequence: load 50, append 50, refresh window, append at 100.
+  const page1 = Array.from({ length: 50 }, (_, i) => ({ id: `d${i}` }));
+  const page2 = Array.from({ length: 50 }, (_, i) => ({ id: `d${50 + i}` }));
+  const page3 = Array.from({ length: 50 }, (_, i) => ({ id: `d${100 + i}` }));
+  let loaded = mergeGatekeeperItems([], page1, { append: false });
+  loaded = mergeGatekeeperItems(loaded, page2, { append: true });
+  assert.equal(loaded.length, 100);
+  const refresh = pageRequest(loaded.length, { append: false });
+  assert.deepEqual(refresh, { offset: 0, limit: 100 });
+  loaded = mergeGatekeeperItems([], [...page1, ...page2], { append: false });
+  assert.equal(loaded.length, 100);
+  const next = pageRequest(loaded.length, { append: true });
+  assert.deepEqual(next, { offset: 100, limit: 50 });
+  loaded = mergeGatekeeperItems(loaded, page3, { append: true });
+  assert.equal(loaded.length, 150);
+  assert.equal(loaded[0].id, 'd0');
+  assert.equal(loaded[149].id, 'd149');
+});
+
+// Gatekeeper applied search survives polling; stale generations never commit
+test('Gatekeeper loader keeps the committed search across refresh', async () => {
+  const { createGatekeeperLoader, restorationActive } = await import('../src/sampark/gatekeeperModel.js');
+  const calls = [];
+  const rowsFor = (query) => Array.from({ length: 50 }, (_, i) => ({ id: `${query || 'all'}-${i}`, status: 'dropped' }));
+  const fetchDropped = async ({ limit, offset, profile, status, search }) => {
+    calls.push({ limit, offset, profile, status, search });
+    return {
+      items: rowsFor(search).slice(offset, offset + limit),
+      counts: { all: 500 },
+      total: 500,
+      matched: 500,
+      has_more: offset + limit < 500,
+    };
+  };
+  const activeQueue = async () => ({ jobs: [{ id: 'j1', status: 'queued' }], counts: { queued: 1 }, worker: {} });
+  const seen = [];
+  const loader = createGatekeeperLoader({
+    fetchDropped,
+    fetchQueue: activeQueue,
+    onState: (patch) => seen.push(patch),
+  });
+  assert.equal(restorationActive([{ status: 'queued' }], []), true);
+  // Initial applied query is empty: 50 rows.
+  await loader.reload();
+  assert.equal(loader.getState().items.length, 50);
+  assert.equal(loader.getState().matched, 500);
+  // User applies a query returning 50 rows; length stays 50.
+  loader.setScope({ search: 'chip' });
+  await loader.reload();
+  assert.equal(loader.getState().items.length, 50);
+  assert.equal(loader.getState().items[0].id, 'chip-0');
+  // A polling tick uses the newly applied query, not the old empty one.
+  const before = calls.length;
+  await loader.refresh();
+  assert.equal(calls[calls.length - 1].search, 'chip');
+  assert.equal(calls[calls.length - 1].offset, 0);
+  assert.equal(calls[calls.length - 1].limit, 50);
+  assert.equal(loader.getState().items.length, 50);
+  assert.ok(before >= 2);
+  // A stale unfiltered response cannot overwrite the committed results: start
+  // an old load, supersede it with the applied-query load, resolve old first.
+  const deferreds = [];
+  const loader2 = createGatekeeperLoader({
+    fetchDropped: () => new Promise((res) => { deferreds.push(res); }),
+    fetchQueue: activeQueue,
+    onState: () => {},
+  });
+  const stale = loader2.reload();
+  loader2.setScope({ search: 'chip' });
+  const fresh = loader2.reload();
+  assert.equal(deferreds.length, 2);
+  deferreds[0]({ items: rowsFor(''), counts: { all: 500 }, total: 500, matched: 500, has_more: true });
+  const outcome = await stale;
+  assert.equal(outcome.ignored, true);
+  assert.equal(loader2.getState().items.length, 0);
+  deferreds[1]({ items: rowsFor('chip'), counts: { all: 500 }, total: 500, matched: 500, has_more: true });
+  await fresh;
+  assert.equal(loader2.getState().items[0].id, 'chip-0');
+});
+
+// StrictMode lifecycle: setup, cleanup, setup must leave a usable runner.
+test('Search runner survives StrictMode replay and settles every lifecycle', async () => {
+  const { createSearchRunner } = await import('../src/sampark/searchRunner.js');
+  let now = 0;
+  const timers = [];
+  const fakeTimers = {
+    setTimeout: (fn, ms) => { const id = timers.length + 1; timers.push({ id, fn, at: now + ms, cleared: false }); return id; },
+    clearTimeout: (id) => { const t = timers.find((x) => x.id === id); if (t) t.cleared = true; },
+  };
+  const advance = async (ms) => {
+    now += ms;
+    for (const t of timers.filter((x) => !x.cleared && !x.fired && x.at <= now)) {
+      t.fired = true;
+      await t.fn();
+    }
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+  const liveTimers = () => timers.filter((t) => !t.cleared && !t.fired);
+  let calls = 0;
+  let failNext = false;
+  const states = [];
+  // 1. Create/mount the search behavior exactly like the component ref init.
+  const runner = createSearchRunner({
+    timers: fakeTimers,
+    fetchPage: async ({ query }) => {
+      calls += 1;
+      if (failNext) { failNext = false; throw new Error('Search could not be completed.'); }
+      return { items: [{ title: `Hit for ${query}` }], total: 1, has_more: false };
+    },
+    onState: (patch) => states.push(patch),
+  });
+  // 2. StrictMode-style setup, cleanup, and setup sequence.
+  runner.activate();
+  runner.dispose();
+  runner.activate();
+  // 3. Start a route search.
+  const first = runner.run({ query: 'Samsung' });
+  let firstSettled = false;
+  void first.then(() => { firstSettled = true; }, () => { firstSettled = true; });
+  // 4-5. Advance the 150ms timer: fetch runs and loading settles with results.
+  await advance(150);
+  await first;
+  assert.equal(calls, 1);
+  assert.ok(firstSettled);
+  const last = states[states.length - 1];
+  assert.equal(last.loading, false);
+  assert.equal(last.error, '');
+  assert.equal(last.items.length, 1);
+  // 6. Fail -> error -> immediate retry -> success.
+  failNext = true;
+  runner.retry({ query: 'Samsung' });
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(calls, 2);
+  assert.ok(states.some((s) => s.error));
+  const retryPromise = runner.retry({ query: 'Samsung' });
+  await retryPromise;
+  assert.equal(calls, 3);
+  const recovered = states[states.length - 1];
+  assert.equal(recovered.loading, false);
+  assert.equal(recovered.error, '');
+  assert.equal(recovered.items[0].title, 'Hit for Samsung');
+  // 7a. Replacement: a newer query supersedes; stale completion never applies.
+  const slowA = runner.run({ query: 'Alpha' });
+  const fastB = runner.run({ query: 'Beta' });
+  await advance(150);
+  await Promise.allSettled([slowA, fastB]);
+  assert.ok(!states.some((s) => (s.items || []).some((it) => it.title === 'Hit for Alpha')));
+  assert.ok(states.some((s) => (s.items || []).some((it) => it.title === 'Hit for Beta')));
+  // 7b. Real unmount cleanup: pending work settles silently, timers released.
+  const pending = runner.run({ query: 'Gamma' });
+  let pendingSettled = false;
+  void pending.then(() => { pendingSettled = true; }, () => { pendingSettled = true; });
+  runner.dispose();
+  await advance(1000);
+  await pending;
+  assert.ok(pendingSettled);
+  assert.equal(liveTimers().length, 0);
+  const statesAfterUnmount = states.length;
+  await advance(1000);
+  assert.equal(states.length, statesAfterUnmount);
+  // 8. No orphaned timer or unresolved cancelled operation remains.
+  assert.equal(liveTimers().length, 0);
+  runner.dispose();
+});
+
+// Gatekeeper foreground priority: polling never discards user pagination
+test('Gatekeeper background refresh defers to active foreground work', async () => {
+  const { createGatekeeperLoader } = await import('../src/sampark/gatekeeperModel.js');
+  const rowsFor = (n, prefix = 'd') => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, status: 'dropped' }));
+  const page = (items, total = 500, matched = 500) => ({
+    items, counts: { all: total }, total, matched, has_more: true,
+  });
+  const quietQueue = async () => ({ jobs: [], counts: {}, worker: {} });
+  const activeQueue = async () => ({ jobs: [{ id: 'j1', status: 'queued' }], counts: { queued: 1 }, worker: {} });
+
+  // 1. Initial 50-item load.
+  const resolvers = [];
+  const loader = createGatekeeperLoader({
+    fetchDropped: () => new Promise((res) => { resolvers.push(res); }),
+    fetchQueue: quietQueue,
+    onState: () => {},
+  });
+  const initial = loader.reload();
+  resolvers[0](page(rowsFor(50)));
+  await initial;
+  assert.equal(loader.getState().items.length, 50);
+
+  // 2-4. Start Show more, then poll before it resolves; resolve append first.
+  const appendIdx = resolvers.length;
+  const append = loader.loadMore();
+  const callsBeforePoll = resolvers.length;
+  const poll = loader.refresh();
+  // Poll defers while the append is active: no new dropped fetch runs.
+  assert.equal(resolvers.length, callsBeforePoll);
+  const pollOutcome = await poll;
+  assert.equal(pollOutcome.skipped, true);
+  resolvers[appendIdx](page(rowsFor(50, 'e')));
+  const appendOutcome = await append;
+  assert.equal(appendOutcome.ignored, false);
+  assert.equal(loader.getState().items.length, 100);
+
+  // 5-6. Reverse order: poll in flight, then append supersedes it.
+  const waiting = [];
+  const loader2 = createGatekeeperLoader({
+    fetchDropped: () => new Promise((res) => { waiting.push(res); }),
+    fetchQueue: activeQueue,
+    onState: () => {},
+  });
+  const boot = loader2.reload();
+  waiting[0](page(rowsFor(50)));
+  await boot;
+  assert.equal(loader2.getState().items.length, 50);
+  const poll2 = loader2.refresh();
+  const append2 = loader2.loadMore();
+  // The poll resolves first but must not discard the append.
+  waiting[1](page(rowsFor(50)));
+  const poll2Outcome = await poll2;
+  assert.equal(poll2Outcome.ignored, true);
+  waiting[2](page(rowsFor(50, 'e')));
+  const append2Outcome = await append2;
+  assert.equal(append2Outcome.ignored, false);
+  // 6. Both schedules finish with the requested 100-item window.
+  assert.equal(loader2.getState().items.length, 100);
+
+  // 8. A filter change during an old request still rejects the old response.
+  const pending3 = [];
+  const loader3 = createGatekeeperLoader({
+    fetchDropped: () => new Promise((res) => { pending3.push(res); }),
+    fetchQueue: quietQueue,
+    onState: () => {},
+  });
+  const old = loader3.reload();
+  loader3.setScope({ search: 'chip' });
+  const current = loader3.reload();
+  pending3[0](page(rowsFor(50)));
+  assert.equal((await old).ignored, true);
+  pending3[1](page(rowsFor(50, 'chip')));
+  await current;
+  assert.equal(loader3.getState().items[0].id, 'chip0');
+
+  // 9. Repeated polling never overlaps: second tick skips while one runs.
+  const pending4 = [];
+  const loader4 = createGatekeeperLoader({
+    fetchDropped: () => new Promise((res) => { pending4.push(res); }),
+    fetchQueue: activeQueue,
+    onState: () => {},
+  });
+  const firstPoll = loader4.refresh();
+  const secondPoll = loader4.refresh();
+  assert.equal((await secondPoll).skipped, true);
+  pending4[0](page(rowsFor(50)));
+  await firstPoll;
+  assert.equal(loader4.getState().items.length, 50);
 });

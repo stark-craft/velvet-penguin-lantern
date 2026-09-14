@@ -8,6 +8,7 @@ import ResearchArtifactDetail from './research/ResearchArtifactDetail.jsx';
 import ResearchArchiveSearch from './research/ResearchArchiveSearch.jsx';
 import { apiRequest } from '../shared/api/client.js';
 import { evaluateReloadResult } from './shared/researchHelper.js';
+import useAutoDismiss from './shared/useAutoDismiss.js';
 import './research/research.css';
 
 // Light wrappers around venture-lens endpoints — same-origin, no hard-coded host
@@ -95,6 +96,8 @@ export default function SamparkResearch() {
   const [comparison, setComparison] = useState(null);
   const [comparing, setComparing] = useState(false);
   const dossierRef = useRef({ token: 0, controller: null });
+
+  useAutoDismiss(notice, () => setNotice(''));
 
   const load = useCallback(async () => {
     setLoading(true);

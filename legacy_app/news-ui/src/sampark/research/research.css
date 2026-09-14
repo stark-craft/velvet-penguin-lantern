@@ -45,7 +45,7 @@
 .sampark-research-visual-icon.is-patent { color: #6b7280; }
 .sampark-research-visual-icon.is-technology { color: #1428a0; }
 .sampark-research-visual-icon.is-large { width: 64px; height: 64px; }
-.sampark-research-source-badge { position: absolute; left: 10px; bottom: 10px; padding: 3px 10px; border-radius: 12px; background: rgba(255,255,255,.96); color: #1a1a2e; font-size: 12px; font-weight: 500; box-shadow: 0 1px 6px rgba(0,0,0,.08); }
+.sampark-research-source-badge { position: absolute; left: 10px; bottom: 10px; padding: 4px 9px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: rgba(10,18,45,.58); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; box-shadow: 0 1px 5px rgba(0,0,0,.16); backdrop-filter: blur(5px); }
 .sampark-research-starter-badge { position: absolute; right: 10px; top: 10px; padding: 3px 8px; border-radius: 10px; background: #fffbeb; color: #92400e; font-size: 11px; font-weight: 700; border: 1px solid #fde68a; }
 .sampark-research-artifact-body { padding: 14px 16px; display: flex; flex-direction: column; flex: 1; gap: 8px; }
 .sampark-research-artifact-kicker { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #6b7280; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }

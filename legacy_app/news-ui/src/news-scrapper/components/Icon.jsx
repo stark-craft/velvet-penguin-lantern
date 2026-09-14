@@ -21,6 +21,7 @@ const PATHS = {
   filter:    <><path d="M4 5h16l-6 8v5l-4 2v-7z"/></>,
   sort:      <><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l3-3M17 20l-3-3"/></>,
   menu:      <><path d="M4 6h16M4 12h16M4 18h16"/></>,
+  dots:      <><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></>,
   sparkle:   <><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></>,
   note:      <><path d="M4 4h16v14l-4 4H4z"/><path d="M16 22v-6h6"/></>,
   studio:    <><path d="M5 5h9l5 5v9H5z"/><path d="M14 5v5h5"/><path d="M9 14h6M12 11v6"/><path d="M3 8V3h5"/></>,

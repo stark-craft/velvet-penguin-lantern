@@ -988,6 +988,10 @@ class NewsSpider(scrapy.Spider):
         # paragraph fallback because many sites hide article text in custom DOMs.
         full_text = extracted_text if len(extracted_text.split()) >= self.MIN_ARTICLE_WORDS else fallback_text
 
+        # Strip generic in-article promo/newsletter chrome from either path so
+        # persisted full_content keeps article paragraphs, not provider UI text.
+        full_text = self.strip_boilerplate_sentences(full_text)
+
         # Reject thin/non-story pages. This protects the AI layer from receiving
         # navigation pages or empty publisher error pages.
         if not title or len(full_text.split()) < self.MIN_ARTICLE_WORDS:
@@ -1144,11 +1148,29 @@ class NewsSpider(scrapy.Spider):
         """Fallback body extractor that reads visible article/main paragraphs."""
 
         # Exclude layout/navigation areas so fallback text does not include menus,
-        # footer links, cookie forms, or scripts.
+        # footer links, cookie forms, or scripts. The class-based exclusions cover
+        # generic in-article promo/newsletter/related-content containers that
+        # publishers nest inside <article> (provider-agnostic, no outlet names).
         excluded = (
             "not(ancestor::header or ancestor::nav or ancestor::footer or "
             "ancestor::aside or ancestor::form or ancestor::button or "
-            "ancestor::script or ancestor::style or ancestor::*[@role='navigation'])"
+            "ancestor::script or ancestor::style or ancestor::*[@role='navigation'] or "
+            "ancestor::*[@role='complementary'] or ancestor::*[@role='contentinfo'] or "
+            "ancestor::*[contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'newsletter') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'subscribe') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'signup') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sign-up') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'promo') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'related') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'read-also') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'read-more') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'trending') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'sidebar') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'widget') or "
+            "contains(translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'social-share') or "
+            "contains(translate(@id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'newsletter') or "
+            "contains(translate(@id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'subscribe') or "
+            "contains(translate(@id, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'signup')])"
         )
 
         # First try <article>, the semantic HTML container for story content.
@@ -1244,6 +1266,50 @@ class NewsSpider(scrapy.Spider):
         """Collapse whitespace and convert None into an empty string."""
 
         return re.sub(r"\s+", " ", str(value or "")).strip()
+
+    # Conservative standalone call-to-action shapes that leak from in-article
+    # promo boxes into extracted body text. Every pattern is anchored to the
+    # whole sentence (^...$) and generic (no outlet or provider names), so
+    # legitimate reporting that merely mentions subscriptions, newsletters,
+    # trusted sources, sharing, or related stories is always preserved.
+    # Titles are never passed through this filter.
+    BOILERPLATE_SENTENCE_PATTERNS = (
+        re.compile(r"subscribe\s+(to|for)\s+our\s+newsletter[^.]{0,60}\.?$", re.IGNORECASE),
+        re.compile(r"sign\s*up\s+for\s+[^.]{0,60}newsletter[^.]{0,60}\.?$", re.IGNORECASE),
+        re.compile(r"^make\s+.+\s+my\s+trusted\s+source\.?$", re.IGNORECASE),
+        re.compile(r"^(join|get)\s+our\s+newsletter[^.]{0,60}\.?$", re.IGNORECASE),
+        re.compile(r"^key\s+highlights\.?$", re.IGNORECASE),
+        re.compile(r"^(also\s+read|read\s+also|read\s+more|related)\b.{0,80}$", re.IGNORECASE),
+        re.compile(r"^(follow\s+us|share\s+this\s+(article|story))[^.]{0,60}\.?$", re.IGNORECASE),
+        re.compile(r"^advertisement\.?$", re.IGNORECASE),
+    )
+
+    # Leading boilerplate prefix from concatenated promo chrome that carries no
+    # sentence-ending punctuation (e.g. "Make Telecom Talk My Trusted Source
+    # My Trusted Source Key Highlights <article...>"). Stripped only from the
+    # very start of the body, repeatedly, so later article text is untouched.
+    BOILERPLATE_PREFIX_PATTERN = re.compile(
+        r"^(?:make\s+\S+(?:\s+\S+){0,8}?\s+my\s+trusted\s+source\s*"
+        r"|my\s+trusted\s+source\s*"
+        r"|key\s+highlights\s*)+",
+        re.IGNORECASE,
+    )
+
+    def strip_boilerplate_sentences(self, text):
+        """Drop standalone promo/navigation sentences from body text."""
+
+        body = self.BOILERPLATE_PREFIX_PATTERN.sub("", str(text or "")).strip()
+        sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", body)
+            if sentence.strip()
+        ]
+        kept = [
+            sentence
+            for sentence in sentences
+            if not any(pattern.search(sentence) for pattern in self.BOILERPLATE_SENTENCE_PATTERNS)
+        ]
+        return " ".join(kept).strip()
 
     def make_summary(self, text):
         """Create a short crawler-side summary from the first few sentences."""

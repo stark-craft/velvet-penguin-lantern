@@ -5,7 +5,7 @@ import { articleKey } from '../news-scrapper/utils/intelligence.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import SamparkWorkspaceShell, { WorkspaceEmpty } from './shared/SamparkWorkspaceShell.jsx';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
-import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
+import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
 
 function ArticleDossier({ item, onClose }) {
   const engagement = useArticleEngagement(item || {}, { surface: 'following' });
@@ -14,11 +14,10 @@ function ArticleDossier({ item, onClose }) {
   useEffect(() => { if (item && articleId) engagement.onDossierOpen(item); }, [articleId]);
   if (!item) return null;
   return (
-    <SamparkArticleDossier
+    <ArticleModal
       item={item}
       onClose={handleClose}
       onSourceOpen={() => engagement.onSourceOpen()}
-      titleId="sampark-following-dossier-title"
     />
   );
 }

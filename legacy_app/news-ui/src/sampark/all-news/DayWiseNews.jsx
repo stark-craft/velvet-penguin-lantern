@@ -5,7 +5,7 @@ import { articleKey } from '../../news-scrapper/utils/intelligence.js';
 const INITIAL_DAYS = 3;
 const MORE_DAYS = 5;
 
-export default function DayWiseNews({ grouped, onOpen, onLike, onDislike, onFollow, onHide, onSourceOpen, votes, savedKeys, busyMap, savedHydrated, reactionsHydrated }){
+export default function DayWiseNews({ grouped, onOpen, onLike, onDislike, onFollow, onHide, onSourceOpen, votes, savedKeys, busyMap, savedHydrated, reactionsHydrated, reviewAllowed, workflowReady, checkedMap, selectedIds, approvedIds, onCheck, onSubmitForReview }){
   const safeGrouped = (grouped || []).filter(Boolean).map(([d, its])=> [d, (its||[]).filter(Boolean)]).filter(([,its])=> its.length);
   const [visibleDays, setVisibleDays] = useState(INITIAL_DAYS);
   useEffect(() => { setVisibleDays(INITIAL_DAYS); }, [grouped]);
@@ -34,7 +34,7 @@ export default function DayWiseNews({ grouped, onOpen, onLike, onDislike, onFoll
               const busyHide = Boolean(busyMap?.[`${key}::hide`]);
               const reactionReady = Boolean(reactionsHydrated || votes[key] || item.reactions);
               const saveReady = Boolean(savedHydrated);
-              return <NewsCard key={key} item={item} onOpen={onOpen} onLike={onLike} onDislike={onDislike} onFollow={onFollow} onHide={onHide} onSourceOpen={onSourceOpen} isFollowing={savedKeys?.has(key)} likeActive={v.viewer_reaction==='like'} dislikeActive={v.viewer_reaction==='dislike'} busyReaction={busyReaction} busySave={busySave} busyHide={busyHide} savedHydrated={saveReady} reactionsHydrated={reactionReady} />;
+              return <NewsCard key={key} variant="daywise" item={item} onOpen={onOpen} onLike={onLike} onDislike={onDislike} onFollow={onFollow} onHide={onHide} onSourceOpen={onSourceOpen} isFollowing={savedKeys?.has(key)} likeActive={v.viewer_reaction==='like'} dislikeActive={v.viewer_reaction==='dislike'} likeCount={Number(v.like_count || 0)} dislikeCount={Number(v.dislike_count || 0)} busyReaction={busyReaction} busySave={busySave} busyHide={busyHide} savedHydrated={saveReady} reactionsHydrated={reactionReady} reviewAllowed={reviewAllowed} workflowReady={workflowReady} checked={Boolean(checkedMap?.[key])} isSelected={selectedIds?.has(key)} isApproved={approvedIds?.has(key)} onCheck={onCheck} onSubmitForReview={onSubmitForReview} />;
             })}
           </div>
         </section>

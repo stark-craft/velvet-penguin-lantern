@@ -13,51 +13,11 @@ import {
 } from '../../news-scrapper/api.js';
 import { articleKey, reactionIdentity, scoreOf } from '../../news-scrapper/utils/intelligence.js';
 import { normalizeList } from '../../news-scrapper/utils/normalize.js';
-import useModalFocus from '../../news-scrapper/components/modals/useModalFocus.js';
+import ArticleModal from '../../news-scrapper/components/modals/ArticleModal.jsx';
+import useAutoDismiss from '../shared/useAutoDismiss.js';
 
 function imageOf(item) {
   return item?.image_url || item?.imageUrl || item?.thumbnail_url || item?.og_image || item?.top_image || '';
-}
-
-function SamparkResearchDossier({ item, onClose, saved, onSave, onHide, onReact }) {
-  const dialogRef = useModalFocus(Boolean(item), onClose);
-  if (!item) return null;
-  const image = imageOf(item);
-  const reactions = item.reactions || { like_count: 0, dislike_count: 0, viewer_reaction: 'neutral' };
-  const lead = item.summary_lead || item.summary || item.master_summary || '';
-  const points = Array.isArray(item.summary_points) ? item.summary_points : [];
-  const sourceLink = item.link || item.url || '';
-  return (
-    <div className="sampark-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <section aria-labelledby="sampark-research-dossier-title" aria-modal="true" className="sampark-dossier sampark-dossier--large" ref={dialogRef} role="dialog" tabIndex={-1}>
-        <header className="sampark-dossier-header">
-          <div>
-            <div className="sampark-dossier-kicker">{item.category || 'Research'} · {item.src || item.source || 'Archive'} · {item.archive_date || item.date || 'Latest'}</div>
-            <div className="sampark-dossier-subtitle">{item.region || 'Global'} · Score {scoreOf(item)} {item.search_score ? `· ${item.search_score}% match` : ''}</div>
-          </div>
-          <button aria-label="Close dossier" className="sampark-dossier-close" onClick={onClose} type="button"><Icon name="x" size={18} /></button>
-        </header>
-        <div className="sampark-dossier-scroll">
-          {image ? <div className="sampark-dossier-media"><img alt="" className="sampark-dossier-img" src={image} /></div> : <div className="sampark-dossier-media is-placeholder"><Icon name="globe" size={42} /></div>}
-          <div className="sampark-dossier-body">
-            <h2 id="sampark-research-dossier-title" className="sampark-dossier-title">{item.title}</h2>
-            {lead && <p className="sampark-dossier-summary">{lead}</p>}
-            {points.length ? <ul className="sampark-dossier-points">{points.slice(0, 5).map((p, i) => <li key={i}>{p}</li>)}</ul> : null}
-            {item.matched_terms?.length ? <div className="sampark-dossier-keywords">{item.matched_terms.slice(0, 6).map((kw) => <span key={kw} className="sampark-keyword">{kw}</span>)}</div> : null}
-            {sourceLink ? <a className="sampark-dossier-link" href={sourceLink} rel="noreferrer noopener" target="_blank">Open original source <Icon name="external" size={14} /></a> : null}
-          </div>
-        </div>
-        <footer className="sampark-dossier-actions">
-          <button className={`sampark-action-btn${reactions.viewer_reaction === 'like' ? ' is-active' : ''}`} onClick={() => onReact(item, 'like')} type="button"><Icon name="thumbsUp" size={16} /> {reactions.like_count || 0} Like</button>
-          <button className={`sampark-action-btn${reactions.viewer_reaction === 'dislike' ? ' is-active' : ''}`} onClick={() => onReact(item, 'dislike')} type="button"><Icon name="thumbsDown" size={16} /> {reactions.dislike_count || 0}</button>
-          <button className={`sampark-action-btn${saved ? ' is-active' : ''}`} onClick={() => onSave(item)} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={16} /> {saved ? 'Following' : 'Follow'}</button>
-          <button className="sampark-action-btn" onClick={() => onHide(item)} type="button"><Icon name="eye" size={16} /> Hide</button>
-          <span className="sampark-dossier-spacer" />
-          <button className="sampark-action-btn sampark-action-close" onClick={onClose} type="button">Close</button>
-        </footer>
-      </section>
-    </div>
-  );
 }
 
 function groupByDate(items) {
@@ -87,9 +47,12 @@ export default function ResearchArchiveSearch() {
   const [hasMore, setHasMore] = useState(false);
   const [openArticle, setOpenArticle] = useState(null);
   const [savedKeys, setSavedKeys] = useState(new Set());
+  const [hiddenKeys, setHiddenKeys] = useState(new Set());
   const [busy, setBusy] = useState({});
   const [notice, setNotice] = useState('');
   const locks = useRef(new Set());
+
+  useAutoDismiss(notice, () => setNotice(''));
 
   useEffect(() => { setQuery(urlQuery); }, [urlQuery]);
   useEffect(() => {
@@ -102,6 +65,7 @@ export default function ResearchArchiveSearch() {
   useEffect(() => {
     let cancelled = false;
     getViewerSaved().then((r) => { if (!cancelled) setSavedKeys(new Set(normalizeList(r?.items || []).map(articleKey))); }).catch(() => {});
+    getViewerHidden().then((r) => { if (!cancelled) setHiddenKeys(new Set(normalizeList(r?.items || []).map(articleKey))); }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
@@ -193,6 +157,7 @@ export default function ResearchArchiveSearch() {
     const key = articleKey(item);
     return runAction(key, async () => {
       await hideArticleForViewer(item);
+      setHiddenKeys((cur) => { const next = new Set(cur); next.add(key); return next; });
       setItems((cur) => cur.filter((it) => articleKey(it) !== key));
       setNotice('Hidden from your private view.');
     });
@@ -210,7 +175,8 @@ export default function ResearchArchiveSearch() {
     });
   };
 
-  const grouped = useMemo(() => groupByDate(items), [items]);
+  const visibleItems = useMemo(() => items.filter((item) => !hiddenKeys.has(articleKey(item))), [items, hiddenKeys]);
+  const grouped = useMemo(() => groupByDate(visibleItems), [visibleItems]);
 
   return (
     <div className="sampark-research-archive">
@@ -247,12 +213,12 @@ export default function ResearchArchiveSearch() {
       <div className="sampark-research-status" aria-live="polite">
         {loading && <span className="sampark-research-loading"><span className="sampark-spinner" /> Searching every retained briefing…</span>}
         {!loading && error && <span className="sampark-research-error" role="alert">{error} <button onClick={() => executeSearch({ q: query || urlQuery, from: fromDate, to: toDate, sites: targetSites })} type="button">Retry</button></span>}
-        {!loading && !error && !items.length && query.trim() && <span>No matching signals. Widen the date window or try a related phrase.</span>}
-        {!loading && !error && !items.length && !query.trim() && <span>Enter a query above to surface ranked archive signals. Results appear grouped by date, newest first. The distinction is clear: Discovery searches Venture Lens providers; this Archive Search searches retained briefing evidence.</span>}
-        {!loading && !error && items.length > 0 && <span><strong>{items.length}</strong> of {total} matches shown · {hasMore ? 'more available' : 'all loaded'} · evidence from {meta.archive_files_searched} files</span>}
+        {!loading && !error && !visibleItems.length && query.trim() && <span>No matching signals. Widen the date window or try a related phrase.</span>}
+        {!loading && !error && !visibleItems.length && !query.trim() && <span>Enter a query above to surface ranked archive signals. Results appear grouped by date, newest first. The distinction is clear: Discovery searches Venture Lens providers; this Archive Search searches retained briefing evidence.</span>}
+        {!loading && !error && visibleItems.length > 0 && <span><strong>{visibleItems.length}</strong> of {total} matches shown · {hasMore ? 'more available' : 'all loaded'} · evidence from {meta.archive_files_searched} files</span>}
       </div>
 
-      {items.length > 0 && (
+      {visibleItems.length > 0 && (
         <div className="sampark-research-results">
           {grouped.map(([date, group]) => (
             <section key={date} className="sampark-research-group">
@@ -299,7 +265,14 @@ export default function ResearchArchiveSearch() {
         </div>
       )}
 
-      <SamparkResearchDossier item={openArticle} onClose={() => setOpenArticle(null)} onHide={async (it) => { setOpenArticle(null); await handleHide(it); }} onReact={handleReact} onSave={handleSave} saved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} />
+      <ArticleModal
+        item={openArticle}
+        onClose={() => setOpenArticle(null)}
+        onHide={async (item) => { setOpenArticle(null); await handleHide(item); }}
+        onVote={handleReact}
+        onSave={handleSave}
+        isSaved={openArticle ? savedKeys.has(articleKey(openArticle)) : false}
+      />
     </div>
   );
 }

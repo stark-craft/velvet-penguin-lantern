@@ -57,7 +57,7 @@ test('Global search scope and performance', ()=>{
   assert.match(search, /Showing 100 of/);
   assert.match(search, /limit.*100/);
   assert.doesNotMatch(search, /limit.*500.*offset.*while.*offset < total/s);
-  assert.match(search, /AbortController/);
+  assert.match(read('../src/sampark/searchRunner.js'), /AbortController/);
   assert.match(search, /From date/);
   assert.match(search, /To date/);
   assert.match(search, /Source/);
@@ -267,8 +267,12 @@ test('WS14 gatekeeper paginates without shell flash', ()=>{
   assert.match(gate, /rowBusy/);
   assert.match(gate, /Apply/);
   assert.match(gate, /restorationActive/);
-  assert.match(gate, /requestRef/);
-  assert.match(gate, /nextPageOffset/);
+  assert.match(gate, /createGatekeeperLoader/);
+  assert.match(gate, /loaderRef/);
+  assert.match(read('../src/sampark/gatekeeperModel.js'), /pageRequest/);
+  assert.match(gate, /appliedSearch/);
+  assert.match(gate, /fetchQueue: \(params\) => getGatekeeperQueue\(params\)/);
+  assert.match(gate, /setScope/);
   assert.match(gate, /decodedRowText/);
   assert.doesNotMatch(gate, /slice\(0,50\)\.map/);
   assert.doesNotMatch(gate, /d\.stage==='queued'/);

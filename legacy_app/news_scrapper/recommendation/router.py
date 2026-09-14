@@ -817,10 +817,50 @@ def _activity_summary_for_viewer(viewer_key: str, tz_name: str) -> dict:
     # Following total: from saved store via legacy helper? Use REPOSITORY not enough, need saved count
     # We will compute via legacy helper in endpoint, but for summary we approximate via reaction? Instead use saved count passed in
     # For now return 0, endpoint will override with real saved count
+    # Active Days: distinct calendar days (viewer tz) with qualifying engagement in the last 30 days.
+    # Real per-viewer value derived from the same private event + reaction stores (no demo data).
+    active_day_keys: set[str] = set()
+    for ev in events:
+        parsed = _parse_utc(ev.get("occurred_at"))
+        if not parsed:
+            continue
+        tz_time = _to_tz(parsed)
+        # Only count recent engagement (30-day window) to keep the metric meaningful.
+        try:
+            if (now_tz - tz_time).days > 30:
+                continue
+        except Exception:
+            continue
+        action = str(ev.get("action") or "")
+        if action == "dossier_dwell":
+            if int(ev.get("active_ms") or 0) < 5000:
+                continue
+        elif action not in {"dossier_dwell", "source_open", "dossier_open", "hide"}:
+            # Passive opens + explicit hide both prove the viewer was active that day.
+            continue
+        active_day_keys.add(tz_time.strftime("%Y-%m-%d"))
+    for rec in reaction_events.values():
+        if not isinstance(rec, dict):
+            continue
+        parsed = _parse_utc(rec.get("updated_at"))
+        if not parsed:
+            continue
+        tz_time = _to_tz(parsed)
+        try:
+            if (now_tz - tz_time).days > 30:
+                continue
+        except Exception:
+            continue
+        active_day_keys.add(tz_time.strftime("%Y-%m-%d"))
+    active_days_total = len(active_day_keys)
+    # Days active in the current calendar month (viewer tz) for the "this month" label.
+    month_prefix = now_tz.strftime("%Y-%m")
+    active_days_month = len([d for d in active_day_keys if d.startswith(month_prefix)])
     return {
         "news_read": {"today": today, "yesterday": yesterday, "trend_percent": trend, "trend_state": trend_state},
         "likes": {"this_week": this_week, "last_week": last_week, "trend_percent": like_trend, "trend_state": like_state},
         "following": {"total": 0},
+        "active_days": {"total_30d": active_days_total, "this_month": active_days_month, "timezone": tz_name},
         "timezone": tz_name,
     }
 

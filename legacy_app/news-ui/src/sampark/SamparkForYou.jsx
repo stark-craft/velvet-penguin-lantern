@@ -13,14 +13,16 @@ import {
   removeSavedArticle,
   saveArticleForLater,
   setViewerReaction,
+  updateViewerPreferences,
 } from '../news-scrapper/api.js';
 import { articleKey, reactionIdentity } from '../news-scrapper/utils/intelligence.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
 import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
 import useRecommendationEvents from '../news-scrapper/for-you/useRecommendationEvents.js';
+import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
 import SamparkTooltip from './shared/SamparkTooltip.jsx';
-import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
 import { hideOptimistic, hideRollback, findNeighbors } from './shared/hideHelper.js';
+import useAutoDismiss from './shared/useAutoDismiss.js';
 // per-article per-action optimistic with ref-based deduplication (no stale closure)
 import { readSamparkSettings } from './SamparkSettingsModal.jsx';
 
@@ -34,6 +36,39 @@ function metaLabels(status, preferences) {
     .slice(0, 5)
     .map((id) => options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' '));
   return labels.length ? labels : ['Balanced mix'];
+}
+
+// Real preference chips with stable group/id so the X control can persist a removal.
+function prefChipItems(status, preferences) {
+  const options = [...(status?.taxonomy?.topics || []), ...(status?.taxonomy?.outcomes || [])];
+  const topics = Array.isArray(preferences?.topics) ? preferences.topics : [];
+  const outcomes = Array.isArray(preferences?.outcomes) ? preferences.outcomes : [];
+  const items = [
+    ...topics.map((id) => ({ group: 'topics', id })),
+    ...outcomes.map((id) => ({ group: 'outcomes', id })),
+  ].slice(0, 5).map(({ group, id }) => ({
+    group,
+    id,
+    label: options.find((option) => option.id === id)?.label || String(id).replaceAll('_', ' '),
+  }));
+  if (items.length) return items;
+  return [{ group: '', id: '__balanced__', label: 'Balanced mix', locked: true }];
+}
+
+function categoryOf(item) {
+  return item?.category || item?.vertical || item?.topic || item?.src || item?.source || 'Intelligence';
+}
+
+function summaryOf(item) {
+  return item?.summary || item?.master_summary || item?.summary_lead || 'Open the dossier for the full summary.';
+}
+
+function sourceOf(item) {
+  return item?.src || item?.source || 'TechScout';
+}
+
+function timeOf(item) {
+  return item?.date || item?.published_at || item?.publishedAt || 'Latest';
 }
 
 // ========== 3-Step Preferences Wizard — Sampark-native, behavior matches original InterestSetup ==========
@@ -195,19 +230,6 @@ function SamparkPreferencesModal({ open, onClose, taxonomy, initial, onSaved }) 
   );
 }
 
-function ReactionButton({ item, reaction, onReact, disabled }) {
-  const state = item.reactions || {};
-  const active = state.viewer_reaction === reaction;
-  const count = Number(state[`${reaction}_count`] || 0);
-  const label = reaction === 'like' ? 'Like' : 'Dislike';
-  return (
-    <button aria-label={`${label} ${item.title}, ${count}`} className={`sampark-card-action${active ? ' is-active' : ''}`} disabled={disabled} onClick={() => onReact(item, reaction)} type="button">
-      <Icon name={reaction === 'like' ? 'thumbsUp' : 'thumbsDown'} size={14} />
-      <span>{count}</span>
-    </button>
-  );
-}
-
 // ========== Following — Sampark-native access within For You ==========
 function SamparkFollowingModal({ open, onClose, threads, loading, error, onRetry, onOpenArticle, onUnfollow, busy }) {
   const dialogRef = useModalFocus(open, onClose);
@@ -267,29 +289,139 @@ function SamparkFollowingModal({ open, onClose, threads, loading, error, onRetry
   );
 }
 
-// ========== Card — clean language, image never cropped (contain + letterbox) ==========
-function SamparkForYouCard({ item, large, saved, savedReady, busy, isPending, onOpen, onSave, onHide, onReact }) {
-  const image = imageOf(item);
-  const busyReaction = isPending ? isPending(item, 'reaction') : busy;
-  const busySave = isPending ? isPending(item, 'save') : busy;
-  const busyHide = isPending ? isPending(item, 'hide') : busy;
+// ========== Three-dot action menu — visual placement matches the reference, behavior uses existing APIs ==========
+function ForYouCardMenu({ item, saved, savedReady, isPending, onSave, onHide, onReact, dark }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const btnIdRef = useRef(`fy-menu-${Math.random().toString(36).slice(2, 9)}`);
+  const viewerReaction = item?.reactions?.viewer_reaction || 'neutral';
+  const likeCount = Number(item?.reactions?.like_count || 0);
+  const dislikeCount = Number(item?.reactions?.dislike_count || 0);
+  const busyReaction = isPending ? isPending(item, 'reaction') : false;
+  const busySave = isPending ? isPending(item, 'save') : false;
+  const busyHide = isPending ? isPending(item, 'hide') : false;
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (!wrapRef.current?.contains(e.target)) setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open ]);
+
+  const act = async (fn) => {
+    try { await fn(); } finally { setOpen(false); }
+  };
+
   return (
-    <article className={large ? 'sampark-news-card-large' : 'sampark-news-card'}>
-      <button aria-label={`Open dossier for ${item.title}`} className={large ? 'sampark-card-media' : 'sampark-card-media-sm'} onClick={() => onOpen(item)} type="button">
-        {image ? <img alt="" className="sampark-card-img" src={image} loading="lazy" /> : <span className="sampark-card-img-placeholder"><Icon name="globe" size={28} /></span>}
-        <span className="sampark-card-source-badge">{item.src || item.source || 'TechScout'}</span>
+    <span ref={wrapRef} className="fy-menu-wrap">
+      <SamparkTooltip label="Actions">
+      <button
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`Actions for ${item?.title || 'article'}`}
+        className={dark ? 'action-btn action-btn-light' : 'mfy-action-btn'}
+        data-btn-id={btnIdRef.current}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); setOpen((v) => !v); }}
+        type="button"
+      >
+        <Icon name="dots" size={16} />
       </button>
-      <div className="sampark-card-body">
+      </SamparkTooltip>
+      {open && (
+        <span className="cn-action-popup show" role="menu">
+          <button
+            className={`cn-action-item like-item${viewerReaction === 'like' ? ' liked' : ''}`}
+            disabled={busyReaction}
+            onClick={(e) => { e.stopPropagation(); act(() => onReact(item, 'like')); }}
+            role="menuitem"
+            type="button"
+          >
+            <Icon name="thumbsUp" size={14} />
+            <span>{viewerReaction === 'like' ? 'Liked' : 'Like'}</span>
+            <span className="cn-action-count" aria-label={`${likeCount} likes`}>{likeCount.toLocaleString()}</span>
+          </button>
+          <button
+            className={`cn-action-item dislike-item${viewerReaction === 'dislike' ? ' disliked' : ''}`}
+            disabled={busyReaction}
+            onClick={(e) => { e.stopPropagation(); act(() => onReact(item, 'dislike')); }}
+            role="menuitem"
+            type="button"
+          >
+            <Icon name="thumbsDown" size={14} />
+            <span>{viewerReaction === 'dislike' ? 'Disliked' : 'Dislike'}</span>
+            <span className="cn-action-count" aria-label={`${dislikeCount} dislikes`}>{dislikeCount.toLocaleString()}</span>
+          </button>
+          <button
+            className={`cn-action-item follow-item${saved ? ' following' : ''}`}
+            disabled={busySave || !savedReady}
+            onClick={(e) => { e.stopPropagation(); act(() => onSave(item)); }}
+            role="menuitem"
+            type="button"
+          >
+            <Icon name="bookmark" size={14} /> {saved ? 'Following' : 'Follow'}
+          </button>
+          <button
+            className="cn-action-item hide-item"
+            disabled={busyHide}
+            onClick={(e) => { e.stopPropagation(); act(() => onHide(item)); }}
+            role="menuitem"
+            type="button"
+          >
+            <Icon name="eye" size={14} /> Hide content
+          </button>
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ========== Selected For You — full-image overlay cards (lead + 2×2), no white body ==========
+function SamparkForYouCard({ item, large, saved, savedReady, isPending, onOpen, onSave, onHide, onReact }) {
+  const image = imageOf(item);
+  return (
+    <article className={large ? 'news-card-large fy-card-full fy-card-large' : 'news-card-small fy-card-full'}>
+      {image ? (
+        <img alt="" className="fy-card-img" loading="lazy" src={image} />
+      ) : (
+        <span className="fy-card-img-fallback" aria-hidden="true"><Icon name="globe" size={32} /></span>
+      )}
+      <div className="card-overlay-full">
+        <button className="fy-overlay-open" onClick={() => onOpen(item)} type="button" aria-label={`Open dossier for ${item.title}`}>
+          <h4>{item.title}</h4>
+        </button>
+        <p>{summaryOf(item)}</p>
+        <div className="card-overlay-footer">
+          <span className="card-source-text">Sources: {sourceOf(item)}</span>
+          <ForYouCardMenu dark item={item} saved={saved} savedReady={savedReady} isPending={isPending} onHide={onHide} onReact={onReact} onSave={onSave} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// ========== More For You — three-column editorial treatment with cropped top image ==========
+function SamparkMoreForYouCard({ item, saved, savedReady, isPending, onOpen, onSave, onHide, onReact }) {
+  const image = imageOf(item);
+  return (
+    <article className="research-card mfy-card">
+      <button className="mfy-card-image" onClick={() => onOpen(item)} type="button" aria-label={`Open dossier for ${item.title}`}>
+        {image ? <img alt="" loading="lazy" src={image} /> : <span className="mfy-card-img-fallback" aria-hidden="true"><Icon name="globe" size={28} /></span>}
+      </button>
+      <div className="research-card-body">
+        <span className="research-tag">{categoryOf(item)}</span>
         <button className="sampark-card-title-btn" onClick={() => onOpen(item)} type="button"><h4>{item.title}</h4></button>
-        <p className="sampark-card-summary">{item.summary || item.master_summary || 'Open the dossier for the full summary.'}</p>
-        <div className="sampark-card-footer">
-          <span className="sampark-card-meta"><Icon name="clock" size={12} /> {item.date || 'Latest'} · {item.category || 'Intelligence'}</span>
-          <div className="sampark-card-actions">
-            <SamparkTooltip label="Like"><span><ReactionButton disabled={busyReaction} item={item} onReact={onReact} reaction="like" /></span></SamparkTooltip>
-            <SamparkTooltip label="Dislike"><span><ReactionButton disabled={busyReaction} item={item} onReact={onReact} reaction="dislike" /></span></SamparkTooltip>
-            <SamparkTooltip label={saved ? 'Unfollow' : 'Follow'}><button aria-label={`${saved ? 'Stop following' : 'Follow'} ${item.title}`} className={`sampark-card-action${saved ? ' is-active' : ''}`} disabled={busySave || !savedReady} onClick={() => onSave(item)} type="button"><Icon name={saved ? 'check' : 'bookmark'} size={14} /></button></SamparkTooltip>
-            <SamparkTooltip label="Hide"><button aria-label={`Hide ${item.title}`} className="sampark-card-action" disabled={busyHide} onClick={() => onHide(item)} type="button"><Icon name="eye" size={14} /></button></SamparkTooltip>
-          </div>
+        <p className="mfy-summary">{summaryOf(item)}</p>
+        <div className="card-footer">
+          <span className="card-meta"><Icon name="clock" size={12} /> {timeOf(item)}</span>
+          <span className="card-source-text">{sourceOf(item)}</span>
+          <ForYouCardMenu item={item} saved={saved} savedReady={savedReady} isPending={isPending} onHide={onHide} onReact={onReact} onSave={onSave} />
         </div>
       </div>
     </article>
@@ -318,6 +450,8 @@ export default function SamparkForYou() {
   const [followingBusy, setFollowingBusy] = useState('');
   const actionLocks = useRef(new Set());
   const savedRequest = useRef(0);
+
+  useAutoDismiss(actionNotice, () => setActionNotice(null));
 
   const labels = useMemo(() => metaLabels(status, preferences), [status, preferences]);
   const { record, flush } = useRecommendationEvents(
@@ -675,6 +809,36 @@ export default function SamparkForYou() {
   };
   const newsTrendLabel = activity ? `${formatTrend(activity.news_read.today, activity.news_read.yesterday, activity.news_read.trend_percent, activity.news_read.trend_state)} vs yesterday` : '—';
   const likesTrendLabel = activity ? `${formatTrend(activity.likes.this_week, activity.likes.last_week, activity.likes.trend_percent, activity.likes.trend_state)} vs last week` : '—';
+  const newsTrendUp = (activity?.news_read?.trend_percent ?? 0) > 0;
+  const likesTrendUp = (activity?.likes?.trend_percent ?? 0) > 0;
+  const activeDaysMonth = activity?.active_days ? Number(activity.active_days.this_month ?? activity.active_days.total_30d ?? 0) : 0;
+  const activeDays30d = activity?.active_days ? Number(activity.active_days.total_30d ?? 0) : 0;
+  const chips = useMemo(() => prefChipItems(status, preferences), [status, preferences]);
+
+  const removePrefChip = async (chip) => {
+    if (!chip || chip.locked || !chip.group || !chip.id) return;
+    const prev = preferences || {};
+    const next = {
+      ...prev,
+      topics: Array.isArray(prev.topics) ? [...prev.topics] : [],
+      outcomes: Array.isArray(prev.outcomes) ? [...prev.outcomes] : [],
+      source_families: prev.source_families || [],
+      regions: prev.regions || ['balanced'],
+      surprise_me: prev.surprise_me !== false,
+    };
+    if (chip.group === 'topics') next.topics = next.topics.filter((id) => id !== chip.id);
+    else if (chip.group === 'outcomes') next.outcomes = next.outcomes.filter((id) => id !== chip.id);
+    else return;
+    setPreferences(next);
+    try {
+      await updateViewerPreferences(next);
+      setActionNotice({ message: 'Preference removed.' });
+      setLoadAttempt((c) => c + 1);
+    } catch (e) {
+      setPreferences(prev);
+      setActionNotice({ message: e?.message || 'Could not remove preference.' });
+    }
+  };
 
   if (loading) {
     return (
@@ -705,59 +869,68 @@ export default function SamparkForYou() {
       {actionNotice && <div className="sampark-for-you-feedback" role="status"><span>{actionNotice.message}</span><button aria-label="Dismiss" onClick={() => setActionNotice(null)} type="button"><Icon name="x" size={14} /></button></div>}
       {['error', 'stale-error'].includes(savedState.status) && <div className="sampark-for-you-feedback is-error" role="alert"><span>{savedState.error}</span> <button onClick={loadSavedState} type="button">Retry</button></div>}
 
-      <section className="sampark-preferences-bar">
+      {/* 1. Preferences bar — compact white row */}
+      <section className="sampark-preferences-bar" aria-label="Your preferences">
         <span className="sampark-pref-label">Your Preferences:</span>
         <div className="sampark-pref-tags">
-          {labels.map((label) => <span className="sampark-pref-tag" key={label}>{label}</span>)}
+          {chips.map((chip) => (
+            <span className="sampark-pref-tag" key={`${chip.group}:${chip.id}:${chip.label}`}>
+              {chip.label}
+              {!chip.locked && (
+                <button aria-label={`Remove ${chip.label}`} className="remove-tag" onClick={() => removePrefChip(chip)} type="button">
+                  <Icon name="x" size={12} />
+                </button>
+              )}
+            </span>
+          ))}
         </div>
-        <button className="sampark-view-prefs-link" onClick={() => setPrefsOpen(true)} type="button">Edit Preferences</button>
+        <button className="sampark-view-prefs-link view-prefs-link" onClick={() => setPrefsOpen(true)} type="button">View Preferences</button>
       </section>
 
-      <section className="sampark-activity-section" aria-labelledby="sampark-activity-title">
-        <div className="sampark-activity-head">
-          <h3 className="sampark-section-title" id="sampark-activity-title">Your Activities</h3>
-          {savedKeys.size > 0 && (
-            <button className="sampark-following-pill" onClick={openFollowing} type="button"><Icon name="bookmark" size={14} /> Following · {savedKeys.size} <Icon name="chevR" size={12} /></button>
-          )}
-        </div>
-        <div className="sampark-metrics-grid">
-          <div className="sampark-metric-card">
-            <span className="sampark-metric-icon blue"><Icon name="eye" size={18} /></span>
-            <div className="sampark-metric-info">
-              <div className="sampark-metric-value">{activity ? activity.news_read.today : 0}</div>
-              <div className="sampark-metric-label">News read</div>
-              <div className="sampark-metric-sub">TODAY · {activity ? newsTrendLabel : '—'}</div>
-            </div>
+      {/* 2. Activity metrics — one unified four-column panel */}
+      <section className="sampark-activity-section activity-section" aria-labelledby="sampark-activity-title">
+        <div className="sampark-metrics-grid metrics-grid">
+          <div className="sampark-metric-card metric-card">
+            <span className="sampark-metric-icon metric-icon blue"><Icon name="eye" size={18} /></span>
+            <span className="sampark-metric-text">
+              <span className="sampark-metric-label metric-label">News read</span>
+              <span className="sampark-metric-value metric-value">{activity ? activity.news_read.today : 0}</span>
+            </span>
+            <span className={`sampark-metric-trend metric-trend${newsTrendUp ? ' up' : ''}`}>{activity ? newsTrendLabel : '—'}</span>
           </div>
-          <div className="sampark-metric-card">
-            <span className="sampark-metric-icon green"><Icon name="thumbsUp" size={18} /></span>
-            <div className="sampark-metric-info">
-              <div className="sampark-metric-value">{activity ? activity.likes.this_week : 0}</div>
-              <div className="sampark-metric-label">Likes</div>
-              <div className="sampark-metric-sub">THIS WEEK · {activity ? likesTrendLabel : '—'}</div>
-            </div>
+          <div className="sampark-metric-card metric-card">
+            <span className="sampark-metric-icon metric-icon green"><Icon name="thumbsUp" size={18} /></span>
+            <span className="sampark-metric-text">
+              <span className="sampark-metric-label metric-label">Likes</span>
+              <span className="sampark-metric-value metric-value">{activity ? activity.likes.this_week : 0}</span>
+            </span>
+            <span className={`sampark-metric-trend metric-trend${likesTrendUp ? ' up' : ''}`}>{activity ? likesTrendLabel : '—'}</span>
           </div>
-          <button className="sampark-metric-card is-interactive" onClick={openFollowing} type="button">
-            <span className="sampark-metric-icon purple"><Icon name="bookmark" size={18} /></span>
-            <div className="sampark-metric-info">
-              <div className="sampark-metric-value">{activity ? activity.following.total : savedKeys.size}</div>
-              <div className="sampark-metric-label">Following</div>
-              <div className="sampark-metric-sub">TOTAL</div>
-            </div>
-            <Icon name="chevR" size={14} />
+          <button className="sampark-metric-card metric-card is-interactive" onClick={openFollowing} type="button" aria-label={`Open following, ${activity ? activity.following.total : savedKeys.size} stories`}>
+            <span className="sampark-metric-icon metric-icon purple"><Icon name="bookmark" size={18} /></span>
+            <span className="sampark-metric-text">
+              <span className="sampark-metric-label metric-label">Follows</span>
+              <span className="sampark-metric-value metric-value">{activity ? activity.following.total : savedKeys.size}</span>
+            </span>
+            <span className="sampark-metric-trend metric-trend">Total</span>
           </button>
+          <div className="sampark-metric-card metric-card">
+            <span className="sampark-metric-icon metric-icon blue"><Icon name="calendar" size={18} /></span>
+            <span className="sampark-metric-text">
+              <span className="sampark-metric-label metric-label">Active Days</span>
+              <span className="sampark-metric-value metric-value">{activeDaysMonth}</span>
+            </span>
+            <span className="sampark-metric-trend metric-trend">{activeDays30d} in 30d</span>
+          </div>
         </div>
       </section>
 
-      <section className="sampark-news-for-you" aria-labelledby="sampark-selected-title">
-        <div className="sampark-section-head">
-          <h3 className="sampark-section-title" id="sampark-selected-title">News Selected For You</h3>
-          <button className="sampark-following-inline" onClick={openFollowing} type="button"><Icon name="bookmark" size={14} /> Following ({savedKeys.size})</button>
-        </div>
+      {/* 3. News Selected For You — one lead + four overlay cards */}
+      <section className="sampark-news-for-you news-for-you" aria-labelledby="sampark-selected-title">
+        <h3 className="sampark-section-title section-title" id="sampark-selected-title">News Selected For You</h3>
         {featured.length ? (
           <>
-            {/* ONE composition: 1 large + 2×2 beside it — five together, no vertical scroll */}
-            <div className="sampark-foryou-grid">
+            <div className="sampark-foryou-grid foryou-grid">
               <SamparkForYouCard
                 isPending={isPending}
                 item={featured[0]}
@@ -769,7 +942,7 @@ export default function SamparkForYou() {
                 saved={savedKeys.has(articleKey(featured[0]))}
                 savedReady={savedState.status === 'ready'}
               />
-              <div className="sampark-news-card-small-grid">
+              <div className="sampark-news-card-small-grid news-card-small-grid">
                 {featured.slice(1).map((item) => (
                   <SamparkForYouCard
                     isPending={isPending}
@@ -786,12 +959,13 @@ export default function SamparkForYou() {
               </div>
             </div>
 
+            {/* 4. More For You — three-column editorial treatment */}
             {remaining.length ? (
-              <div className="sampark-for-you-remaining">
-                <h4 className="sampark-remaining-title">More for you · {remaining.length} of {feed?.total ?? items.length}{feed?.cursor ? '+' : ''}</h4>
-                <div className="sampark-for-you-more-grid">
+              <div className="sampark-for-you-remaining more-for-you">
+                <h3 className="sampark-section-title section-title">More For You</h3>
+                <div className="sampark-for-you-more-grid more-foryou-grid">
                   {remaining.map((item) => (
-                    <SamparkForYouCard
+                    <SamparkMoreForYouCard
                       isPending={isPending}
                       item={item}
                       key={articleKey(item)}
@@ -839,19 +1013,16 @@ export default function SamparkForYou() {
         open={followingOpen}
         threads={followingThreads}
       />
-      <SamparkArticleDossier
+      <ArticleModal
         item={openArticle}
+        variant="for-you"
         onClose={closeDossier}
         onHide={async (item) => { closeDossier(); await hide(item); }}
-        onReact={react}
-        onSave={toggleSave}
+        onVote={react}
+        onSave={savedState.status === 'ready' ? toggleSave : undefined}
         onSourceOpen={handleSourceOpen}
-        onWhyOpen={handleWhyOpen}
-        trailingMeta={openArticle && openArticle.mins_read ? `${openArticle.mins_read} min read` : ''}
-        saved={openArticle ? savedKeys.has(articleKey(openArticle)) : false}
-        savedHydrated={savedState.status === 'ready'}
-        reactionsHydrated
-        titleId="sampark-dossier-title"
+        onWhyThisStory={handleWhyOpen}
+        isSaved={openArticle ? savedKeys.has(articleKey(openArticle)) : false}
       />
     </div>
   );

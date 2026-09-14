@@ -21,6 +21,7 @@ import {
   validateCoverFile,
 } from '../news-scrapper/internal/contributionModel.js';
 import { EDITABLE_STATUS_SET as EDITABLE_STATUSES, coverReady, isEditableStatus, validateCreateSubmit } from './createModel.js';
+import useAutoDismiss from './shared/useAutoDismiss.js';
 
 const TEMPLATES = [
   { id: 'story', label: 'Story', icon: 'note', desc: 'Write a colleague story for Samsung Internal. One cover, full body.', hint: 'Best for technology or culture stories.' },
@@ -73,6 +74,8 @@ export default function SamparkCreate({ onDirtyChange, initialAccess = null, ini
   const [confirmDeleteId, setConfirmDeleteId] = useState('');
   const [actingId, setActingId] = useState('');
   const [visibleContributions, setVisibleContributions] = useState(10);
+
+  useAutoDismiss(notice || problem, () => { setNotice(''); setProblem(''); });
 
   const openRecord = (rec) => {
     const tpl = rec.contentType === 'leadership' ? 'leadership' : rec.contentType === 'announcement' ? 'announcement' : 'story';

@@ -77,6 +77,62 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
   );
 }
 
+function ForYouActions({ item, onHide, onVote, onSave, isSaved }) {
+  const reactions = item?.reactions || {};
+  const current = reactions.viewer_reaction || 'neutral';
+  const likes = Number(reactions.like_count || 0);
+  const dislikes = Number(reactions.dislike_count || 0);
+  const choose = (reaction) => onVote?.(item, current === reaction ? 'neutral' : reaction);
+
+  return (
+    <section className="dossier-section dossier-for-you-actions">
+      <div className="dossier-for-you-actions-head">
+        <h4>Your actions</h4>
+        <span>Personalize your news</span>
+      </div>
+      <div className="dossier-for-you-action-row">
+        <button
+          aria-pressed={current === 'like'}
+          className={`dossier-inline-action is-like${current === 'like' ? ' is-active' : ''}`}
+          onClick={() => choose('like')}
+          type="button"
+        >
+          <Icon name="thumbsUp" size={16} />
+          <span>Like</span>
+          <strong>{likes}</strong>
+        </button>
+        <button
+          aria-pressed={current === 'dislike'}
+          className={`dossier-inline-action is-dislike${current === 'dislike' ? ' is-active' : ''}`}
+          onClick={() => choose('dislike')}
+          type="button"
+        >
+          <Icon name="thumbsDown" size={16} />
+          <span>Dislike</span>
+          <strong>{dislikes}</strong>
+        </button>
+        {onSave && (
+          <button
+            aria-pressed={isSaved}
+            className={`dossier-inline-action is-follow${isSaved ? ' is-active' : ''}`}
+            onClick={() => onSave(item)}
+            type="button"
+          >
+            <Icon name={isSaved ? 'check' : 'bookmark'} size={16} />
+            <span>{isSaved ? 'Following' : 'Follow'}</span>
+          </button>
+        )}
+        {onHide && (
+          <button className="dossier-inline-action is-hide" onClick={() => onHide(item)} type="button">
+            <Icon name="eye" size={16} />
+            <span>Hide</span>
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function RegionCorrection({ item, onCorrectRegion }) {
   const currentRegion = item.region || 'Global';
   const alternateRegion = currentRegion === 'Local' ? 'Global' : 'Local';
@@ -193,11 +249,20 @@ export default function ArticleModal({
   isSaved = false,
   onSourceOpen,
   onWhyThisStory,
+  variant = 'default',
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+  const [reasonsExpanded, setReasonsExpanded] = useState(false);
   const [whyMatters, setWhyMatters] = useState('');
   const [insightLoading, setInsightLoading] = useState(false);
   const dialogRef = useModalFocus(Boolean(item), onClose);
+
+  useEffect(() => {
+    setExpanded(false);
+    setSourcesExpanded(false);
+    setReasonsExpanded(false);
+  }, [item?.id, item?.url, item?.title]);
 
   useEffect(() => {
     let cancelled = false;
@@ -257,13 +322,16 @@ export default function ArticleModal({
   const summaryPoints = Array.isArray(item.summary_points)
     ? item.summary_points.filter(Boolean)
     : [];
+  const isForYou = variant === 'for-you';
+  const isAllBriefings = variant === 'all-briefings';
+  const isStreamlined = isForYou || isAllBriefings;
 
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div
         aria-labelledby="intelligence-dossier-title"
         aria-modal="true"
-        className="modal dossier"
+        className={`modal dossier${isStreamlined ? ' dossier--for-you' : ''}`}
         onClick={(e) => e.stopPropagation()}
         ref={dialogRef}
         role="dialog"
@@ -271,10 +339,12 @@ export default function ArticleModal({
       >
         <div className="head dossier-head">
           <div>
-            <h3 id="intelligence-dossier-title">Intelligence Dossier</h3>
-            <div className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              {score >= 80 ? 'High Signal' : 'Signal'} · {item.source_count || sources.length || 1} sources · {item.date || 'Latest'}
-            </div>
+            <h3 id="intelligence-dossier-title">{isStreamlined ? 'Article Details' : 'Intelligence Dossier'}</h3>
+            {!isStreamlined && (
+              <div className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                {score >= 80 ? 'High Signal' : 'Signal'} · {item.source_count || sources.length || 1} sources · {item.date || 'Latest'}
+              </div>
+            )}
           </div>
           <button aria-label="Close dossier" className="x" onClick={onClose} type="button"><Icon name="x" /></button>
         </div>
@@ -285,7 +355,7 @@ export default function ArticleModal({
             <div className="mt-6 flex flex-wrap gap-2">
               <span className="signal-chip">{item.category || 'News'}</span>
               <span className="signal-chip">{item.region || 'Global'}</span>
-              <span className="signal-chip">Score {score}</span>
+              {!isStreamlined && <span className="signal-chip">Score {score}</span>}
               <span className="signal-chip">{item.source_count || sources.length || 1} sources</span>
             </div>
             <h2 className="dossier-title mt-5 text-3xl font-semibold leading-tight text-white sm:text-4xl">{item.title}</h2>
@@ -293,7 +363,7 @@ export default function ArticleModal({
               {[item.date, item.time, item.src].filter(Boolean).join(' · ')}
             </div>
 
-            {(item.what_changed || item.attention_hook || item.why_now) && (
+            {!isStreamlined && (item.what_changed || item.attention_hook || item.why_now) && (
               <section className="dossier-section dossier-attention mt-7">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-200">AI Context · What Changed</h4>
@@ -305,7 +375,7 @@ export default function ArticleModal({
               </section>
             )}
 
-            {item.recommendation?.reasons?.length > 0 && (
+            {!isStreamlined && item.recommendation?.reasons?.length > 0 && (
               <section className="dossier-section mt-7">
                 <button className="btn-dark-secondary" onClick={() => onWhyThisStory?.(item)} type="button">Why you’re seeing this</button>
                 <ul className="mt-4 space-y-2 text-sm text-slate-300">
@@ -348,17 +418,33 @@ export default function ArticleModal({
               <p className="mt-3 text-base leading-8 text-slate-300">
                 {insightLoading
                   ? 'Generating strategic implication...'
-                  : whyMatters || `This signal is ranked at ${score}/100 from ${item.source_count || sources.length || 1} source${(item.source_count || sources.length || 1) === 1 ? '' : 's'}, with category and regional context for briefing review.`}
+                  : whyMatters || (isStreamlined
+                    ? (isForYou
+                      ? 'This article was selected for its relevance to your interests and recent activity.'
+                      : 'This article highlights developments that may affect the wider technology landscape.')
+                    : `This signal is ranked at ${score}/100 from ${item.source_count || sources.length || 1} source${(item.source_count || sources.length || 1) === 1 ? '' : 's'}, with category and regional context for briefing review.`)}
               </p>
             </section>
 
-            <section className="dossier-section dossier-sources mt-8">
-              <div className="flex items-center justify-between gap-4">
-                <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Source Coverage</h4>
-                <span className="text-sm text-slate-500">Clustered from {item.source_count || sources.length || 1} sources</span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {visibleSources.length ? visibleSources.map((source, idx) => {
+            <section className={`dossier-section dossier-sources mt-8${isStreamlined ? ' is-collapsible' : ''}`}>
+              {isStreamlined ? (
+                <button
+                  aria-expanded={sourcesExpanded}
+                  className="dossier-sources-toggle"
+                  onClick={() => setSourcesExpanded((value) => !value)}
+                  type="button"
+                >
+                  <strong>Source Coverage</strong>
+                  <Icon name={sourcesExpanded ? 'up' : 'down'} size={18} />
+                </button>
+              ) : (
+                <div className="flex items-center justify-between gap-4">
+                  <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Source Coverage</h4>
+                  <span className="text-sm text-slate-500">Clustered from {item.source_count || sources.length || 1} sources</span>
+                </div>
+              )}
+              {(!isStreamlined || sourcesExpanded) && <div className="mt-4 space-y-3 dossier-source-list">
+                {(isStreamlined ? sources : visibleSources).length ? (isStreamlined ? sources : visibleSources).map((source, idx) => {
                   const name = source.name || source.source || item.src || `Source ${idx + 1}`;
                   const url = source.url || source.link || item.url;
                   return (
@@ -376,16 +462,47 @@ export default function ArticleModal({
                 }) : (
                   <div className="source-coverage-card rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm text-slate-400">No source metadata available.</div>
                 )}
-              </div>
-              {sources.length > 5 && (
+              </div>}
+              {!isStreamlined && sources.length > 5 && (
                 <button className="mt-4 btn-dark-secondary" onClick={() => setExpanded((v) => !v)} type="button">
                   {expanded ? 'Show first 5 sources' : `View all ${sources.length} sources`}
                 </button>
               )}
             </section>
+
+            {isStreamlined && (
+              <>
+                <ForYouActions item={item} onHide={onHide} onVote={onVote} onSave={onSave} isSaved={isSaved} />
+                {isForYou && item.recommendation?.reasons?.length > 0 && (
+                  <section className="dossier-section dossier-why-seen">
+                    <button
+                      aria-expanded={reasonsExpanded}
+                      className="dossier-why-seen-toggle"
+                      onClick={() => {
+                        setReasonsExpanded((value) => {
+                          if (!value) onWhyThisStory?.(item);
+                          return !value;
+                        });
+                      }}
+                      type="button"
+                    >
+                      <span>Why you’re seeing this</span>
+                      <Icon name={reasonsExpanded ? 'up' : 'down'} size={17} />
+                    </button>
+                    {reasonsExpanded && (
+                      <ul className="dossier-why-seen-list">
+                        {item.recommendation.reasons.map((reason, index) => (
+                          <li key={`${reason}-${index}`}><span>{index + 1}</span><p>{reason}</p></li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
+                )}
+              </>
+            )}
           </div>
 
-          <aside className="dossier-rail overflow-y-auto border-t border-white/10 bg-[#0b1220]/80 p-5 lg:border-l lg:border-t-0">
+          {!isStreamlined && <aside className="dossier-rail overflow-y-auto border-t border-white/10 bg-[#0b1220]/80 p-5 lg:border-l lg:border-t-0">
             <div className="sticky top-4 space-y-4">
               <div className="dossier-strength rounded-2xl border border-sky-300/15 bg-sky-400/[0.06] p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-200">Signal Strength</div>
@@ -421,7 +538,7 @@ export default function ArticleModal({
                 isSaved={isSaved}
               />
             </div>
-          </aside>
+          </aside>}
         </div>
       </div>
     </div>,

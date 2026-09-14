@@ -106,13 +106,40 @@ export function resolveImage(item) {
 
 export function resolveSources(item) {
   const sources = Array.isArray(item?.sources) ? item.sources : item?.source_list || [];
-  return sources.map((s) => {
-    if (typeof s === 'string') return { name: s, url: '' };
-    if (s && typeof s === 'object') {
-      return { name: safeName(s) || String(s.name || s.title || ''), url: sanitizeExternalUrl(s.link || s.url || '') };
+  // Normalize and deduplicate by URL: two rows sharing one URL collapse into
+  // a single row keeping the most useful nonempty label. Different URLs never
+  // merge merely because labels match. Unsafe URLs validate to '' but keep a
+  // valid label as text-only.
+  const byUrl = new Map();
+  const unlabeled = [];
+  const unlabeledSeen = new Set();
+  for (const s of sources) {
+    if (typeof s === 'string') {
+      const name = s.trim();
+      const folded = name.toLowerCase();
+      if (name && !unlabeledSeen.has(folded)) {
+        unlabeledSeen.add(folded);
+        unlabeled.push({ name, url: '' });
+      }
+      continue;
     }
-    return { name: '', url: '' };
-  }).filter((s) => s.name || s.url);
+    if (s && typeof s === 'object') {
+      const name = safeName(s) || String(s.name || s.title || '').trim();
+      const url = sanitizeExternalUrl(s.link || s.url || '');
+      if (!name && !url) continue;
+      if (!url) {
+        unlabeled.push({ name, url: '' });
+        continue;
+      }
+      const key = normalizeUrlKey(url);
+      const prev = byUrl.get(key);
+      if (!prev || (!prev.name && name) || (name && name.length > prev.name.length)) {
+        byUrl.set(key, { name: name || prev?.name || '', url });
+      }
+      continue;
+    }
+  }
+  return [...byUrl.values(), ...unlabeled];
 }
 
 function labelOf(value) {
@@ -129,9 +156,51 @@ function normalizedWords(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-function pointsOf(value) {
-  if (!Array.isArray(value)) return [];
-  return value.map(labelOf).map((s) => s.trim()).filter(Boolean);
+// True when every substantial part of the candidate is already displayed.
+// Short fragments (< 25 chars) only count when the whole candidate is covered,
+// so no legitimate continuation is ever removed. Sentence boundaries are
+// detected on the RAW candidate: normalizedWords strips periods, so splitting
+// must happen before normalization.
+export function textCoveredBy(shownNorms, candidate) {
+  const shown = (shownNorms || []).filter(Boolean).join(' ');
+  const raw = safeText(candidate);
+  if (!raw) return true;
+  const n = normalizedWords(raw);
+  if (!n) return true;
+  if (!shown) return false;
+  if (shown.includes(n)) return true;
+  const parts = splitRawSentences(raw).map(normalizedWords).filter((p) => p.length > 24);
+  if (!parts.length) return false;
+  return parts.every((p) => shown.includes(p));
+}
+
+function splitRawSentences(text) {
+  return String(text || '')
+    .split(/(?<=[.!?\n])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Remove only a confirmed repeated leading run: drop consecutive leading
+// sentences already rendered, keep every distinct continuation — including a
+// matching sentence that reappears later in the article. Original wording and
+// punctuation of the kept suffix are preserved.
+export function stripRepeatedLeading(shownNorms, rawText) {
+  const text = safeText(rawText);
+  if (!text) return '';
+  const shown = (shownNorms || []).filter(Boolean);
+  if (!shown.length) return text;
+  const sentences = splitRawSentences(text);
+  if (!sentences.length) return text;
+  let drop = 0;
+  for (const sentence of sentences) {
+    if (textCoveredBy(shown, sentence)) drop += 1;
+    else break;
+  }
+  if (drop >= sentences.length) return '';
+  if (drop === 0) return text;
+  const idx = text.indexOf(sentences[drop]);
+  return (idx >= 0 ? text.slice(idx) : sentences.slice(drop).join(' ')).trim();
 }
 
 // True when the master summary only reconstructs text already displayed as
@@ -139,33 +208,90 @@ function pointsOf(value) {
 // Genuinely distinct summaries are preserved.
 export function masterSummaryRepeatsDisplayed({ summaryLead, summary, summaryPoints, keyPoints, masterSummary }) {
   const shown = [summaryLead, summary, ...(summaryPoints || []), ...(keyPoints || [])]
-    .filter(Boolean).map(normalizedWords).join(' ');
-  const master = normalizedWords(masterSummary);
-  if (!master) return true;
-  if (!shown) return false;
-  if (shown.includes(master) || master.includes(shown)) return true;
-  const parts = master.split('.').map((s) => s.trim()).filter((s) => s.length > 24);
-  if (!parts.length) return shown.includes(master);
-  return parts.every((p) => shown.includes(p));
+    .filter(Boolean).map(normalizedWords);
+  return textCoveredBy(shown, masterSummary);
 }
 
-// One resolved view per article: every available field, nothing invented.
+function splitLeadingSentences(text) {
+  return String(text || '')
+    .split(/(?<=[.!?\n])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Remove only a confirmed repeated prefix from the full body: drop leading
+// sentences/paragraphs already displayed, keep every later paragraph — even
+// one matching an earlier sentence. Returns '' only if nothing unique remains.
+export function stripRepeatedBodyPrefix(shownTexts, body) {
+  const raw = safeText(body);
+  if (!raw) return '';
+  const shown = (shownTexts || []).filter(Boolean).map(normalizedWords).filter(Boolean);
+  if (!shown.length) return raw;
+  const sentences = splitLeadingSentences(raw);
+  if (!sentences.length) return raw;
+  let drop = 0;
+  for (const sentence of sentences) {
+    const n = normalizedWords(sentence);
+    if (n && textCoveredBy(shown, sentence)) drop += 1;
+    else break;
+  }
+  if (drop >= sentences.length) return '';
+  if (drop === 0) return raw;
+  // Rejoin from the original text at the first kept sentence.
+  const idx = raw.indexOf(sentences[drop]);
+  return (idx >= 0 ? raw.slice(idx) : sentences.slice(drop).join(' ')).trim();
+}
+
+export function normalizeUrlKey(url) {
+  const clean = String(url || '').trim().toLowerCase();
+  if (!clean) return '';
+  return clean.replace(/\/+$/, '');
+}
+
+function pointsOf(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(labelOf).map((s) => s.trim()).filter(Boolean);
+}
+
+// One resolved view per article: every distinct backend text is rendered
+// exactly once, absent fields stay absent, nothing is invented.
 export function resolveDossierView(item) {
-  const summaryLead = safeText(item?.summary_lead);
-  const summary = safeText(item?.summary);
-  const masterSummary = safeText(item?.master_summary);
-  const snippet = safeText(item?.snippet);
-  const summaryPoints = pointsOf(item?.summary_points);
-  const keyPoints = pointsOf(item?.key_points);
-  const pointsEqual = summaryPoints.length === keyPoints.length
-    && summaryPoints.length > 0
-    && summaryPoints.every((v, i) => v === keyPoints[i]);
-  const fullBody = safeText(item?.full_contents || item?.full_content || item?.body);
-  const shownTexts = [summaryLead, summary, masterSummary].filter(Boolean);
-  const masterDistinct = masterSummary
-    && masterSummary !== summary
-    && masterSummary !== summaryLead
-    && !masterSummaryRepeatsDisplayed({ summaryLead, summary, summaryPoints, keyPoints, masterSummary });
+  // Ordered emission: a block renders only when it adds text not already
+  // displayed. A lead never erases a distinct summary, and equality with a
+  // hidden field can never suppress the only visible copy.
+  const shownNorms = [];
+  // Ordered emission with prefix trimming: a block renders its distinct
+  // continuation even when it opens with already-displayed text. Fields that
+  // stay hidden never enter coverage, so equality with a hidden field can
+  // never suppress the only visible copy.
+  const takeText = (value) => {
+    const raw = stripRepeatedLeading(shownNorms, value);
+    if (!raw) return '';
+    shownNorms.push(normalizedWords(raw));
+    return raw;
+  };
+  const takeList = (value) => {
+    if (!Array.isArray(value)) return [];
+    const out = [];
+    for (const entry of value) {
+      const raw = stripRepeatedLeading(shownNorms, labelOf(entry).trim());
+      if (!raw) continue;
+      shownNorms.push(normalizedWords(raw));
+      out.push(raw);
+    }
+    return out;
+  };
+  const summaryLead = takeText(item?.summary_lead);
+  const summaryPoints = takeList(item?.summary_points);
+  const keyPoints = takeList(item?.key_points);
+  const summary = takeText(item?.summary);
+  const masterSummary = takeText(item?.master_summary);
+  const snippet = takeText(item?.snippet);
+  const fullBodyRaw = safeText(item?.full_contents || item?.full_content || item?.body);
+  // Strip only a confirmed repeated prefix; identical bodies collapse to ''.
+  const fullBody = fullBodyRaw && !textCoveredBy(shownNorms, fullBodyRaw)
+    ? stripRepeatedBodyPrefix(shownNorms, fullBodyRaw)
+    : '';
   const score = resolveScore(item);
   const region = resolveRegion(item);
   const learnedRegion = resolveLearnedRegion(item);
@@ -178,11 +304,16 @@ export function resolveDossierView(item) {
     ? sourceList.map((s) => s.name).filter(Boolean).join(', ')
     : fallbackSource;
   const externalLink = sanitizeExternalUrl(item?.link);
-  const externalLinkAlt = sanitizeExternalUrl(item?.url);
+  const externalLinkRawAlt = sanitizeExternalUrl(item?.url);
+  // Identical primary/alternate URLs (modulo case and trailing slash) collapse.
+  const externalLinkAlt = externalLinkRawAlt
+    && normalizeUrlKey(externalLinkRawAlt) !== normalizeUrlKey(externalLink)
+    ? externalLinkRawAlt
+    : '';
   // Avoid a duplicate source action when the source list already links the
-  // same URL shown as the primary external link.
-  const listedUrls = new Set([externalLink, externalLinkAlt].filter(Boolean));
-  const dedupedSources = sourceList.filter((s) => !s.url || !listedUrls.has(s.url));
+  // same URL shown as the primary external link (normalized comparison).
+  const listedUrls = new Set([externalLink, externalLinkAlt].filter(Boolean).map(normalizeUrlKey));
+  const dedupedSources = sourceList.filter((s) => !s.url || !listedUrls.has(normalizeUrlKey(s.url)));
   return {
     title: safeText(item?.title) || 'Untitled',
     image: resolveImage(item),
@@ -197,17 +328,17 @@ export function resolveDossierView(item) {
     dateLine: date,
     summaryLead,
     summaryPoints,
-    keyPoints: pointsEqual ? [] : keyPoints,
-    summary: summary && !summaryLead && !summaryPoints.length ? summary : '',
+    keyPoints,
+    summary,
     summarizedBy: safeText(item?.summarized_by),
-    masterSummary: masterDistinct ? masterSummary : '',
-    snippet: !summaryLead && !summary && !masterSummary && snippet ? snippet : '',
+    masterSummary,
+    snippet,
     attentionHook: safeText(item?.attention_hook),
     whatChanged: safeText(item?.what_changed),
     whyNow: safeText(item?.why_now),
     whyMatters: safeText(item?.why_matters || item?.why_it_matters),
     watchNext: safeText(item?.watch_next),
-    fullBody: fullBody && !shownTexts.includes(fullBody) ? fullBody : '',
+    fullBody,
     keywords: resolveKeywords(item),
     entities: resolveEntities(item),
     correction: item?.region && typeof item.region === 'object' ? safeText(item.region.correct) : '',

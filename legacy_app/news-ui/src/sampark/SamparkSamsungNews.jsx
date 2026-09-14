@@ -18,7 +18,7 @@ import {
   resolveInternalImage,
   splitByScope,
 } from '../news-scrapper/internal/samsungInternalModel.js';
-import SamparkArticleDossier from './shared/SamparkArticleDossier.jsx';
+import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
 
 function imageOf(item) {
@@ -32,11 +32,10 @@ function SamparkSamsungDossier({ item, onClose }) {
   React.useEffect(()=>{ if(item && articleId) engagement.onDossierOpen(item); }, [articleId]);
   if (!item) return null;
   return (
-    <SamparkArticleDossier
+    <ArticleModal
       item={item}
       onClose={handleClose}
       onSourceOpen={() => engagement.onSourceOpen()}
-      titleId="sampark-samsung-dossier-title"
     />
   );
 }
@@ -224,6 +223,9 @@ export default function SamparkSamsungNews() {
         <LeadershipCard record={leadership} onOpen={()=> setOpenArticle(leadershipSignal)} />
       )}
 
+      {selected.length === 0 ? (
+        <div className="sampark-empty sampark-samsung-empty-channel" role="status"><Icon name="inbox" size={20} /><p>No regular stories in this channel right now. New coverage arrives with the next briefing run.</p></div>
+      ) : (
       <div className="sampark-samsung-hero">
         <section className="sampark-samsung-featured" aria-label="Featured Samsung News">
           {selected[0] ? (
@@ -249,17 +251,18 @@ export default function SamparkSamsungNews() {
           </div>
         </aside>
       </div>
+      )}
 
+      {selected.length > 0 && (
       <section className="sampark-samsung-latest" aria-labelledby="sampark-samsung-latest-title">
         <header><h3 id="sampark-samsung-latest-title">{tab==='internal' ? 'SRI-D News' : tab==='local' ? 'Local Samsung News' : 'Global Samsung News'} <span className="sampark-samsung-count">({selected.length} News)</span></h3><span className="sampark-samsung-hint">Tap a card to open the dossier</span></header>
-        {selected.length ? (
-          <div className="sampark-samsung-latest-scroll">
-            {selected.map((it)=>(
-              <SamparkSamsungTile key={it.title + (it.date||'') + (it._publishedId||'')} item={it} onOpen={(item)=> setOpenArticle(item)} />
-            ))}
-          </div>
-        ) : <div className="sampark-empty"><Icon name="inbox" size={20} /><p>Nothing in {tab} yet. The next unified archive run may bring fresh Samsung coverage.</p></div>}
+        <div className="sampark-samsung-latest-scroll">
+          {selected.map((it)=>(
+            <SamparkSamsungTile key={it.title + (it.date||'') + (it._publishedId||'')} item={it} onOpen={(item)=> setOpenArticle(item)} />
+          ))}
+        </div>
       </section>
+      )}
 
       {tab==='internal' && announcementSignals.length > 0 && (
         <section className="sampark-samsung-latest" aria-labelledby="sampark-samsung-announcements-title">

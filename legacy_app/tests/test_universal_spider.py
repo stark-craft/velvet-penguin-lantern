@@ -265,6 +265,81 @@ class UniversalSpiderTests(unittest.TestCase):
         })
         self.assertEqual(list(spider.parse_article_page(response)), [])
 
+    def test_body_extraction_excludes_promo_chrome_but_keeps_article_paragraphs(self):
+        spider = NewsSpider(keyword="OLED")
+        paras = " ".join(
+            ["The new OLED panel improves brightness and power efficiency for flagship phones."] * 12
+        )
+        html = f"""<html><body><article>
+        <h1>OLED panel breakthrough</h1>
+        <p>{paras}</p>
+        <div class="newsletter-signup-box"><p>Make Telecom Talk My Trusted Source. Subscribe to our newsletter for daily telecom updates.</p></div>
+        <div class="highlights-wrap"><p>Key Highlights</p></div>
+        <aside class="related-stories"><p>Also read: other stories you may like.</p></aside>
+        <p>{"More reporting on supply chain moves and production timelines across Asia." * 6}</p>
+        </article></body></html>"""
+        response = make_response(HtmlResponse, "https://example.com/news/oled", html, {"site_name": "Example"})
+        text = spider.extract_clean_body_text(response)
+        self.assertIn("brightness and power efficiency", text)
+        self.assertIn("supply chain moves", text)
+        self.assertNotIn("Trusted Source", text)
+        self.assertNotIn("newsletter", text.casefold())
+        self.assertNotIn("Also read", text)
+
+    def test_boilerplate_standalone_ctas_are_removed(self):
+        spider = NewsSpider(keyword="OLED")
+        self.assertEqual(
+            spider.strip_boilerplate_sentences("Subscribe to our newsletter for daily telecom updates."),
+            "",
+        )
+        self.assertEqual(spider.strip_boilerplate_sentences("Key Highlights"), "")
+        self.assertEqual(
+            spider.strip_boilerplate_sentences("Also read: other stories you may like."),
+            "",
+        )
+
+    def test_boilerplate_long_noisy_prefix_is_removed(self):
+        spider = NewsSpider(keyword="Samsung")
+        noisy = (
+            "Make Telecom Talk My Trusted Source My Trusted Source Key Highlights "
+            "Apple and Samsung reportedly signed a deal worth billions of dollars for next-generation "
+            "display panels to be manufactured across several Asian facilities over the coming years."
+        )
+        cleaned = spider.strip_boilerplate_sentences(noisy)
+        self.assertNotIn("Trusted Source", cleaned)
+        self.assertNotIn("Key Highlights", cleaned)
+        self.assertIn("Apple and Samsung reportedly signed a deal", cleaned)
+
+    def test_boilerplate_preserves_legitimate_reporting_sentences(self):
+        spider = NewsSpider(keyword="Samsung")
+        legitimate = [
+            "The company launched a newsletter for AI researchers. Revenue grew 20 percent this quarter.",
+            "Users can subscribe to enterprise alerts through the new dashboard. The release ships next week.",
+            "The publisher's newsletter business generated additional revenue.",
+            "The service lets enterprise customers subscribe to security notifications.",
+        ]
+        for sentence in legitimate:
+            with self.subTest(sentence=sentence):
+                self.assertEqual(spider.strip_boilerplate_sentences(sentence), sentence)
+
+    def test_boilerplate_keeps_surrounding_article_paragraphs(self):
+        spider = NewsSpider(keyword="OLED")
+        body = (
+            "The new OLED panel improves brightness and power efficiency for flagship phones. "
+            "Subscribe to our newsletter for daily updates. "
+            "Production timelines across Asia remain on track for the next quarter with new capacity."
+        )
+        cleaned = spider.strip_boilerplate_sentences(body)
+        self.assertIn("brightness and power efficiency", cleaned)
+        self.assertIn("Production timelines", cleaned)
+        self.assertNotIn("Subscribe", cleaned)
+
+    def test_boilerplate_filter_never_touches_titles(self):
+        spider = NewsSpider(keyword="OLED")
+        title = "Newsletter growth and trusted source rankings"
+        # Titles travel through clean_text only, never the boilerplate filter.
+        self.assertEqual(spider.clean_text(title), title)
+
 
 if __name__ == "__main__":
     unittest.main()

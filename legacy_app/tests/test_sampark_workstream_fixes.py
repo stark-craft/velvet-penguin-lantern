@@ -376,3 +376,50 @@ class CapabilitySessionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GatekeeperPaginationContractTests(unittest.TestCase):
+    def _items(self, n=120):
+        return [
+            {
+                "id": f"d{i}",
+                "title": f"Signal {i} {'chip' if i % 2 == 0 else 'display'}",
+                "status": "dropped",
+                "profile": "default",
+                "updated_at": f"2026-09-{(i % 28) + 1:02d}T10:00:00",
+            }
+            for i in range(n)
+        ]
+
+    def test_dropped_returns_total_matched_page_and_has_more(self):
+        req, _ = _request(ip="10.0.0.25", viewer_key="gatekeeper-viewer")
+        with patch.object(app, "load_dropped_articles", return_value=self._items()), \
+             patch.object(app, "require_gatekeeper_access", return_value="10.0.0.25"):
+            first = app.gatekeeper_dropped(req, profile="all", status="all", search="", offset=0, limit=50)
+            self.assertEqual(first["total"], 120)
+            self.assertEqual(first["matched"], 120)
+            self.assertEqual(first["count"], 50)
+            self.assertEqual(first["offset"], 0)
+            self.assertEqual(first["limit"], 50)
+            self.assertTrue(first["has_more"])
+            second = app.gatekeeper_dropped(req, profile="all", status="all", search="", offset=50, limit=50)
+            self.assertEqual(second["count"], 50)
+            self.assertEqual(second["matched"], 120)
+            self.assertTrue(second["has_more"])
+            third = app.gatekeeper_dropped(req, profile="all", status="all", search="", offset=100, limit=50)
+            self.assertEqual(third["count"], 20)
+            self.assertFalse(third["has_more"])
+            expect_order = sorted(
+                range(120),
+                key=lambda i: f"2026-09-{(i % 28) + 1:02d}T10:00:00",
+                reverse=True,
+            )
+            self.assertEqual(
+                [r["id"] for r in first["items"]] + [r["id"] for r in second["items"]],
+                [f"d{i}" for i in expect_order[:100]],
+            )
+            filtered = app.gatekeeper_dropped(req, profile="all", status="all", search="chip", offset=0, limit=50)
+            self.assertEqual(filtered["total"], 120)
+            self.assertEqual(filtered["matched"], 60)
+            self.assertEqual(filtered["count"], 50)
+            self.assertTrue(filtered["has_more"])

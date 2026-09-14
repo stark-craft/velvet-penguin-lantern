@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../news-scrapper/components/Icon.jsx';
-import { getAccessCapabilities, getRecommendationStatus, getViewerPreferences, getViewerProfile, logoutCapabilitySession, updateViewerPreferences } from '../news-scrapper/api.js';
+import { getAccessCapabilities, getRecommendationStatus, getViewerPreferences, getViewerProfile, updateViewerPreferences } from '../news-scrapper/api.js';
 import { useLanguage } from '../news-scrapper/translation/LanguageProvider.jsx';
 import { useSamparkAuth } from './auth/SamparkAuthContext.jsx';
 import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
@@ -60,8 +60,8 @@ function ForYouStructure() {
   return <SamparkForYou />;
 }
 
-function AllNewsStructure() {
-  return <SamparkAllNews />;
+function AllNewsStructure({ capabilities=[] }) {
+  return <SamparkAllNews capabilities={capabilities} />;
 }
 
 function ResearchStructure() {
@@ -113,7 +113,6 @@ export default function SamparkApp() {
   const [searchHistory, setSearchHistory] = useState(readSearchHistory);
   const [settings, setSettings] = useState(readSamparkSettings);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [viewer, setViewer] = useState(null);
   const [capabilities, setCapabilities] = useState([]);
   const [serviceError, setServiceError] = useState('');
@@ -192,18 +191,6 @@ export default function SamparkApp() {
     return () => window.removeEventListener('sampark-open-settings', handler);
   }, []);
 
-  useEffect(() => {
-    if (!userMenuOpen) return undefined;
-    const onDown = (e) => {
-      if (!e.target.closest('.sampark-user-menu')) setUserMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [userMenuOpen]);
-
-  // Close user menu on navigation
-  useEffect(() => { setUserMenuOpen(false); }, [location.pathname]);
-
   const refreshAccess = async () => {
     if (auth?.refresh) {
       await auth.refresh();
@@ -241,73 +228,38 @@ export default function SamparkApp() {
     setLanguage(nextLanguage);
   };
 
-  const handleLogout = async () => {
-    try {
-      if (auth?.logout) await auth.logout();
-      else {
-        await logoutCapabilitySession();
-        await refreshAccess();
-      }
-      setUserMenuOpen(false);
-      navigate('/login');
-    } catch (e) {
-      setServiceError(e?.message || 'Could not sign out.');
-    }
-  };
-
   const tabClass = (target) => ({ isActive }) => `main-tab${isActive || (target === '/all-news' && location.pathname === '/search') ? ' active' : ''}`;
   const rawDisplayName = String(viewer?.display_name || '').trim();
   const hasName = rawDisplayName.length >= 2;
   const displayName = hasName ? rawDisplayName : '';
-  const initials = hasName ? rawDisplayName.slice(0, 2).toUpperCase() : 'TS';
-  const hasPrivilegedSession = Boolean(auth?.privilegedSessionActive);
-  const isAuthed = hasPrivilegedSession;
-  // Role comes from the server session when safe; never inferred from the
-  // capability union (network + principal + session).
-  const activeRoleLabel = hasPrivilegedSession ? `Privileged session${auth?.sessionRole ? ` · ${auth.sessionRole}` : ''}` : 'Standard access';
-
+  const canWriteOrPublishNews = capabilities.some((capability) => [
+    'contributions.create',
+    'review.contributions.publish',
+  ].includes(capability));
   // navigate('/create') legacy contract for tests — actual navigation uses backgroundLocation
   const backgroundLocation = location.state?.backgroundLocation || location.state?.background;
+  const openCreateNews = () => navigate('/create', { state: { backgroundLocation: location } });
   return <div className="techscout-app">
     <a className="skip-link" href="#news-main-content">Skip to news</a>
+    {/* Sampark supplies the surrounding portal chrome; TechScout begins here. */}
     <header className="techscout-header">
       <div className="techscout-brand-row"><NavLink className="techscout-logo" to="/for-you"><span className="logo-samsung">Samsung</span><span className="logo-techscout">TechScout</span></NavLink><div className="techscout-greeting"><p>{hasName ? <>Hi <span data-no-translate>{displayName}</span>! Your Personalized Technology briefing</> : 'Your Personalized Technology briefing'}</p></div></div>
       <div className="techscout-actions">
-        <form className="search-bar" onSubmit={submitSearch} role="search"><button aria-label="Search Technologies News" className="search-submit" type="submit"><Icon name="search" size={16} /></button><input aria-label="Search all archived news" list="sampark-search-history" onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search all archived news" type="search" value={searchDraft} />{searchDraft && <button aria-label="Clear search" className="search-clear" onClick={clearSearch} type="button"><Icon name="x" size={14} /></button>}<datalist id="sampark-search-history">{searchHistory.map((item) => <option key={item} value={item} />)}</datalist><span style={{ display: 'none' }}>Search Technologies News</span></form>
+        <form className="search-bar" onSubmit={submitSearch} role="search"><button aria-label="Search Technologies News" className="search-submit" type="submit"><Icon name="search" size={16} /></button><input aria-label="Search all archived news" list="sampark-search-history" onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search Technologies News" type="search" value={searchDraft} />{searchDraft && <button aria-label="Clear search" className="search-clear" onClick={clearSearch} type="button"><Icon name="x" size={14} /></button>}<datalist id="sampark-search-history">{searchHistory.map((item) => <option key={item} value={item} />)}</datalist><span style={{ display: 'none' }}>Search Technologies News</span></form>
         <label className="lang-btn" data-no-translate><Icon name="globe" size={16} /><select aria-label="Language" onChange={(event) => changeLanguage(event.target.value)} value={language}><option value="en">English</option><option value="ko">한국어</option></select></label>
         <button aria-label="Open settings" className="icon-btn settings-btn" onClick={() => setSettingsOpen(true)} type="button"><Icon name="settings" size={18} /></button>
-        <SamparkNotificationBell />
-        <div className="sampark-user-menu">
-          <button className="sampark-user-trigger" aria-haspopup="menu" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen((v) => !v)} type="button">
-            <span className="sampark-avatar" aria-hidden="true">{initials}</span>
-            <span className="sampark-user-name" data-no-translate>{hasName ? displayName : 'TechScout'}</span>
-            <Icon name="chevD" size={12} />
-          </button>
-          {userMenuOpen && (
-            <div className="sampark-user-dropdown" role="menu">
-              <div className="sampark-user-card">
-                <span className="sampark-avatar large" aria-hidden="true">{initials}</span>
-                <div>
-                  <strong data-no-translate>{hasName ? displayName : 'Set display name'}</strong>
-                  <small data-no-translate>{viewer?.email || (hasName ? 'Private browser profile' : 'Private — set name in Settings')}</small>
-                  <small className="sampark-user-capabilities">{isAuthed ? `${activeRoleLabel} · ${capabilities.length} permission${capabilities.length===1?'':'s'} active` : 'Standard access — IP/network permissions'}</small>
-                </div>
-              </div>
-              <button className="sampark-menu-item" onClick={() => { setUserMenuOpen(false); setSettingsOpen(true); }} role="menuitem" type="button"><Icon name="settings" size={14} /> Settings</button>
-              <NavLink className="sampark-menu-item" to="/login" onClick={() => setUserMenuOpen(false)} role="menuitem"><Icon name="key" size={14} /> {isAuthed ? 'Access — Privileged session' : 'Sign in — Access'}</NavLink>
-              {isAuthed ? <button className="sampark-menu-item is-danger" onClick={handleLogout} role="menuitem" type="button"><Icon name="x" size={14} /> Sign out of privileged session</button> : <span className="sampark-menu-hint">Network permissions apply automatically; role key adds tools</span>}
-            </div>
-          )}
-        </div>
+        {canWriteOrPublishNews && <SamparkNotificationBell />}
+        {canWriteOrPublishNews && <button className="create-news-btn" onClick={openCreateNews} type="button"><Icon name="plus" size={16} /> Create News</button>}
       </div>
     </header>
     {serviceError && <div className="shell-status is-error" role="alert">{serviceError}</div>}
     {language === 'ko' && (translationState.translating || translationState.error) && <div className={`shell-status${translationState.error ? ' is-error' : ''}`} data-no-translate role={translationState.error ? 'alert' : 'status'}>{translationState.error ? <><span>{translationState.error}</span><button onClick={translationState.retry} type="button">Retry</button></> : <span>{translationState.phase === 'downloading' ? `한국어 번역 준비 중${translationState.downloadProgress === null ? '' : ` · ${translationState.downloadProgress}%`}` : `한국어로 번역 중 · ${translationState.completed}/${translationState.total}`}</span>}</div>}
     <div className="main-card-container">
-      <nav aria-label="TechScout sections" className="main-tabs"><NavLink className={tabClass('/for-you')} to="/for-you"><Icon name="sparkle" size={16} />For You</NavLink><NavLink className={tabClass('/all-news')} to="/all-news"><Icon name="globe" size={16} />All News</NavLink><NavLink className={tabClass('/research')} to="/research"><Icon name="file" size={16} />Research</NavLink><NavLink className={tabClass('/samsung-news')} to="/samsung-news"><Icon name="layers" size={16} />Samsung News</NavLink><NavLink className={tabClass('/create')} to="/create" state={{ backgroundLocation: location }} style={{ height: '100%', display: 'inline-flex', alignItems: 'center' }}><Icon name="plus" size={16} />Create</NavLink></nav>
+      {/* White product-tab row inside the rounded workspace — exactly four pills */}
+      <nav aria-label="TechScout sections" className="main-tabs"><NavLink className={tabClass('/for-you')} to="/for-you"><Icon name="sparkle" size={16} />For You</NavLink><NavLink className={tabClass('/all-news')} to="/all-news"><Icon name="globe" size={16} />All News</NavLink><NavLink className={tabClass('/research')} to="/research"><Icon name="file" size={16} />Research</NavLink><NavLink className={tabClass('/samsung-news')} to="/samsung-news"><Icon name="layers" size={16} />Samsung News</NavLink></nav>
       <main className="content-area" id="news-main-content" tabIndex={-1}>
         <Routes location={backgroundLocation || location}>
-          <Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/research/*" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/create" element={<SamparkCreate />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} onAccessChanged={refreshAccess} />} /><Route path="/search" element={<SamparkSearchResults query={query} />} /><Route path="*" element={<Navigate replace to="/for-you" />} />
+          <Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure capabilities={capabilities} />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/research/*" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/create" element={<SamparkCreate />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} onAccessChanged={refreshAccess} />} /><Route path="/search" element={<SamparkSearchResults query={query} />} /><Route path="*" element={<Navigate replace to="/for-you" />} />
         </Routes>
         {backgroundLocation && (
           <Routes>

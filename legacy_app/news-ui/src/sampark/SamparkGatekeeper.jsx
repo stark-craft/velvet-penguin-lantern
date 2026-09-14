@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Icon from '../news-scrapper/components/Icon.jsx';
 import { getGatekeeperDropped, getGatekeeperQueue, queueGatekeeperRestore, retryGatekeeperRestore } from '../news-scrapper/api.js';
-import { decodedKeywords, decodedRowText, mergeGatekeeperItems, nextPageOffset, restorationActive } from './gatekeeperModel.js';
+import { createGatekeeperLoader, decodedKeywords, decodedRowText, restorationActive } from './gatekeeperModel.js';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
 
 export default function SamparkGatekeeper({ capabilities = [] }) {
@@ -14,15 +14,16 @@ export default function SamparkGatekeeper({ capabilities = [] }) {
   const [profile, setProfile] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
+  // Committed search query: typing stays draft until Apply. Polling and
+  // pagination always use the committed value so an old interval can never
+  // restore an earlier query.
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [rowBusy, setRowBusy] = useState({});
   const [rowErrors, setRowErrors] = useState({});
   const pollRef = useRef(null);
-  // Request generation: stale responses from older filters/searches must not
-  // replace current state. Only the latest generation may commit.
-  const requestRef = useRef(0);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -30,72 +31,59 @@ export default function SamparkGatekeeper({ capabilities = [] }) {
   }, []);
   const PAGE = 50;
 
-  const load = async ({ append = false, background = false } = {}) => {
-    const generation = ++requestRef.current;
-    // Snapshot the loaded window at call time: Show more always begins after
-    // the rows already on screen, and refresh covers the whole window.
-    const baseLength = dropped.length;
-    if (background) setRefreshing(true);
-    else setLoading(true);
-    if (!background) setError('');
-    try {
-      const useOffset = append ? nextPageOffset(dropped) : 0;
-      const useLimit = append ? PAGE : Math.max(PAGE, baseLength);
-      const [droppedRes, queueRes] = await Promise.all([
-        getGatekeeperDropped({ limit: useLimit, offset: useOffset, profile, status: statusFilter, search }),
-        getGatekeeperQueue(),
-      ]);
-      if (!mountedRef.current || generation !== requestRef.current) return;
-      const drops = Array.isArray(droppedRes?.items) ? droppedRes.items : [];
-      const countsRaw = droppedRes?.counts || {};
-      const jobs = Array.isArray(queueRes?.jobs) ? queueRes.jobs : [];
-      const queueCounts = queueRes?.counts || {};
-      const worker = queueRes?.worker || {};
-      // Totals come from the backend contract, never from the page length.
-      const total = Number(droppedRes?.total ?? countsRaw.all ?? drops.length);
-      setMatched(Number(droppedRes?.matched ?? drops.length));
-      if (append) {
-        setDropped((cur) => mergeGatekeeperItems(cur, drops, { append: true }));
-        setHasMore(Boolean(droppedRes?.has_more ?? drops.length >= PAGE));
-      } else {
-        setDropped(mergeGatekeeperItems([], drops, { append: false }));
-        setHasMore(Boolean(droppedRes?.has_more ?? drops.length >= useLimit));
-      }
-      setQueue(jobs);
-      setCounts({ total, dropped: countsRaw.dropped ?? 0, queued: countsRaw.queued ?? 0, counts: countsRaw, queueCounts, worker });
-    } catch (e) {
-      if (!mountedRef.current || generation !== requestRef.current) return;
-      setError(e?.message || 'Gatekeeper data could not be loaded');
-    }
-    finally {
-      if (!mountedRef.current || generation !== requestRef.current) return;
-      setLoading(false); setRefreshing(false);
-    }
+  // One loader owns the pagination window, so polling intervals never capture
+  // stale offsets or queries. React state mirrors it for rendering.
+  const loaderRef = useRef(null);
+  if (!loaderRef.current) {
+    loaderRef.current = createGatekeeperLoader({
+      pageSize: PAGE,
+      fetchDropped: (params) => getGatekeeperDropped(params),
+      fetchQueue: (params) => getGatekeeperQueue(params),
+      isMounted: () => mountedRef.current,
+      onState: (patch) => {
+        if (patch.items !== undefined) setDropped(patch.items);
+        if (patch.queue !== undefined) setQueue(patch.queue);
+        if (patch.counts !== undefined) setCounts(patch.counts);
+        if (patch.matched !== undefined) setMatched(patch.matched);
+        if (patch.hasMore !== undefined) setHasMore(patch.hasMore);
+        if (patch.loading !== undefined) setLoading(patch.loading);
+        if (patch.refreshing !== undefined) setRefreshing(patch.refreshing);
+        if (patch.error !== undefined) setError(patch.error);
+      },
+    });
+  }
+  const load = ({ append = false, background = false } = {}) => {
+    if (append) return loaderRef.current.loadMore();
+    if (background) return loaderRef.current.refresh();
+    return loaderRef.current.reload();
   };
+  const syncScope = (scope) => loaderRef.current.setScope(scope);
 
-  // Single initial + filter effect: page resets only when filters change,
-  // avoiding the duplicate mount/filter double load.
+  // Single initial + filter effect: page resets only when committed filters
+  // change (typing alone never reloads), avoiding duplicate mount loads.
   useEffect(() => {
     if (!hasAccess) return;
-    load();
+    syncScope({ profile, status: statusFilter, search: appliedSearch });
+    loaderRef.current.reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasAccess, profile, statusFilter]);
+  }, [hasAccess, profile, statusFilter, appliedSearch]);
 
   useEffect(() => {
     // Polling authority is restoration status only — never pipeline stages.
     const polling = restorationActive(queue, dropped);
     if (!polling) { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current=null; } return; }
     if (pollRef.current) return;
-    pollRef.current = setInterval(() => { load({ background: true }); }, 5000);
+    pollRef.current = setInterval(() => { loaderRef.current.refresh(); }, 5000);
     return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current=null; } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restorationActive(queue, dropped), dropped.length, profile, statusFilter]);
+  }, [restorationActive(queue, dropped), dropped.length, profile, statusFilter, appliedSearch]);
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   const applySearch = (e) => {
     e?.preventDefault();
-    load();
+    // Commit the draft query: the filter effect reloads page one with it.
+    setAppliedSearch(search);
   };
 
   const handleRestore = async (id) => {

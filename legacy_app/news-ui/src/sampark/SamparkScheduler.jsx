@@ -3,6 +3,7 @@ import Icon from '../news-scrapper/components/Icon.jsx';
 import { getSchedulerStatus, runSchedulerNow } from '../news-scrapper/api.js';
 import { describeSchedulerStatus, isConflictStatus, isRunDisabled } from './schedulerHelper.js';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
+import useAutoDismiss from './shared/useAutoDismiss.js';
 
 function formatTime(value) {
   if (!value) return '—';
@@ -21,6 +22,7 @@ export default function SamparkScheduler({ capabilities = [] }) {
   const [notice, setNotice] = useState('');
   const mountedRef = useRef(true);
   const pollRef = useRef(null);
+  useAutoDismiss(notice, () => setNotice(''));
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; if (pollRef.current) window.clearInterval(pollRef.current); pollRef.current = null; };

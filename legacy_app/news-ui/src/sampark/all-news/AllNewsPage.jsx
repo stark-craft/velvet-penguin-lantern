@@ -4,16 +4,22 @@ import { articleKey, reactionIdentity, matchesBriefingLens } from '../../news-sc
 import { normalizeList } from '../../news-scrapper/utils/normalize.js';
 import {
   getViewerReactions,
+  getViewerHidden,
   getViewerSaved,
+  getWorkflow,
   hideArticleForViewer,
   removeSavedArticle,
   saveArticleForLater,
+  selectWorkflow,
   setViewerReaction,
   trackEvent,
 } from '../../news-scrapper/api.js';
+import ArticleModal from '../../news-scrapper/components/modals/ArticleModal.jsx';
+import DraftExportModal from '../../news-scrapper/components/modals/DraftExportModal.jsx';
+import NameModal from '../../news-scrapper/components/modals/NameModal.jsx';
 import { useArticleEngagement } from '../shared/useArticleEngagement.js';
-import SamparkArticleDossier from '../shared/SamparkArticleDossier.jsx';
 import { computeOptimisticVote, getCurrentVote } from '../shared/reactionHelper.js';
+import useAutoDismiss from '../shared/useAutoDismiss.js';
 import { createSavedHydrationController, createReactionHydrationController } from './allNewsHydration.js';
 import useBriefingFeed from './data/useBriefingFeed.js';
 import { deriveFilterOptions, selectFeatured, selectAllNewsRail, selectLatestToday } from './allNewsModel.js';
@@ -34,23 +40,22 @@ function AllNewsDossier({ item, onClose, saved, onSave, onHide, onReact, savedHy
   if(!item) return null;
   const handleHideClick = () => { engagement.onDossierClose(); onHide(item); };
   return (
-    <SamparkArticleDossier
+    <ArticleModal
       item={item}
+      variant="all-briefings"
       onClose={handleClose}
-      saved={saved}
-      onSave={onSave}
+      isSaved={saved}
+      onSave={savedHydrated ? onSave : undefined}
       onHide={handleHideClick}
-      onReact={onReact}
+      onVote={reactionsHydrated ? onReact : undefined}
       onSourceOpen={() => engagement.onSourceOpen()}
-      savedHydrated={savedHydrated}
-      reactionsHydrated={reactionsHydrated}
-      titleId="sampark-allnews-dossier-title"
     />
   );
 }
 
-export default function AllNewsPage(){
+export default function AllNewsPage({ capabilities=[] }){
   const { articles, loading, error, retry } = useBriefingFeed();
+  const reviewAllowed = capabilities.includes('review.news.submit');
   const [activeLens, setActiveLens] = useState('all');
   const [draftFilters, setDraftFilters] = useState({ region:'all', category:'all', source:'all', date:'all' });
   const [appliedFilters, setAppliedFilters] = useState({ region:'all', category:'all', source:'all', date:'all' });
@@ -62,7 +67,51 @@ export default function AllNewsPage(){
   const [busy, setBusy] = useState({});
   const [hiddenKeys, setHiddenKeys] = useState(new Set());
   const [notice, setNotice] = useState('');
+  const [workflow, setWorkflow] = useState({ selected: [], approved: [] });
+  const [workflowStatus, setWorkflowStatus] = useState(reviewAllowed ? 'loading' : 'hidden');
+  const [checked, setChecked] = useState({});
+  const [pendingSelect, setPendingSelect] = useState(null);
+  const [batchSelect, setBatchSelect] = useState(null);
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [draftExportOpen, setDraftExportOpen] = useState(false);
   const locks = useRef(new Set());
+
+  useAutoDismiss(notice, () => setNotice(''));
+
+  useEffect(()=>{
+    if(!reviewAllowed){
+      setWorkflow({ selected: [], approved: [] });
+      setWorkflowStatus('hidden');
+      setChecked({});
+      setPendingSelect(null);
+      setBatchSelect(null);
+      setDraftExportOpen(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setWorkflowStatus('loading');
+    getWorkflow().then((result)=>{
+      if(cancelled) return;
+      setWorkflow({
+        selected: normalizeList(result?.selected || []),
+        approved: normalizeList(result?.approved || []),
+      });
+      setWorkflowStatus('ready');
+    }).catch(()=>{
+      if(!cancelled) setWorkflowStatus('error');
+    });
+    return ()=>{ cancelled = true; };
+  },[reviewAllowed]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getViewerHidden()
+      .then((result) => {
+        if (!cancelled) setHiddenKeys(new Set(normalizeList(result?.items || []).map(articleKey)));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const options = useMemo(()=> deriveFilterOptions(articles), [articles]);
 
@@ -95,6 +144,9 @@ export default function AllNewsPage(){
     }
     return [...map.entries()];
   },[filtered]);
+  const selectedIds = useMemo(()=> new Set(workflow.selected.map(articleKey).filter(Boolean)), [workflow.selected]);
+  const approvedIds = useMemo(()=> new Set(workflow.approved.map(articleKey).filter(Boolean)), [workflow.approved]);
+  const selectedBatch = useMemo(()=> articles.filter((item)=> checked[articleKey(item)]), [articles, checked]);
 
   const [savedError, setSavedError] = useState('');
   const [savedLoading, setSavedLoading] = useState(false);
@@ -292,7 +344,7 @@ export default function AllNewsPage(){
     if(item._published) return;
     const key=articleKey(item);
     if(locks.current.has(`${key}::reaction`)) return;
-    const currentSnap = getCurrentVote(votes, item, reactionsHydrated) || (votes[key] || (item.reactions ? { like_count: item.reactions.like_count||0, dislike_count: item.reactions.dislike_count||0, viewer_reaction: item.reactions.viewer_reaction||'neutral' } : null));
+    const currentSnap = votes[key] || getCurrentVote(votes, item, reactionsHydrated) || (item.reactions ? { like_count: item.reactions.like_count||0, dislike_count: item.reactions.dislike_count||0, viewer_reaction: item.reactions.viewer_reaction||'neutral' } : null);
     if (!currentSnap && !reactionsHydrated) {
       setNotice('Reaction status still loading — please wait.');
       return;
@@ -317,6 +369,87 @@ export default function AllNewsPage(){
         throw e;
       }
     });
+  };
+
+  const handleReviewCheck = (item, isChecked)=>{
+    if(!reviewAllowed || workflowStatus !== 'ready') return;
+    const key = articleKey(item);
+    if(!key || selectedIds.has(key) || approvedIds.has(key)) return;
+    setChecked((current)=>{
+      const next = { ...current };
+      if(isChecked) next[key] = true;
+      else delete next[key];
+      return next;
+    });
+  };
+
+  const requestReviewSubmission = (item)=>{
+    if(!reviewAllowed) return;
+    if(workflowStatus !== 'ready'){
+      setNotice(workflowStatus === 'error' ? 'Review Queue is unavailable right now.' : 'Review Queue is still loading.');
+      return;
+    }
+    const key = articleKey(item);
+    if(selectedIds.has(key) || approvedIds.has(key)) return;
+    setPendingSelect(item);
+  };
+
+  const confirmReviewSubmission = async(item, name)=>{
+    if(workflowStatus !== 'ready') throw new Error('Review Queue is unavailable right now.');
+    const key = articleKey(item);
+    const payload = {
+      ...item,
+      selected_by: name,
+      selected_at: new Date().toISOString().slice(0,16).replace('T',' '),
+    };
+    return runAction(key, 'review', async()=>{
+      try{
+        await selectWorkflow(payload);
+        setWorkflow((current)=>({
+          ...current,
+          selected: [payload, ...current.selected.filter((entry)=>articleKey(entry)!==key)],
+        }));
+        setChecked((current)=>{ const next={...current}; delete next[key]; return next; });
+        setNotice('Article sent to the shared Review Queue.');
+      }catch(reviewError){
+        setNotice(reviewError?.message || 'The article could not be sent to Review Queue.');
+        throw reviewError;
+      }
+    });
+  };
+
+  const confirmBatchSubmission = async(_item, name)=>{
+    if(batchBusy || !selectedBatch.length) return;
+    if(workflowStatus !== 'ready') throw new Error('Review Queue is unavailable right now.');
+    setBatchBusy(true);
+    const stamp = new Date().toISOString().slice(0,16).replace('T',' ');
+    const payloads = selectedBatch.map((item)=>({ ...item, selected_by:name, selected_at:stamp }));
+    try{
+      const results = await Promise.allSettled(payloads.map((payload)=>selectWorkflow(payload)));
+      const succeeded = payloads.filter((_,index)=>results[index].status==='fulfilled');
+      const failed = payloads.filter((_,index)=>results[index].status==='rejected');
+      if(succeeded.length){
+        const succeededKeys = new Set(succeeded.map(articleKey));
+        setWorkflow((current)=>({
+          ...current,
+          selected: [...succeeded, ...current.selected.filter((entry)=>!succeededKeys.has(articleKey(entry)))],
+        }));
+        setChecked((current)=>{
+          const next={...current};
+          succeededKeys.forEach((key)=>{ delete next[key]; });
+          return next;
+        });
+      }
+      if(failed.length){
+        const batchError = new Error(`${failed.length} of ${payloads.length} articles could not be sent. Failed articles remain selected so you can retry.`);
+        setNotice(batchError.message);
+        throw batchError;
+      }
+      setBatchSelect(null);
+      setNotice(`${succeeded.length} article${succeeded.length===1?'':'s'} sent to the shared Review Queue.`);
+    }finally{
+      setBatchBusy(false);
+    }
   };
 
   const handleApply = ()=> setAppliedFilters({...draftFilters});
@@ -350,9 +483,20 @@ export default function AllNewsPage(){
 
       <FilterPanel options={options} draft={draftFilters} setDraft={setDraftFilters} onApply={handleApply} onReset={handleReset} filteredCount={filtered.length} />
 
-      <DayWiseNews grouped={grouped} onOpen={setOpenArticle} onLike={(it)=> handleVote(it,'like')} onDislike={(it)=> handleVote(it,'dislike')} onFollow={handleSave} onHide={handleHide} onSourceOpen={handleCardSourceOpen} votes={votes} savedKeys={savedKeys} busyMap={busy} savedHydrated={savedHydrated} reactionsHydrated={reactionsHydrated} />
+      <DayWiseNews grouped={grouped} onOpen={setOpenArticle} onLike={(it)=> handleVote(it,'like')} onDislike={(it)=> handleVote(it,'dislike')} onFollow={handleSave} onHide={handleHide} onSourceOpen={handleCardSourceOpen} votes={votes} savedKeys={savedKeys} busyMap={busy} savedHydrated={savedHydrated} reactionsHydrated={reactionsHydrated} reviewAllowed={reviewAllowed} workflowReady={workflowStatus==='ready'} checkedMap={checked} selectedIds={selectedIds} approvedIds={approvedIds} onCheck={handleReviewCheck} onSubmitForReview={requestReviewSubmission} />
 
       <AllNewsDossier item={openArticle} onClose={()=>setOpenArticle(null)} saved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} onSave={handleSave} onHide={async it=>{ setOpenArticle(null); await handleHide(it); }} onReact={handleVote} savedHydrated={savedHydrated} reactionsHydrated={reactionsHydrated} />
+      {reviewAllowed && <NameModal article={pendingSelect} open={Boolean(pendingSelect)} onClose={()=>setPendingSelect(null)} onConfirm={confirmReviewSubmission} />}
+      {reviewAllowed && <NameModal article={batchSelect} confirmLabel="Send to Review Queue" description="Enter your name." open={Boolean(batchSelect)} onClose={()=>setBatchSelect(null)} onConfirm={confirmBatchSubmission} title={`Send ${selectedBatch.length} articles to Review Queue`} />}
+      <DraftExportModal items={selectedBatch} open={draftExportOpen} source="sampark-all-news" onClose={()=>setDraftExportOpen(false)} />
+      {reviewAllowed && selectedBatch.length > 0 && <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+        <div className="batch-action-bar flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
+          <strong>{selectedBatch.length} selected</strong>
+          <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setChecked({})} type="button">Clear</button>
+          <button className="btn-dark-primary h-9" disabled={batchBusy} onClick={()=>setBatchSelect({ title:`${selectedBatch.length} selected articles` })} type="button">Send to Review Queue</button>
+          <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setDraftExportOpen(true)} type="button">Draft Export</button>
+        </div>
+      </div>}
     </div>
   );
 }

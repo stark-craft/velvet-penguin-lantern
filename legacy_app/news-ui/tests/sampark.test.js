@@ -18,6 +18,8 @@ test('Sampark remains an independent frontend entry with persisted theme prefere
 
 test('Sampark first milestone contains only the signed-off structural shell', () => {
   const app = read('../src/sampark/SamparkApp.jsx');
+  // Sampark supplies the surrounding portal chrome; TechScout starts at its own header.
+  assert.doesNotMatch(app, /sampark-header|sampark-nav/);
   assert.match(app, /techscout-header/);
   assert.match(app, /Search Technologies News/);
   assert.match(app, /Your Personalized Technology briefing/);
@@ -31,7 +33,8 @@ test('Sampark first milestone contains only the signed-off structural shell', ()
   assert.match(app, /SamparkSamsungNews|SamsungStructure/);
   // Final surfaces replace lightweight shell regions with real implementations
   assert.match(app, /SamparkForYou/);
-  assert.doesNotMatch(app, /sampark-header|sampark-nav/);
+  // Corporate nav preserves visual order without fake href="#" routes
+  assert.doesNotMatch(app, /href="#"/);
 });
 
 test('Sampark shell mounts only allowed Search/Settings integrations and viewer APIs, not original presentation components', () => {
@@ -80,12 +83,14 @@ test('Sampark For You uses real recommendation APIs and Sampark-native presentat
   assert.match(forYou, /normalizeList/);
   assert.match(forYou, /sampark-preferences-bar|sampark-metrics-grid|sampark-foryou-grid|sampark-news-card/);
   assert.match(forYou, /SamparkPreferencesModal|SamparkArticleDossier|SamparkForYouCard/);
-  assert.match(forYou, /sampark-card-media|sampark-card-img/);
+  assert.match(forYou, /fy-card-full|card-overlay-full|ForYouCardMenu|cn-action-popup/);
+  assert.match(forYou, /SamparkMoreForYouCard|more-foryou-grid/);
   assert.match(read('../src/sampark/shared/SamparkArticleDossier.jsx'), /object-fit|sampark-dossier-img/);
   assert.doesNotMatch(forYou, /ForYouScreen|presentation="sampark"/);
   assert.doesNotMatch(forYou, /fetch\(|https?:\/\/|127\.0\.0\.1/);
   assert.match(read('../src/sampark/sampark.css'), /sampark-for-you-page|sampark-foryou-grid|sampark-metrics-grid/);
-  assert.match(read('../src/sampark/sampark.css'), /object-fit:\s*contain/);
+  assert.match(read('../src/sampark/sampark.css'), /fy-card-img[\s\S]*object-fit:\s*cover/);
+  assert.match(read('../src/sampark/sampark.css'), /sampark-dossier-img[\s\S]*object-fit:\s*contain/);
   assert.match(forYou, /onWhyOpen|why_matters|why_it_matters|summary_points/);
 });
 
@@ -99,15 +104,18 @@ test('Sampark For You featured layout is five-card composition and feed beyond f
   assert.doesNotMatch(forYou, /items\.slice\(0,\s*[45]\)[\s\S]*return[\s\S]*stories\.length.*only 5/i);
   assert.match(forYou, /sampark-foryou-grid/);
   assert.match(forYou, /sampark-news-card-small-grid/);
-  assert.match(css, /sampark-foryou-grid[\s\S]*1\.32fr 1fr|sampark-news-card-small-grid[\s\S]*repeat\(2/);
+  assert.match(css, /sampark-foryou-grid[\s\S]*1\.26fr 1\.1fr/);
+  assert.match(css, /sampark-news-card-small-grid[\s\S]*repeat\(2/);
+  assert.match(css, /fy-card-large[\s\S]*min-height:\s*527px/);
+  assert.match(css, /sampark-metrics-grid[\s\S]*repeat\(4/);
   // Remaining feed is rendered and pagination is preserved
-  assert.match(forYou, /sampark-for-you-remaining|sampark-for-you-more-grid/);
+  assert.match(forYou, /sampark-for-you-remaining|sampark-for-you-more-grid|more-foryou-grid|More For You/);
   assert.match(forYou, /feed\?.cursor|loadMore|getForYou\(\{ cursor/);
   assert.match(forYou, /Load more|feed\.total/);
-  // Image no-crop contract
-  assert.match(css, /\.sampark-card-img[\s\S]*object-fit:\s*contain/);
+  // Editorial overlay contract: cover (edge-to-edge), never contain/letterbox
+  assert.match(css, /fy-card-img[\s\S]*object-fit:\s*cover/);
   assert.match(css, /\.sampark-dossier-img[\s\S]*object-fit:\s*contain/);
-  assert.doesNotMatch(css, /\.sampark-card-img[\s\S]*object-fit:\s*cover/);
+  assert.doesNotMatch(forYou, /sampark-card-media-sm|sampark-card-img-placeholder/);
 });
 
 test('Sampark preferences wizard is three-step and Skip preserves automatic personalization', () => {
@@ -181,14 +189,18 @@ test('Viewer/browser identity is cookie-primary and same-IP browsers remain isol
 test('Sampark header, auth and settings remain standalone and SSO-ready without portal chrome', () => {
   const app = read('../src/sampark/SamparkApp.jsx');
   assert.match(app, /techscout-header/);
-  assert.match(app, /sampark-user-menu|sampark-user-trigger/);
+  assert.doesNotMatch(app, /sampark-header|sampark-nav|Sampark corporate/);
   assert.match(app, /SamparkLogin/);
   assert.match(app, /path="\/login"/);
   assert.match(app, /Search Technologies News/);
   assert.match(app, /lang-btn/);
-  assert.doesNotMatch(app, /sampark-header|sampark-nav/);
-  assert.match(app, /to="\/create".*Create/s);
-  assert.match(app, /main-tabs.*Create/s);
+  // Corporate visual order preserved without fake href="#" jumps
+  assert.doesNotMatch(app, /href="#"/);
+  // Create News lives in the TechScout utility header, not as a fifth product tab
+  assert.match(app, /create-news-btn/);
+  assert.match(app, /Create News/);
+  assert.match(app, /navigate\(['"]\/create['"]/);
+  assert.doesNotMatch(app, />Create<\/NavLink>/);
   const login = read('../src/sampark/SamparkLogin.jsx');
   assert.match(login, /useSamparkAuth|login\(role/);
   assert.match(login, /Access TechScout|Samsung Sampark SSO will be used/);
@@ -376,6 +388,9 @@ test('Sampark routing stays inside /sampark and four primary tabs remain', () =>
   assert.match(app, /to="\/all-news".*All News/s);
   assert.match(app, /to="\/research".*Research/s);
   assert.match(app, /to="\/samsung-news".*Samsung News/s);
-  assert.match(app, /to="\/create".*Create/s);
+  // Golden master: exactly four product pills; Create News is a header action, still routed
+  assert.match(app, /create-news-btn/);
+  assert.match(app, /navigate\(['"]\/create['"]/);
+  assert.doesNotMatch(app, />Create<\/NavLink>/);
   assert.doesNotMatch(app, /SamparkForYouView|SamparkBriefingView|SamsungNewsScreen/);
 });

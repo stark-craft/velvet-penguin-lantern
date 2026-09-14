@@ -42,6 +42,14 @@ export default function FeaturedCarousel({ items=[], onOpen }){
     : { objectPosition: 'center 35%' };
   const source = item?.src || item?.source || 'TechScout';
   const time = item?.date || 'Latest';
+  const sourceCount = Number(item?.source_count || item?.sources?.length || 1);
+  const category = typeof item?.category === 'object'
+    ? (item.category?.value || item.category?.name || 'News')
+    : (item?.category || 'News');
+  const region = typeof item?.region === 'object'
+    ? (item.region?.value || item.region?.name || 'Global')
+    : (item?.region || 'Global');
+  const summary = item?.summary_lead || item?.summary || item?.master_summary || item?.description || '';
   const showPauseControl = safeItems.length > 1 && !prefersReducedMotion();
 
   return (
@@ -49,8 +57,15 @@ export default function FeaturedCarousel({ items=[], onOpen }){
       {image ? <img alt="" className="tsan-featured-media" src={image} style={focalStyle} /> : <div className="tsan-featured-fallback"><Icon name="globe" size={48} /></div>}
       <div className="tsan-featured-gradient" aria-hidden="true" />
       <div className="tsan-featured-overlay">
+        <div className="tsan-featured-tags" aria-label="Story details">
+          <span>{sourceCount} Source{sourceCount === 1 ? '' : 's'}</span>
+          <span>{category}</span>
+          <span>{region}</span>
+        </div>
         <span className="tsan-featured-kicker">{source} · {time}</span>
         <button className="tsan-featured-title" onClick={()=> onOpen?.(item)} type="button"><h3>{item.title}</h3></button>
+        {summary && summary !== item?.title && <p className="tsan-featured-summary">{summary}</p>}
+        <button className="tsan-featured-open" onClick={()=> onOpen?.(item)} type="button"><Icon name="file" size={14} /> Open article details</button>
       </div>
       {safeItems.length>1 && (
         <>

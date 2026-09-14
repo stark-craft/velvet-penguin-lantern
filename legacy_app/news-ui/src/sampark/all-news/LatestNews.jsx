@@ -40,7 +40,7 @@ export default function LatestNews({ items=[], onOpen, onLike, onDislike, onFoll
           const busyHide = busyMap?.[`${key}::hide`];
           const reactionReady = Boolean(reactionsHydrated || (votes && votes[key]) || item.reactions);
           const saveReady = Boolean(savedHydrated);
-          return <NewsCard key={key} item={item} onOpen={onOpen} onLike={onLike} onDislike={onDislike} onFollow={onFollow} onHide={onHide} onSourceOpen={onSourceOpen} isFollowing={savedKeys?.has(key)} likeActive={v.viewer_reaction==='like'} dislikeActive={v.viewer_reaction==='dislike'} busyReaction={busyReaction} busySave={busySave} busyHide={busyHide} savedHydrated={saveReady} reactionsHydrated={reactionReady} />;
+          return <NewsCard key={key} variant="latest" item={item} onOpen={onOpen} onLike={onLike} onDislike={onDislike} onFollow={onFollow} onHide={onHide} onSourceOpen={onSourceOpen} isFollowing={savedKeys?.has(key)} likeActive={v.viewer_reaction==='like'} dislikeActive={v.viewer_reaction==='dislike'} busyReaction={busyReaction} busySave={busySave} busyHide={busyHide} savedHydrated={saveReady} reactionsHydrated={reactionReady} />;
         })}
       </div>
     </section>

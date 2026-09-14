@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Icon from '../news-scrapper/components/Icon.jsx';
 import { getWorkflow, getInternalReviewQueue, publishInternalContent, requestInternalContentChanges, rejectInternalContent, unlockInternalReview, lockInternalReview } from '../news-scrapper/api.js';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
+import useAutoDismiss from './shared/useAutoDismiss.js';
 
 function formatDate(v){ try{ return new Date(v).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});}catch{ return ''; } }
 
@@ -15,6 +16,8 @@ export default function SamparkReview({ capabilities = [] }) {
   const [confirmReject, setConfirmReject] = useState('');
   const [noteDraft, setNoteDraft] = useState({}); // id -> note
   const [rowErrors, setRowErrors] = useState({}); // id -> error
+
+  useAutoDismiss(internalState.notice, () => setInternalState((state) => ({ ...state, notice: '' })));
 
   const loadWorkflow = async () => {
     if (!hasWorkflowAccess) { setWorkflowState({ status: 'ready', error: '', data: { selected: [] } }); return; }
