@@ -26,6 +26,8 @@ BODY_DRAFT_MAX = EXTRACT_MAX_CHARS
 MIN_SUBMIT_BODY_CHARS = 20
 FIELD_MAX = {"category": 200, "team": 400, "author": 400, "owner_name": 200}
 CONTENT_TYPES = ("story", "document_import", "leadership", "announcement")
+LAYOUTS = ("two-column", "list-view", "feature-card", "text-top")
+DISPLAY_SECTIONS = ("hero", "srid")
 
 STATUSES = (
     "draft",
@@ -89,10 +91,17 @@ def _require_owned(items: dict[str, dict], record_id: str, owner_id: str) -> dic
 
 def _base_record(owner_id: str, content_type: str, fields: dict) -> dict:
     now = utc_now()
+    safe_type = content_type if content_type in CONTENT_TYPES else "story"
+    default_layout = "feature-card" if safe_type == "leadership" else "text-top" if safe_type == "announcement" else "two-column"
+    default_section = "hero" if safe_type == "leadership" else "srid"
+    layout = _clean(fields.get("layout"), 40)
+    display_section = _clean(fields.get("display_section"), 40)
     return {
         "id": storage.new_id(),
         "owner_id": owner_id,
-        "content_type": content_type if content_type in CONTENT_TYPES else "story",
+        "content_type": safe_type,
+        "layout": layout if layout in LAYOUTS else default_layout,
+        "display_section": display_section if display_section in DISPLAY_SECTIONS else default_section,
         "title": _clean(fields.get("title"), TITLE_MAX),
         "summary": _clean(fields.get("summary"), SUMMARY_MAX),
         "body": _clean(fields.get("body")),
@@ -214,6 +223,8 @@ def update_draft(owner_id: str, record_id: str, fields: dict) -> dict:
             "category": _clean(fields.get("category"), FIELD_MAX["category"]),
             "team": _clean(fields.get("team"), FIELD_MAX["team"]),
             "author": _clean(fields.get("author"), FIELD_MAX["author"]),
+            "layout": _clean(fields.get("layout"), 40) if _clean(fields.get("layout"), 40) in LAYOUTS else record.get("layout", "two-column"),
+            "display_section": _clean(fields.get("display_section"), 40) if _clean(fields.get("display_section"), 40) in DISPLAY_SECTIONS else record.get("display_section", "srid"),
             "publish_at": _optional_timestamp(fields.get("publish_at")),
             "expires_at": _optional_timestamp(fields.get("expires_at")),
             "updated_at": utc_now(),

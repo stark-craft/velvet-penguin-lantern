@@ -167,12 +167,13 @@ test('WS6 every Sampark article surface uses the original TechScout dossier', ()
 
 test('WS2 author dashboard reopens editable records with status actions', ()=>{
   const create = read('../src/sampark/SamparkCreate.jsx');
+  const drafts = read('../src/sampark/create-news/CreateNewsDrafts.jsx');
   assert.match(create, /openRecord/);
   assert.match(create, /needs_changes/);
-  assert.match(create, /withdrawn/);
-  assert.match(create, /Withdraw/);
-  assert.match(create, /Back to contributions/);
-  assert.match(create, /Confirm delete/);
+  assert.match(drafts, /withdrawn/);
+  assert.match(drafts, /Withdraw/);
+  assert.match(drafts, /Drafts and submissions/);
+  assert.match(drafts, /Confirm delete/);
   assert.match(create, /reviewNote/);
   assert.doesNotMatch(create, /coverPreview && !form\.id/);
   assert.match(create, /validateCreateSubmit/);
@@ -216,7 +217,7 @@ test('WS2 Sampark notification bell deep-links records', ()=>{
   const app = read('../src/sampark/SamparkApp.jsx');
   assert.match(app, /SamparkNotificationBell/);
   const create = read('../src/sampark/SamparkCreate.jsx');
-  assert.match(create, /\?open=/);
+  assert.match(create, /get\('open'\)/);
 });
 
 test('WS9 sources use stable keys and paginate', ()=>{
@@ -367,11 +368,11 @@ test('Settings exits restore the opening theme and report session truth', ()=>{
   assert.match(access, /onAccessChanged/);
 });
 
-test('Create header stacks on narrow screens without redesigning desktop', ()=>{
-  const css = read('../src/sampark/sampark.css');
-  assert.match(css, /sampark-create-header > div:first-child/);
-  assert.match(css, /max-width: 560px/);
-  assert.match(css, /flex-direction: column/);
+test('Create modal and composer stack cleanly at narrow widths', ()=>{
+  const css = read('../src/sampark/create-news/create-news.css');
+  assert.match(css, /sampark-create-modal/);
+  assert.match(css, /max-width: 520px/);
+  assert.match(css, /sampark-create-editor-layout/);
 });
 
 test('Search shell clear stays in Search via shared targets', ()=>{

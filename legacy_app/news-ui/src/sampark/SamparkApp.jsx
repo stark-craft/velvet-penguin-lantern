@@ -4,7 +4,6 @@ import Icon from '../news-scrapper/components/Icon.jsx';
 import { getAccessCapabilities, getRecommendationStatus, getViewerPreferences, getViewerProfile, updateViewerPreferences } from '../news-scrapper/api.js';
 import { useLanguage } from '../news-scrapper/translation/LanguageProvider.jsx';
 import { useSamparkAuth } from './auth/SamparkAuthContext.jsx';
-import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
 import SamparkSearchResults from './SamparkSearchResults.jsx';
 import SamparkSettingsModal, { readSamparkSettings } from './SamparkSettingsModal.jsx';
 import SamparkForYou from './SamparkForYou.jsx';
@@ -12,6 +11,7 @@ import SamparkAllNews from './all-news/AllNewsPage.jsx';
 import SamparkResearch from './SamparkResearch.jsx';
 import SamparkSamsungNews from './SamparkSamsungNews.jsx';
 import SamparkCreate from './SamparkCreate.jsx';
+import SamparkCreateModal from './create-news/SamparkCreateModal.jsx';
 import SamparkNotificationBell from './shared/SamparkNotificationBell.jsx';
 import { searchClearTarget, searchSubmitTarget } from './searchNav.js';
 import SamparkLogin from './SamparkLogin.jsx';
@@ -70,39 +70,6 @@ function ResearchStructure() {
 
 function SamsungStructure() {
   return <SamparkSamsungNews />;
-}
-
-function SamparkCreateModal({ onClose }) {
-  const previousActiveRef = useRef(null);
-  const overlayRef = useRef(null);
-  const [hasUnsaved, setHasUnsaved] = useState(false);
-  const attemptClose = () => {
-    if (hasUnsaved && !confirm('You have unsaved work. Discard and close?')) return;
-    onClose();
-  };
-  const dialogRef = useModalFocus(true, attemptClose);
-  // Body scroll lock - preserve useModalFocus's html overflow handling, add body lock
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
-  // Focus restoration - handled by useModalFocus isolation, keep explicit restoration
-  useEffect(() => {
-    previousActiveRef.current = document.activeElement;
-    return () => {
-      const prev = previousActiveRef.current;
-      if (prev && typeof prev.focus === 'function') try { prev.focus(); } catch {}
-    };
-  }, []);
-  return (
-    <div ref={overlayRef} className="sampark-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) attemptClose(); }} style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', display: 'grid', placeItems: 'center', zIndex: 100 }} role="presentation">
-      <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="create-modal-title" tabIndex={-1} style={{ width: 'min(96vw, 960px)', maxHeight: '90vh', overflow: 'auto', background: 'var(--surface)', borderRadius: 12, padding: 16 }}>
-        <header style={{ display: 'flex', justifyContent: 'space-between' }}><h2 id="create-modal-title">Create News</h2><button aria-label="Close" onClick={attemptClose} type="button"><Icon name="x" size={18} /></button></header>
-        <SamparkCreate onDirtyChange={setHasUnsaved} />
-      </section>
-    </div>
-  );
 }
 
 export default function SamparkApp() {

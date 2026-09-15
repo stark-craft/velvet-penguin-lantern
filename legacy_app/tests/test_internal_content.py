@@ -193,21 +193,29 @@ class InternalContentTests(unittest.TestCase):
             "category": "Technology",
             "team": "Display Research",
             "author": "Vineet",
+            "layout": "list-view",
+            "display_section": "hero",
         })
         self.assertEqual(created.status_code, 200)
         record = created.json()
         self.assertEqual(record["status"], "draft")
         self.assertEqual(record["content_type"], "story")
         self.assertEqual(record["title"], "Display roadmap")
+        self.assertEqual(record["layout"], "list-view")
+        self.assertEqual(record["display_section"], "hero")
         self.assertTrue(record["id"])
 
         updated = owner.request("PUT", f"/internal-content/{record['id']}", json_body={
             "title": "Display roadmap 2026",
             "summary": "A short summary.",
             "body": "Rewritten body.",
+            "layout": "feature-card",
+            "display_section": "srid",
         })
         self.assertEqual(updated.status_code, 200)
         self.assertEqual(updated.json()["title"], "Display roadmap 2026")
+        self.assertEqual(updated.json()["layout"], "feature-card")
+        self.assertEqual(updated.json()["display_section"], "srid")
 
         listed = owner.request("GET", "/internal-content/mine")
         self.assertEqual([item["id"] for item in listed.json()["items"]], [record["id"]])

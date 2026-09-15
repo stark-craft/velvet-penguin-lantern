@@ -358,14 +358,25 @@ test('Sampark Create News workflow is capability-gated with templates, preview a
   assert.match(app, /SamparkCreate/);
   assert.match(app, /navigate\('\/create'\)|navigate\("\/create"\)/);
   const create = read('../src/sampark/SamparkCreate.jsx');
+  const model = read('../src/sampark/create-news/createNewsModel.js');
+  const landing = read('../src/sampark/create-news/CreateNewsLanding.jsx');
+  const sriOptions = read('../src/sampark/create-news/SriCreateOptions.jsx');
+  const editor = read('../src/sampark/create-news/CreateNewsStoryEditor.jsx');
+  const preview = read('../src/sampark/create-news/CreateNewsPreview.jsx');
+  const urlImporter = read('../src/sampark/create-news/UrlStoryImporter.jsx');
   assert.match(create, /getContributionAccess|getAccessCapabilities/);
   assert.match(create, /createContributionDraft|updateContributionDraft|uploadContributionCover|submitContributionDraft|importContributionDocument/);
-  assert.match(create, /TEMPLATES|Story.*Leadership.*Announcement/);
-  assert.match(create, /Preview|previewOpen|sampark-create-preview/);
-  assert.match(create, /CONTRIBUTION_LIMITS|validateCoverFile|validateCoverDimensions/);
-  assert.match(create, /Save draft|Submit for approval/);
-  assert.match(create, /sampark-create-page|sampark-create-template/);
-  assert.match(read('../src/sampark/sampark.css'), /sampark-create-page/);
+  assert.match(model, /STORY_TEMPLATES/);
+  assert.match(sriOptions, /Create for SRI-D/);
+  assert.match(model, /Create Story/);
+  assert.match(model, /Leadership Message/);
+  assert.match(model, /Announcement/);
+  assert.match(landing, /Create from URL/);
+  assert.match(urlImporter, /createViewerBriefings|getViewerBriefings|retryViewerBriefing/);
+  assert.match(preview, /Live preview|Submit for approval/);
+  assert.match(editor, /Choose Template|Hero Banner|SRI-D News|Save draft/);
+  assert.match(create, /validateCoverFile|validateCoverDimensions|validateDocumentFile/);
+  assert.match(read('../src/sampark/create-news/create-news.css'), /sampark-create-modal|sampark-create-template/);
 });
 
 test('Sampark Review Center integrates contribution approval and Approved reflects published', () => {

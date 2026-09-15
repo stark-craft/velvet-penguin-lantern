@@ -694,6 +694,8 @@ const toBackendDraftFields = (draft) => ({
   author: draft.author || '',
   owner_name: draft.ownerName || localStorage.getItem('news-viewer-name') || '',
   content_type: draft.contentType || '',
+  layout: draft.layout || '',
+  display_section: draft.displaySection || '',
 });
 
 const fromBackendRecord = (record) => ({
@@ -707,6 +709,8 @@ const fromBackendRecord = (record) => ({
   category: record.category || '',
   team: record.team || '',
   author: record.author || '',
+  layout: record.layout || '',
+  displaySection: record.display_section || '',
   ownerName: record.owner_name || '',
   cover: record.cover
     ? {
@@ -784,6 +788,9 @@ export const uploadContributionCover = async (id, file, focalX = 0.5, focalY = 0
   form.append('focal_y', String(focalY));
   return fromBackendRecord(await uploadFetch(`/internal-content/${id}/cover`, form));
 };
+
+export const deleteContributionCover = (id) =>
+  jsonFetch(`/internal-content/${encodeURIComponent(id)}/cover`, { method: 'DELETE' });
 
 export const deleteContributionRecord = (id) => jsonFetch(`/internal-content/${id}`, { method: 'DELETE' });
 

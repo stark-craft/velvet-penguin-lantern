@@ -6,13 +6,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { renderToHtml, srcImport } from './ssr-render.js';
 
-function createEl(access, items) {
+function createEl(access, items, initialView = 'landing') {
   return `
 import SamparkCreate from ${srcImport('sampark/SamparkCreate.jsx')};
 function __element() {
   return React.createElement(SamparkCreate, {
     initialAccess: ${JSON.stringify(access)},
     initialItems: ${JSON.stringify(items)},
+    initialView: ${JSON.stringify(initialView)},
   });
 }
 `;
@@ -20,7 +21,9 @@ function __element() {
 
 test('Create landing renders without a selected template (TDZ regression)', () => {
   const html = renderToHtml(createEl({ allowed: true }, []), { route: '/create' });
-  assert.match(html, /What will you publish today\?/);
+  assert.match(html, /How would you like to create the news\?/);
+  assert.match(html, /Create for SRI-D/);
+  assert.match(html, /Create from URL/);
 });
 
 test('Create denied state renders when access is off', () => {
@@ -38,8 +41,8 @@ test('Create dashboard lists every contribution with its total count', () => {
     updatedAt: '2026-09-01',
     reviewNote: i === 3 ? 'Add a cover' : '',
   }));
-  const html = renderToHtml(createEl({ allowed: true }, items), { route: '/create' });
-  assert.match(html, /Your contributions \(12\)/);
+  const html = renderToHtml(createEl({ allowed: true }, items, 'drafts'), { route: '/create' });
+  assert.match(html, /Drafts and submissions/);
   assert.match(html, /Draft 0/);
   assert.match(html, /Draft 9/);
   assert.match(html, /Reviewer: Add a cover/);
