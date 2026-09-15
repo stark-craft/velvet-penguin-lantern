@@ -1,6 +1,8 @@
+import { articleKey } from '../../news-scrapper/utils/intelligence.js';
+
 // Pure helpers for All News hydration, used in AllNewsPage and tested behaviorally
 export function getCurrentVote(votes, item, reactionsHydrated) {
-  const key = item ? (item.article_id || item.id || item.canonical_link || item.link || item.url || item.title || '') : '';
+  const key = item ? articleKey(item) : '';
   // Prefer hydrated votes, fallback to trustworthy item.reactions
   const snap = votes[key];
   if (snap) return snap;
@@ -16,9 +18,7 @@ export function getCurrentVote(votes, item, reactionsHydrated) {
 }
 
 export function isReactionReady(votes, item, reactionsHydrated) {
-  const key = item ? (item.article_id || item.id || item.canonical_link || item.link || item.url || item.title || '') : '';
-  // Use articleKey logic is more accurate, but for helper we use simple id
-  // In production, AllNewsPage uses articleKey; here we approximate
+  const key = item ? articleKey(item) : '';
   return Boolean(reactionsHydrated || (votes && votes[key]) || (item && item.reactions));
 }
 

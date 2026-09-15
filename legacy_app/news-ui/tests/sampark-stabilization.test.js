@@ -133,8 +133,7 @@ test('WS4 engagement covers Following Hidden and card source opens', ()=>{
   assert.match(following, /onDossierOpen/);
   assert.match(following, /onDossierClose/);
   assert.match(following, /onSourceOpen/);
-  assert.match(following, /SamparkArticleDossier/);
-  assert.match(following, /following-dossier-title/);
+  assert.match(following, /ArticleModal/);
   const hidden = read('../src/sampark/SamparkHidden.jsx');
   assert.match(hidden, /source_open/);
   assert.match(hidden, /sanitizeExternalUrl/);
@@ -144,9 +143,9 @@ test('WS4 engagement covers Following Hidden and card source opens', ()=>{
   assert.match(page, /onSourceOpen=\{handleCardSourceOpen\}/);
 });
 
-test('WS6 shared article dossier renders every field safely', ()=>{
-  const dossier = read('../src/sampark/shared/SamparkArticleDossier.jsx');
-  assert.match(dossier, /resolveDossierView/);
+test('WS6 every Sampark article surface uses the original TechScout dossier', ()=>{
+  const dossier = read('../src/news-scrapper/components/modals/ArticleModal.jsx');
+  assert.match(dossier, /sourceList/);
   const model = read('../src/sampark/shared/dossierModel.js');
   for (const field of ['summary_lead','summary_points','key_points','what_changed','why_now','why_matters','watch_next','full_contents','keywords_found','source_count','sentiment','learned']) {
     assert.match(model, new RegExp(field));
@@ -156,12 +155,13 @@ test('WS6 shared article dossier renders every field safely', ()=>{
   assert.match(dossier, /aria-labelledby/);
   assert.match(dossier, /Close dossier/);
   for (const surface of ['SamparkHistory.jsx', 'SamparkFollowing.jsx', 'SamparkSearchResults.jsx', 'SamparkForYou.jsx', 'SamparkSamsungNews.jsx']) {
-    assert.match(read(`../src/sampark/${surface}`), /SamparkArticleDossier/);
+    assert.match(read(`../src/sampark/${surface}`), /ArticleModal/);
   }
   const history = read('../src/sampark/SamparkHistory.jsx');
-  assert.match(history, /SamparkArticleDossier/);
+  assert.match(history, /ArticleModal/);
   const forYou = read('../src/sampark/SamparkForYou.jsx');
-  assert.match(forYou, /SamparkArticleDossier/);
+  assert.match(forYou, /ArticleModal/);
+  assert.match(read('../src/sampark/all-news/AllNewsPage.jsx'), /ArticleModal/);
   assert.doesNotMatch(forYou, /function SamparkArticleModal/);
 });
 

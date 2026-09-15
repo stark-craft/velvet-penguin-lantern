@@ -752,6 +752,16 @@
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
+html[data-theme="light"] .tsan-card-review-check {
+  border-color: rgba(255,255,255,.82) !important;
+  background: rgba(8,16,35,.2) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18) !important;
+}
+html[data-theme="light"] .tsan-card-review-check:checked {
+  border-color: rgba(255,255,255,.92) !important;
+  background: #111318 !important;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.4), 0 3px 10px rgba(0,0,0,.2) !important;
+}
 .tsan-card-review-check:disabled {
   cursor: not-allowed;
 }

@@ -12,7 +12,8 @@ test('Sampark remains an independent frontend entry with persisted theme prefere
   assert.match(read('../src/sampark/theme.js'), /sampark-theme/);
   assert.match(read('../src/sampark/theme.js'), /dark/);
   assert.doesNotMatch(read('../src/main.jsx'), /sampark/);
-  assert.doesNotMatch(entry, /GuidePetProvider|ui-polish|index\.css/);
+  assert.doesNotMatch(entry, /GuidePetProvider/);
+  assert.match(entry, /index\.css|ui-polish\.css/);
   assert.match(read('../sampark/index.html'), /data-theme="light"/);
 });
 
@@ -91,7 +92,7 @@ test('Sampark For You uses real recommendation APIs and Sampark-native presentat
   assert.match(read('../src/sampark/sampark.css'), /sampark-for-you-page|sampark-foryou-grid|sampark-metrics-grid/);
   assert.match(read('../src/sampark/sampark.css'), /fy-card-img[\s\S]*object-fit:\s*cover/);
   assert.match(read('../src/sampark/sampark.css'), /sampark-dossier-img[\s\S]*object-fit:\s*contain/);
-  assert.match(forYou, /onWhyOpen|why_matters|why_it_matters|summary_points/);
+  assert.match(forYou, /onWhyThisStory|handleWhyOpen/);
 });
 
 test('Sampark For You featured layout is five-card composition and feed beyond five is preserved with pagination', () => {
@@ -302,8 +303,8 @@ test('Sampark All News is functional with real briefing APIs and Sampark-native 
   assert.match(allNewsModel, /selectFeatured|selectAllNewsRail|selectLatestToday|deriveFilterOptions/);
   assert.match(allNewsPage, /CategoryTabs|FeaturedCarousel|AllNewsRail|LatestNews|FilterPanel|DayWiseNews/);
   assert.match(allNewsPage, /tsan-page|tsan-category-tabs|tsan-featured-rail|tsan-rail|tsan-latest|tsan-filter-panel|tsan-daywise/);
-  assert.match(allNewsPage, /SamparkArticleDossier/);
-  assert.match(read('../src/sampark/shared/SamparkArticleDossier.jsx'), /sampark-dossier|useModalFocus/);
+  assert.match(allNewsPage, /ArticleModal/);
+  assert.match(read('../src/news-scrapper/components/modals/ArticleModal.jsx'), /dossier|useModalFocus/);
   assert.match(allNewsPage, /getViewerReactions|saveArticleForLater|hideArticleForViewer|setViewerReaction/);
   // ensure isolated tsan-* namespace, not old classes
   assert.match(read('../src/sampark/all-news/all-news.css'), /\.tsan-/);
