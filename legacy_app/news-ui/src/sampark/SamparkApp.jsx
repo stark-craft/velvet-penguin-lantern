@@ -26,6 +26,7 @@ import SamparkSources from './SamparkSources.jsx';
 import SamparkScheduler from './SamparkScheduler.jsx';
 import SamparkAnalytics from './SamparkAnalytics.jsx';
 import SamparkAccess from './SamparkAccess.jsx';
+import GutterMonkey from './mascot/GutterMonkey.jsx';
 import './sampark.css';
 const SEARCH_HISTORY_KEY = 'sampark-search-history-v1';
 const LEGACY_SEARCH_HISTORY_KEY = 'sampark-search-history-v1';
@@ -73,6 +74,8 @@ function SamsungStructure() {
 }
 
 export default function SamparkApp() {
+  const brandRef = useRef(null);
+  const workspaceRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search).get('q') || '';
@@ -210,7 +213,7 @@ export default function SamparkApp() {
     <a className="skip-link" href="#news-main-content">Skip to news</a>
     {/* Sampark supplies the surrounding portal chrome; TechScout begins here. */}
     <header className="techscout-header">
-      <div className="techscout-brand-row"><NavLink className="techscout-logo" to="/for-you"><span className="logo-samsung">Samsung</span><span className="logo-techscout">TechScout</span></NavLink><div className="techscout-greeting"><p>{hasName ? <>Hi <span data-no-translate>{displayName}</span>! Your Personalized Technology briefing</> : 'Your Personalized Technology briefing'}</p></div></div>
+      <div className="techscout-brand-row"><NavLink className="techscout-logo gutter-monkey-brand" ref={brandRef} to="/for-you"><span className="logo-samsung">Samsung</span><span className="logo-techscout">TechScout</span></NavLink><div className="techscout-greeting"><p>{hasName ? <>Hi <span data-no-translate>{displayName}</span>! Your Personalized Technology briefing</> : 'Your Personalized Technology briefing'}</p></div></div>
       <div className="techscout-actions">
         <form className="search-bar" onSubmit={submitSearch} role="search"><button aria-label="Search Technologies News" className="search-submit" type="submit"><Icon name="search" size={16} /></button><input aria-label="Search all archived news" list="sampark-search-history" onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search Technologies News" type="search" value={searchDraft} />{searchDraft && <button aria-label="Clear search" className="search-clear" onClick={clearSearch} type="button"><Icon name="x" size={14} /></button>}<datalist id="sampark-search-history">{searchHistory.map((item) => <option key={item} value={item} />)}</datalist><span style={{ display: 'none' }}>Search Technologies News</span></form>
         <label className="lang-btn" data-no-translate><Icon name="globe" size={16} /><select aria-label="Language" onChange={(event) => changeLanguage(event.target.value)} value={language}><option value="en">English</option><option value="ko">한국어</option></select></label>
@@ -221,7 +224,7 @@ export default function SamparkApp() {
     </header>
     {serviceError && <div className="shell-status is-error" role="alert">{serviceError}</div>}
     {language === 'ko' && (translationState.translating || translationState.error) && <div className={`shell-status${translationState.error ? ' is-error' : ''}`} data-no-translate role={translationState.error ? 'alert' : 'status'}>{translationState.error ? <><span>{translationState.error}</span><button onClick={translationState.retry} type="button">Retry</button></> : <span>{translationState.phase === 'downloading' ? `한국어 번역 준비 중${translationState.downloadProgress === null ? '' : ` · ${translationState.downloadProgress}%`}` : `한국어로 번역 중 · ${translationState.completed}/${translationState.total}`}</span>}</div>}
-    <div className="main-card-container">
+    <div className="main-card-container" ref={workspaceRef}>
       {/* White product-tab row inside the rounded workspace — exactly four pills */}
       <nav aria-label="TechScout sections" className="main-tabs"><NavLink className={tabClass('/for-you')} to="/for-you"><Icon name="sparkle" size={16} />For You</NavLink><NavLink className={tabClass('/all-news')} to="/all-news"><Icon name="globe" size={16} />All News</NavLink><NavLink className={tabClass('/research')} to="/research"><Icon name="file" size={16} />Research</NavLink><NavLink className={tabClass('/samsung-news')} to="/samsung-news"><Icon name="layers" size={16} />Samsung News</NavLink></nav>
       <main className="content-area" id="news-main-content" tabIndex={-1}>
@@ -235,6 +238,7 @@ export default function SamparkApp() {
         )}
       </main>
     </div>
+    <GutterMonkey brandRef={brandRef} workspaceRef={workspaceRef} />
     <SamparkSettingsModal capabilities={capabilities} privilegedSessionActive={Boolean(auth?.privilegedSessionActive)} sessionRole={auth?.sessionRole || ''} onAccessChanged={refreshAccess} onClose={() => setSettingsOpen(false)} onSaved={async (nextSettings, nextViewer) => { setSettings(nextSettings); setViewer(nextViewer); if (auth?.refresh) await auth.refresh(); if (!nextSettings.saveSearchHistory) { setSearchHistory([]); window.localStorage.removeItem(getNamespacedHistoryKey(nextViewer || viewer)); window.localStorage.removeItem(SEARCH_HISTORY_KEY); } else if (nextViewer?.principal) { // refresh namespaced history after viewer change
         setSearchHistory(readSearchHistoryForViewer(nextViewer));
       } }} open={settingsOpen} settings={settings} viewer={viewer} />

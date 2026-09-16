@@ -1,7 +1,7 @@
 :root {
   font-family: Roboto, "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #1a1a2e;
-  background: #f5f7fa;
+  background: #efefef;
   font-synthesis: none;
   --primary: #1428a0;
   --surface: #ffffff;
@@ -15,12 +15,13 @@
 
 * { box-sizing: border-box; }
 html, body, #root { min-width: 320px; min-height: 100%; margin: 0; }
-body { min-height: 100vh; background: #f5f7fa; color: var(--text); font-size: 16px; line-height: 1.5; }
+body { min-height: 100vh; background: #efefef; color: var(--text); font-size: 16px; line-height: 1.5; }
+#root { background: #efefef; }
 button, input, select { font: inherit; }
 button { border: 0; cursor: pointer; }
 a { color: inherit; text-decoration: none; }
 
-.techscout-app { min-height: 100vh; background: var(--surface-soft); }
+.techscout-app { min-height: 100vh; background: #efefef; }
 .skip-link { position: fixed; top: -64px; left: 12px; z-index: 20; border-radius: 8px; background: var(--surface); color: var(--primary); padding: 10px 14px; box-shadow: 0 6px 20px rgb(20 40 160 / 14%); }
 .skip-link:focus { top: 12px; }
 
@@ -45,7 +46,7 @@ a { color: inherit; text-decoration: none; }
 .icon-btn { display: grid; width: 38px; padding: 0; place-items: center; background: #f5f7fa; color: var(--text); }
 .create-news-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0 18px; background: var(--primary); color: #fff; font-weight: 500; }
 
-.main-card-container { min-height: calc(100vh - 103px); margin: 16px 24px; overflow: hidden; border-radius: 16px; background: var(--surface); box-shadow: 0 2px 12px rgb(0 0 0 / 8%); }
+.main-card-container { width: 100%; max-width: none; min-height: calc(100vh - 103px); margin: 16px 0; overflow: hidden; border-radius: 16px; background: var(--surface); box-shadow: 0 2px 12px rgb(0 0 0 / 8%); }
 .main-tabs { display: flex; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--surface); }
 .main-tab { flex: none; gap: 8px; min-height: 52px; padding: 14px 24px; border-right: 1px solid var(--line); color: var(--muted); font-weight: 500; white-space: nowrap; }
 .main-tab[aria-current="page"], .main-tab.active { background: var(--primary); color: #fff; }
@@ -477,7 +478,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .techscout-brand-row, .techscout-actions { align-items: stretch; flex-wrap: wrap; }
   .techscout-greeting { width: 100%; padding: 8px 0 0; border-top: 1px solid var(--line); border-left: 0; }
   .search-bar { flex-basis: 100%; width: 100%; }
-  .main-card-container { margin: 10px; }
+  .main-card-container { margin: 10px 0; }
   .content-area { padding: 16px; }
   .main-tab { padding: 13px 18px; }
   .preferences-bar { align-items: flex-start; flex-wrap: wrap; }
@@ -713,6 +714,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* ========== DARK THEME TOKENS ========== */
 html[data-theme="dark"] { color-scheme: dark; --primary: #8ea2ff; --surface: #171722; --surface-soft: #1e1e2e; --surface-blue: #23233a; --text: #eceaf4; --muted: #b6b3c8; --faint: #8b88a0; --line: #34344a; background: #101018; }
 html[data-theme="dark"] body { background: #101018; color: var(--text); }
+html[data-theme="dark"] #root { background: #101018; }
+html[data-theme="dark"] .techscout-app { background: var(--surface-soft); }
 html[data-theme="dark"] .techscout-header, html[data-theme="dark"] .main-card-container, html[data-theme="dark"] .sampark-review-card, html[data-theme="dark"] .sampark-approved-card { background: var(--surface); border-color: var(--line); }
 html[data-theme="dark"] .search-bar, html[data-theme="dark"] .lang-btn, html[data-theme="dark"] .icon-btn { background: var(--surface-soft); border-color: var(--line); color: var(--text); }
 html[data-theme="dark"] .sampark-dossier, html[data-theme="dark"] .settings-modal { background: var(--surface); color: var(--text); }
@@ -803,7 +806,7 @@ html[data-theme="light"] .techscout-actions .icon-btn.settings-btn { background:
 html[data-theme="dark"] .create-news-btn { background: var(--primary); color: #101018; }
 
 /* ---- Workspace + pill tab row ---- */
-.main-card-container { background: var(--surface); margin: 16px 24px; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; min-height: 0; }
+.main-card-container { background: var(--surface); border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; min-height: 0; }
 .main-tabs { display: flex; gap: 10px; padding: 16px 24px; background: var(--surface); border-bottom: 1px solid var(--line); overflow-x: auto; }
 .main-tabs .main-tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 20px; background: #f1f3fd; color: #1a1a2e; font-size: 14px; font-weight: 500; border: 0; border-radius: 50px; white-space: nowrap; flex: none; min-height: 0; }
 html[data-theme="dark"] .main-tabs .main-tab { background: var(--surface-soft); color: var(--text); }
@@ -812,6 +815,23 @@ html[data-theme="dark"] .main-tabs .main-tab:hover { color: #101018; background:
 .main-tabs .main-tab.active, .main-tabs .main-tab[aria-current="page"] { color: #fff; background: #1428a0; }
 html[data-theme="dark"] .main-tabs .main-tab.active { color: #101018; background: var(--primary); }
 .content-area { padding: 20px 24px; min-height: 0; }
+html:not([data-theme="dark"]) .techscout-header,
+html:not([data-theme="dark"]) .main-card-container,
+html:not([data-theme="dark"]) .main-tabs,
+html:not([data-theme="dark"]) .content-area { background: #ffffff; }
+
+@media (min-width: 2000px) {
+  .main-card-container { width: 80%; margin-left: auto; margin-right: auto; }
+}
+@media (min-width: 2560px) {
+  .main-card-container { width: 70%; }
+}
+@media (min-width: 3200px) {
+  .main-card-container { width: 64%; }
+}
+@media (min-width: 3840px) {
+  .main-card-container { width: 60%; }
+}
 
 /* ---- For You: preferences bar (compact white row) ---- */
 .sampark-for-you-page { display: grid; gap: 16px; }
@@ -928,7 +948,7 @@ html[data-theme="dark"] .mfy-action-btn:hover { color: var(--primary); }
 @media (max-width: 600px) {
   .main-tabs { overflow-x: auto; scrollbar-width: thin; }
   .main-tabs .main-tab { white-space: nowrap; }
-  .main-card-container { margin: 10px; }
+  .main-card-container { margin: 10px 0; }
   .content-area { padding: 16px; }
   .techscout-header { padding: 14px 16px; }
   html, body, #root, .techscout-app, .main-card-container, .content-area { max-width: 100%; overflow-x: clip; }
