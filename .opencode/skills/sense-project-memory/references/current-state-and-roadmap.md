@@ -548,3 +548,70 @@ modals, translation, access controls, or article interactions yet. The obsolete
 Sampark-specific screen adapters and combined prototype stylesheet were removed.
 The original application and backend remain intact. Add Sampark content and
 behavior one reviewed component at a time from this baseline.
+
+### Sampark selected-news report workspace (2026-09-30)
+
+A portable report-editor folder and `/reports` backend module are integrated with
+one Create Report button in All News's existing selection bar. The document is a
+continuous editable flow, with stored summaries, analysis space and article
+image/summary/Samsung-implication/team fields. Private signed-viewer drafts,
+revision conflicts and export history use an atomic runtime store. Snapshot
+exports cover HTML/PDF/DOCX/XLSX and PPT template-marker mapping; template.pptx is
+absent from this checkout. The flow-page estimate is not pixel-identical export
+pagination. Ask AI calls the existing Samsung Web Search and Chat adapters and
+charges one question once for both services: two questions per rolling six hours,
+shared across report tabs, persisted before upstream calls. Missing configuration
+is not charged; attempted upstream failures are. See
+`legacy_app/docs/SAMPARK_REPORT_EDITOR.md` for Windows integration and limitations.
+Live Samsung answers and proprietary-template visual fidelity remain deployment
+checks. Existing permission/recommendation tests also fail independently in this
+checkout; report-specific tests and frontend verification cover the new module.
+
+Report photos now expose Replace from computer on click or keyboard selection.
+Local PNG/JPEG/WebP pictures (up to 1 MB) are embedded in the same article slot,
+with native Undo, private save/reopen and HTML/PDF/Word export verification.
+
+Each report article now has a distinct editable Why this matters to Samsung
+section. The report-only Samsung impact panel asks the existing Chat adapter for
+deeper strategic relevance, opportunities, risks, stakeholders and next steps,
+using the current article context. It shares the durable two-request/six-hour
+allowance with Ask AI; no Web Search dependency or automatic generation is added.
+Preview/Apply preserves native Undo and rejects stale article or section edits.
+Old drafts retain their wording and receive structural wrappers on open. Report
+tests cover Chat-only generation, the shared quota, missing/empty responses,
+private save/export and the existing PPT insight mapping. Browser checks used an
+isolated test answer for Apply/Undo, then restored the normal backend and verified
+the missing Samsung Chat configuration message without spending quota.
+
+Cross-article comparison now generates automatically when a new report opens
+with two or more articles. The report-only `/reports/analysis` path sends detailed
+selected summaries to Samsung Chat, preserving full context for two long inputs
+and fairly bounding larger selections. It is separate from Ask AI reservations:
+automatic generation and failures never spend either of the two questions.
+Private content-based caching lasts six hours (16 results per viewer), and
+concurrent openings share one upstream call. Edited comparison text receives an
+explicit review/replacement option, changed article context requires retry, and
+saved drafts or closed editors reject late insertion. No Web Search/OpenAlex
+lookup is needed. Relevant tests and browser QA cover unchanged allowance,
+cached openings, automatic insertion, native Undo, protection of ongoing edits,
+and light/dark/narrow layouts. Live Samsung responses still need deployment
+credentials; browser generation was checked with an isolated test response.
+
+The report now also automatically generates a detailed Why this matters to
+Samsung section for every selected article on open, including single-article
+reports. `/reports/impact` uses the full summary and source metadata with the
+existing detailed Samsung prompt, without Ask AI reservations. The separate
+private cache lasts six hours (up to 100 article results per viewer); identical
+concurrent requests share one upstream call. The editor queues articles one at a
+time, preserves edited sections for review, and rejects changed source evidence.
+Missing summaries skip that article, connection failures pause for Retry, and
+already completed sections are retained. Opening a saved draft or closing the
+editor invalidates pending insertion and stops the remaining queue. Exports wait
+for pending automatic work; the optional toolbar refinement still uses the shared
+Ask AI allowance. Mobile QA was explicitly waived for this update.
+Verified: 245 frontend tests, 25 report backend tests, production build and desktop
+light/dark QA with isolated Chat fixtures. Single/multiple-article generation,
+cached reopening, section edit protection, Apply/Undo, private save/reopen and
+saved-draft cancellation pass. The normal backend is restored; absent Samsung
+Chat credentials produce Retry without spending quota. No live answer or real
+proprietary-template validation is claimed.

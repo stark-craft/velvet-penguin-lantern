@@ -30,6 +30,7 @@ import LatestNews from './LatestNews.jsx';
 import FilterPanel from './FilterPanel.jsx';
 import DayWiseNews from './DayWiseNews.jsx';
 import './all-news.css';
+const ReportEditor = React.lazy(() => import('../report-editor/ReportEditor.jsx'));
 
 function AllNewsDossier({ item, onClose, saved, onSave, onHide, onReact, savedHydrated, reactionsHydrated }){
   const engagement = useArticleEngagement(item || {}, { surface: 'shared_briefing' });
@@ -74,6 +75,7 @@ export default function AllNewsPage({ capabilities=[] }){
   const [batchSelect, setBatchSelect] = useState(null);
   const [batchBusy, setBatchBusy] = useState(false);
   const [draftExportOpen, setDraftExportOpen] = useState(false);
+  const [reportItems, setReportItems] = useState(null);
   const locks = useRef(new Set());
 
   useAutoDismiss(notice, () => setNotice(''));
@@ -488,12 +490,14 @@ export default function AllNewsPage({ capabilities=[] }){
       <AllNewsDossier item={openArticle} onClose={()=>setOpenArticle(null)} saved={openArticle ? savedKeys.has(articleKey(openArticle)) : false} onSave={handleSave} onHide={async it=>{ setOpenArticle(null); await handleHide(it); }} onReact={handleVote} savedHydrated={savedHydrated} reactionsHydrated={reactionsHydrated} />
       {reviewAllowed && <NameModal article={pendingSelect} open={Boolean(pendingSelect)} onClose={()=>setPendingSelect(null)} onConfirm={confirmReviewSubmission} />}
       {reviewAllowed && <NameModal article={batchSelect} confirmLabel="Send to Review Queue" description="Enter your name." open={Boolean(batchSelect)} onClose={()=>setBatchSelect(null)} onConfirm={confirmBatchSubmission} title={`Send ${selectedBatch.length} articles to Review Queue`} />}
+      {reportItems && <React.Suspense fallback={<div role="status">Opening report editor…</div>}><ReportEditor items={reportItems} onClose={()=>setReportItems(null)} /></React.Suspense>}
       <DraftExportModal items={selectedBatch} open={draftExportOpen} source="sampark-all-news" onClose={()=>setDraftExportOpen(false)} />
       {reviewAllowed && selectedBatch.length > 0 && <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
         <div className="batch-action-bar flex flex-wrap items-center justify-center gap-3 rounded-full border border-sky-300/20 bg-[#101827]/95 px-5 py-3 text-sm text-slate-200 shadow-cockpit backdrop-blur-xl">
           <strong>{selectedBatch.length} selected</strong>
           <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setChecked({})} type="button">Clear</button>
           <button className="btn-dark-primary h-9" disabled={batchBusy} onClick={()=>setBatchSelect({ title:`${selectedBatch.length} selected articles` })} type="button">Send to Review Queue</button>
+          <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setReportItems(selectedBatch.slice())} type="button">Create Report</button>
           <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setDraftExportOpen(true)} type="button">Draft Export</button>
         </div>
       </div>}

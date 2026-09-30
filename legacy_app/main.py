@@ -20,6 +20,7 @@ from news_scrapper.access_control.router import router as access_control_router
 from news_scrapper.internal_content.router import router as internal_content_router
 from news_scrapper.recommendation import router as recommendation_router
 from news_scrapper.translation import router as translation_router
+from news_scrapper.reports.router import router as reports_router
 from venture_lens.router import router as venture_lens_router
 
 
@@ -28,6 +29,7 @@ app.include_router(translation_router)
 app.include_router(recommendation_router)
 app.include_router(internal_content_router)
 app.include_router(access_control_router)
+app.include_router(reports_router)
 
 
 SPA_API_COLLISION_ROUTES = {"/for-you", "/voc", "/scheduler"}
@@ -52,6 +54,7 @@ async def serve_spa_api_collision_deep_links(request, call_next):
     return await call_next(request)
 
 API_ROUTES = {
+    "reports",
     "archive",
     "crawl",
     "train",
