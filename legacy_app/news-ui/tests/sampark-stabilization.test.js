@@ -294,7 +294,7 @@ test('WS10 narrow layout and WS18 theme tokens', ()=>{
   assert.match(voc, /timed out/);
 });
 
-test('WS11 motion pauses on focus hidden and reduced motion', ()=>{
+test('WS11 motion reacts to focus, hidden tabs and reduced motion', ()=>{
   const carousel = read('../src/sampark/all-news/FeaturedCarousel.jsx');
   assert.match(carousel, /prefers-reduced-motion/);
   assert.match(carousel, /onFocus/);
@@ -303,8 +303,10 @@ test('WS11 motion pauses on focus hidden and reduced motion', ()=>{
   assert.match(carousel, /objectPosition/);
   const rail = read('../src/sampark/all-news/AllNewsRail.jsx');
   assert.match(rail, /IntersectionObserver/);
-  assert.match(rail, /prefers-reduced-motion/);
-  assert.match(rail, /visibilitychange/);
+  assert.match(rail, /useAutoplayState/);
+  const motion = read('../src/news-scrapper/hooks/useAutoplayState.js');
+  assert.match(motion, /prefers-reduced-motion/);
+  assert.match(motion, /visibilitychange/);
 });
 
 test('WS7 search workspace keeps privacy near controls and stays in Search', ()=>{

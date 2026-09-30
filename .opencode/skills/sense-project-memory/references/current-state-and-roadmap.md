@@ -615,3 +615,21 @@ cached reopening, section edit protection, Apply/Undo, private save/reopen and
 saved-draft cancellation pass. The normal backend is restored; absent Samsung
 Chat credentials produce Retry without spending quota. No live answer or real
 proprietary-template validation is claimed.
+
+### Sampark large-screen stream and checkbox repair (2026-09-30)
+
+The user's Windows report could not be reproduced as a width-only freeze on the
+Mac: the All News stream already moved at 2560/3840 CSS pixels. Two real defects
+were repaired: checkbox hover/focus specificity faded checked inputs, and Sampark
+hard-stopped under reduced motion despite the original UI's established slowed
+Windows behavior. Scoped checkbox states preserve solid black/white selection in
+both themes and more discoverable transparent hover controls. AllNewsRail now
+uses the existing reactive autoplay hook, an elapsed-time clock, exact cycle
+geometry, ResizeObserver and enough repeated copies for short feeds. Pause/Resume
+and separate pointer/keyboard pauses retain the current position. No backend,
+permission or global gutter behavior changes. Exact Windows source/CSS replacement
+instructions live in `legacy_app/docs/Big Screen Defect Resolution.md`.
+Verified: 250 frontend tests, production build, real-route browser checks at
+1024/1440/2560/3840 widths, both themes, active checked state, Pause/Resume and
+paused resize. A single-story 4K filter fills the clip and keeps moving. Windows
+deployment/motion preference verification remains outstanding on that machine.

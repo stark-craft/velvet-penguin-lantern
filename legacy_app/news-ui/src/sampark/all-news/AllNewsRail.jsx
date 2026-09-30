@@ -1,58 +1,79 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 import { scoreOf } from '../../news-scrapper/utils/intelligence.js';
+import useAutoplayState from '../../news-scrapper/hooks/useAutoplayState.js';
+import { advanceRailOffset, normalizeRailOffset, railCopyCount, railLoopDistance } from './railMotion.js';
 
 export default function AllNewsRail({ items=[], onOpen }){
-  const safeItems = (items || []).filter(Boolean);
-  const [paused, setPaused] = useState(false);
+  const safeItems = useMemo(()=> (items || []).filter(Boolean), [items]);
+  const [manualPaused, setManualPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [inView, setInView] = useState(true);
-  const [docHidden, setDocHidden] = useState(false);
+  const [copies, setCopies] = useState(2);
+  const { documentVisible, reducedMotion } = useAutoplayState();
   const listRef = useRef(null);
   const trackRef = useRef(null);
+  const offsetRef = useRef(0);
+  const distanceRef = useRef(0);
 
-  // duplicate content for seamless loop if enough items
-  const display = safeItems.length ? [...safeItems, ...safeItems] : [];
-  const itemSig = safeItems.map((it)=> it?.title || '').join('|');
-
-  const reducedMotion = () => {
-    try { return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
-  };
-  const shouldAnimate = safeItems.length > 0 && !paused && inView && !docHidden && !reducedMotion();
+  const display = Array.from({ length: copies }, ()=> safeItems).flat();
+  const itemSig = JSON.stringify(safeItems.map((it)=> [it?.title, it?.date, it?.src || it?.source, it?.category]));
+  const hasItems = safeItems.length > 0;
+  const shouldAnimate = hasItems && !manualPaused && !hovered && !focused && inView && documentVisible;
 
   useEffect(()=>{
-    try { setDocHidden(document.visibilityState === 'hidden'); } catch {}
-    const onVis = () => { try { setDocHidden(document.visibilityState === 'hidden'); } catch {} };
-    document.addEventListener?.('visibilitychange', onVis);
-    return () => document.removeEventListener?.('visibilitychange', onVis);
-  }, []);
-
-  useEffect(()=>{
+    if (!hasItems) {
+      setHovered(false);
+      setFocused(false);
+      setInView(true);
+    }
     const el = listRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return undefined;
     const obs = new IntersectionObserver((entries)=>{ setInView(Boolean(entries[0]?.isIntersecting)); }, { threshold: 0 });
     obs.observe(el);
     return ()=> obs.disconnect();
-  }, []);
+  }, [hasItems]);
+
+  useEffect(()=>{
+    const track = trackRef.current;
+    const viewport = listRef.current;
+    if (!track || !viewport) return undefined;
+    offsetRef.current = 0;
+    const measure = ()=> {
+      distanceRef.current = railLoopDistance(track, safeItems.length);
+      offsetRef.current = normalizeRailOffset(offsetRef.current, distanceRef.current);
+      track.style.transform = `translateY(-${offsetRef.current}px)`;
+      const needed = railCopyCount(viewport.clientHeight, distanceRef.current);
+      setCopies((current)=> current === needed ? current : needed);
+    };
+    measure();
+    // Text wrapping, browser zoom and monitor moves can change either dimension.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(track);
+    observer?.observe(viewport);
+    window.addEventListener('resize', measure);
+    return ()=> {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [itemSig, safeItems.length]);
 
   useEffect(()=>{
     const el = trackRef.current;
     if(!el || !shouldAnimate) return undefined;
     let raf;
-    let offset = 0;
-    const speed = 0.3; // px per frame ~18px/s
-    const step = ()=>{
-      offset += speed;
-      if(el){
-        // when first copy scrolled fully, reset
-        const half = el.scrollHeight / 2;
-        if(offset >= half) offset = 0;
-        el.style.transform = `translateY(-${offset}px)`;
-      }
+    let previousTime = null;
+    const step = (now)=>{
+      const elapsed = previousTime === null ? 0 : now - previousTime;
+      previousTime = now;
+      offsetRef.current = advanceRailOffset(offsetRef.current, elapsed, distanceRef.current, reducedMotion);
+      el.style.transform = `translateY(-${offsetRef.current}px)`;
       raf = window.requestAnimationFrame(step);
     };
     raf = window.requestAnimationFrame(step);
     return ()=> window.cancelAnimationFrame(raf);
-  },[shouldAnimate, itemSig]);
+  },[shouldAnimate, itemSig, reducedMotion]);
 
   if(!safeItems.length){
     return (
@@ -64,9 +85,21 @@ export default function AllNewsRail({ items=[], onOpen }){
   }
 
   return (
-    <aside className="tsan-rail" aria-label="All News" onMouseEnter={()=> setPaused(true)} onMouseLeave={()=> setPaused(false)} onFocus={()=> setPaused(true)} onBlur={()=> setPaused(false)}>
-      <h3 className="tsan-rail-title">All News</h3>
-      <div className="tsan-rail-window" ref={listRef}>
+    <aside className="tsan-rail" aria-label="All News">
+      <div className="tsan-rail-header">
+        <h3 className="tsan-rail-title">All News</h3>
+        <button className="tsan-rail-toggle" type="button" aria-pressed={manualPaused}
+          aria-label={manualPaused ? 'Resume briefing stream' : 'Pause briefing stream'}
+          title={manualPaused ? 'Resume stream' : `Pause stream${reducedMotion ? ' (slowed for Windows motion preference)' : ''}`}
+          onClick={()=> setManualPaused((current)=> !current)}>
+          <Icon name={manualPaused ? 'play' : 'pause'} size={12} />
+          <span>{manualPaused ? 'Resume' : 'Pause'}</span>
+        </button>
+      </div>
+      <div className="tsan-rail-window" ref={listRef}
+        onMouseEnter={()=> setHovered(true)} onMouseLeave={()=> setHovered(false)}
+        onFocus={()=> setFocused(true)}
+        onBlur={(event)=> { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
         <div className="tsan-rail-track" ref={trackRef}>
           {display.map((item, idx)=>(
             <button
