@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import json
 import os
 import re
@@ -73,11 +75,47 @@ def sweep_orphan_runtime_files(
 def _pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+    if os.name == "nt":
+        return _windows_pid_alive(pid)
     try:
         os.kill(pid, 0)
-    except OSError:
+    except OverflowError:
         return False
+    except OSError as exc:
+        # Permission denial is evidence of an existing process, not a stale lock.
+        return exc.errno != errno.ESRCH
     return True
+
+
+def _windows_pid_alive(pid: int) -> bool:
+    """Probe without signalling; uncertain/inaccessible owners retain the lock."""
+
+    if not 0 < pid <= 0xFFFFFFFF:
+        return False  # Win32 PIDs are DWORDs; do not wrap a corrupt lock value.
+    try:
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel32.WaitForSingleObject.restype = wintypes.DWORD
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+
+        # SYNCHRONIZE is sufficient to inspect the process' signalled state.
+        handle = kernel32.OpenProcess(0x00100000, False, pid)
+        if not handle:
+            # OpenProcess reports an absent PID as ERROR_INVALID_PARAMETER.
+            # Access denied and every other failure must fail closed.
+            return ctypes.get_last_error() != 87
+        try:
+            # Zero timeout is non-blocking; only a signalled process is dead.
+            return kernel32.WaitForSingleObject(handle, 0) != 0
+        finally:
+            kernel32.CloseHandle(handle)
+    except (AttributeError, OSError, SystemError):
+        return True
 
 
 class SchedulerOwnership:

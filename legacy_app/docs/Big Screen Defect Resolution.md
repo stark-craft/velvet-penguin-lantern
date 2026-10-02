@@ -13,6 +13,10 @@ This guide transfers the Sampark All News fixes from the Mac/GitHub checkout to 
 
 These changes stay in the All News frontend. They do not change backend logic, permissions, global page widths, or the decorative gutters.
 
+### Follow-up from the Windows handoff (2 October 2026)
+
+The supplied Windows debugging handoff reports that the large-monitor client's checkbox was absent from the DOM because that client did not receive `review.news.submit`, while the laptop did. That reported disappearance is a capability configuration issue; the CSS repair below cannot render a control that authorization omits. Check the approved client's capability response and exact-IP `REVIEW_NEWS_ALLOWED_IPS` configuration or an explicit access grant. `*` is not a supported wildcard in the current allowlist code. This finding comes from the handoff; the Windows deployment was not independently inspected from this Mac.
+
 ## 1. Replace the review-checkbox CSS block
 
 **File:** `legacy_app\news-ui\src\sampark\all-news\all-news.css`

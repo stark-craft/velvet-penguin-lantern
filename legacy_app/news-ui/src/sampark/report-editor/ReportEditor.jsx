@@ -9,6 +9,7 @@ import SamsungImpactPanel from './SamsungImpactPanel.jsx';
 import AutomaticAnalysisStatus from './AutomaticAnalysisStatus.jsx';
 import AutomaticImpactStatus from './AutomaticImpactStatus.jsx';
 import useAutomaticImpact from './useAutomaticImpact.js';
+import { startReportIntelligence } from './reportStartup.js';
 import { currentAnalysisInputs, analysisSignature, canApplyAnalysis } from './reportAnalysis.js';
 import { prepareImpactSections, reportImpactArticles, canApplyImpact, canApplyAutomaticImpact } from './reportImpact.js';
 import { IMAGE_ACCEPT, readReportImage } from './reportImages.js';
@@ -56,6 +57,7 @@ export default function ReportEditor({items, onClose}) {
   const imageTarget = useRef(null);
   const analysisToken = useRef(0);
   const analysisApply = useRef(null);
+  const reportStartup = useRef(null);
   const [initial] = useState(()=>seedReport(items));
   const savedHtml = useRef('');
   const savedTitle = useRef('');
@@ -85,9 +87,14 @@ export default function ReportEditor({items, onClose}) {
   const change = ()=>{setDirty(documentHtml(editor.current) !== savedHtml.current || title !== savedTitle.current);};
   const snapshot = ()=>({title,html:documentHtml(editor.current) || initial,...draft.current});
   useEffect(()=>{
-    generateAnalysis();
-    automaticImpact.generate();
-    return ()=>{analysisToken.current++;automaticImpact.cancel(false);};
+    const startup=startReportIntelligence({
+      analysis:generateAnalysis,
+      impacts:automaticImpact.generate,
+      cancelPending:()=>{analysisToken.current++;automaticImpact.cancel(false);},
+    });
+    reportStartup.current=startup;
+    startup.done.catch(error=>{if(!startup.cancelled)setMessage(error.message);});
+    return ()=>startup.cancel();
   },[]);
   useEffect(()=>{
     reportRequest('/status').then(data=>{setQuota(data.quota);setTemplate(data.template);}).catch(e=>setMessage(e.message));
@@ -178,6 +185,7 @@ export default function ReportEditor({items, onClose}) {
     else exportFile(action.fmt);
   }
   async function openDraft(id) {
+    reportStartup.current?.cancel();
     analysisToken.current++;setAutomaticAnalysis(null);automaticImpact.cancel();
     setBusy(true);try{const doc=await reportRequest(`/drafts/${id}`);selectImage(null);editor.current.innerHTML=doc.html;prepareImpactSections(editor.current);savedHtml.current=documentHtml(editor.current);savedTitle.current=doc.title;draft.current={id:doc.id,revision:doc.revision};setTitle(doc.title);setDirty(false);range.current=null;setHistory(null);setImpact(false);}catch(e){setMessage(e.message);}finally{setBusy(false);}
   }

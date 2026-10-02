@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { reportRequest } from './reportApi.js';
+import { createRequestId } from './requestId.js';
 import { quotaClock } from './reportModel.js';
 import { impactContext } from './reportImpact.js';
 
@@ -23,7 +24,7 @@ export default function SamsungImpactPanel({getArticles, quota, setQuota, onAppl
     try {
       const data=await reportRequest('/ask',{
         purpose:'samsung-impact',question:'Explain why this article matters to Samsung in depth.',
-        context:target.context,request_id:crypto.randomUUID(),
+        context:target.context,request_id:createRequestId(),
       });
       setQuota(data.quota);setResult({text:data.replacement,target});
     } catch(e) {

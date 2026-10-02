@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { reportRequest } from './reportApi.js';
+import { createRequestId } from './requestId.js';
 import { quotaClock, safeUrl } from './reportModel.js';
 
 export default function AskAiPanel({quota, setQuota, getContext, selection, onApply, onClose, onBusy}) {
@@ -18,7 +19,7 @@ export default function AskAiPanel({quota, setQuota, getContext, selection, onAp
     event.preventDefault(); if(busy || !question.trim()) return;
     setBusy(true); onBusy(true); setError(''); setResult(null);
     try {
-      const data = await reportRequest('/ask',{question:question.trim(),context:(scope==='selection'?selection:getContext()).slice(0,30000),request_id:crypto.randomUUID()});
+      const data = await reportRequest('/ask',{question:question.trim(),context:(scope==='selection'?selection:getContext()).slice(0,30000),request_id:createRequestId()});
       setQuota(data.quota); setResult(data);
     } catch(e) {
       setError(e.message);

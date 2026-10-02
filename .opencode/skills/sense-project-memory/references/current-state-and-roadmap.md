@@ -633,3 +633,26 @@ Verified: 250 frontend tests, production build, real-route browser checks at
 1024/1440/2560/3840 widths, both themes, active checked state, Pause/Resume and
 paused resize. A single-story 4K filter fills the clip and keeps moving. Windows
 deployment/motion preference verification remains outstanding on that machine.
+
+### Create Report Windows integration handoff fixes (2026-10-02)
+
+Applied the missing handoff fixes surgically in `legacy_app/`. Both manual report
+panels share a request-ID generator that works when plain-HTTP browsers lack
+`crypto.randomUUID`. Report startup now awaits cross-analysis completion or its
+handled failure before the existing sequential per-article impact queue begins.
+Canceled/StrictMode-discarded startup and saved-draft loads cannot start late
+impact work. No frontend pacing or manual-priority queue was introduced.
+Only `extract_json` changed in the Samsung Chat adapter: complete adjacent/fenced
+objects merge via raw_decode, while malformed/truncated objects fail safely.
+Automatic impact prefers replacement, then equivalent semantic fields; diagnostics
+log only keys/error types. Endpoint/TLS/metadata, shared rate limiter, private
+quotas, cache and single-flight behavior remain intact. Windows scheduler owner
+probes now use typed OpenProcess/nonblocking wait with handle cleanup; uncertain
+or inaccessible owners keep their locks, including POSIX permission failures.
+The Windows handoff identifies absent review controls as missing
+`review.news.submit`, not CSS. No grants or environment values were changed.
+Verified: 259 frontend tests, production build and 70 relevant backend tests;
+real-route light/dark/390px browser checks, analysis-failure-to-impact ordering
+and both manual request paths. This Mac lacks Samsung credentials: manual paths
+show configuration errors without consuming quota. Embedded Windows execution
+and live Samsung answers still require validation on the configured deployment.

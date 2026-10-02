@@ -60,15 +60,29 @@ def clean_points(value, maximum: int = 5) -> list[str]:
 
 
 def extract_json(value: str) -> dict:
+    """Merge complete objects, including separately fenced model responses."""
     text = str(value or "").strip()
-    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.I)
-    try:
-        return json.loads(text)
-    except ValueError:
-        start, end = text.find("{"), text.rfind("}")
-        if start >= 0 and end > start:
-            return json.loads(text[start : end + 1])
+    decoder = json.JSONDecoder()
+    merged = {}
+    position = 0
+    found = False
+    while position < len(text):
+        start = text.find("{", position)
+        if start < 0:
+            break
+        try:
+            parsed, position = decoder.raw_decode(text, start)
+        except json.JSONDecodeError as exc:
+            # Do not mistake a nested fragment in a malformed object for a
+            # complete response, or silently accept a truncated later block.
+            raise RuntimeError("Samsung Chat response did not contain valid JSON") from exc
+        # raw_decode advances beyond braces inside strings and nested objects.
+        # If the model corrects a field in a later block, its last value wins.
+        merged.update(parsed)
+        found = True
+    if not found:
         raise RuntimeError("Samsung Chat response did not contain valid JSON")
+    return merged
 
 
 def safe_error_excerpt(response, limit: int = 1200) -> str:

@@ -1,6 +1,7 @@
 """Detailed Samsung relevance belongs only to the private report editor."""
 import hashlib
 import json
+import logging
 import threading
 import time
 from concurrent.futures import Future
@@ -13,6 +14,7 @@ CACHE_LIMIT = 100
 PROMPT_VERSION = 'samsung-impact-v1'
 _lock = threading.Lock()
 _flights = {}
+_logger = logging.getLogger(__name__)
 
 
 def impact_prompt(context):
@@ -83,8 +85,17 @@ def generate(owner, article):
         else:
             response = chat.call_samsung_chat(impact_prompt(article_context(article)))
             parsed = chat.extract_json(response.get('content', ''))
-            impact = parsed.get('replacement')
+            impact = None
+            for field in (
+                'replacement', 'impact', 'analysis', 'samsung_impact',
+                'why_it_matters', 'why_matters', 'answer',
+            ):
+                candidate = parsed.get(field)
+                if isinstance(candidate, str) and candidate.strip():
+                    impact = candidate
+                    break
             if not isinstance(impact, str) or not impact.strip():
+                _logger.warning('[REPORT_IMPACT] Parsed JSON keys: %s', sorted(parsed))
                 raise ValueError('Empty impact')
             impact = impact.strip()[:20000]
             def save_cache(state):
@@ -97,6 +108,8 @@ def generate(owner, article):
         future.set_result(result)
         return result
     except Exception as exc:
+        # Exception messages can contain response content, URLs or credentials.
+        _logger.warning('[REPORT_IMPACT] Samsung Chat failure type: %s', type(exc).__name__)
         error = HTTPException(502, 'Samsung Chat could not generate this article’s Samsung impact. Retry without spending an Ask AI question.')
         future.set_exception(error)
         raise error from exc
