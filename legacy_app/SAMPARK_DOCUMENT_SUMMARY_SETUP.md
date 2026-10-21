@@ -1,79 +1,88 @@
-# Sampark: summarize the whole extracted document into 300 characters
+# Sampark document Description — Samsung Chat, with offline DistilBART fallback
 
-Branch: `test/sampark-pdf-diagnostics-20261021`
+Test branch: `test/sampark-pdf-diagnostics-20261021`
 
-## Replace/copy two backend files
+## Copy two backend files as full replacements
 
 1. `legacy_app/news_scrapper/internal_content/router.py`
    -> `C:\scrappyV3\news_scrapper\internal_content\router.py`
-   (replace complete file; back up your existing PC file first)
 2. `legacy_app/news_scrapper/internal_content/document_summarizer.py`
    -> `C:\scrappyV3\news_scrapper\internal_content\document_summarizer.py`
-   (new file, paste complete GitHub Raw source)
 
-**Do not copy GitHub service.py, document_parser.py, api.js or SamparkCreate.jsx**
-over newer PC files. The new router preserves the PDF upload fallback,
-the secondary-cover routes and the Edit PDF replacement endpoints.
+Open GitHub Raw for each file, copy the ENTIRE contents, back up the existing
+router, replace both local files, and restart Uvicorn. Do not replace your newer
+`service.py`, `document_parser.py`, `api.js`, or frontend files with GitHub's
+older baseline. The updated router retains PDF upload warning fallback,
+Edit PDF, secondary-cover and contribution endpoints.
 
-## Behavior
+## Actual processing order
 
-- Valid PDF / DOCX: extract text, select important evidence from the entire
-  supplied extracted text (not just its opening), and generate a description
-  no longer than 300 CHARACTERS.
-- Save the computed `summary` on the contribution draft and return it in the
-  same /internal-content/import response used to populate Description.
-- Save `source_document.summary_method` as `ai` or `extractive`.
-- Invalid/unextractable PDF: do not try to summarize; preserve original
-  upload and put the actionable extraction warning into Description.
-- File-size checks and Edit PDF handling are unchanged.
+1. Import PDF/DOCX. Retain the existing 150 MiB PDF upload limits and parsing.
+2. The importer extracts readable text (up to 200,000 characters).
+3. Gather representative statements from *every region* of the extracted text
+   including the opening and final recommendation; budget roughly 14k source
+   characters for the model.
+4. Call the preinstalled `news_scrapper.adapters.samsung_chat.call_samsung_chat`
+   with the SAME authenticated Samsung Chat endpoint/settings already used by
+   article and report analysis. Request strict JSON: `{"summary": "..."}`.
+5. If Samsung Chat is unavailable, fails, or returns no usable summary,
+   generate using the already-installed LOCAL DistilBART weights configured
+   via `news_scrapper.semantic_clustering.BART_MODEL_DIR`.
+6. BART produces notes for multiple document sections, then reduces those
+   notes to one short summary. The same shared BART model and inference
+   locks are reused; the code does NOT download missing weights.
+7. Description is capped at **300 characters** and saved to the draft.
 
-## Optional true AI-generated summary
+## Existing Samsung Chat configuration
 
-By default the dependency-free method is `extractive`: it considers
-sentences throughout the document and chooses important representative
-phrases. It is NOT an LLM paraphrase.
+Uses these variables from the existing adapter, with no new endpoint:
 
-For actual generated/paraphrased summaries, configure a PRIVATE,
-organization-approved OpenAI-compatible chat endpoint in the backend
-environment before starting Uvicorn:
+    SAMSUNG_CHAT_URL
+    SAMSUNG_CHAT_CLIENT
+    SAMSUNG_CHAT_TOKEN
+    SAMSUNG_CHAT_MODEL_ID
 
-    $env:SAMPARK_SUMMARY_API_URL='https://APPROVED-HOST/v1/chat/completions'
-    $env:SAMPARK_SUMMARY_MODEL='APPROVED-MODEL-NAME'
-    $env:SAMPARK_SUMMARY_API_KEY='YOUR-APPROVED-SERVICE-KEY'
+Do NOT paste tokens into source code or GitHub. Configure authorized Samsung
+corporate endpoints in the backend environment. The content selection
+runs locally; only the selected evidence goes to Samsung Chat. Source text
+is treated as untrusted data in the prompt.
 
-An authorized local service may use http://127.0.0.1:... without a key.
-The summarizer supports HTTPS for nonlocal hosts and will NOT send
-content anywhere if URL or model are missing. Do not send enterprise
-documents to a third-party service without authorization.
+## No misleading fallback
 
-The AI text is based on the entire extracted text when it is short, or
-a set of globally ranked observations from across the document when long.
-If the optional AI request errors or exceeds 15 seconds, the local
-extractive summary is returned and the PDF upload still succeeds.
+- `source_document.summary_method = samsung_chat`: Samsung Chat worked.
+- `source_document.summary_method = bart`: local DistilBART took over.
+- `source_document.summary_method = unavailable`: both engines failed.
+  The original document remains saved, the extracted text remains present,
+  and Description says summarization is unavailable and can be entered
+  manually. It does NOT silently use the first 300 characters.
+- Unreadable PDFs are still stored with their extraction-error Description.
 
-## Test
+The BART fallback requires a local model directory and Transformers/PyTorch
+already supported by the NewsScrapper backend. For a large PDF on a normal
+CPU, multi-section generation can take time. Samsung Chat's configured timeout
+is controlled by SAMSUNG_CHAT_TIMEOUT in the existing adapter.
 
-After copying the two backend files, restart Uvicorn.
-Upload a readable PDF, such as the Sampark 10 or 100 MiB synthetic test.
-Expected: Description is at most 300 characters and reflects the conclusion
-rather than only the opening. `source_document.summary_method` reports
-which mode produced the summary. Upload a non-extractable PDF and confirm
-its saved Description explains the extraction failure.
+## Smoke tests
 
-Optional independent smoke-test code:
-
-    scripts/test_document_summarizer.py
-
-Copy it to C:\scrappyV3\scripts\test_document_summarizer.py then run:
+Copy `legacy_app/scripts/test_document_summarizer.py` into
+`C:\scrappyV3\scripts\test_document_summarizer.py`, then run:
 
     & C:\scrappyV3\venv\Scripts\python.exe C:\scrappyV3\scripts\test_document_summarizer.py
 
-## Known extraction limit
+The smoke test mocks the models and validates primary/fallback routing,
+long-document section coverage, final recommendation retention and the
+300-character limit. Test actual Samsung Chat/BART by uploading a real
+readable document and inspecting the returned summary_method metadata.
 
-`document_parser.py` currently caps extracted text at 200,000 characters.
-The summary reads the complete extracted text that reaches the importer.
-Documents whose readable content exceeds the cap would require a separate
-streaming/full-document extraction implementation. The generated 10 MiB
-and 100 MiB synthetic test PDFs were below that character cap.
+## Important boundaries
 
-All edits are on the test branch. Current PC runtime has not been tested.
+- Full PDF filesize is not the text sent to Chat or BART. Images do not
+  become extractable text without a separate authorized OCR path.
+- Selection processes all available extracted text, but trims *evidence*
+  to the model budget; this is not equivalent to an LLM reading each word
+  of a 100 MiB PDF.
+- Content beyond the document parser's 200k-character extraction limit
+  requires a separate extraction expansion.
+- Do not send company documents to unapproved external AI endpoints.
+
+Test branch only; changes have not yet been run on your Windows instance.
