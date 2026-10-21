@@ -1,0 +1,349 @@
+/* Sampark PDF Studio: scoped styles; intentionally does not touch Create News CSS. */
+.spdf-workspace {
+  --spdf-ink: #192c45;
+  --spdf-secondary: #718096;
+  --spdf-line: #e6ebf2;
+  --spdf-brand: #185bd1;
+  --spdf-surface: #ffffff;
+  --spdf-base: #f3f6fa;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: min(880px, calc(100vh - 112px));
+  min-height: 620px;
+  color: var(--spdf-ink);
+  background: var(--spdf-surface);
+  border: 1px solid #e4eaf1;
+  border-radius: 17px;
+  overflow: hidden;
+  font-family: Inter, "Geist Variable", "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+  box-shadow: 0 8px 32px rgba(28, 45, 73, .055);
+}
+.spdf-workspace * { box-sizing: border-box; }
+.spdf-workspace button,
+.spdf-workspace input,
+.spdf-workspace textarea { font: inherit; }
+.spdf-workspace button { cursor: pointer; }
+.spdf-workspace button:disabled { opacity: .38; cursor: not-allowed; }
+.spdf-workspace button:focus-visible,
+.spdf-workspace input:focus-visible,
+.spdf-workspace textarea:focus-visible {
+  outline: 2px solid #3076eb; outline-offset: 2px;
+}
+.spdf-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 13px 18px; min-height: 77px;
+  border-bottom: 1px solid var(--spdf-line); background: #fff;
+}
+.spdf-header-left, .spdf-header-actions, .spdf-title-group, .spdf-toolbar,
+.spdf-toolstrip, .spdf-toolbar-tail { display: flex; align-items: center; }
+.spdf-header-left { gap: 12px; min-width: 0; }
+.spdf-header-actions { gap: 9px; flex-shrink: 0; }
+.spdf-docsymbol {
+  display: flex; justify-content: center; align-items: center; flex: 0 0 41px;
+  height: 41px; border-radius: 11px; background: #ebf2ff; color: #1c5dbb;
+}
+.spdf-title-group { flex-direction: column; align-items: flex-start; min-width: 0; gap: 5px; }
+.spdf-title-group strong {
+  font-size: 15px; font-weight: 700; color: #162c49;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 30vw; letter-spacing: -.02em;
+}
+.spdf-title-group > span {
+  display: flex; align-items: center; gap: 8px; color: #8995a5; font-size: 11px;
+}
+.spdf-title-group > span i {
+  width: 3px; height: 3px; border-radius: 50%; background: #9ea8b4;
+}
+.spdf-unsaved { color: #ae7525; font-size: 11px; display: inline-flex; gap: 7px; align-items: center; margin-right: 4px; }
+.spdf-unsaved > span { width: 7px; height: 7px; border-radius: 50%; background: #f1a944; }
+.spdf-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 9px; font-size: 12px; font-weight: 650 !important;
+  min-height: 37px; padding: 0 13px; border: 1px solid var(--spdf-line);
+  transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.spdf-button:hover:not(:disabled) { transform: translateY(-1px); }
+.spdf-button--light { background: #fff; color: #324d6f; }
+.spdf-button--light:hover:not(:disabled) { background: #f4f7fb; }
+.spdf-button--primary { border-color: #185bd1; background: #185bd1; color: #fff; }
+.spdf-button--primary:hover:not(:disabled) { background: #0e4dbd; }
+.spdf-button--danger {
+  background: #fff5f4; color: #b52f39; border-color: #f4ddda; width: 100%;
+}
+.spdf-icon-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; background: transparent; color: #6f8096;
+  border: 1px solid transparent; border-radius: 8px; height: 35px; width: 35px;
+}
+.spdf-icon-button:hover:not(:disabled) { background: #eff4fb; color: #265bb4; }
+.spdf-toolbar {
+  justify-content: space-between; padding: 9px 17px; gap: 12px;
+  min-height: 60px; border-bottom: 1px solid var(--spdf-line); background: #fff;
+}
+.spdf-toolstrip { flex-wrap: wrap; gap: 4px; min-width: 0; }
+.spdf-tool {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 7px 10px; min-height: 36px; border-radius: 8px;
+  border: 1px solid transparent; background: #fff; color: #6d7a8d;
+  white-space: nowrap; font-size: 11.5px; font-weight: 580;
+}
+.spdf-tool:hover:not(:disabled) { color: #1959be; background: #f3f7fe; }
+.spdf-tool.is-active {
+  color: #195cc5; border-color: #d7e6ff; background: #edf4ff;
+  box-shadow: inset 0 0 0 1px #eaf1fd;
+}
+.spdf-toolbar-tail { gap: 3px; flex-shrink: 0; }
+.spdf-toolbar-separator { height: 22px; width: 1px; background: #e4eaf2; margin: 0 7px; }
+.spdf-zoom-value { min-width: 40px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; color: #435671; font-weight: 650; }
+.spdf-alert {
+  display: flex; align-items: center; gap: 8px; padding: 9px 18px;
+  line-height: 1.45; border-bottom: 1px solid; font-size: 12px; color: #815a22;
+}
+.spdf-alert button {
+  display: inline-flex; margin-left: auto; background: transparent; color: inherit;
+  border: none; padding: 3px; align-items: center;
+}
+.spdf-alert--note { background: #fffaf0; border-color: #f2e6cb; }
+.spdf-alert--error { color: #b02e38; background: #fff1f1; border-color: #f5dce1; }
+.spdf-columns {
+  display: grid; grid-template-columns: 180px minmax(0, 1fr) 262px;
+  flex: 1; min-height: 0; min-width: 0;
+}
+.spdf-pages {
+  display: flex; flex-direction: column; min-width: 0;
+  border-right: 1px solid var(--spdf-line); background: #fff;
+}
+.spdf-panel-heading {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 54px; padding: 0 18px; border-bottom: 1px solid #edf1f6;
+  font-size: 13px; font-weight: 750; color: #21334c;
+}
+.spdf-panel-heading > strong {
+  border-radius: 8px; background: #f1f5fa; padding: 3px 8px;
+  color: #758497; font-weight: 600; font-size: 11px;
+}
+.spdf-page-list {
+  flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin;
+  padding: 14px 14px 20px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.spdf-thumb {
+  display: flex; width: 100%; flex-direction: column; align-items: center; gap: 8px;
+  padding: 8px 6px; background: transparent; border-radius: 9px;
+  border: 1px solid transparent; color: #8190a1;
+  transition: border-color .15s ease, background .15s ease;
+}
+.spdf-thumb:hover { background: #f7f9fc; color: #1d4f9e; }
+.spdf-thumb.is-current { border-color: #a8c6f8; background: #f0f5ff; color: #225ab5; font-weight: 700; }
+.spdf-thumb-paper {
+  display: flex; position: relative; overflow: hidden;
+  align-items: center; justify-content: center; height: 118px; width: 84px;
+  border: 1px solid #dde5ef; border-radius: 3px; box-shadow: 0 3px 7px #1d355019;
+  background: white; color: #d6dde8;
+}
+.spdf-thumb.is-current .spdf-thumb-paper { border-color: #88adeb; }
+.spdf-thumb-paper img { width: 100%; height: 100%; object-fit: contain; }
+.spdf-thumb > span:last-child { font-size: 11px; font-variant-numeric: tabular-nums; }
+.spdf-thumb-edited {
+  display: block; position: absolute; right: 4px; bottom: 4px;
+  width: 7px; height: 7px; border: 1px solid white; border-radius: 50%; background: #2464d4;
+}
+.spdf-page-list-footer {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+  padding: 10px 8px; border-top: 1px solid var(--spdf-line);
+}
+.spdf-page-list-footer button {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  background: #f5f8fc; color: #607289; min-height: 35px; border-radius: 7px;
+  border: 1px solid #e4eaf2; font-size: 10.5px; font-weight: 600;
+}
+.spdf-page-list-footer button:hover:not(:disabled) { background: #edf4ff; color: #2058b8; }
+.spdf-stage-area {
+  min-width: 0; min-height: 0; display: flex; flex-direction: column;
+  background: #eff2f7; overflow: hidden;
+}
+.spdf-stage-topline {
+  background: rgba(249,251,254,.96); min-height: 46px; padding: 8px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; color: #8090a3; font-size: 11px;
+  border-bottom: 1px solid #e3e9f0;
+}
+.spdf-stage-topline > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spdf-page-stepper { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+.spdf-page-stepper strong { min-width: 54px; font-variant-numeric: tabular-nums; text-align: center; font-size: 11px; font-weight: 650; color: #4b607a; }
+.spdf-page-stepper button { border: none; background: transparent; padding: 4px; display: flex; color: #647c9b; }
+.spdf-page-stepper button:hover:not(:disabled) { color: #185bd1; }
+.spdf-stage-scroll {
+  flex: 1; min-width: 0; min-height: 0; overflow: auto;
+  padding: 38px 32px 58px; display: flex; align-items: flex-start;
+  justify-content: safe center; scrollbar-width: thin;
+  background-image: radial-gradient(circle at 1px 1px, #d4dbe52f 1px, transparent 0);
+  background-size: 14px 14px;
+}
+.spdf-paper {
+  position: relative; flex: 0 0 auto; background: #fff;
+  box-shadow: 0 9px 30px #18304f24, 0 1px 4px #1f375420;
+  line-height: 1.35; user-select: none;
+}
+.spdf-paper.is-placement { cursor: crosshair; }
+.spdf-canvas {
+  display: block; width: 100%; height: 100%; pointer-events: none;
+}
+.spdf-text-hit {
+  position: absolute; z-index: 2; border: 1px dashed rgba(24,91,209,.10);
+  border-radius: 2px; background: rgba(24,91,209,.02); padding: 0; cursor: text;
+}
+.spdf-text-hit:hover { background: rgba(24,91,209,.15); border-color: #377ce0; }
+.spdf-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+.spdf-mark {
+  position: absolute; z-index: 3; cursor: grab; user-select: none; touch-action: none;
+  overflow: hidden; border: 1px dashed transparent; padding: 0; white-space: pre-wrap;
+}
+.spdf-mark:hover { border-color: #74a6ed; }
+.spdf-mark.is-selected { z-index: 4; border: 1px solid #246be1; outline: 1px solid #fff; box-shadow: 0 0 0 2px #2068da2b; }
+.spdf-mark-grip {
+  position: absolute; top: -1px; right: -1px; width: 8px; height: 8px;
+  background: #2875ec; border: 1px solid #fff; border-radius: 2px;
+}
+.spdf-mark--text { background: transparent; }
+.spdf-mark--replace { background: #fff; }
+.spdf-mark--whiteout { background: #fff; }
+.spdf-mark--highlight { background: rgba(255,225,85,.43); mix-blend-mode: multiply; }
+.spdf-mark--rectangle { border: 2px solid #2563eb; }
+.spdf-mark--image img { display: block; width: 100%; height: 100%; object-fit: fill; }
+.spdf-mark--ink { overflow: visible; }
+.spdf-mark-text {
+  display: block; width: 100%; height: 100%;
+  line-height: 1.2; overflow: hidden; word-wrap: break-word; white-space: pre-wrap;
+  padding: 2px; font-family: Helvetica, Arial, sans-serif; pointer-events: none;
+}
+.spdf-drawing {
+  position: absolute; z-index: 5; left: 0; top: 0; width: 100%; height: 100%;
+  pointer-events: none;
+}
+.spdf-inspector {
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  background: #fff; border-left: 1px solid var(--spdf-line);
+}
+.spdf-inspector-kicker { font-size: 9px; letter-spacing: .11em; font-weight: 750; color: #a5b1bf; }
+.spdf-inspector-content { padding: 18px 17px; flex: 1; overflow-y: auto; scrollbar-width: thin; }
+.spdf-page-summary {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 16px 8px 24px; gap: 8px;
+}
+.spdf-page-summary-icon {
+  display: flex; align-items: center; justify-content: center;
+  height: 54px; width: 54px; border-radius: 14px; color: #2e62b5; background: #edf4ff;
+}
+.spdf-page-summary strong { margin-top: 3px; font-size: 14px; color: #243753; }
+.spdf-page-summary > span { font-size: 11px; color: #99a5b3; }
+.spdf-inspector-label {
+  font-size: 10px; color: #98a4b3; font-weight: 750; letter-spacing: .08em;
+  text-transform: uppercase; margin-bottom: 10px; margin-top: 15px;
+}
+.spdf-inspector-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.spdf-inspector-grid > button, .spdf-inspector-stack > button {
+  display: flex; align-items: center; justify-content: center;
+  gap: 6px; min-height: 57px; padding: 7px;
+  background: #f8fafc; border: 1px solid #e7ecf2; border-radius: 9px;
+  color: #5f7390; flex-direction: column; font-size: 11px; font-weight: 550;
+}
+.spdf-inspector-grid > button:hover:not(:disabled),
+.spdf-inspector-stack > button:hover:not(:disabled) { background: #eff5ff; border-color: #d4e4ff; color: #215fb6; }
+.spdf-inspector-grid > button.is-danger { color: #bd6470; background: #fff9f9; }
+.spdf-inspector-stack { display: flex; flex-direction: column; gap: 7px; }
+.spdf-inspector-stack > button { min-height: 39px; flex-direction: row; justify-content: flex-start; padding-left: 12px; }
+.spdf-help { font-size: 11px; color: #8c99a9; line-height: 1.62; margin: 18px 0 0; }
+.spdf-help strong { color: #58718d; }
+.spdf-selection-title { display: flex; justify-content: space-between; align-items: center; margin: 0 0 20px; }
+.spdf-selection-title strong { font-size: 14px; text-transform: capitalize; }
+.spdf-selection-title button { display: flex; color: #9aa9ba; border: none; background: transparent; padding: 3px; }
+.spdf-field { display: flex; flex-direction: column; font-size: 12px; font-weight: 650; color: #5b708a; gap: 8px; margin-bottom: 16px; }
+.spdf-field textarea, .spdf-field input[type="number"] {
+  width: 100%; resize: vertical; background: #fff; color: #20324a;
+  border: 1px solid #dfe6ef; border-radius: 8px; padding: 9px 10px;
+  font-size: 12px; line-height: 1.45; font-weight: 450;
+}
+.spdf-field input[type="color"] {
+  width: 100%; height: 35px; border-radius: 8px; border: 1px solid #dfe6ef;
+  background: #fff; padding: 3px 7px;
+}
+.spdf-field-row { display: flex; flex-direction: column; gap: 10px; }
+.spdf-field-row label { display: flex; align-items: center; gap: 10px; color: #7c8fa8; font-size: 11px; font-weight: 500; }
+.spdf-field-row input { flex: 1; width: 100%; accent-color: #2466d5; }
+.spdf-inspector-bottom {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px; color: #8998aa; border-top: 1px solid var(--spdf-line);
+}
+.spdf-inspector-bottom input {
+  min-width: 0; flex: 1; height: 30px;
+  border: 1px solid #e5eaf1; border-radius: 7px; padding: 0 8px;
+  font-size: 11px; color: #263b55;
+}
+.spdf-inspector-bottom button { border: none; border-radius: 7px; color: #1d5dbe; background: #edf4ff; height: 30px; padding: 0 10px; font-size: 11px; font-weight: 700; }
+.spdf-statusbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-shrink: 0; min-height: 34px; padding: 0 17px;
+  background: #fff; border-top: 1px solid var(--spdf-line);
+  color: #929dac; font-size: 10px;
+}
+.spdf-statusbar > span { display: inline-flex; align-items: center; gap: 6px; }
+.spdf-statusbar b { color: #c8d0da; margin: 0 3px; }
+.spdf-status-dot { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: #24b187; }
+.spdf-status-caveat { color: #a6aebb; }
+.spdf-empty {
+  display: flex; align-items: center; justify-content: center; flex-direction: column;
+  flex: 1; text-align: center; padding: 30px;
+  color: #66809f; gap: 12px; min-height: 240px;
+}
+.spdf-empty strong { font-size: 15px; color: #314867; }
+.spdf-empty span { font-size: 12px; line-height: 1.5; max-width: 340px; }
+.spdf-empty button { border: 1px solid #d8e2ee; background: white; border-radius: 8px; padding: 9px 14px; color: #225fb4; }
+@keyframes spdf-rotate { to { transform: rotate(360deg); } }
+.spdf-spin { animation: spdf-rotate .9s linear infinite; }
+
+@media (max-width: 1300px) {
+  .spdf-columns { grid-template-columns: 142px minmax(0, 1fr) 228px; }
+  .spdf-pages .spdf-thumb-paper { width: 72px; height: 99px; }
+  .spdf-tool { padding: 7px 8px; gap: 5px; }
+  .spdf-stage-scroll { padding: 26px 22px 36px; }
+}
+@media (max-width: 1000px) {
+  .spdf-columns { grid-template-columns: 112px minmax(0, 1fr) 206px; }
+  .spdf-tool span { display: none; }
+  .spdf-tool { width: 34px; padding: 7px; }
+  .spdf-toolbar { gap: 4px; }
+  .spdf-header-actions .spdf-unsaved { display: none; }
+  .spdf-inspector-grid { grid-template-columns: 1fr 1fr; }
+  .spdf-inspector-grid > button { font-size: 10px; }
+  .spdf-page-list-footer { grid-template-columns: 1fr; }
+  .spdf-header { padding: 12px; }
+}
+@media (max-width: 700px) {
+  .spdf-workspace { height: calc(100vh - 90px); min-height: 510px; border-radius: 0; }
+  .spdf-header { min-height: 67px; gap: 6px; }
+  .spdf-docsymbol { display: none; }
+  .spdf-title-group strong { max-width: 30vw; font-size: 13px; }
+  .spdf-title-group > span { font-size: 10px; }
+  .spdf-header-actions { gap: 4px; }
+  .spdf-button { padding: 0 9px; font-size: 11px; }
+  .spdf-columns { grid-template-columns: 66px minmax(0, 1fr); }
+  .spdf-inspector { display: none; }
+  .spdf-pages .spdf-panel-heading { padding: 0 6px; font-size: 10px; }
+  .spdf-pages .spdf-panel-heading > strong { display: none; }
+  .spdf-page-list { padding: 8px 3px; gap: 6px; }
+  .spdf-pages .spdf-thumb-paper { width: 38px; height: 55px; }
+  .spdf-thumb { padding: 6px 3px; }
+  .spdf-thumb > span:last-child { font-size: 9px; }
+  .spdf-page-list-footer { padding: 6px 3px; }
+  .spdf-page-list-footer button { font-size: 0; }
+  .spdf-toolbar { padding: 6px; overflow-x: auto; }
+  .spdf-toolstrip { flex-wrap: nowrap; }
+  .spdf-toolbar-tail { gap: 0; }
+  .spdf-toolbar-tail > button { width: 30px; }
+  .spdf-zoom-value { font-size: 10px; min-width: 31px; }
+  .spdf-stage-scroll { padding: 18px 12px 25px; }
+  .spdf-status-caveat { display: none !important; }
+}
