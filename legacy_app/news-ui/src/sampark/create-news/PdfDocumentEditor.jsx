@@ -214,9 +214,12 @@ export default function PdfDocumentEditor({
         let viewport;
         let text = [];
         if (activePage.blank) {
+          const width = activePage.width || 595;
+          const height = activePage.height || 842;
+          const sideways = (activePage.rotation || 0) % 180 !== 0;
           viewport = {
-            width: (activePage.width || 595) * zoom,
-            height: (activePage.height || 842) * zoom,
+            width: (sideways ? height : width) * zoom,
+            height: (sideways ? width : height) * zoom,
           };
         } else {
           const source = sourcesRef.current.get(activePage.source);
@@ -537,9 +540,17 @@ export default function PdfDocumentEditor({
       let rotation = item.rotation || 0;
       if (item.blank) {
         page = output.addPage([item.width || 595, item.height || 842]);
+        page.setRotation(degrees(rotation));
+        const w = page.getWidth(), h = page.getHeight();
         viewport = {
-          width: page.getWidth(), height: page.getHeight(),
-          convertToPdfPoint: (x, y) => [x, page.getHeight() - y],
+          width: rotation % 180 ? h : w,
+          height: rotation % 180 ? w : h,
+          convertToPdfPoint: (x, y) => {
+            if (rotation === 90) return [y, x];
+            if (rotation === 180) return [w - x, y];
+            if (rotation === 270) return [w - y, h - x];
+            return [x, h - y];
+          },
         };
       } else {
         if (!loaded.has(item.source)) {
