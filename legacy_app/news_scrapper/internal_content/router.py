@@ -18,7 +18,11 @@ from news_scrapper.access_control import service as access_service
 from core.request_limits import REQUEST_LIMITER
 from . import access, service, storage
 from .document_parser import ContributionError
-from .document_parser import DOCUMENT_MAX_BYTES
+from .document_parser import (
+    DOCUMENT_MAX_BYTES,
+    _signature_matches,
+    validate_document_upload,
+)
 from .image_processor import COVER_MAX_BYTES
 from .schemas import DraftUpdate, NotificationRead, ReviewNote, ReviewUnlock
 
@@ -126,11 +130,28 @@ async def import_document(
     data = await _read_upload_limited(document, DOCUMENT_MAX_BYTES, "document")
     if not data:
         raise HTTPException(status_code=400, detail="Choose a PDF or Word (.docx) document to import.")
+    filename = document.filename or ""
+    declared_type = document.content_type or ""
     try:
+        # A file whose bytes cannot be recognized must not be stored as a
+        # successful PDF upload. This is independent of extracting text from
+        # valid scanned/enterprise PDFs (which remains best effort).
+        kind = validate_document_upload(filename, declared_type, len(data))
+        if not _signature_matches(kind, data):
+            if kind == "pdf":
+                raise ContributionError(
+                    "This upload could not be recognized as a PDF. The file "
+                    "data may have been altered by a document protection "
+                    "system or become corrupted during upload. Try an "
+                    "approved standard-PDF export, or ask your IT team."
+                )
+            raise ContributionError(
+                "This upload is not a valid Word (.docx) document."
+            )
         record = service.import_document(
             _owner(request, response),
-            document.filename or "",
-            document.content_type or "",
+            filename,
+            declared_type,
             data,
             {"owner_name": owner_name, "content_type": content_type},
         )
@@ -389,27 +410,140 @@ def get_cover(record_id: str, request: Request, response: Response):
     )
 
 
+@router.post("/{record_id}/secondary-cover")
+async def upload_secondary_cover(
+    record_id: str,
+    request: Request,
+    response: Response,
+    cover: UploadFile = File(...),
+    focal_x: float = Form(default=0.5),
+    focal_y: float = Form(default=0.5),
+):
+    access.require_contributor_ip(request)
+    REQUEST_LIMITER.check(
+        "contribution.cover",
+        access.get_client_ip(request),
+        limit=30,
+        window_seconds=60 * 60,
+    )
+    data = await _read_upload_limited(cover, COVER_MAX_BYTES, "cover image")
+    if not data:
+        raise HTTPException(
+            status_code=400,
+            detail="Choose a JPG, PNG, or WebP image for the secondary image.",
+        )
+    try:
+        return service.attach_secondary_cover(
+            _owner(request, response),
+            record_id,
+            cover.filename or "",
+            data,
+            focal_x,
+            focal_y,
+        )
+    except (ContributionError, LookupError) as error:
+        raise _fail(error) from error
+
+
 @router.delete("/{record_id}/cover")
 def delete_cover(record_id: str, request: Request, response: Response):
     access.require_contributor_ip(request)
-    owner = _owner(request, response)
     try:
-        record = service.get_owned(owner, record_id)
+        return service.remove_cover(_owner(request, response), record_id)
+    except (ContributionError, LookupError) as error:
+        raise _fail(error) from error
+
+
+@router.delete("/{record_id}/secondary-cover")
+def delete_secondary_cover(
+    record_id: str,
+    request: Request,
+    response: Response,
+):
+    access.require_contributor_ip(request)
+    try:
+        return service.remove_secondary_cover(
+            _owner(request, response), record_id,
+        )
+    except (ContributionError, LookupError) as error:
+        raise _fail(error) from error
+
+
+@router.get("/{record_id}/secondary-cover")
+def get_secondary_cover(
+    record_id: str,
+    request: Request,
+    response: Response,
+):
+    try:
+        record = _readable_media_record(request, response, record_id)
     except LookupError as error:
         raise _fail(error) from error
-    cover = record.get("cover") if isinstance(record.get("cover"), dict) else None
-    if not cover or not cover.get("file"):
-        raise HTTPException(status_code=404, detail="No cover to delete")
-    # remove file and clear persistence
-    import datetime as _dt
-    storage.remove_quietly(storage.COVERS_DIR / str(cover.get("file")))
-    with storage.mutation_lock:
-        items = storage.load_records()
-        if record_id in items:
-            items[record_id]["cover"] = None
-            items[record_id]["updated_at"] = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
-            storage.write_records(items)
-    return {"status": "success", "removed": True}
+    cover = record.get("secondary_cover") or {}
+    path = storage.COVERS_DIR / str(cover.get("file") or "")
+    if not cover.get("file") or not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="This contribution has no secondary image yet.",
+        )
+    extension = path.suffix.lstrip(".").lower()
+    return FileResponse(
+        path,
+        media_type=storage.COVER_MIME_BY_EXTENSION.get(
+            extension, "application/octet-stream"
+        ),
+        headers={"Cache-Control": "private, max-age=60"},
+    )
+
+
+@router.put("/{record_id}/document")
+async def replace_document(
+    record_id: str,
+    request: Request,
+    response: Response,
+    document: UploadFile = File(...),
+):
+    access.require_contributor_ip(request)
+    REQUEST_LIMITER.check(
+        "contribution.document.replace",
+        access.get_client_ip(request),
+        limit=20,
+        window_seconds=60 * 60,
+    )
+    data = await _read_upload_limited(
+        document, DOCUMENT_MAX_BYTES, "edited PDF",
+    )
+    if not data:
+        raise HTTPException(
+            status_code=400, detail="Choose an edited PDF to save.",
+        )
+    filename = document.filename or "edited-document.pdf"
+    declared_type = document.content_type or "application/pdf"
+    is_pdf = (
+        declared_type == "application/pdf"
+        or filename.lower().endswith(".pdf")
+    )
+    if not is_pdf:
+        raise HTTPException(
+            status_code=400,
+            detail="PDF editing currently supports PDF files only.",
+        )
+    if not _signature_matches("pdf", data):
+        raise HTTPException(
+            status_code=400,
+            detail="The edited file is not a recognizable PDF. "
+                   "Nothing has been replaced.",
+        )
+    try:
+        return service.replace_document(
+            _owner(request, response),
+            record_id,
+            filename,
+            declared_type,
+            data,
+        )
+    except (ContributionError, LookupError) as error:
+        raise _fail(error) from error
 
 
 @router.get("/{record_id}/document")
