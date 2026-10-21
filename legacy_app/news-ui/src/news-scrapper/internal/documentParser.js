@@ -1,7 +1,7 @@
 // Instant client-side validation for contribution document picks.
 //
 // Production extraction happens on the backend (pypdf / python-docx inside
-// legacy_app/news_scrapper/internal_content/). This module no longer parses
+// news_scrapper/internal_content/). This module no longer parses
 // documents in the browser; it only gives quick feedback on obvious problems
 // so users never wait for an upload that cannot succeed.
 
@@ -26,7 +26,7 @@ export function validateDocumentFile(file) {
     return { ok: false, isPdf: false, isDocx: false, message: 'Choose a PDF or Word (.docx) document to import.' };
   }
   if (Number(file?.size) > CONTRIBUTION_LIMITS.DOCUMENT_MAX_BYTES) {
-    return { ok: false, isPdf: false, isDocx: false, message: `${name} is larger than the 25 MB document limit. Split it or export a smaller copy.` };
+    return { ok: false, isPdf: false, isDocx: false, message: `${name} is larger than the ${Math.round(CONTRIBUTION_LIMITS.DOCUMENT_MAX_BYTES / (1024 * 1024))} MB document limit. Upload a smaller copy.` };
   }
   return { ok: true, isPdf, isDocx, message: '' };
 }
