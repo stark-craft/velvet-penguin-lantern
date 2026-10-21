@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import sys
 from pathlib import Path
 
 MAX_BYTES = 150 * 1024 * 1024
@@ -129,6 +130,37 @@ def read_with_pymupdf(data: bytes) -> dict:
     return result
 
 
+
+def check_actual_backend_parser(data: bytes, file_name: str) -> dict:
+    """Run the app's real parser directly, exposing swallowed error messages.
+
+    Script is designed to run from C:\scrappyV3 in PowerShell.
+    No document contents, paragraphs, or extracted text are printed.
+    """
+    result = {}
+    # Running from the app root lets Python find news_scrapper.
+    sys.path.insert(0, str(Path.cwd()))
+    try:
+        from news_scrapper.internal_content import document_parser as parser
+        result["module_path"] = str(Path(parser.__file__).resolve())
+        result["module_has_optional_fallback"] = hasattr(parser, "_open_pymupdf")
+        result["document_max_bytes"] = parser.DOCUMENT_MAX_BYTES
+        result["pdf_max_pages"] = parser.PDF_MAX_PAGES
+    except Exception as exc:
+        result["import_error"] = safe_error(exc)
+        return result
+
+    try:
+        parsed = parser.parse_document(file_name, "application/pdf", data)
+        result["status"] = "returned"
+        result["page_count"] = parsed.get("page_count")
+        result["character_count"] = parsed.get("character_count")
+        result["summary_possible"] = bool(str(parsed.get("text") or "").strip())
+    except Exception as exc:
+        result["status"] = "raised"
+        result["error"] = safe_error(exc)
+    return result
+
 def diagnose(path: Path) -> dict:
     # Path and PDF text deliberately do not appear in the result.
     size = path.stat().st_size
@@ -145,6 +177,7 @@ def diagnose(path: Path) -> dict:
         return result
 
     data = path.read_bytes()
+    result["actual_backend_parser"] = check_actual_backend_parser(data, path.name)
     header_offset = data.find(b"%PDF-", 0, 1024 * 1024)
     result["pdf_header_offset"] = header_offset
     if header_offset < 0:
