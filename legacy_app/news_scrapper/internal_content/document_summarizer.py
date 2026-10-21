@@ -30,7 +30,7 @@ import urllib.request
 from collections import Counter
 
 DESCRIPTION_MAX = 300
-MAX_CANDIDATES = 4000
+MAX_CANDIDATES = 20000
 MODEL_EVIDENCE_MAX = 13000
 
 STOPWORDS = frozenset(
