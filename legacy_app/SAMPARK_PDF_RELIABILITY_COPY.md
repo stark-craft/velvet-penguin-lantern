@@ -1,52 +1,57 @@
-# Sampark PDF import reliability — full-file copy
+# Sampark PDF import fallback and large PDF generators
 
-## Copy only one newly updated file
+All links below refer to the test branch: test/sampark-pdf-diagnostics-20261021
 
-GitHub test branch: `test/sampark-pdf-diagnostics-20261021`
+## Source-code files to copy
 
-GitHub source:
-`legacy_app/news_scrapper/internal_content/router.py`
+1. Backend router: legacy_app/news_scrapper/internal_content/router.py
+   Windows: C:\scrappyV3\news_scrapper\internal_content\router.py
+   Replace the entire file after backing it up.
+2. 10 MB generator: legacy_app/scripts/sampark_generate_pdf_10mb.py
+   Windows: C:\scrappyV3\sampark_generate_pdf_10mb.py
+3. 100 MB generator: legacy_app/scripts/sampark_generate_pdf_100mb.py
+   Windows: C:\scrappyV3\sampark_generate_pdf_100mb.py
 
-PC destination:
-`C:\scrappyV3\news_scrapper\internal_content\router.py`
+For each GitHub file open Raw, copy all its text, create/replace the corresponding PC file, and save.
 
-Use GitHub **Raw**, copy the *entire* file, replace the local file's
-contents, and save. **Back up the local router.py first.**
+## PowerShell: generate both PDFs
 
-No `legacy_app` prefix on the PC.
+    cd C:\scrappyV3
+    & ".\venv\Scripts\python.exe" -m pip install PyMuPDF
+    & ".\venv\Scripts\python.exe" ".\sampark_generate_pdf_10mb.py"
+    & ".\venv\Scripts\python.exe" ".\sampark_generate_pdf_100mb.py"
 
-## What changes
+This creates sampark_10MB_long_text_test.pdf (~9.99 MiB, 8 pages, ~34k characters)
+and sampark_100MB_long_text_test.pdf (~99.99 MiB, 41 pages, ~173k characters).
+They are fresh synthetic PDFs, not byte-for-byte copies of previously shared PDFs.
+The binary PDF attachment accounts for much of each file's size while the
+pages contain selectable sentences and a final recommendation at the end.
 
-- Validate the uploaded PDF/DOCX bytes before saving a new contribution
-  draft. An unrecognizable PDF now returns an HTTP 400 with an actionable
-  message rather than a 200 response for an unusable file.
-- Keep the existing handling of valid scanned PDFs: they can be saved with
-  an editable, manually entered description when text extraction is absent.
-- Apply the same recognizable-PDF check to the existing edited-PDF
-  replacement endpoint.
-- Retain the PC version's PDF editing/replacement and secondary cover
-  routes. These routes are absent from GitHub's older baseline.
+## Upload behavior
 
-## Important scope
+The current PC service.import_document already saves PDF bytes if extraction
+raises ContributionError. The updated router no longer rejects unrecognizable
+PDF bytes, persists the extraction warning in Description (summary, max 300
+characters), and marks the PDF extraction as unavailable. DOCX remains strictly
+validated. File-size limits and PDF extension checks still apply.
 
-The local `service.py`, `api.js`, `SamparkCreate.jsx`, and PDF
-editor are **newer than GitHub's baseline**. Do not copy those older files
-from GitHub. The parser, frontend limits, and other files already copied
-in the previous step do not need copying again.
+Warning: the saved bytes of a nonstandard or protected PDF can still be
+unviewable in a PDF reader; uploading is not repair or protection bypass.
+The edited-PDF replacement route still requires a recognizable PDF.
 
-This change does **not** make protected/altered bytes readable and does
-**not** fix frontend extraction-status field mapping. Those need a
-separate update based on the full newer source, not legacy GitHub files.
+## Do not overwrite newer PC files
 
-## Test
+GitHub's service.py, api.js and SamparkCreate.jsx are older than the local
+PC versions. Only copy the three files listed above. Keep the prior parser.
 
-1. Restart backend with the project's virtual environment.
-2. Upload `Sampark-report.pdf` whose browser-visible bytes had no PDF
-   header: expect HTTP 400 with clear error and **no new draft**.
-3. Upload the small ordinary PDF that previously extracted 22 characters:
-   expect normal extraction and a populated Description.
-4. Confirm View original PDF, Edit PDF, and secondary cover UI remain
-   functional.
+## Test checklist
 
-Keep the GitHub branch isolated; don't merge it into main on the
-assumption that its old backend/service/frontend baseline is current.
+- Ordinary PDFs should extract and populate Description from the opening
+  300 characters (there is not yet an AI summarizer).
+- An unreadable PDF should save successfully but show an extraction error
+  in Description and extraction_status=unavailable.
+- View original PDF and Edit PDF should continue working for valid PDFs.
+- Verify both large test PDFs upload successfully and that the generated
+  Description does not summarize the final-page recommendation.
+
+This change is only on the test branch; it has not been run on the user's PC.
