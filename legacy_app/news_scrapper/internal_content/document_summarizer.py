@@ -86,8 +86,17 @@ def document_evidence(text: str) -> list[str]:
     content = str(text or "").replace("\x00", " ").strip()
     if not content:
         return []
-    if len(content) <= TOTAL_EVIDENCE_CHARS:
+    if len(content) <= 2200:
         return [content]
+    if len(content) <= TOTAL_EVIDENCE_CHARS:
+        # Preserve ALL available text for medium-sized documents while
+        # fitting each BART map pass inside the 1024-token model window.
+        parts = max(2, (len(content) + 1499) // 1500)
+        return [
+            f"[Document section {i + 1} of {parts}]\\n"
+            + content[len(content) * i // parts:len(content) * (i + 1) // parts]
+            for i in range(parts)
+        ]
     size = len(content)
     chunks = []
     for i in range(EVIDENCE_PARTS):
