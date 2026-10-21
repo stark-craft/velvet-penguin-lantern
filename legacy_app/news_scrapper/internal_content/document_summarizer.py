@@ -93,7 +93,7 @@ def document_evidence(text: str) -> list[str]:
         # fitting each BART map pass inside the 1024-token model window.
         parts = max(2, (len(content) + 1499) // 1500)
         return [
-            f"[Document section {i + 1} of {parts}]\\n"
+            f"[Document section {i + 1} of {parts}]\n"
             + content[len(content) * i // parts:len(content) * (i + 1) // parts]
             for i in range(parts)
         ]
