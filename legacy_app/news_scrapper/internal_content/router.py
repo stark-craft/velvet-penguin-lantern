@@ -146,9 +146,9 @@ def _save_pdf_import_warning(
         records = storage.load_records()
         saved = records.get(record_id)
         if isinstance(saved, dict) and saved.get("owner_id") == owner_id:
-            # Never replace a user-provided description.
-            if not str(saved.get("summary") or "").strip():
-                saved["summary"] = description
+            # Import form has no user-written Description; overwrite any
+            # provisional first-300-characters value from the importer.
+            saved["summary"] = description
             metadata = saved.get("source_document")
             if isinstance(metadata, dict):
                 metadata["extraction_status"] = "unavailable"
@@ -157,8 +157,7 @@ def _save_pdf_import_warning(
             storage.write_records(records)
             return saved
     # Defensive response fallback; the service's stored record is unchanged.
-    if not str(record.get("summary") or "").strip():
-        record["summary"] = description
+    record["summary"] = description
     source["extraction_status"] = "unavailable"
     source["extraction_warning"] = message
     return record
@@ -180,6 +179,8 @@ def _save_document_summary(
             metadata = saved.get("source_document")
             if isinstance(metadata, dict):
                 metadata["summary_method"] = method
+                if method == "unavailable":
+                    metadata["summary_warning"] = summary
             records[record_id] = saved
             storage.write_records(records)
             return saved
@@ -189,6 +190,8 @@ def _save_document_summary(
     metadata = record.get("source_document")
     if isinstance(metadata, dict):
         metadata["summary_method"] = method
+        if method == "unavailable":
+            metadata["summary_warning"] = summary
     return record
 
 
@@ -244,9 +247,9 @@ async def import_document(
                 record, owner_id, signature_missing,
             )
         elif body_text:
-            # Select key information from across the entire extracted body,
-            # then make a 300-character Description. Never fail the upload if
-            # an optional model is slow/unavailable.
+            # Samsung Chat first, shared local DistilBART second.
+            # Both see evidence spanning the extracted document, not just
+            # its introductory characters.
             try:
                 summary, method = await asyncio.to_thread(
                     summarize_document, body_text, 300,
@@ -256,8 +259,16 @@ async def import_document(
                         record, owner_id, summary, method,
                     )
             except Exception:
-                # Preserve the import and the service's fallback Description.
-                pass
+                # Do NOT silently pass through a first-300-char excerpt and
+                # call it a model-produced summary when both models fail.
+                record = _save_document_summary(
+                    record,
+                    owner_id,
+                    "PDF uploaded and text extracted, but Samsung Chat and "
+                    "local BART could not generate a summary. Please enter "
+                    "the Description manually.",
+                    "unavailable",
+                )
     except ContributionError as error:
         raise _fail(error) from error
     return record
