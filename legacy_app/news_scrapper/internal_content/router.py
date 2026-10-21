@@ -115,6 +115,53 @@ def list_mine(request: Request, response: Response):
         raise _fail(error) from error
 
 
+def _save_pdf_import_warning(
+    record: dict, owner_id: str, signature_missing: bool,
+) -> dict:
+    """Show extraction failures in Description and persist them on the draft.
+
+    The original upload remains saved. This is not a PDF repair or a bypass
+    for documents subject to enterprise access restrictions.
+    """
+    source = record.get("source_document")
+    if not isinstance(source, dict):
+        return record
+    if signature_missing:
+        message = (
+            "PDF uploaded, but its contents were not recognized as a standard "
+            "PDF. Text extraction and preview may fail. Try an approved PDF "
+            "export, or contact IT if the file is protected."
+        )
+    else:
+        warning = str(source.get("extraction_warning") or "").strip()
+        message = (
+            "PDF uploaded, but automatic text extraction was unavailable. "
+            + (warning or "Please enter the description manually.")
+        )
+    description = message[:300]
+    record_id = str(record.get("id") or "")
+    with storage.mutation_lock:
+        records = storage.load_records()
+        saved = records.get(record_id)
+        if isinstance(saved, dict) and saved.get("owner_id") == owner_id:
+            # Never replace a user-provided description.
+            if not str(saved.get("summary") or "").strip():
+                saved["summary"] = description
+            metadata = saved.get("source_document")
+            if isinstance(metadata, dict):
+                metadata["extraction_status"] = "unavailable"
+                metadata["extraction_warning"] = message
+            records[record_id] = saved
+            storage.write_records(records)
+            return saved
+    # Defensive response fallback; the service's stored record is unchanged.
+    if not str(record.get("summary") or "").strip():
+        record["summary"] = description
+    source["extraction_status"] = "unavailable"
+    source["extraction_warning"] = message
+    return record
+
+
 @router.post("/import")
 async def import_document(
     request: Request,
@@ -133,28 +180,37 @@ async def import_document(
     filename = document.filename or ""
     declared_type = document.content_type or ""
     try:
-        # A file whose bytes cannot be recognized must not be stored as a
-        # successful PDF upload. This is independent of extracting text from
-        # valid scanned/enterprise PDFs (which remains best effort).
         kind = validate_document_upload(filename, declared_type, len(data))
-        if not _signature_matches(kind, data):
-            if kind == "pdf":
-                raise ContributionError(
-                    "This upload could not be recognized as a PDF. The file "
-                    "data may have been altered by a document protection "
-                    "system or become corrupted during upload. Try an "
-                    "approved standard-PDF export, or ask your IT team."
-                )
+        if kind == "pdf" and not filename.lower().endswith(".pdf"):
+            raise ContributionError("Choose a file with the .pdf extension.")
+        # A PDF can be stored even when its signature/parser is unavailable.
+        # Keep DOCX strict: an invalid ZIP/Word structure is not a DOCX.
+        if kind == "docx" and not _signature_matches(kind, data):
             raise ContributionError(
                 "This upload is not a valid Word (.docx) document."
             )
+        owner_id = _owner(request, response)
         record = service.import_document(
-            _owner(request, response),
+            owner_id,
             filename,
             declared_type,
             data,
             {"owner_name": owner_name, "content_type": content_type},
         )
+        # service.import_document on the current PC already stores PDFs even
+        # when parse_document raises ContributionError. Fill the blank
+        # Description *and persist it* without modifying the original bytes.
+        if kind == "pdf":
+            source = record.get("source_document") or {}
+            signature_missing = not _signature_matches("pdf", data)
+            no_text = (
+                source.get("extraction_status") == "unavailable"
+                or not str(record.get("body") or "").strip()
+            )
+            if signature_missing or no_text:
+                record = _save_pdf_import_warning(
+                    record, owner_id, signature_missing,
+                )
     except ContributionError as error:
         raise _fail(error) from error
     return record
