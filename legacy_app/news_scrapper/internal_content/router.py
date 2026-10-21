@@ -7,6 +7,7 @@ viewers' drafts are indistinguishable from missing records (404).
 
 from __future__ import annotations
 
+import asyncio
 import os
 import secrets
 
@@ -23,6 +24,7 @@ from .document_parser import (
     _signature_matches,
     validate_document_upload,
 )
+from .document_summarizer import summarize_document
 from .image_processor import COVER_MAX_BYTES
 from .schemas import DraftUpdate, NotificationRead, ReviewNote, ReviewUnlock
 
@@ -162,6 +164,34 @@ def _save_pdf_import_warning(
     return record
 
 
+def _save_document_summary(
+    record: dict, owner_id: str, summary: str, method: str,
+) -> dict:
+    """Persist the document-wide description instead of the opening text."""
+    summary = str(summary or "").strip()[:300]
+    if not summary:
+        return record
+    record_id = str(record.get("id") or "")
+    with storage.mutation_lock:
+        records = storage.load_records()
+        saved = records.get(record_id)
+        if isinstance(saved, dict) and saved.get("owner_id") == owner_id:
+            saved["summary"] = summary
+            metadata = saved.get("source_document")
+            if isinstance(metadata, dict):
+                metadata["summary_method"] = method
+            records[record_id] = saved
+            storage.write_records(records)
+            return saved
+    # Returning the correct description is useful even if persistence fails,
+    # but should not hide the fact the original draft may have been removed.
+    record["summary"] = summary
+    metadata = record.get("source_document")
+    if isinstance(metadata, dict):
+        metadata["summary_method"] = method
+    return record
+
+
 @router.post("/import")
 async def import_document(
     request: Request,
@@ -200,17 +230,34 @@ async def import_document(
         # service.import_document on the current PC already stores PDFs even
         # when parse_document raises ContributionError. Fill the blank
         # Description *and persist it* without modifying the original bytes.
-        if kind == "pdf":
-            source = record.get("source_document") or {}
-            signature_missing = not _signature_matches("pdf", data)
-            no_text = (
-                source.get("extraction_status") == "unavailable"
-                or not str(record.get("body") or "").strip()
+        source = record.get("source_document") or {}
+        signature_missing = kind == "pdf" and not _signature_matches("pdf", data)
+        body_text = str(record.get("body") or "").strip()
+        no_text = (
+            source.get("extraction_status") == "unavailable"
+            or not body_text
+        )
+        if kind == "pdf" and (signature_missing or no_text):
+            # An unreadable PDF still uploads; Description explains why
+            # automatic summarization was impossible.
+            record = _save_pdf_import_warning(
+                record, owner_id, signature_missing,
             )
-            if signature_missing or no_text:
-                record = _save_pdf_import_warning(
-                    record, owner_id, signature_missing,
+        elif body_text:
+            # Select key information from across the entire extracted body,
+            # then make a 300-character Description. Never fail the upload if
+            # an optional model is slow/unavailable.
+            try:
+                summary, method = await asyncio.to_thread(
+                    summarize_document, body_text, 300,
                 )
+                if summary:
+                    record = _save_document_summary(
+                        record, owner_id, summary, method,
+                    )
+            except Exception:
+                # Preserve the import and the service's fallback Description.
+                pass
     except ContributionError as error:
         raise _fail(error) from error
     return record
