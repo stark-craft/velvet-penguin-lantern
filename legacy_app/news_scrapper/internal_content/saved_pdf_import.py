@@ -76,7 +76,6 @@ def import_saved_pdf(
     if not uploaded_bytes:
         raise ContributionError("Choose a nonempty PDF to upload.")
 
-    storage.ensure_directories()
     target = storage.original_path(storage.new_file_id(), "pdf")
     source_type = storage.DOCUMENT_MIME_BY_EXTENSION["pdf"]
     base_title = _fallback_title(filename)
@@ -90,42 +89,43 @@ def import_saved_pdf(
     try:
         with storage.mutation_lock:
             # Lock only file/metadata writes; ML inference must never hold it.
+            storage.ensure_directories()
             target.write_bytes(uploaded_bytes)
-            items = storage.load_records()
-            record = service._base_record(
-                owner_id,
-                "document_import",
-                {
-                    **fields,
-                    "title": fields.get("title") or base_title,
-                    "summary": "",
-                },
-            )
-            record_id = str(record["id"])
-            if fields.get("owner_name"):
-                record["owner_name"] = str(fields["owner_name"]).strip()[:200]
-            record["body"] = ""
-            record["source_document"] = {
-                "file": target.name,
-                "name": str(filename or ""),
-                "type": source_type,
-                "size": len(uploaded_bytes),
-                "page_count": None,
-                "extracted_characters": 0,
-                "extraction_method": "pending",
-                "extraction_status": "processing",
-                "extraction_warning": "",
-                # Retain the local PC's existing metadata fields.
-                "metadata_status": "skipped",
-                "metadata_error": "",
-                "metadata_model_id": "",
-                "metadata_input_characters": 0,
-            }
-            items[record_id] = record
             try:
+                items = storage.load_records()
+                record = service._base_record(
+                    owner_id,
+                    "document_import",
+                    {
+                        **fields,
+                        "title": fields.get("title") or base_title,
+                        "summary": "",
+                    },
+                )
+                record_id = str(record["id"])
+                if fields.get("owner_name"):
+                    record["owner_name"] = str(fields["owner_name"]).strip()[:200]
+                record["body"] = ""
+                record["source_document"] = {
+                    "file": target.name,
+                    "name": str(filename or ""),
+                    "type": source_type,
+                    "size": len(uploaded_bytes),
+                    "page_count": None,
+                    "extracted_characters": 0,
+                    "extraction_method": "pending",
+                    "extraction_status": "processing",
+                    "extraction_warning": "",
+                    # Retain the local PC's existing metadata fields.
+                    "metadata_status": "skipped",
+                    "metadata_error": "",
+                    "metadata_model_id": "",
+                    "metadata_input_characters": 0,
+                }
+                items[record_id] = record
                 storage.write_records(items)
             except Exception:
-                # This original has not been linked by a persisted draft.
+                # Failure to create the record must not strand an orphan PDF.
                 storage.remove_quietly(target)
                 raise
     except OSError as error:
