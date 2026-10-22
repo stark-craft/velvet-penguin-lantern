@@ -20,10 +20,11 @@ review controls continue to be provided by service.py and router.py.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 from . import service, storage
-from .document_parser import ContributionError, detect_title, parse_document, validate_document_upload
+from .document_parser import ContributionError, parse_document, validate_document_upload
 
 LOG = logging.getLogger(__name__)
 
@@ -32,10 +33,59 @@ LOG = logging.getLogger(__name__)
 SUMMARY_MAX = 300
 
 
+# Docling represents figures with a standalone Markdown/HTML comment.
+# It is not actual extracted story text and must never become a headline.
+_IMAGE_PLACEHOLDER = re.compile(r"^\s*<!--\s*image\s*-->\s*$", flags=re.IGNORECASE)
+
+
 def _fallback_title(filename: str) -> str:
     title = str(Path(filename or "Imported document").stem)
     title = " ".join(title.replace("_", " ").replace("-", " ").split())
-    return (title or "Imported document")[:120]
+    return (title or "Imported document")[:service.TITLE_MAX]
+
+
+def _clean_extracted_body(value: str) -> str:
+    """Strip Docling's standalone image markers, preserving all other text.
+
+    Images stay in the saved original PDF; only meaningless placeholder
+    comments are removed from the editable text and summarizer input.
+    """
+    lines = [
+        line for line in str(value or "").splitlines()
+        if not _IMAGE_PLACEHOLDER.fullmatch(line)
+    ]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def _usable_title(value: object) -> str:
+    """Reject non-text placeholders and remove Markdown heading formatting."""
+    candidate = str(value or "").strip()
+    if not candidate or _IMAGE_PLACEHOLDER.fullmatch(candidate):
+        return ""
+    candidate = re.sub(r"^\s{0,3}#{1,6}\s+", "", candidate)
+    candidate = re.sub(r"\s+#+\s*$", "", candidate).strip()
+    if (
+        not (3 <= len(candidate) <= service.TITLE_MAX)
+        or not any(character.isalpha() for character in candidate)
+        or candidate.startswith(("<!--", "<!", "<"))
+    ):
+        return ""
+    return candidate
+
+
+def _choose_title(fields: dict, parsed: dict, cleaned_body: str, filename: str) -> str:
+    """Explicit title, then meaningful parsed/heading text, then filename."""
+    requested = _usable_title(fields.get("title"))
+    if requested:
+        return requested
+    title = _usable_title(parsed.get("detected_title"))
+    if title:
+        return title
+    for line in cleaned_body.splitlines():
+        title = _usable_title(line)
+        if title:
+            return title
+    return _fallback_title(filename)
 
 
 def _persist_owned(owner_id: str, record_id: str, updates: dict, source_updates: dict) -> dict:
@@ -79,6 +129,11 @@ def import_saved_pdf(
     target = storage.original_path(storage.new_file_id(), "pdf")
     source_type = storage.DOCUMENT_MIME_BY_EXTENSION["pdf"]
     base_title = _fallback_title(filename)
+    requested_type = str(fields.get("content_type") or "").strip()
+    content_type = (
+        requested_type if requested_type in service.CONTENT_TYPES
+        else "document_import"
+    )
 
     # A fresh ID and unique original path for EVERY upload, even if two users
     # upload files of the same name concurrently.
@@ -95,7 +150,7 @@ def import_saved_pdf(
                 items = storage.load_records()
                 record = service._base_record(
                     owner_id,
-                    "document_import",
+                    content_type,
                     {
                         **fields,
                         "title": fields.get("title") or base_title,
@@ -173,7 +228,7 @@ def import_saved_pdf(
             },
         )
 
-    extracted = str(parsed.get("text") or "").strip()
+    extracted = _clean_extracted_body(parsed.get("text") or "")
     method = str(parsed.get("extraction_method") or "unknown")
     warning = str(parsed.get("extraction_warning") or "")
     if not extracted:
@@ -195,9 +250,7 @@ def import_saved_pdf(
         owner_id,
         record_id,
         {
-            "title": (str(fields.get("title") or "").strip()
-                      or str(parsed.get("detected_title") or "").strip()
-                      or base_title)[:120],
+            "title": _choose_title(fields, parsed, extracted, filename),
             "body": extracted[:service.BODY_DRAFT_MAX],
             "summary": provisional_summary,
         },
