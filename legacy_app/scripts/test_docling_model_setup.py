@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import os
+import shutil
 import subprocess
 import sys
 import traceback
@@ -100,6 +101,100 @@ def prefetch_models(directory: Path, output: Path, use_public_hf: bool) -> bool:
     return True
 
 
+
+def discover_tesseract(explicit: str | None) -> str | None:
+    """Find system Tesseract, not Python package pytesseract."""
+    locations = [
+        explicit,
+        os.environ.get("TESSERACT_CMD"),
+        shutil.which("tesseract"),
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        str(project_root() / "tools" / "Tesseract-OCR" / "tesseract.exe"),
+    ]
+    for item in locations:
+        if not item:
+            continue
+        candidate = shutil.which(item) or (str(Path(item)) if Path(item).is_file() else None)
+        if candidate:
+            return candidate
+    return None
+
+
+def tesseract_check(executable: str, langs: list[str]) -> bool:
+    """Show installed executable and OCR languages; never download anything."""
+    try:
+        version = subprocess.run(
+            [executable, "--version"], capture_output=True, text=True, timeout=15
+        )
+        print("Tesseract:", version.stdout.splitlines()[0] if version.stdout else executable,
+              flush=True)
+        if version.returncode != 0:
+            print("ERROR: Tesseract --version returned", version.returncode, flush=True)
+            return False
+        probe = subprocess.run(
+            [executable, "--list-langs"], capture_output=True, text=True, timeout=15
+        )
+        installed = {
+            line.strip() for line in (probe.stdout + "\n" + probe.stderr).splitlines()
+            if line.strip() and not line.startswith("List of available languages")
+        }
+        print("Tesseract languages:", ", ".join(sorted(installed)) or "[none]", flush=True)
+        missing = [lang for lang in langs if lang not in installed]
+        if missing:
+            print("ERROR: Missing Tesseract language data:", ", ".join(missing), flush=True)
+            print("Check the Tesseract tessdata folder and TESSDATA_PREFIX.", flush=True)
+            return False
+        return True
+    except (OSError, subprocess.TimeoutExpired) as error:
+        print("ERROR: Cannot execute Tesseract:", type(error).__name__, error, flush=True)
+        return False
+
+
+def generate_scanned_test_pdf(output_dir: Path) -> Path:
+    """Create a genuine image-only PDF to verify OCR, not PDF text extraction."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+    except ImportError as error:
+        raise RuntimeError("Pillow is required to make the OCR test PDF") from error
+    img = Image.new("RGB", (1654, 2339), "white")
+    draw = ImageDraw.Draw(img)
+    font = None
+    for location in [
+        r"C:\Windows\Fonts\arial.ttf", r"C:\Windows\Fonts\segoeui.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    ]:
+        if Path(location).is_file():
+            font = ImageFont.truetype(location, size=56)
+            break
+    if font is None:
+        font = ImageFont.load_default()
+
+    lines = [
+        "SAMPARK OCR VALIDATION",
+        "",
+        "THIS IS AN IMAGE ONLY SCANNED PDF.",
+        "THERE IS NO SEARCHABLE TEXT LAYER.",
+        "",
+        "NEWS SCRAPPER PDF EXTRACTION TEST.",
+        "DOCLING SHOULD RECOGNIZE THESE WORDS.",
+        "",
+        "SAMSUNG CHAT SUMMARIZES EXTRACTED TEXT.",
+        "LOCAL BART IS ONLY THE FALLBACK.",
+        "",
+        "FINAL RECOMMENDATION:",
+        "PRESERVE SOURCE PROVENANCE.",
+    ]
+    top = 170
+    for line in lines:
+        draw.text((95, top), line, font=font, fill="black")
+        top += 105
+    pdf = output_dir / "sampark_ocr_scan_test.pdf"
+    img.save(pdf, "PDF", resolution=200.0)
+    print("Generated IMAGE-ONLY OCR test PDF:", pdf, flush=True)
+    return pdf
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -115,13 +210,28 @@ def main() -> int:
     parser.add_argument("--use-public-hf", action="store_true",
                         help="Use public Hugging Face instead of configured corporate mirror")
     parser.add_argument("--no-ocr", action="store_true",
-                        help="Test layout extraction without OCR models")
+                        help="Backward-compatible: disable OCR")
+    parser.add_argument("--ocr-engine", choices=["none", "tesseract", "rapidocr"],
+                        default="none",
+                        help="none (default): no OCR/download; tesseract: local CLI OCR; rapidocr: may require separate models")
+    parser.add_argument("--ocr-lang", default="eng",
+                        help="Installed Tesseract language codes, comma-separated (default: eng)")
+    parser.add_argument("--tesseract-exe", help="Full path to local tesseract.exe, if not on PATH")
+    parser.add_argument("--tessdata-dir", type=Path, help="Folder containing eng.traineddata, etc.")
+    parser.add_argument("--full-page-ocr", action="store_true",
+                        help="OCR every page, needed to verify image-only scans")
+    parser.add_argument("--make-scan", action="store_true",
+                        help="Create an IMAGE-ONLY sample PDF and run OCR on it (no private documents)")
     args = parser.parse_args()
 
     if args.use_public_hf and not args.download:
         parser.error("--use-public-hf requires --download")
-    if not args.pdf and not args.inspect:
-        parser.error("Provide --pdf for extraction or --inspect for cache inspection")
+    if not args.pdf and not args.inspect and not args.make_scan:
+        parser.error("Provide --pdf, --make-scan for an OCR test, or --inspect")
+    if args.no_ocr and args.ocr_engine != "none":
+        parser.error("Use either --no-ocr or --ocr-engine tesseract/rapidocr, not both")
+    if args.make_scan and args.ocr_engine == "none":
+        parser.error("--make-scan requires --ocr-engine tesseract (or rapidocr)")
 
     root = project_root()
     output = root / "docling_tests"
@@ -157,9 +267,36 @@ def main() -> int:
                   flush=True)
             return 2
 
-    if not args.pdf:
+    if args.make_scan:
+        try:
+            pdf = generate_scanned_test_pdf(output)
+        except Exception as error:
+            print("Cannot generate OCR sample:", type(error).__name__, error, flush=True)
+            return 2
+    elif args.pdf:
+        pdf = args.pdf.expanduser().absolute()
+    else:
         return 0
-    pdf = args.pdf.expanduser().absolute()
+
+    ocr_command = None
+    languages = [x.strip() for x in args.ocr_lang.split(",") if x.strip()]
+    if args.ocr_engine == "tesseract":
+        ocr_command = discover_tesseract(args.tesseract_exe)
+        if not ocr_command:
+            print("ERROR: Tesseract CLI is not installed or not found.", flush=True)
+            print("Check: Get-Command tesseract; or use --tesseract-exe with the full path.", flush=True)
+            print("The Python package pytesseract alone is not the Tesseract OCR engine.", flush=True)
+            return 2
+        if not tesseract_check(ocr_command, languages):
+            return 2
+    if args.tessdata_dir:
+        data_dir = args.tessdata_dir.expanduser().absolute()
+        if not data_dir.is_dir():
+            print("ERROR: Tesseract language data folder missing:", data_dir, flush=True)
+            return 2
+        os.environ["TESSDATA_PREFIX"] = str(data_dir)
+
+
     if not pdf.is_file():
         print("ERROR: PDF missing:", pdf, flush=True)
         return 2
@@ -182,8 +319,25 @@ def main() -> int:
         explicit_artifacts = bool(args.artifacts_dir or args.download)
         options = (PdfPipelineOptions(artifacts_path=artifacts)
                    if explicit_artifacts else PdfPipelineOptions())
-        if args.no_ocr:
-            options.do_ocr = False
+        # Explicit selection avoids AutoOCR silently initializing RapidOCR and
+        # trying the blocked modelscope.cn download.
+        options.do_ocr = (args.ocr_engine != "none") and not args.no_ocr
+        if args.ocr_engine == "tesseract":
+            from docling.datamodel.pipeline_options import TesseractCliOcrOptions
+            mode = "full_page" if (args.full_page_ocr or args.make_scan) else "default"
+            options.ocr_options = TesseractCliOcrOptions(
+                lang=languages,
+                tesseract_cmd=ocr_command,
+                mode=mode,
+                path=str(args.tessdata_dir.expanduser().absolute()) if args.tessdata_dir else None,
+            )
+            print("Selected OCR: Tesseract CLI / mode:", mode, flush=True)
+        elif args.ocr_engine == "rapidocr":
+            from docling.datamodel.pipeline_options import RapidOcrOptions
+            options.ocr_options = RapidOcrOptions()
+            print("Selected OCR: RapidOCR (will require its own model weights)", flush=True)
+        else:
+            print("Selected OCR: disabled (offline layout/text only)", flush=True)
         if explicit_artifacts:
             print("Docling artifacts_path:", artifacts, flush=True)
         else:
@@ -203,6 +357,14 @@ def main() -> int:
         print("\nSUCCESS: Docling extracted", f"{len(extracted):,}", "characters.",
               flush=True)
         print("Text file:", destination, flush=True)
+        if args.make_scan:
+            upper = extracted.upper()
+            found = [word for word in ["SAMPARK", "OCR", "SCANNED"] if word in upper]
+            print("Scanned test keywords found:", ", ".join(found), flush=True)
+            if len(found) != 3:
+                print("FAIL: OCR ran but did not recover all expected image-only words.", flush=True)
+                return 1
+            print("PASS: Tesseract/Docling recovered words from an image-only PDF.", flush=True)
         return 0
     except Exception as error:
         stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
