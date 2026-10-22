@@ -40,6 +40,14 @@ def main() -> int:
         print("Copy the Samsung Chat/BART version from the GitHub test branch.", flush=True)
         return 2
 
+    # Match main.py -> core.settings / application.py startup behavior:
+    # .env is loaded before samsung_chat imports its module-level settings.
+    from dotenv import load_dotenv
+    env_file = root / ".env"
+    loaded = load_dotenv(env_file, override=False)
+    print("Project .env present:", env_file.is_file(), flush=True)
+    print("Project .env loaded:", loaded, flush=True)
+
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
     from news_scrapper.internal_content.document_summarizer import (
         DocumentSummaryUnavailable,
@@ -53,7 +61,16 @@ def main() -> int:
     print("Input:", file, flush=True)
     print("Extracted characters:", f"{len(content):,}", flush=True)
     print("Evidence sections:", len(evidence), flush=True)
-    print("Samsung Chat configured:", bool(all((chat.URL, chat.CLIENT, chat.TOKEN, chat.MODEL_ID))), flush=True)
+    configured = bool(all((chat.URL, chat.CLIENT, chat.TOKEN, chat.MODEL_ID)))
+    print("Samsung Chat configured:", configured, flush=True)
+    if not configured:
+        # Print presence only; never leak the API URL, client or token.
+        print("Samsung Chat configuration status:", {
+            "SAMSUNG_CHAT_URL": "SET" if chat.URL else "MISSING",
+            "SAMSUNG_CHAT_CLIENT": "SET" if chat.CLIENT else "MISSING",
+            "SAMSUNG_CHAT_TOKEN": "SET" if chat.TOKEN else "MISSING",
+            "SAMSUNG_CHAT_MODEL_ID": "SET" if chat.MODEL_ID else "MISSING",
+        }, flush=True)
     print("Engine order: Samsung Chat -> local BART", flush=True)
     print("Generating 300-character Description...", flush=True)
 
