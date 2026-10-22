@@ -43,7 +43,8 @@ def _rapidocr_options():
         det_model_path=str(det),
         rec_model_path=str(rec),
         use_cls=False,
-        mode="default",
+        # Matched to the image-only RapidOCR validation that passed on Windows.
+        mode="full_page",
     )
 
 
