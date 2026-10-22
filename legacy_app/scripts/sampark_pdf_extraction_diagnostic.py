@@ -396,7 +396,11 @@ def _choose_best(results: list[dict], base: Path) -> dict | None:
 
 
 def _run(args: argparse.Namespace) -> int:
-    pdf = Path(args.pdf).expanduser().resolve()
+    # Keep the path supplied by the user. On managed Windows laptops,
+    # Path.resolve() may turn a visible .pdf reparse path into a protected
+    # C:\Windows\pcdrm\drmtmp\*.nsc target that Python cannot open.
+    # We do not access such a target directly or bypass its protections.
+    pdf = Path(os.path.abspath(os.path.expanduser(args.pdf)))
     if not pdf.is_file():
         print(f"ERROR: File does not exist: {pdf}", file=sys.stderr)
         return 2
@@ -415,8 +419,70 @@ def _run(args: argparse.Namespace) -> int:
     LOG.info("Results directory: %s", base)
     LOG.info("Original PDF will NOT be modified; no remote PDF upload will occur")
     LOG.info("Main Python: %s", sys.executable)
-    LOG.info("PDF file size: %.2f MiB", pdf.stat().st_size / (1024*1024))
-    preflight = _pdf_header(pdf)
+    # Observational metadata only: do not attempt to open an underlying DRM
+    # target or circumvent Windows access-control restrictions.
+    resolved = None
+    redirected = False
+    try:
+        resolved = pdf.resolve(strict=False)
+        redirected = os.path.normcase(str(resolved)) != os.path.normcase(str(pdf))
+        if redirected:
+            LOG.warning(
+                "Requested path resolves to a different underlying target "
+                "(target extension %s). Possible enterprise DRM/reparse link; "
+                "only the user-supplied path will be opened.", resolved.suffix or "[none]"
+            )
+    except (OSError, RuntimeError) as exc:
+        LOG.warning("Cannot resolve file metadata: %s", _safe_error(exc))
+
+    file_size = None
+    try:
+        file_size = pdf.stat().st_size
+        LOG.info("PDF file size: %.2f MiB", file_size / (1024*1024))
+        preflight = _pdf_header(pdf)
+    except OSError as exc:
+        # Nothing else can safely parse a file until its bytes can be read.
+        # Retain machine-readable results instead of crashing before the
+        # diagnostic report is written.
+        status = "access_denied" if isinstance(exc, PermissionError) else "file_read_failed"
+        preflight = {
+            "filename": pdf.name,
+            "requested_extension": pdf.suffix.lower(),
+            "resolved_extension": resolved.suffix.lower() if resolved else None,
+            "path_redirected": redirected,
+            "bytes_if_stat_available": file_size,
+            "status": status,
+            "error_type": type(exc).__name__,
+            "error": _safe_error(exc),
+            "looks_like_pdf": None,
+        }
+        (base / "file_preflight.json").write_text(
+            json.dumps(preflight, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        report = {
+            "file": preflight,
+            "engines": [],
+            "chosen_engine": None,
+            "best_output": None,
+            "status": status,
+            "note": (
+                "Original input bytes were not readable by Python. No Docling, "
+                "pdfplumber, pypdf or OCR stage was attempted; those engines "
+                "need readable PDF bytes. For rights-managed documents, ask "
+                "the document owner or IT for authorized access or an approved "
+                "export. No protection bypass was attempted."
+            ),
+        }
+        (base / "SUMMARY_REPORT.json").write_text(
+            json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        LOG.error("PREFLIGHT %s: Python cannot read bytes from the supplied file: %s",
+                  status.upper(), _safe_error(exc))
+        LOG.error("Skipping all extraction engines: input access must be resolved first.")
+        LOG.info("Diagnostic log: %s", base / "diagnostic.log")
+        LOG.info("Structured results: %s", base / "SUMMARY_REPORT.json")
+        return 3
+
     LOG.info("Signature: PDF marker offset=%s; first 16 bytes (hex)=%s",
              preflight["pdf_header_offset_first_megabyte"],
              preflight["first_16_bytes_hex"])
