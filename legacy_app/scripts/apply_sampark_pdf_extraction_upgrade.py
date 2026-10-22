@@ -105,18 +105,69 @@ def extract_pdf(data: bytes, filename: str) -> tuple[str, int | None]:
 
 
 def patch_service(original: str) -> str:
-    # The service might already contain error-preserving PDF logic; don't
-    # overwrite it without a careful manual merge in that situation.
-    if ('"extraction_method": parsed.get(' in original
-            and 'parsed = parse_document(' in original
-            and '"extraction_warning":' in original):
-        print("  service.py: extraction metadata already present", flush=True)
+    """Merge metadata only into user's newer, already-safe PDF import flow.
+
+    The PC service already validates, saves originals before parsing and
+    preserves unreadable PDFs. Do not replace that flow with the old GitHub
+    implementation, or alter any newer leadership/cover/template functions.
+    """
+    match = re.search(r"(?m)^def import_document\(", original)
+    if match is None:
+        raise RuntimeError("Cannot safely merge service.py: import_document missing.")
+    following = re.search(r"(?m)^def [a-zA-Z_]\w*\(", original[match.end():])
+    end = (match.end() + following.start()) if following else len(original)
+    region = original[match.start():end]
+    if ('"extraction_method":' in region
+            and '"extraction_warning":' in region):
+        print("  service.py: extraction method metadata already present", flush=True)
         return original
+
+    # The exact new PC version shared in chat:
+    #   - validate_document_upload is already imported
+    #   - original file is saved BEFORE parse_document()
+    #   - import preserves PDF on ContributionError
+    #   - it has cover/template/editorial fields not found in older GitHub files
+    newer_flow = all((
+        "kind = validate_document_upload(" in region,
+        "target.write_bytes(data)" in region,
+        "parsed = parse_document(" in region,
+        'record["source_document"] = {' in region,
+        '"extraction_status": extraction_status,' in region,
+        '"extraction_warning": extraction_warning,' in region,
+    ))
+    if newer_flow:
+        # Only add metadata: no rewriting summary, storage, or error handling.
+        anchor = '                "extracted_characters": character_count,\n'
+        extra = (
+            '                "extracted_characters": character_count,\n'
+            '                "extraction_method": (\n'
+            '                    parsed.get("extraction_method", "unknown")\n'
+            '                    if parsed is not None else "unavailable"\n'
+            '                ),\n'
+        )
+        updated_region = require_replace(
+            region, anchor, extra,
+            "service.py: current-PC source_document metadata",
+        )
+        print(
+            "  service.py: preserving current PDF-storage, template, "
+            "leadership and cover logic; adding extraction_method only.",
+            flush=True,
+        )
+        return original[:match.start()] + updated_region + original[end:]
+
+    # Old GitHub-style service support remains for users on that baseline.
+    # Apply only when that older structure is clearly present.
+    if 'parsed = parse_document(filename, declared_type, data)' not in region:
+        raise RuntimeError(
+            "Cannot safely merge service.py: unknown import_document shape. "
+            "No changes made. Please provide the original formatted import_document function."
+        )
     changed = require_replace(
         original,
         "    parse_document,\n)",
         "    parse_document,\n    validate_document_upload,\n    detect_title,\n)",
-        "service.py: import list",
+        "service.py: older import list",
     )
     changed = require_replace(
         changed,
@@ -127,7 +178,6 @@ def patch_service(original: str) -> str:
     except ContributionError as error:
         if kind != "pdf":
             raise
-        # Preserve an unreadable ORIGINAL PDF without misreporting extraction.
         parsed = {
             "text": "", "page_count": None, "character_count": 0,
             "detected_title": detect_title("", filename),
@@ -135,7 +185,7 @@ def patch_service(original: str) -> str:
             "extraction_warning": str(error)[:300],
         }
 ''',
-        "service.py: import parser call",
+        "service.py: older import parser call",
     )
     changed = require_replace(
         changed,
@@ -145,7 +195,7 @@ def patch_service(original: str) -> str:
                 "extraction_status": "available" if parsed["text"].strip() else "unavailable",
                 "extraction_warning": parsed.get("extraction_warning"),
 ''',
-        "service.py: source_document metadata",
+        "service.py: older source_document metadata",
     )
     return changed
 
