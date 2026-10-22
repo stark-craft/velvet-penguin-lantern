@@ -195,6 +195,54 @@ def generate_scanned_test_pdf(output_dir: Path) -> Path:
     return pdf
 
 
+
+def find_rapidocr_onnx_weights(root: Path, explicit_dir: Path | None, size: str) -> dict:
+    """Find compatible, locally present RapidOCR ONNX det/rec weights.
+
+    Only accepts exact PP-OCRv6 checkpoints; do not silently pair different
+    architectures or select an arbitrary .onnx file. No networking.
+    """
+    candidates = [
+        explicit_dir,
+        root / ".docling-models" / "RapidOcr",
+        root / "models" / "RapidOcr",
+        Path(sys.prefix) / "Lib" / "site-packages" / "rapidocr" / "models",
+    ]
+    found = {}
+    looked = []
+    for folder in candidates:
+        if not folder or not folder.is_dir():
+            continue
+        looked.append(str(folder))
+        # A cache may have an extra version/backend subdirectory.
+        try:
+            paths = list(folder.rglob("*.onnx"))
+        except OSError:
+            continue
+        for kind, basename in (
+            ("det", f"PP-OCRv6_det_{size}.onnx"),
+            ("rec", f"PP-OCRv6_rec_{size}.onnx"),
+        ):
+            options = [p for p in paths if p.name.casefold() == basename.casefold()
+                       and p.is_file() and p.stat().st_size > 1024]
+            if options and kind not in found:
+                found[kind] = str(options[0])
+    print("RapidOCR model search directories:", flush=True)
+    for folder in looked or ["No existing model directories found"]:
+        print(" ", folder, flush=True)
+    for kind in ("det", "rec"):
+        print(f"RapidOCR {kind}:", found.get(kind, "MISSING"), flush=True)
+    if len(found) != 2:
+        print("RapidOCR needs BOTH matching PP-OCRv6 ONNX files.", flush=True)
+        print("Approved prefetch command (from C:\\scrappyV3):", flush=True)
+        print('  & ".\\.docling-venv\\Scripts\\docling-tools.exe" models download rapidocr '
+              f'--rapidocr-backend-lang onnxruntime:en --rapidocr-model-size {size} '
+              '-o ".\\.docling-models"', flush=True)
+        print("The command may fail while ModelScope access is blocked; if it does, "
+              "obtain the weights using an approved internal distribution.", flush=True)
+    return found
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -220,6 +268,10 @@ def main() -> int:
     parser.add_argument("--tessdata-dir", type=Path, help="Folder containing eng.traineddata, etc.")
     parser.add_argument("--full-page-ocr", action="store_true",
                         help="OCR every page, needed to verify image-only scans")
+    parser.add_argument("--rapidocr-weights-dir", type=Path,
+                        help="Local directory holding BOTH RapidOCR PP-OCRv6 .onnx weights")
+    parser.add_argument("--rapidocr-size", choices=["tiny", "small", "medium"],
+                        default="small", help="RapidOCR detection/recognition model size")
     parser.add_argument("--make-scan", action="store_true",
                         help="Create an IMAGE-ONLY sample PDF and run OCR on it (no private documents)")
     args = parser.parse_args()
@@ -333,8 +385,30 @@ def main() -> int:
             print("Selected OCR: Tesseract CLI / mode:", mode, flush=True)
         elif args.ocr_engine == "rapidocr":
             from docling.datamodel.pipeline_options import RapidOcrOptions
-            options.ocr_options = RapidOcrOptions()
-            print("Selected OCR: RapidOCR (will require its own model weights)", flush=True)
+            local_weights = find_rapidocr_onnx_weights(
+                root,
+                args.rapidocr_weights_dir.expanduser().absolute()
+                if args.rapidocr_weights_dir else None,
+                args.rapidocr_size,
+            )
+            if "det" not in local_weights or "rec" not in local_weights:
+                print("STOP: RapidOCR weights missing; do NOT try an external download "
+                      "during PDF conversion.", flush=True)
+                return 2
+            # Explicitly use the Docling RapidOCR engine, not system Tesseract.
+            # Pin both model paths so RapidOCR cannot attempt a ModelScope
+            # request for the models that were missing in the user's logs.
+            options.ocr_options = RapidOcrOptions(
+                backend="onnxruntime",
+                lang=["en"],
+                model_size=args.rapidocr_size,
+                det_model_path=local_weights["det"],
+                rec_model_path=local_weights["rec"],
+                use_cls=False,
+                mode="full_page" if (args.full_page_ocr or args.make_scan) else "default",
+            )
+            print("Selected OCR: Docling + RapidOCR (local ONNX models, no Tesseract)",
+                  flush=True)
         else:
             print("Selected OCR: disabled (offline layout/text only)", flush=True)
         if explicit_artifacts:
