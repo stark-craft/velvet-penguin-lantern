@@ -223,7 +223,10 @@ async def import_document(
                 "This upload is not a valid Word (.docx) document."
             )
         owner_id = _owner(request, response)
-        record = service.import_document(
+        # Avoid blocking the FastAPI event loop while Docling / RapidOCR
+        # performs CPU-heavy extraction in the isolated offline worker.
+        record = await asyncio.to_thread(
+            service.import_document,
             owner_id,
             filename,
             declared_type,
