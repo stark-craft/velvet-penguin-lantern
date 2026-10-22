@@ -437,7 +437,7 @@ def main() -> int:
             if len(found) != 3:
                 print("FAIL: OCR ran but did not recover all expected image-only words.", flush=True)
                 return 1
-            print("PASS: Tesseract/Docling recovered words from an image-only PDF.", flush=True)
+            print(f"PASS: Docling + {args.ocr_engine} recovered words from an image-only PDF.", flush=True)
         return 0
     except Exception as error:
         stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
