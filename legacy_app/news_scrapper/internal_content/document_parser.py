@@ -401,6 +401,10 @@ def parse_document(
     if kind == "pdf":
         text, page_count, extraction_method = extract_pdf_details(data, filename)
         # No text still produces a draft with a page count, wherever possible.
+        if sum(char.isalnum() for char in text) < MIN_READABLE_CHARS:
+            text = ""
+            if extraction_method != "too_many_pages":
+                extraction_method = "unavailable"
     else:
         text, page_count = extract_docx(data, filename)
         extraction_method = "python-docx"
