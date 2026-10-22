@@ -280,6 +280,12 @@ def main() -> int:
 
     ocr_command = None
     languages = [x.strip() for x in args.ocr_lang.split(",") if x.strip()]
+    if args.tessdata_dir:
+        data_dir = args.tessdata_dir.expanduser().absolute()
+        if not data_dir.is_dir():
+            print("ERROR: Tesseract language data folder missing:", data_dir, flush=True)
+            return 2
+        os.environ["TESSDATA_PREFIX"] = str(data_dir)
     if args.ocr_engine == "tesseract":
         ocr_command = discover_tesseract(args.tesseract_exe)
         if not ocr_command:
@@ -289,13 +295,6 @@ def main() -> int:
             return 2
         if not tesseract_check(ocr_command, languages):
             return 2
-    if args.tessdata_dir:
-        data_dir = args.tessdata_dir.expanduser().absolute()
-        if not data_dir.is_dir():
-            print("ERROR: Tesseract language data folder missing:", data_dir, flush=True)
-            return 2
-        os.environ["TESSDATA_PREFIX"] = str(data_dir)
-
 
     if not pdf.is_file():
         print("ERROR: PDF missing:", pdf, flush=True)
