@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 from news_scrapper.recommendation.identity import resolve_viewer
 from news_scrapper.access_control import service as access_service
 from core.request_limits import REQUEST_LIMITER
-from . import access, service, storage
+from . import access, saved_pdf_import, service, storage
 from .document_parser import ContributionError
 from .document_parser import (
     DOCUMENT_MAX_BYTES,
@@ -223,31 +223,37 @@ async def import_document(
                 "This upload is not a valid Word (.docx) document."
             )
         owner_id = _owner(request, response)
-        # Avoid blocking the FastAPI event loop while Docling / RapidOCR
-        # performs CPU-heavy extraction in the isolated offline worker.
+        # PDF: save PRIVATE original first, reopen it through normal authorized
+        # server file access, and extract from those reopened bytes.  DOCX
+        # retains the existing strict service import logic unchanged.
+        # Both run outside the FastAPI event loop during CPU-heavy extraction.
+        importer = (
+            saved_pdf_import.import_saved_pdf
+            if kind == "pdf" else service.import_document
+        )
         record = await asyncio.to_thread(
-            service.import_document,
+            importer,
             owner_id,
             filename,
             declared_type,
             data,
             {"owner_name": owner_name, "content_type": content_type},
         )
-        # service.import_document on the current PC already stores PDFs even
-        # when parse_document raises ContributionError. Fill the blank
-        # Description *and persist it* without modifying the original bytes.
+
         source = record.get("source_document") or {}
-        signature_missing = kind == "pdf" and not _signature_matches("pdf", data)
         body_text = str(record.get("body") or "").strip()
         no_text = (
             source.get("extraction_status") == "unavailable"
             or not body_text
         )
-        if kind == "pdf" and (signature_missing or no_text):
-            # An unreadable PDF still uploads; Description explains why
-            # automatic summarization was impossible.
+        if kind == "pdf" and no_text:
+            # The RAW multipart bytes can differ from the readable bytes
+            # returned by opening the saved original (enterprise file
+            # management).  Never overwrite SUCCESSFUL extraction based on
+            # a signature check of the raw multipart bytes.
+            # Extraction status is based on the REOPENED stored original.
             record = _save_pdf_import_warning(
-                record, owner_id, signature_missing,
+                record, owner_id, signature_missing=False,
             )
         elif body_text:
             # Samsung Chat first, shared local DistilBART second.
