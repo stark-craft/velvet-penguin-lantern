@@ -16,6 +16,8 @@ from .document_parser import (
     ContributionError,
     EXTRACT_MAX_CHARS,
     parse_document,
+    validate_document_upload,
+    detect_title,
 )
 from .image_processor import normalize_cover, validate_cover_upload
 
@@ -146,7 +148,21 @@ def import_document(
     fields: dict | None = None,
 ) -> dict:
     fields = fields or {}
-    parsed = parse_document(filename, declared_type, data)
+    # Keep the original uploaded PDF, even if a DRM wrapper, corrupt bytes,
+    # or password restriction prevents text extraction. Non-PDF inputs still
+    # go through strict validation, and size/type limits remain enforced.
+    kind = validate_document_upload(filename, declared_type, len(data))
+    try:
+        parsed = parse_document(filename, declared_type, data)
+    except ContributionError as error:
+        if kind != "pdf":
+            raise
+        parsed = {
+            "text": "", "page_count": None, "character_count": 0,
+            "detected_title": detect_title("", filename),
+            "paragraphs": [], "extraction_method": "unavailable",
+            "extraction_warning": str(error)[:300],
+        }
 
     # Imports usually produce document stories, but a caller may route the
     # extracted copy into another channel (for example an HR announcement).
@@ -178,6 +194,9 @@ def import_document(
                 "size": len(data),
                 "page_count": parsed["page_count"],
                 "extracted_characters": parsed["character_count"],
+                "extraction_method": parsed.get("extraction_method", "unknown"),
+                "extraction_status": "available" if parsed["text"].strip() else "unavailable",
+                "extraction_warning": parsed.get("extraction_warning"),
             }
             items[record["id"]] = record
             storage.write_records(items)
