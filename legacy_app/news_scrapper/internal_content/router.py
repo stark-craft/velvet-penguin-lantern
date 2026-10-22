@@ -117,37 +117,28 @@ def list_mine(request: Request, response: Response):
         raise _fail(error) from error
 
 
-def _save_pdf_import_warning(
-    record: dict, owner_id: str, signature_missing: bool,
-) -> dict:
-    """Show extraction failures in Description and persist them on the draft.
+def _save_pdf_import_warning(record: dict, owner_id: str) -> dict:
+    """Persist a warning ONLY if the saved original could not be extracted.
 
-    The original upload remains saved. This is not a PDF repair or a bypass
-    for documents subject to enterprise access restrictions.
+    The in-memory multipart representation is not a reliable measure of
+    readability on an enterprise-managed Windows file system.  The PDF was
+    already saved and reopened by saved_pdf_import before we get here.
     """
     source = record.get("source_document")
     if not isinstance(source, dict):
         return record
-    if signature_missing:
-        message = (
-            "PDF uploaded, but its contents were not recognized as a standard "
-            "PDF. Text extraction and preview may fail. Try an approved PDF "
-            "export, or contact IT if the file is protected."
-        )
-    else:
-        warning = str(source.get("extraction_warning") or "").strip()
-        message = (
-            "PDF uploaded, but automatic text extraction was unavailable. "
-            + (warning or "Please enter the description manually.")
-        )
+
+    warning = str(source.get("extraction_warning") or "").strip()
+    message = (
+        "PDF uploaded, but automatic text extraction was unavailable. "
+        + (warning or "Please enter the Description manually.")
+    )
     description = message[:300]
     record_id = str(record.get("id") or "")
     with storage.mutation_lock:
         records = storage.load_records()
         saved = records.get(record_id)
         if isinstance(saved, dict) and saved.get("owner_id") == owner_id:
-            # Import form has no user-written Description; overwrite any
-            # provisional first-300-characters value from the importer.
             saved["summary"] = description
             metadata = saved.get("source_document")
             if isinstance(metadata, dict):
@@ -156,12 +147,11 @@ def _save_pdf_import_warning(
             records[record_id] = saved
             storage.write_records(records)
             return saved
-    # Defensive response fallback; the service's stored record is unchanged.
+
     record["summary"] = description
     source["extraction_status"] = "unavailable"
     source["extraction_warning"] = message
     return record
-
 
 def _save_document_summary(
     record: dict, owner_id: str, summary: str, method: str,
@@ -252,9 +242,7 @@ async def import_document(
             # management).  Never overwrite SUCCESSFUL extraction based on
             # a signature check of the raw multipart bytes.
             # Extraction status is based on the REOPENED stored original.
-            record = _save_pdf_import_warning(
-                record, owner_id, signature_missing=False,
-            )
+            record = _save_pdf_import_warning(record, owner_id)
         elif body_text:
             # Samsung Chat first, shared local DistilBART second.
             # Both see evidence spanning the extracted document, not just
