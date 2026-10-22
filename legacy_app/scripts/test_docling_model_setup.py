@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test Docling PDF extraction with cached or freshly downloaded local models.
+r"""Test Docling PDF extraction with cached or freshly downloaded local models.
 
 READ-ONLY with respect to the input PDF and existing model caches.
 Does not use Samsung Chat, BART, or the Sampark backend.
@@ -126,14 +126,21 @@ def main() -> int:
     root = project_root()
     output = root / "docling_tests"
     output.mkdir(parents=True, exist_ok=True)
+    # Detect an existing copied Hugging Face cache under C:\scrappyV3\models\hub
+    # automatically. A Hugging Face cache MUST point HF_HOME at the parent of hub.
+    local_hf_home = root / "models"
+    use_local_cache = (not args.hf_home and (local_hf_home / "hub").is_dir())
     hf_home = (args.hf_home.expanduser().absolute() if args.hf_home
+               else local_hf_home if use_local_cache
                else Path(os.environ.get("HF_HOME",
-                                      str(Path.home() / ".cache" / "huggingface"))))
+                                      str(Path.home() / ".cache" / "huggingface")))))
     # Set environment before importing Docling or huggingface_hub.
-    if args.hf_home:
+    if args.hf_home or use_local_cache:
         os.environ["HF_HOME"] = str(hf_home)
         os.environ.pop("HF_HUB_CACHE", None)
         os.environ.pop("HUGGINGFACE_HUB_CACHE", None)
+    if use_local_cache:
+        print("Found copied model cache inside scrappyV3/models/hub.", flush=True)
 
     print("Python:", sys.executable, flush=True)
     print("HF_ENDPOINT:", os.environ.get("HF_ENDPOINT", "[default]"), flush=True)
