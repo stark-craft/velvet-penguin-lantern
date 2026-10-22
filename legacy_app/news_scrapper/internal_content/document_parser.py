@@ -4,8 +4,9 @@ The original PDF is stored by service.import_document independently of whether
 text can be extracted. For a readable PDF with no selectable text, return an
 empty result WITH its page count instead of raising an empty-text error.
 
-Primary extractor: pypdf. Optional per-page fallback: PyMuPDF.
-No OCR, network calls, Samsung Chat, or automatic summarization.
+Primary extractor: locally cached Docling (+ local RapidOCR for scanned pages).
+Fallbacks: PyMuPDF, preserved pypdf, and pdfplumber in the Docling venv.
+No external OCR model downloads, Samsung Chat, or summarization in this file.
 """
 
 from __future__ import annotations
@@ -162,7 +163,7 @@ def _open_pymupdf(data: bytes):
     return doc
 
 
-def extract_pdf(data: bytes, filename: str) -> tuple[str, int | None]:
+def _extract_pdf_legacy(data: bytes, filename: str) -> tuple[str, int | None]:
     """Extract text page by page; preserve page count on zero-text PDFs.
 
     A failed individual page does not invalidate all other readable pages.
@@ -326,6 +327,26 @@ def extract_pdf(data: bytes, filename: str) -> tuple[str, int | None]:
             fallback_doc.close()
 
 
+def extract_pdf_details(data: bytes, filename: str) -> tuple[str, int | None, str]:
+    """Offline Docling + RapidOCR first, then reliable alternate engines.
+
+    The original pypdf + per-page PyMuPDF implementation is preserved as
+    _extract_pdf_legacy so older imports and documents remain supported.
+    """
+    from .pdf_extraction_pipeline import extract_pdf_with_fallbacks
+
+    return extract_pdf_with_fallbacks(
+        data, filename, legacy_extract=_extract_pdf_legacy,
+        max_pages=PDF_MAX_PAGES, max_chars=EXTRACT_MAX_CHARS,
+    )
+
+
+def extract_pdf(data: bytes, filename: str) -> tuple[str, int | None]:
+    """Backward-compatible public API for other import call sites."""
+    text, page_count, _method = extract_pdf_details(data, filename)
+    return text, page_count
+
+
 def extract_docx(data: bytes, filename: str) -> tuple[str, int | None]:
     try:
         document = docx.Document(io.BytesIO(data))
@@ -378,10 +399,11 @@ def parse_document(
         )
 
     if kind == "pdf":
-        text, page_count = extract_pdf(data, filename)
+        text, page_count, extraction_method = extract_pdf_details(data, filename)
         # No text still produces a draft with a page count, wherever possible.
     else:
         text, page_count = extract_docx(data, filename)
+        extraction_method = "python-docx"
         meaningful = re.sub(r"\s+", "", text)
         if len(meaningful) < MIN_READABLE_CHARS:
             raise _empty_text_error(kind)
@@ -399,4 +421,11 @@ def parse_document(
         "character_count": len(text),
         "detected_title": detect_title(text, filename),
         "paragraphs": [part for part in text.split("\n\n") if part],
+        "extraction_method": extraction_method,
+        "extraction_warning": (
+            "The document exceeds the 500-page automatic extraction limit."
+            if extraction_method == "too_many_pages"
+            else "No readable text could be extracted; the original PDF was preserved."
+            if kind == "pdf" and not text else None
+        ),
     }
