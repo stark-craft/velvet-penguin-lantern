@@ -120,3 +120,147 @@ def normalize_cover(data: bytes, filename: str, focal_x: float = 0.5, focal_y: f
         }
 
     raise ContributionError("The cover could not be processed by this server. Try a different image.")
+
+
+LEADERSHIP_MAX_EDGE = 2400
+
+
+def normalize_leadership_cover(
+    data: bytes,
+    filename: str,
+) -> dict:
+    """
+    Normalize a Leadership image without cropping it.
+    Portrait, square and landscape images are all accepted.
+    The original aspect ratio is preserved.
+    Very large images are downscaled only for storage/rendering safety.
+    Smaller images are never enlarged.
+    """
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter(
+                "error",
+                Image.DecompressionBombWarning,
+            )
+            image = Image.open(
+                io.BytesIO(data),
+            )
+            image_format = (image.format or "").upper()
+            width, height = image.size
+            if width <= 0 or height <= 0 or width * height > COVER_MAX_PIXELS:
+                raise ContributionError(
+                    "This image has too many pixels to process safely. "
+                    "Choose a smaller image."
+                )
+    except ContributionError:
+        raise
+    except Exception as error:
+        logger.warning(
+            "[internal-content] leadership image open failed for %s: %s",
+            filename,
+            error,
+        )
+        raise ContributionError(
+            "This image could not be read. " "Choose a JPG, PNG, or WebP file."
+        ) from error
+    if image_format == "GIF":
+        raise ContributionError(
+            "GIF images are not accepted. "
+            "Export the frame as JPG, PNG, or WebP and try again."
+        )
+    if image_format not in ALLOWED_FORMATS:
+        raise ContributionError(
+            "Choose a JPG, PNG, or WebP image. "
+            "SVG, HEIC, and other formats are not supported yet."
+        )
+    try:
+        image = ImageOps.exif_transpose(
+            image,
+        )
+        width, height = image.size
+    except Exception as error:
+        logger.warning(
+            "[internal-content] leadership image decode failed for %s: %s",
+            filename,
+            error,
+        )
+        raise ContributionError(
+            "This image could not be decoded. "
+            "Choose a different JPG, PNG, or WebP file."
+        ) from error
+    longest_edge = max(
+        width,
+        height,
+    )
+    if longest_edge > LEADERSHIP_MAX_EDGE:
+        ratio = LEADERSHIP_MAX_EDGE / float(longest_edge)
+        output_width = max(
+            1,
+            int(round(width * ratio)),
+        )
+        output_height = max(
+            1,
+            int(round(height * ratio)),
+        )
+        image = image.resize(
+            (
+                output_width,
+                output_height,
+            ),
+            Image.LANCZOS,
+        )
+    image = image.convert(
+        "RGB",
+    )
+    output_width, output_height = image.size
+    encode_attempts = (
+        (
+            "WEBP",
+            "webp",
+            {
+                "quality": QUALITY,
+                "method": 6,
+            },
+        ),
+        (
+            "JPEG",
+            "jpg",
+            {
+                "quality": QUALITY,
+            },
+        ),
+    )
+    for (
+        target_format,
+        extension,
+        options,
+    ) in encode_attempts:
+        buffer = io.BytesIO()
+        try:
+            image.save(
+                buffer,
+                format=target_format,
+                **options,
+            )
+        except (
+            ValueError,
+            OSError,
+            KeyError,
+        ) as error:
+            logger.warning(
+                "[internal-content] %s leadership image encode failed: %s",
+                target_format,
+                error,
+            )
+            continue
+        return {
+            "data": buffer.getvalue(),
+            "extension": extension,
+            "format_name": target_format,
+            "width": output_width,
+            "height": output_height,
+        }
+    raise ContributionError(
+        "The leadership image could not be processed by this server. "
+        "Try a different image."
+    )
