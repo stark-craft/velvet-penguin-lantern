@@ -77,7 +77,7 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
   );
 }
 
-function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, isDocument = false }) {
+function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, isDocument = false, documentNotice = '', reactionReady = true, onRetryReaction }) {
   const reactions = item?.reactions || {};
   const current = reactions.viewer_reaction || 'neutral';
   const likes = Number(reactions.like_count || 0);
@@ -100,7 +100,7 @@ function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, 
         >
           <Icon name="thumbsUp" size={16} />
           <span>Like</span>
-          <strong>{likes}</strong>
+          <strong>{isDocument && !reactionReady ? '—' : likes}</strong>
         </button>
         <button
           aria-pressed={current === 'dislike'}
@@ -111,7 +111,7 @@ function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, 
         >
           <Icon name="thumbsDown" size={16} />
           <span>Dislike</span>
-          <strong>{dislikes}</strong>
+          <strong>{isDocument && !reactionReady ? '—' : dislikes}</strong>
         </button>
         {onViewDocument && (
           <button
@@ -142,6 +142,14 @@ function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, 
           </button>
         )}
       </div>
+      {isDocument && documentNotice && (
+        <div className="sri-document-action-alert" role="alert">
+          <span>{documentNotice}</span>
+          {onRetryReaction && (
+            <button onClick={onRetryReaction} type="button">Retry reactions</button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -263,6 +271,9 @@ export default function ArticleModal({
   onSourceOpen,
   onWhyThisStory,
   onViewDocument,
+  documentNotice = '',
+  reactionReady = true,
+  onRetryReaction,
   variant = 'default',
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -494,7 +505,7 @@ export default function ArticleModal({
 
             {isStreamlined && (
               <>
-                <ForYouActions item={item} onHide={onHide} onVote={onVote} onSave={onSave} onViewDocument={isDocument ? onViewDocument : undefined} isDocument={isDocument} isSaved={isSaved} />
+                <ForYouActions item={item} onHide={onHide} onVote={onVote} onSave={onSave} onViewDocument={isDocument ? onViewDocument : undefined} isDocument={isDocument} isSaved={isSaved} documentNotice={documentNotice} reactionReady={reactionReady} onRetryReaction={onRetryReaction} />
                 {isForYou && item.recommendation?.reasons?.length > 0 && (
                   <section className="dossier-section dossier-why-seen">
                     <button
