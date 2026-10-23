@@ -30,7 +30,7 @@ def _jpeg_preview(source: Image.Image) -> bytes:
         source.load()
         rgb = ImageOps.exif_transpose(source).convert("RGB")
     # Keep charts, diagrams, page content and labels fully visible.
-    fitted = ImageOps.contain(rgb, (WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+    fitted = ImageOps.contain(rgb, (WIDTH, HEIGHT), Image.LANCZOS)
     canvas = Image.new("RGB", (WIDTH, HEIGHT), (241, 244, 249))
     canvas.paste(fitted, ((WIDTH - fitted.width) // 2, (HEIGHT - fitted.height) // 2))
     result = io.BytesIO()
