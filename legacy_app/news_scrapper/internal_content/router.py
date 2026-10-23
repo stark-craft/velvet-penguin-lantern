@@ -11,10 +11,13 @@ import asyncio
 import os
 import secrets
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Body, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 
 from news_scrapper.recommendation.identity import resolve_viewer
+from news_scrapper.recommendation.candidates import article_id
+from news_scrapper.recommendation.reactions import ReactionRepository
+from core.settings import NEWS_RUNTIME_DIR
 from news_scrapper.access_control import service as access_service
 from core.request_limits import REQUEST_LIMITER
 from . import access, saved_pdf_import, service, storage
@@ -29,6 +32,12 @@ from .image_processor import COVER_MAX_BYTES
 from .schemas import DraftUpdate, NotificationRead, ReviewNote, ReviewUnlock
 
 router = APIRouter(prefix="/internal-content", tags=["Internal Content"])
+
+# Share the existing persistent viewer reaction store, but authorize
+# documents against the published contribution registry instead of briefing.
+DOCUMENT_REACTIONS = ReactionRepository(
+    NEWS_RUNTIME_DIR / "recommendation" / "reactions.json"
+)
 
 
 def _owner(request: Request, response: Response) -> str:
@@ -690,3 +699,53 @@ def get_document(
         filename=safe_name,
         content_disposition_type="inline" if show_inline else "attachment",
     )
+
+
+@router.get("/{record_id}/reactions")
+def get_document_reactions(record_id: str, request: Request, response: Response):
+    """Hydrate viewer-specific counts for a genuinely published document."""
+    try:
+        record = service.get_published(record_id)
+    except LookupError as error:
+        raise _fail(error) from error
+    if record.get("content_type") != "document_import":
+        raise HTTPException(status_code=404, detail="Published document not found.")
+    viewer_key = _owner(request, response)
+    identity = article_id({"canonical_link": f"internal://{record_id}"})
+    return {
+        "status": "success",
+        **DOCUMENT_REACTIONS.snapshots(viewer_key, [identity]).get(identity, {}),
+    }
+
+
+@router.put("/{record_id}/reactions")
+def update_document_reactions(
+    record_id: str,
+    request: Request,
+    response: Response,
+    payload: dict = Body(default={}),
+):
+    """Like, dislike or clear one viewer's vote; never allow draft votes.
+
+    Server owns canonical document identity and metadata. Callers cannot
+    inject arbitrary article objects into the shared reaction store.
+    """
+    try:
+        record = service.get_published(record_id)
+    except LookupError as error:
+        raise _fail(error) from error
+    if record.get("content_type") != "document_import":
+        raise HTTPException(status_code=404, detail="Published document not found.")
+    reaction = str(payload.get("reaction") or "").strip().lower()
+    if reaction not in {"like", "dislike", "neutral"}:
+        raise HTTPException(status_code=400, detail="Reaction must be like, dislike, or neutral.")
+    viewer_key = _owner(request, response)
+    identity = article_id({"canonical_link": f"internal://{record_id}"})
+    safe_article = {
+        "article_id": identity,
+        "canonical_link": f"internal://{record_id}",
+        "title": record.get("title") or "",
+        "summary": record.get("summary") or "",
+        "source": record.get("owner_name") or record.get("author") or "SRI-D",
+    }
+    return {"status": "success", **DOCUMENT_REACTIONS.set(viewer_key, safe_article, reaction)}
