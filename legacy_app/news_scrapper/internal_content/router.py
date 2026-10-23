@@ -658,7 +658,20 @@ async def replace_document(
 
 
 @router.get("/{record_id}/document")
-def get_document(record_id: str, request: Request, response: Response):
+def get_document(
+    record_id: str,
+    request: Request,
+    response: Response,
+    inline: bool = False,
+):
+    """Stream the original PDF inline for the reader, or as a download.
+
+    Existing document download links keep attachment semantics by default.
+    An authorized reader requests ?inline=1 to let the browser PDF viewer
+    stream this URL directly, including HTTP byte-range requests, without
+    temporary blob URLs that can be revoked while the viewer is still active.
+    Access control is identical in both modes.
+    """
     try:
         record = _readable_media_record(request, response, record_id)
     except LookupError as error:
@@ -669,9 +682,11 @@ def get_document(record_id: str, request: Request, response: Response):
         raise HTTPException(status_code=404, detail="This contribution has no original document.")
     extension = path.suffix.lstrip(".").lower()
     safe_name = "".join(character if character.isalnum() or character in "._- " else "_" for character in source.get("name") or path.name)
+    show_inline = inline and extension == "pdf"
     return FileResponse(
         path,
         media_type=storage.DOCUMENT_MIME_BY_EXTENSION.get(extension, "application/octet-stream"),
         headers={"Cache-Control": "private, max-age=60"},
         filename=safe_name,
+        content_disposition_type="inline" if show_inline else "attachment",
     )
