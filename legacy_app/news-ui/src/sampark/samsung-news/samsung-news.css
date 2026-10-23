@@ -935,3 +935,51 @@ keeps contributor information on the left and View document on the right.
 .samsung-document-card .samsung-document-card-title {
   cursor: inherit;
 }
+
+
+/* ============================================================
+SRI-D DOCUMENT READER — LOCAL PDF RELOAD
+Keep reload inside the reader; do not reload the Samsung News page.
+============================================================ */
+.sri-document-modal-reader-actions {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 9px;
+}
+
+.sri-document-modal-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px solid #dfe4eb;
+  border-radius: 7px;
+  background: #fff;
+  color: #1428a0;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.sri-document-modal-retry:hover:not(:disabled) {
+  background: #f0f3ff;
+  border-color: #bac6f2;
+}
+
+.sri-document-modal-retry:focus-visible {
+  outline: 2px solid #1428a0;
+  outline-offset: 2px;
+}
+
+.sri-document-modal-retry:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+@media (max-width: 760px) {
+  .sri-document-modal-reader-actions { gap: 5px; }
+  .sri-document-modal-retry { padding: 6px 7px; font-size: 10px; }
+}
