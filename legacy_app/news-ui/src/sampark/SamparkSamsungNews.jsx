@@ -20,6 +20,9 @@ import {
 } from '../news-scrapper/internal/samsungInternalModel.js';
 import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
+import SriDDocumentCard from './samsung-news/SriDDocumentCard.jsx';
+import SriDDocumentModal from './samsung-news/SriDDocumentModal.jsx';
+import './samsung-news/samsung-news.css';
 
 function imageOf(item) {
   return resolveInternalImage(item) || item?.image_url || item?.top_image || '';
@@ -88,6 +91,7 @@ export default function SamparkSamsungNews() {
   const [publishedError, setPublishedError] = useState('');
   const [retryKey, setRetryKey] = useState(0);
   const [openArticle, setOpenArticle] = useState(null);
+  const [openDocument, setOpenDocument] = useState(null);
   const [focusMissed, setFocusMissed] = useState('');
   const handledFocusRef = React.useRef('');
 
@@ -124,9 +128,10 @@ export default function SamparkSamsungNews() {
     const local = rankTrending(channels.local);
     const inside = rankTrending(channels.inside);
     // Normalized published shapes: retain full body separate from summary.
-    const colleagueStories = published.filter((r)=> (r.contentType==='story' || r.contentType==='document_import') && r.status==='published');
+    const colleagueStories = published.filter((r)=> r.contentType==='story' && r.status==='published');
+    const documents = published.filter((r)=> r.contentType==='document_import' && r.status==='published');
     const announcements = published.filter((r)=> r.contentType==='announcement' && r.status==='published');
-    return { leadership, global, local, inside, colleagueStories, announcements };
+    return { leadership, global, local, inside, colleagueStories, documents, announcements };
   }, [channels, published]);
 
   const toSignal = (r)=>({
@@ -163,7 +168,7 @@ export default function SamparkSamsungNews() {
 
   const announcementSignals = useMemo(()=> model.announcements.map(toSignal), [model]);
   const leadershipSignal = useMemo(()=> (model.leadership ? toSignal(model.leadership) : null), [model]);
-  const sridCount = model.inside.length + model.colleagueStories.length + model.announcements.length + (model.leadership ? 1 : 0);
+  const sridCount = model.inside.length + model.colleagueStories.length + model.documents.length + model.announcements.length + (model.leadership ? 1 : 0);
 
   // Direct linking: /samsung-news?focus=<recordId> opens the exact public item
   // across every surfaced contribution type (story, document import,
@@ -174,14 +179,15 @@ export default function SamparkSamsungNews() {
   useEffect(()=>{
     const params = new URLSearchParams(location.search || '');
     const focus = params.get('focus');
-    if (!focus || openArticle || handledFocusRef.current === `${location.search}`) return;
+    if (!focus || openArticle || openDocument || handledFocusRef.current === `${location.search}`) return;
     if (loading) return;
     const match = findPublishedFocusRecord(published, focus);
     if (match) {
       setFocusMissed('');
       handledFocusRef.current = `${location.search}`;
       if (tab !== 'internal') setTab('internal');
-      setOpenArticle(toSignal(match));
+      if (match.contentType === 'document_import') setOpenDocument(match);
+      else setOpenArticle(toSignal(match));
       return;
     }
     const signal = [...model.inside, ...model.global, ...model.local].find((s)=> String(s.id || s.canonical_link || s.link || s.title)===String(focus));
@@ -264,6 +270,27 @@ export default function SamparkSamsungNews() {
       </section>
       )}
 
+      {tab==='internal' && model.documents.length > 0 && (
+        <section className="samsung-srid-documents" aria-labelledby="samsung-srid-documents-title">
+          <header className="samsung-srid-documents-header">
+            <div>
+              <span className="samsung-srid-documents-overline">From our teams</span>
+              <h3 id="samsung-srid-documents-title">Documents <small>({model.documents.length})</small></h3>
+            </div>
+            <span>Tap anywhere on a card to view details</span>
+          </header>
+          <div className="samsung-document-grid">
+            {model.documents.map((document) => (
+              <SriDDocumentCard
+                item={document}
+                key={document.id}
+                onOpen={setOpenDocument}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {tab==='internal' && announcementSignals.length > 0 && (
         <section className="sampark-samsung-latest" aria-labelledby="sampark-samsung-announcements-title">
           <header><h3 id="sampark-samsung-announcements-title">Announcements <span className="sampark-samsung-count">({announcementSignals.length})</span></h3><span className="sampark-samsung-hint">Notices from colleagues</span></header>
@@ -282,6 +309,7 @@ export default function SamparkSamsungNews() {
       )}
 
       <SamparkSamsungDossier item={openArticle} onClose={()=>setOpenArticle(null)} />
+      <SriDDocumentModal item={openDocument} onClose={()=>setOpenDocument(null)} />
     </div>
   );
 }
