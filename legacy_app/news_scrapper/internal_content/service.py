@@ -413,6 +413,14 @@ def replace_document(
             raise ContributionError(
                 "The edited PDF could not be stored on the server. Try again."
             ) from error
+        old_cover = record.get("cover")
+        old_auto_file = (
+            str(old_cover.get("file"))
+            if isinstance(old_cover, dict)
+            and old_cover.get("origin") == "pdf_auto"
+            and old_cover.get("file")
+            else ""
+        )
         previous_record = dict(record)
         try:
             record["source_document"] = {
@@ -424,6 +432,10 @@ def replace_document(
                 "extracted_characters": parsed["character_count"],
             }
             record["body"] = parsed["text"]
+            if old_auto_file:
+                # A replaced PDF must never display the previous PDF's preview.
+                # Manual cover selections are intentionally not changed.
+                record["cover"] = None
             record["updated_at"] = utc_now()
             items[record_id] = record
             storage.write_records(items)
@@ -433,7 +445,17 @@ def replace_document(
             raise
         if old_path and old_path != new_target:
             storage.remove_quietly(old_path)
-        return record
+    if old_auto_file:
+        storage.remove_quietly(storage.COVERS_DIR / old_auto_file)
+    try:
+        reopened_bytes = new_target.read_bytes()
+        attach_automatic_pdf_cover(
+            owner_id, record_id, reopened_bytes, new_target.name
+        )
+    except Exception:
+        # A thumbnail is optional and can never invalidate a PDF replacement.
+        pass
+    return get_owned(owner_id, record_id)
 
 
 def update_draft(
@@ -647,6 +669,82 @@ def attach_cover(
     if isinstance(previous, dict) and previous.get("file"):
         storage.remove_quietly(storage.COVERS_DIR / previous["file"])
     return record
+
+
+
+def attach_automatic_pdf_cover(
+    owner_id: str,
+    record_id: str,
+    pdf_bytes: bytes,
+    expected_original_file: str,
+) -> dict | None:
+    """Best-effort auto cover, replacing only covers generated from a PDF.
+
+    Keep explicit user-selected covers intact. Work on the current saved PDF
+    only, and never hold the storage lock during PDF rendering or normalization.
+    A missing PyMuPDF dependency or unsupported PDF does not affect the draft.
+    """
+    if not pdf_bytes:
+        return None
+    from .pdf_cover_extractor import extract_pdf_cover
+
+    preview = extract_pdf_cover(pdf_bytes)
+    if not preview:
+        return None
+    # The extractor already supplies a 1600x900 JPEG. Use the existing
+    # validator / normalizer for the same image storage contract as manual covers.
+    normalized = normalize_cover(
+        preview["data"], "automatic-pdf-cover.jpg", 0.5, 0.5
+    )
+    target = storage.cover_path(
+        storage.new_file_id(), normalized["extension"]
+    )
+    previous = None
+    with storage.mutation_lock:
+        items = storage.load_records()
+        current = items.get(record_id)
+        if not isinstance(current, dict) or current.get("owner_id") != owner_id:
+            return None
+        if current.get("status") not in EDITABLE_STATUSES:
+            return None
+        if current.get("content_type") != "document_import":
+            return None
+        original = current.get("source_document") or {}
+        if original.get("file") != expected_original_file:
+            # The user has replaced the PDF while the preview was rendering.
+            return None
+        previous = current.get("cover")
+        if isinstance(previous, dict) and previous.get("file"):
+            if previous.get("origin") != "pdf_auto":
+                # A user cover always wins over automatic PDF previews.
+                return None
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(normalized["data"])
+            current["cover"] = {
+                "file": target.name,
+                "name": "Automatic PDF preview",
+                "type": (
+                    f"image/{normalized['extension'].replace('jpg', 'jpeg')}"
+                ),
+                "size": len(normalized["data"]),
+                "width": normalized["width"],
+                "height": normalized["height"],
+                "focal_x": 0.5,
+                "focal_y": 0.5,
+                "origin": "pdf_auto",
+                "pdf_image_origin": str(preview.get("origin") or ""),
+                "pdf_page": preview.get("page"),
+            }
+            current["updated_at"] = utc_now()
+            items[record_id] = current
+            storage.write_records(items)
+        except Exception:
+            storage.remove_quietly(target)
+            raise
+    if isinstance(previous, dict) and previous.get("file"):
+        storage.remove_quietly(storage.COVERS_DIR / previous["file"])
+    return current
 
 
 def attach_secondary_cover(
