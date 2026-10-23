@@ -192,6 +192,7 @@ def import_saved_pdf(
     # The original at target is not replaced or rewritten after this read.
     parsed = None
     failure = ""
+    readable_bytes = b""
     try:
         readable_bytes = target.read_bytes()
         if not readable_bytes:
@@ -213,6 +214,22 @@ def import_saved_pdf(
             "[internal-content] Stored PDF extraction failed: type=%s file=%s",
             type(error).__name__, target.name,
         )
+
+    # Use the SAME reopened file representation used for text extraction.
+    # PDF thumbnails are optional; never fail the saved import because of one.
+    if readable_bytes and content_type == "document_import":
+        try:
+            service.attach_automatic_pdf_cover(
+                owner_id,
+                record_id,
+                readable_bytes,
+                target.name,
+            )
+        except Exception as error:
+            LOG.warning(
+                "[internal-content] PDF cover unavailable: type=%s",
+                type(error).__name__,
+            )
 
     if parsed is None:
         return _persist_owned(
