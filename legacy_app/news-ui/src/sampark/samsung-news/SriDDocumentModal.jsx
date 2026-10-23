@@ -115,15 +115,12 @@ export default function SriDDocumentModal({ item, onClose }) {
         variant="document"
         onVote={published && reactions && !reactionBusy ? voteDocument : undefined}
         onViewDocument={viewOriginalDocument}
+        reactionReady={Boolean(reactions)}
+        documentNotice={documentError || reactionError}
+        onRetryReaction={reactionError && published
+          ? () => setRetry((current) => current + 1)
+          : undefined}
       />
-      {(reactionError || documentError) && (
-        <div className="sri-document-feedback" role="alert">
-          <span>{documentError || reactionError}</span>
-          {reactionError && published && (
-            <button onClick={() => setRetry((current) => current + 1)} type="button">Retry reactions</button>
-          )}
-        </div>
-      )}
     </>
   );
 }
