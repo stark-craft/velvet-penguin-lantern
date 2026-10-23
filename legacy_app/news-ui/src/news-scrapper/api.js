@@ -808,3 +808,19 @@ export const setDocumentReaction = (id, reaction) =>
     method: 'PUT',
     body: JSON.stringify({ reaction }),
   });
+
+
+/**
+ * Selects the configured contribution card cover without affecting the PDF.
+ * Preserve this export for newer local Samsung Internal screens which import
+ * contributionCardImage from the shared API module.
+ *
+ * Accepts both normalized frontend records and raw backend contribution data.
+ */
+export function contributionCardImage(record = {}) {
+  const selected = record.cardImageSource || record.card_image_source || 'primary';
+  const secondary = record.secondaryCover || record.secondary_cover;
+  const primary = record.cover;
+  if (selected === 'secondary' && secondary?.url) return secondary.url;
+  return primary?.url || secondary?.url || '';
+}
