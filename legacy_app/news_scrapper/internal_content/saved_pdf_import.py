@@ -219,12 +219,23 @@ def import_saved_pdf(
     # PDF thumbnails are optional; never fail the saved import because of one.
     if readable_bytes and content_type == "document_import":
         try:
-            service.attach_automatic_pdf_cover(
+            covered = service.attach_automatic_pdf_cover(
                 owner_id,
                 record_id,
                 readable_bytes,
                 target.name,
             )
+            if covered and isinstance(covered.get("cover"), dict):
+                LOG.info(
+                    "[internal-content] PDF cover created: origin=%s page=%s",
+                    covered["cover"].get("pdf_image_origin"),
+                    covered["cover"].get("pdf_page"),
+                )
+            else:
+                LOG.warning(
+                    "[internal-content] PDF saved without an automatic cover. "
+                    "Check the PyMuPDF installation and PDF readability."
+                )
         except Exception as error:
             LOG.warning(
                 "[internal-content] PDF cover unavailable: type=%s",
