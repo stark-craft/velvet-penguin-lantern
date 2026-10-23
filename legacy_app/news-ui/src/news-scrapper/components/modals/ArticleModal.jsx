@@ -277,7 +277,7 @@ export default function ArticleModal({
   variant = 'default',
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(variant === 'document');
   const [reasonsExpanded, setReasonsExpanded] = useState(false);
   const [whyMatters, setWhyMatters] = useState('');
   const [insightLoading, setInsightLoading] = useState(false);
@@ -285,9 +285,9 @@ export default function ArticleModal({
 
   useEffect(() => {
     setExpanded(false);
-    setSourcesExpanded(false);
+    setSourcesExpanded(variant === 'document');
     setReasonsExpanded(false);
-  }, [item?.id, item?.url, item?.title]);
+  }, [item?.id, item?.url, item?.title, variant]);
 
   useEffect(() => {
     let cancelled = false;
