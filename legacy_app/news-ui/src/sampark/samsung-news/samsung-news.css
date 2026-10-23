@@ -656,3 +656,159 @@ Retain the PDF reader's existing two-column layout and behavior.
     transition: none;
   }
 }
+
+
+/* ============================================================
+SRI-D DOCUMENT CARD — IMAGE-LED 60/40 REFINEMENT
+No summary: preserve the image, title and two actions only.
+============================================================ */
+.samsung-document-card {
+  height: 302px;
+  min-height: 302px;
+  display: grid;
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+.samsung-document-card .samsung-document-card-media {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  align-self: stretch;
+  overflow: hidden;
+  border: 0;
+  background: #eef1f6;
+}
+
+.samsung-document-card .samsung-document-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center center;
+  transform: none;
+  background: #eef1f6;
+}
+
+.samsung-document-card:hover .samsung-document-card-media img {
+  transform: none;
+}
+
+.samsung-document-card .samsung-document-card-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 14px 15px 11px;
+}
+
+.samsung-document-card .samsung-document-card-title {
+  width: 100%;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: left;
+  -webkit-line-clamp: 2;
+}
+
+.samsung-document-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: 9px;
+  width: 100%;
+  min-height: 43px;
+  padding-top: 10px;
+  border-top: 1px solid #e6eaf0;
+}
+
+.samsung-document-card .samsung-document-card-action {
+  display: inline-flex;
+  width: auto;
+  max-width: calc(100% - 48px);
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  margin: 0;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: #1428a0;
+  font-size: 11.5px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.samsung-document-card-like {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-width: 34px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid #e5e9f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #8992a2;
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.samsung-document-card-like:hover,
+.samsung-document-card-like.is-active {
+  border-color: #bcc6ef;
+  background: #f0f3ff;
+  color: #1428a0;
+}
+
+.samsung-document-card-like:focus-visible {
+  outline: 2px solid #1428a0;
+  outline-offset: 2px;
+}
+
+.samsung-document-card-like:disabled,
+.samsung-document-card button:disabled {
+  cursor: default;
+}
+
+.samsung-document-card.is-preview {
+  height: 302px;
+  max-width: 720px;
+}
+
+/* Reader sidebar reuses the same component without cropping the PDF image. */
+.sri-document-modal-sidebar .samsung-document-card {
+  height: 302px;
+  min-height: 302px;
+}
+
+.sri-document-modal-sidebar .samsung-document-card-media {
+  height: 100%;
+  min-height: 0;
+}
+
+.sri-document-modal-sidebar .samsung-document-card-body {
+  padding: 14px 15px 11px;
+}
+
+@media (max-width: 700px) {
+  .samsung-document-card,
+  .samsung-document-card.is-preview {
+    height: 294px;
+    min-height: 294px;
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samsung-document-card-like {
+    transition: none;
+  }
+}
