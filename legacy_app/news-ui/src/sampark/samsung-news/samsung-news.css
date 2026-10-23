@@ -812,3 +812,41 @@ No summary: preserve the image, title and two actions only.
     transition: none;
   }
 }
+
+
+/* ============================================================
+SRI-D DOCUMENT READER — SUMMARY BELOW CARD
+Summary stays out of the compact grid card; appears only on open.
+============================================================ */
+.sri-document-modal-summary {
+  margin-top: 18px;
+  padding: 18px 16px 20px;
+  border: 1px solid #e4e9f1;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
+}
+
+.sri-document-modal-summary h2 {
+  margin: 0 0 10px;
+  color: #202a3d;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.sri-document-modal-summary p {
+  margin: 0;
+  color: #566172;
+  font-size: 12.5px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .sri-document-modal-summary {
+    margin-top: 14px;
+    padding: 16px;
+  }
+}
