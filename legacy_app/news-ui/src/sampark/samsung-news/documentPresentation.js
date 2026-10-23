@@ -33,7 +33,7 @@ export function documentInsightOf(record) {
   const summary = text(record?.summary);
   const textToAnalyze = body.replace(/\s+/g, ' ');
   const sentences = textToAnalyze.split(/(?<=[.!?])\s+/).filter(Boolean);
-  const grounded = sentences.find(sentence => sentence.length >= 55 && sentence.length <= 300 && IMPACT.test(sentence));
+  const grounded = sentences.find(sentence => sentence.length >= 35 && sentence.length <= 300 && IMPACT.test(sentence));
   // This is a selected quote from extracted text, not a generated prediction.
   if (grounded) return grounded;
   if (summary) return summary.slice(0, 520);
