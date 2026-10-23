@@ -1,72 +1,96 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 
-function documentDescriptionOf(item) {
-  return String(
-    item?.summary ||
-    item?.description ||
-    '',
-  ).trim();
-}
-
+/**
+ * The published feed uses image_url while Create News may pass the draft
+ * record directly. Keep both paths supported without changing their API.
+ */
 function documentImageOf(item) {
-  const recordId = item?.id;
-  const cover = item?.cover;
-  const fallbackCoverUrl = cover && recordId
-    ? '/internal-content/' + encodeURIComponent(recordId) +
-      '/cover?v=' + encodeURIComponent(item?.updatedAt || item?.updated_at || '')
-    : '';
+  const record = item?.record || item?.draft || item;
+  const cover = item?.cover || record?.cover;
+  const recordId =
+    item?.id || record?.id || item?.recordId || item?.draftId;
+  const stamp =
+    record?.updated_at || record?.updatedAt ||
+    item?.updated_at || item?.updatedAt || '';
+  const privateCoverUrl =
+    cover?.file && recordId
+      ? '/internal-content/' + encodeURIComponent(recordId) +
+        '/cover?v=' + encodeURIComponent(stamp)
+      : '';
 
   const candidates = [
+    item?.previewCoverUrl,
+    item?.coverPreviewUrl,
+    item?.preview_image_url,
+    item?.cover_url,
     item?.image_url,
     item?.top_image,
     item?.imageUrl,
     item?.coverUrl,
     cover?.url,
     typeof cover === 'string' ? cover : '',
-    fallbackCoverUrl,
+    record?.image_url,
+    record?.top_image,
+    privateCoverUrl,
   ];
   return candidates.find((value) =>
     typeof value === 'string' && value.trim()
   )?.trim() || '';
 }
 
-function categoryOf(item) {
-  const category = item?.category;
-  if (category && typeof category === 'object') {
-    return String(category.value || category.name || '').trim();
-  }
-  return String(category || '').trim();
-}
-
 export default function SriDDocumentCard({
   item,
   onOpen,
   preview = false,
+  onLike,
+  likeActive,
+  likeCount = 0,
+  busyReaction = false,
 }) {
+  const [localLiked, setLocalLiked] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const imageUrl = documentImageOf(item);
+  const isLiked = typeof likeActive === 'boolean' ? likeActive : localLiked;
+  const canOpen = typeof onOpen === 'function';
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [imageUrl]);
+  useEffect(() => {
+    setLocalLiked(false);
+  }, [item?.id]);
+
   if (!item) {
     return null;
   }
 
-  const description = documentDescriptionOf(item);
-  const imageUrl = documentImageOf(item);
-  const category = categoryOf(item);
+  function likeDocument() {
+    if (onLike) {
+      onLike(item);
+    } else {
+      // Until the Documents parent supplies persisted reactions, this
+      // provides an accessible per-view interaction without fake counts.
+      setLocalLiked((previous) => !previous);
+    }
+  }
 
   return (
     <article
       className={'samsung-document-card' + (preview ? ' is-preview' : '')}
     >
-      {/* Same image-first silhouette as the All News article cards. */}
       <button
-        aria-label={'Open ' + (item?.title || 'document')}
+        aria-label={'View document: ' + (item?.title || 'Untitled document')}
         className="samsung-document-card-media"
+        disabled={!canOpen}
         onClick={() => onOpen?.(item)}
         type="button"
       >
-        {imageUrl ? (
+        {imageUrl && !imageFailed ? (
           <img
             alt=""
-            loading="lazy"
+            loading={preview ? 'eager' : 'lazy'}
+            onError={() => setImageFailed(true)}
             src={imageUrl}
           />
         ) : (
@@ -79,38 +103,44 @@ export default function SriDDocumentCard({
         )}
         <span className="samsung-document-card-media-badge">
           <Icon name="file" size={12} />
-          Document
+          PDF
         </span>
       </button>
 
       <div className="samsung-document-card-body">
-        <div className="samsung-document-card-kind">
-          <span>Internal Document</span>
-          {category && <small>{category}</small>}
-        </div>
-
-        <div className="samsung-document-card-copy">
-          <button
-            className="samsung-document-card-title"
-            onClick={() => onOpen?.(item)}
-            type="button"
-          >
-            {item?.title || 'Untitled document'}
-          </button>
-          <p>
-            {description ||
-              'A description will appear here once the document details are complete.'}
-          </p>
-        </div>
-
         <button
-          className="samsung-document-card-action"
+          className="samsung-document-card-title"
+          disabled={!canOpen}
           onClick={() => onOpen?.(item)}
           type="button"
         >
-          View document
-          <Icon name="chevR" size={13} />
+          {item?.title || 'Untitled document'}
         </button>
+
+        <div className="samsung-document-card-footer">
+          <button
+            className="samsung-document-card-action"
+            disabled={!canOpen}
+            onClick={() => onOpen?.(item)}
+            type="button"
+          >
+            View document
+            <Icon name="chevR" size={13} />
+          </button>
+
+          <button
+            aria-label={isLiked ? 'Remove like' : 'Like document'}
+            aria-pressed={isLiked}
+            className={'samsung-document-card-like' + (isLiked ? ' is-active' : '')}
+            disabled={busyReaction}
+            onClick={likeDocument}
+            title={onLike ? 'Like document' : 'Like (in this view only)'}
+            type="button"
+          >
+            <Icon name="thumbsUp" size={16} />
+            {Number(likeCount) > 0 && <span>{likeCount}</span>}
+          </button>
+        </div>
       </div>
     </article>
   );
