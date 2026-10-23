@@ -39,17 +39,30 @@ export default function SriDDocumentModal({
     );
   const viewerRef =
     useRef(null);
-  const [pdfUrl, setPdfUrl] =
-    useState('');
-  const [loadingPdf, setLoadingPdf] =
+  // Keep only a retry counter; do not create/revoke temporary blob URLs.
+  // The browser can stream the authorized PDF directly, including ranges.
+  const [viewerAttempt, setViewerAttempt] =
+    useState(0);
+  const [viewerFailed, setViewerFailed] =
     useState(false);
-  const [pdfProblem, setPdfProblem] =
-    useState('');
   const sourceDocument =
     sourceDocumentOf(item);
+  const recordId = item?.id || item?.record?.id || item?.draft?.id;
   const originalUrl =
     sourceDocument?.url ||
-    '';
+    (recordId
+      ? '/internal-content/' + encodeURIComponent(recordId) + '/document'
+      : '');
+  const viewerUrl = originalUrl
+    ? originalUrl +
+      (originalUrl.includes('?') ? '&' : '?') +
+      'inline=1&viewer_retry=' + viewerAttempt
+    : '';
+  const pdfProblem = !viewerUrl
+    ? 'The original PDF is not available.'
+    : viewerFailed
+      ? 'The PDF could not be displayed. Use Reload PDF to retry the viewer without reloading Samsung News.'
+      : '';
 
   /*
    * Keep the same body-lock / modal behavior
@@ -70,96 +83,21 @@ export default function SriDDocumentModal({
   }, [item]);
 
   /*
-   * Fetch the original PDF and convert it to a local
-   * application/pdf blob URL.
+   * Give each document/retry a fresh iframe URL; browser PDF renderers
+   * can request byte ranges at any time. The backend serves these requests
+   * inline and keeps the regular download endpoint unchanged.
    *
-   * This prevents Content-Disposition: attachment
-   * from forcing a browser download.
+   * Crucially, no object URL is revoked on modal close or React rerender.
+   * The iframe is removed automatically by React when the modal closes.
    */
   useEffect(() => {
-    if (
-      !item ||
-      !originalUrl
-    ) {
-      setPdfUrl('');
-      setLoadingPdf(false);
-      if (item) {
-        setPdfProblem(
-          'The original PDF is not available.',
-        );
-      }
-      return undefined;
-    }
+    setViewerFailed(false);
+  }, [viewerUrl]);
 
-    let cancelled = false;
-    let localUrl = '';
-
-    setPdfUrl('');
-    setPdfProblem('');
-    setLoadingPdf(true);
-
-    fetch(
-      originalUrl,
-      {
-        credentials:
-          'same-origin',
-      },
-    )
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(
-            `PDF request failed (${response.status}).`,
-          );
-        }
-        const sourceBlob =
-          await response.blob();
-        const pdfBlob =
-          sourceBlob.type ===
-          'application/pdf'
-            ? sourceBlob
-            : sourceBlob.slice(
-                0,
-                sourceBlob.size,
-                'application/pdf',
-              );
-        if (cancelled) {
-          return;
-        }
-        localUrl =
-          URL.createObjectURL(
-            pdfBlob,
-          );
-        setPdfUrl(
-          localUrl,
-        );
-      })
-      .catch((error) => {
-        if (cancelled) {
-          return;
-        }
-        setPdfProblem(
-          error?.message ||
-            'The original PDF could not be opened.',
-        );
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingPdf(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-      if (localUrl) {
-        URL.revokeObjectURL(
-          localUrl,
-        );
-      }
-    };
-  }, [
-    item,
-    originalUrl,
-  ]);
+  function reloadPdfOnly() {
+    setViewerFailed(false);
+    setViewerAttempt((previous) => previous + 1);
+  }
 
   if (!item) {
     return null;
@@ -258,23 +196,25 @@ export default function SriDDocumentModal({
                     'PDF document'}
                 </strong>
               </div>
-              <span className="sri-document-modal-reader-status">
-                PDF
-              </span>
+              <div className="sri-document-modal-reader-actions">
+                <button
+                  aria-label="Reload the PDF viewer only"
+                  className="sri-document-modal-retry"
+                  disabled={!viewerUrl}
+                  onClick={reloadPdfOnly}
+                  title="Reload PDF without reloading Samsung News"
+                  type="button"
+                >
+                  <Icon name="refresh" size={13} />
+                  Reload PDF
+                </button>
+                <span className="sri-document-modal-reader-status">
+                  PDF
+                </span>
+              </div>
             </header>
 
             <div className="sri-document-modal-viewer">
-              {loadingPdf && (
-                <div
-                  className="sri-document-modal-loading"
-                  role="status"
-                >
-                  <span className="sampark-spinner" />
-                  <span>
-                    Opening document…
-                  </span>
-                </div>
-              )}
               {pdfProblem && (
                 <div
                   className="sri-document-modal-error"
@@ -294,25 +234,19 @@ export default function SriDDocumentModal({
                   </div>
                 </div>
               )}
-              {!loadingPdf &&
-                !pdfProblem &&
-                pdfUrl && (
-                  <object
-                    className="sri-document-pdf-frame"
-                    data={pdfUrl}
-                    type="application/pdf"
-                  >
-                    <iframe
-                      className="sri-document-pdf-frame"
-                      src={pdfUrl}
-                      title={
-                        item.title ||
-                        sourceDocument?.name ||
-                        'PDF document'
-                      }
-                    />
-                  </object>
-                )}
+              {viewerUrl && !viewerFailed && (
+                <iframe
+                  className="sri-document-pdf-frame"
+                  key={viewerUrl}
+                  onError={() => setViewerFailed(true)}
+                  src={viewerUrl}
+                  title={
+                    item.title ||
+                    sourceDocument?.name ||
+                    'PDF document'
+                  }
+                />
+              )}
             </div>
           </div>
         </div>
