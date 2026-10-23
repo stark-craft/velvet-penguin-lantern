@@ -684,10 +684,12 @@ No summary: preserve the image, title and two actions only.
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  object-position: center center;
+  /* Fill the entire image area; don't show contain/letterbox gutters. */
+  object-fit: cover;
+  /* Favor faces near the upper part of portrait photographs. */
+  object-position: center 35%;
   transform: none;
-  background: #eef1f6;
+  background: transparent;
 }
 
 .samsung-document-card:hover .samsung-document-card-media img {
