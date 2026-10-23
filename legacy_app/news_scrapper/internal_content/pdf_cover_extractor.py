@@ -103,6 +103,78 @@ def _first_page_preview(document, pymupdf) -> bytes | None:
     return _jpeg_preview(image)
 
 
+
+
+def _pypdf_embedded_image(pdf_bytes: bytes) -> dict | None:
+    """Raster-only fallback when PyMuPDF is unavailable in the API process.
+
+    pypdf is already a primary API dependency, so this can recover an actual
+    photograph/chart from ordinary PDFs without needing the OCR worker's venv.
+    It cannot render vector-only or text-only PDF pages.
+    """
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(pdf_bytes), strict=False)
+        if reader.is_encrypted:
+            return None
+        best = None
+        best_score = -1.0
+        attempts = 0
+        for page_idx in range(min(len(reader.pages), MAX_SCAN_PAGES)):
+            try:
+                candidates = reader.pages[page_idx].images
+            except Exception as error:
+                LOG.debug(
+                    "pypdf image scan skipped page %s: %s",
+                    page_idx + 1, type(error).__name__,
+                )
+                continue
+            for image_file in candidates:
+                if attempts >= MAX_CANDIDATES * MAX_SCAN_PAGES:
+                    break
+                attempts += 1
+                try:
+                    data = image_file.data
+                    if not data or len(data) > MAX_EMBEDDED_BYTES:
+                        continue
+                    with Image.open(io.BytesIO(data)) as image:
+                        w, h = image.size
+                        area = w * h
+                        if w < 300 or h < 180 or area < 100_000 or area > MAX_IMAGE_PIXELS:
+                            continue
+                        aspect = w / h
+                        score = (
+                            min(area / 2_000_000, 2.0)
+                            + (0.3 if 1.2 <= aspect <= 2.4 else 0)
+                            + (0.4 if page_idx == 0 else 0)
+                            - page_idx * 0.1
+                        )
+                        if score > best_score:
+                            jpeg = _jpeg_preview(image)
+                            best = {
+                                "data": jpeg,
+                                "origin": "pdf_embedded_pypdf",
+                                "page": page_idx + 1,
+                            }
+                            best_score = score
+                except Exception as error:
+                    LOG.debug(
+                        "pypdf image candidate ignored: %s",
+                        type(error).__name__,
+                    )
+                    continue
+            if attempts >= MAX_CANDIDATES * MAX_SCAN_PAGES:
+                break
+        return best
+    except Exception as error:
+        LOG.warning(
+            "pypdf PDF image extraction unavailable: %s",
+            type(error).__name__,
+        )
+        return None
+
+
 def extract_pdf_cover(pdf_bytes: bytes) -> dict | None:
     """Return {'data': JPEG bytes, 'origin': ..., 'page': ...} or None.
 
@@ -114,7 +186,15 @@ def extract_pdf_cover(pdf_bytes: bytes) -> dict | None:
         try:
             import pymupdf
         except ImportError:
-            import fitz as pymupdf
+            try:
+                import fitz as pymupdf
+            except ImportError:
+                LOG.warning(
+                    "PDF cover rendering unavailable: PyMuPDF is not installed "
+                    "in the API server Python environment. "
+                    "Install it with: python -m pip install pymupdf"
+                )
+                return _pypdf_embedded_image(pdf_bytes)
         with pymupdf.open(stream=pdf_bytes, filetype="pdf") as document:
             if document.needs_pass and document.authenticate("") <= 0:
                 return None
