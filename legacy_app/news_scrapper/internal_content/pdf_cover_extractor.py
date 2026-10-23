@@ -9,7 +9,7 @@ import io
 import logging
 import warnings
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 LOG = logging.getLogger(__name__)
 WIDTH = 1600
@@ -21,7 +21,7 @@ MAX_EMBEDDED_BYTES = 25 * 1024 * 1024
 
 
 def _jpeg_preview(source: Image.Image) -> bytes:
-    """Fit an image into a landscape card without clipping its contents."""
+    """Keep the entire picture; use a soft image-derived backdrop instead of side bars."""
     with warnings.catch_warnings():
         warnings.simplefilter("error", Image.DecompressionBombWarning)
         w, h = source.size
@@ -31,7 +31,15 @@ def _jpeg_preview(source: Image.Image) -> bytes:
         rgb = ImageOps.exif_transpose(source).convert("RGB")
     # Keep charts, diagrams, page content and labels fully visible.
     fitted = ImageOps.contain(rgb, (WIDTH, HEIGHT), Image.LANCZOS)
-    canvas = Image.new("RGB", (WIDTH, HEIGHT), (241, 244, 249))
+    # A portrait embedded photograph shouldn't have grey side gutters, and
+    # a close-up face must not lose its forehead/chin just to fit 16:9.
+    # Blur only the stretched backdrop; the full sharp source stays on top.
+    canvas = ImageOps.fit(
+        rgb, (WIDTH, HEIGHT), method=Image.LANCZOS, centering=(0.5, 0.5)
+    ).filter(ImageFilter.GaussianBlur(radius=28))
+    canvas = Image.blend(
+        canvas, Image.new("RGB", (WIDTH, HEIGHT), (238, 242, 248)), 0.30
+    )
     canvas.paste(fitted, ((WIDTH - fitted.width) // 2, (HEIGHT - fitted.height) // 2))
     result = io.BytesIO()
     canvas.save(result, "JPEG", quality=86, optimize=True)
