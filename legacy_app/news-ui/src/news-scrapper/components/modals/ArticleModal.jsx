@@ -94,7 +94,7 @@ function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, 
         <button
           aria-pressed={current === 'like'}
           className={`dossier-inline-action is-like${current === 'like' ? ' is-active' : ''}`}
-          disabled={!onVote}
+          disabled={isDocument && !onVote}
           onClick={() => choose('like')}
           type="button"
         >
@@ -105,7 +105,7 @@ function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, 
         <button
           aria-pressed={current === 'dislike'}
           className={`dossier-inline-action is-dislike${current === 'dislike' ? ' is-active' : ''}`}
-          disabled={!onVote}
+          disabled={isDocument && !onVote}
           onClick={() => choose('dislike')}
           type="button"
         >
