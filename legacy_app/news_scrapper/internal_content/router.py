@@ -16,8 +16,7 @@ from fastapi.responses import FileResponse
 
 from news_scrapper.recommendation.identity import resolve_viewer
 from news_scrapper.recommendation.candidates import article_id
-from news_scrapper.recommendation.reactions import ReactionRepository
-from core.settings import NEWS_RUNTIME_DIR
+from news_scrapper.recommendation.router import REACTIONS as DOCUMENT_REACTIONS
 from news_scrapper.access_control import service as access_service
 from core.request_limits import REQUEST_LIMITER
 from . import access, saved_pdf_import, service, storage
@@ -33,11 +32,8 @@ from .schemas import DraftUpdate, NotificationRead, ReviewNote, ReviewUnlock
 
 router = APIRouter(prefix="/internal-content", tags=["Internal Content"])
 
-# Share the existing persistent viewer reaction store, but authorize
-# documents against the published contribution registry instead of briefing.
-DOCUMENT_REACTIONS = ReactionRepository(
-    NEWS_RUNTIME_DIR / "recommendation" / "reactions.json"
-)
+# Reuse the actual shared ReactionRepository instance and its thread lock;
+# document votes remain viewer-scoped and never go through article selection.
 
 
 def _owner(request: Request, response: Response) -> str:
