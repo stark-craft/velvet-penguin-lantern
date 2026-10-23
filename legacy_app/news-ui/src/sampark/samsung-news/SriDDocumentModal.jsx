@@ -1,6 +1,29 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ArticleModal from '../../news-scrapper/components/modals/ArticleModal.jsx';
-import { getDocumentReactions, setDocumentReaction } from '../../news-scrapper/api.js';
+// Keep the PDF reader independent of api.js: local deployments have
+// additional API exports not yet present on this test branch.
+async function documentReactionRequest(id, reaction) {
+  const url = '/internal-content/' + encodeURIComponent(id) + '/reactions';
+  const isWrite = reaction !== undefined;
+  const response = await fetch(url, {
+    credentials: 'same-origin',
+    ...(isWrite
+      ? {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reaction }),
+        }
+      : {}),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.detail || 'Document feedback request failed (' + response.status + ').');
+  }
+  return payload;
+}
+
+const getDocumentReactions = (id) => documentReactionRequest(id);
+const setDocumentReaction = (id, reaction) => documentReactionRequest(id, reaction);
 import { documentSignalOf } from './documentPresentation.js';
 
 /**
