@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
+import { documentTagOf } from './documentPresentation.js';
 
 /**
  * Published documents receive a mapped image_url. Draft previews can receive
@@ -77,6 +78,7 @@ export default function SriDDocumentCard({
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = documentImageOf(item);
+  const documentTag = documentTagOf(item);
   const canOpen = typeof onOpen === 'function';
 
   useEffect(() => {
@@ -114,6 +116,7 @@ export default function SriDDocumentCard({
       </div>
 
       <div className="samsung-document-card-body">
+        <span className="samsung-document-card-topic" title={documentTag}>{documentTag}</span>
         <h3 className="samsung-document-card-title">
           {item?.title || 'Untitled document'}
         </h3>
@@ -126,7 +129,7 @@ export default function SriDDocumentCard({
             {documentContributorOf(item)}
           </span>
           <span className="samsung-document-card-action">
-            View document
+            View Details
             <Icon name="chevR" size={13} />
           </span>
         </div>
@@ -136,7 +139,7 @@ export default function SriDDocumentCard({
           title, metadata and View document area clickable, including
           Enter/Space keyboard activation, without nested buttons. */}
       <button
-        aria-label={'View document: ' + (item?.title || 'Untitled document')}
+        aria-label={'View details: ' + (item?.title || 'Untitled document')}
         className="samsung-document-card-open-hitarea"
         disabled={!canOpen}
         onClick={() => onOpen?.(item)}
