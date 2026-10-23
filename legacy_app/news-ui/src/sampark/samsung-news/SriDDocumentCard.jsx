@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 
 /**
- * The published feed uses image_url while Create News may pass the draft
- * record directly. Keep both paths supported without changing their API.
+ * Published documents receive a mapped image_url. Draft previews can receive
+ * the private saved record instead, so support both without changing the API.
  */
 function documentImageOf(item) {
   const record = item?.record || item?.draft || item;
@@ -39,53 +39,59 @@ function documentImageOf(item) {
   )?.trim() || '';
 }
 
+/**
+ * Use details actually supplied with the document. In Create News this is
+ * typically owner_name; published records may use author or ownerName.
+ * Avoid exposing the viewer's internal owner_id.
+ */
+function documentContributorOf(item) {
+  const record = item?.record || item?.draft || item;
+  const name = [
+    item?.owner_name,
+    item?.ownerName,
+    item?.author,
+    record?.owner_name,
+    record?.ownerName,
+    record?.author,
+  ].find((value) =>
+    typeof value === 'string' && value.trim()
+  );
+  if (name) {
+    return 'By ' + name.trim();
+  }
+  const count =
+    record?.source_document?.page_count ??
+    record?.sourceDocument?.pageCount ??
+    item?.source_document?.page_count ??
+    item?.sourceDocument?.pageCount;
+  if (Number.isInteger(Number(count)) && Number(count) > 0) {
+    return Number(count) + (Number(count) === 1 ? ' page' : ' pages');
+  }
+  return 'SRI-D document';
+}
+
 export default function SriDDocumentCard({
   item,
   onOpen,
   preview = false,
-  onLike,
-  likeActive,
-  likeCount = 0,
-  busyReaction = false,
 }) {
-  const [localLiked, setLocalLiked] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = documentImageOf(item);
-  const isLiked = typeof likeActive === 'boolean' ? likeActive : localLiked;
   const canOpen = typeof onOpen === 'function';
 
   useEffect(() => {
     setImageFailed(false);
   }, [imageUrl]);
-  useEffect(() => {
-    setLocalLiked(false);
-  }, [item?.id]);
 
   if (!item) {
     return null;
-  }
-
-  function likeDocument() {
-    if (onLike) {
-      onLike(item);
-    } else {
-      // Until the Documents parent supplies persisted reactions, this
-      // provides an accessible per-view interaction without fake counts.
-      setLocalLiked((previous) => !previous);
-    }
   }
 
   return (
     <article
       className={'samsung-document-card' + (preview ? ' is-preview' : '')}
     >
-      <button
-        aria-label={'View document: ' + (item?.title || 'Untitled document')}
-        className="samsung-document-card-media"
-        disabled={!canOpen}
-        onClick={() => onOpen?.(item)}
-        type="button"
-      >
+      <div className="samsung-document-card-media">
         {imageUrl && !imageFailed ? (
           <img
             alt=""
@@ -105,43 +111,37 @@ export default function SriDDocumentCard({
           <Icon name="file" size={12} />
           PDF
         </span>
-      </button>
+      </div>
 
       <div className="samsung-document-card-body">
-        <button
-          className="samsung-document-card-title"
-          disabled={!canOpen}
-          onClick={() => onOpen?.(item)}
-          type="button"
-        >
+        <h3 className="samsung-document-card-title">
           {item?.title || 'Untitled document'}
-        </button>
+        </h3>
 
         <div className="samsung-document-card-footer">
-          <button
-            className="samsung-document-card-action"
-            disabled={!canOpen}
-            onClick={() => onOpen?.(item)}
-            type="button"
+          <span
+            className="samsung-document-card-contributor"
+            title={documentContributorOf(item)}
           >
+            {documentContributorOf(item)}
+          </span>
+          <span className="samsung-document-card-action">
             View document
             <Icon name="chevR" size={13} />
-          </button>
-
-          <button
-            aria-label={isLiked ? 'Remove like' : 'Like document'}
-            aria-pressed={isLiked}
-            className={'samsung-document-card-like' + (isLiked ? ' is-active' : '')}
-            disabled={busyReaction}
-            onClick={likeDocument}
-            title={onLike ? 'Like document' : 'Like (in this view only)'}
-            type="button"
-          >
-            <Icon name="thumbsUp" size={16} />
-            {Number(likeCount) > 0 && <span>{likeCount}</span>}
-          </button>
+          </span>
         </div>
       </div>
+
+      {/* One real button covers the whole card. This makes the photo,
+          title, metadata and View document area clickable, including
+          Enter/Space keyboard activation, without nested buttons. */}
+      <button
+        aria-label={'View document: ' + (item?.title || 'Untitled document')}
+        className="samsung-document-card-open-hitarea"
+        disabled={!canOpen}
+        onClick={() => onOpen?.(item)}
+        type="button"
+      />
     </article>
   );
 }
