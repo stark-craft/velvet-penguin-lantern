@@ -20,17 +20,29 @@ import {
 } from '../news-scrapper/internal/samsungInternalModel.js';
 import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
+import SriDDocumentModal from './samsung-news/SriDDocumentModal.jsx';
 
 function imageOf(item) {
   return resolveInternalImage(item) || item?.image_url || item?.top_image || '';
 }
 
-function SamparkSamsungDossier({ item, onClose }) {
+function SamparkSamsungDossier({ item, onClose, publishedRecords = [] }) {
   const engagement = useArticleEngagement(item || {}, { surface: 'samsung_news' });
   const handleClose = () => { engagement.onDossierClose(); onClose(); };
   const articleId = item ? (item.canonical_link || item.link || item.url || item.id || item.title || '') : '';
   React.useEffect(()=>{ if(item && articleId) engagement.onDossierOpen(item); }, [articleId]);
   if (!item) return null;
+  // Only change WHICH modal opens for an existing published PDF.
+  // No changes to SRI-D/Local/Global tabs, hero, briefing, tiles or CSS.
+  const documentRecord = item.contentType === 'document_import'
+    ? publishedRecords.find((record) =>
+        record.id === (item._publishedId || item.id)
+        && record.contentType === 'document_import'
+        && record.status === 'published')
+    : null;
+  if (documentRecord) {
+    return <SriDDocumentModal item={documentRecord} onClose={handleClose} />;
+  }
   return (
     <ArticleModal
       item={item}
@@ -281,7 +293,7 @@ export default function SamparkSamsungNews() {
         </div>
       )}
 
-      <SamparkSamsungDossier item={openArticle} onClose={()=>setOpenArticle(null)} />
+      <SamparkSamsungDossier item={openArticle} publishedRecords={published} onClose={()=>setOpenArticle(null)} />
     </div>
   );
 }
