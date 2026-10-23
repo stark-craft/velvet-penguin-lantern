@@ -850,3 +850,86 @@ Summary stays out of the compact grid card; appears only on open.
     padding: 16px;
   }
 }
+
+
+/* ============================================================
+SRI-D DOCUMENT CARD — CONTRIBUTOR + FULL-CARD ACTION
+The entire card is one keyboard-accessible hit target. The footer
+keeps contributor information on the left and View document on the right.
+============================================================ */
+.samsung-document-card {
+  cursor: pointer;
+  isolation: isolate;
+}
+
+.samsung-document-card-open-hitarea {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.samsung-document-card-open-hitarea:focus-visible {
+  outline: 3px solid #1428a0;
+  outline-offset: -3px;
+}
+
+.samsung-document-card-open-hitarea:disabled {
+  cursor: default;
+}
+
+.samsung-document-card-footer {
+  justify-content: space-between;
+}
+
+.samsung-document-card-contributor {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: #7b8495;
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.samsung-document-card .samsung-document-card-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 55%;
+  margin: 0 0 0 auto;
+  padding: 4px 0;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  color: #1428a0;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.samsung-document-card .samsung-document-card-action svg {
+  flex: none;
+}
+
+.samsung-document-card:hover .samsung-document-card-action svg {
+  transform: translateX(2px);
+}
+
+/* Keep a clear hand cursor for the image, title and footer together. */
+.samsung-document-card .samsung-document-card-media,
+.samsung-document-card .samsung-document-card-title {
+  cursor: inherit;
+}
