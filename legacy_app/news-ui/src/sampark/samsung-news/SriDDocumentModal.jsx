@@ -18,6 +18,16 @@ function sourceDocumentOf(item) {
   );
 }
 
+function summaryOf(item) {
+  return String(
+    item?.summary ||
+    item?.description ||
+    item?.record?.summary ||
+    item?.draft?.summary ||
+    ''
+  ).trim();
+}
+
 export default function SriDDocumentModal({
   item,
   onClose,
@@ -217,6 +227,17 @@ export default function SriDDocumentModal({
                 focusDocumentViewer
               }
             />
+
+            <section
+              aria-label="Document summary"
+              className="sri-document-modal-summary"
+            >
+              <h2>Summary</h2>
+              <p>
+                {summaryOf(item) ||
+                  'No summary is available for this document.'}
+              </p>
+            </section>
           </aside>
 
           {/* -----------------------------------------------
