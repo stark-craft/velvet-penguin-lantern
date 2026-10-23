@@ -406,3 +406,253 @@ LEADERSHIP HERO — LEFT-ALIGNED MESSAGE
 .samsung-news-page .samsung-leadership-copy { text-align: left;}
 .samsung-news-page .samsung-leadership-copy h2,
 .samsung-news-page .samsung-leadership-copy p { text-align: left;}
+
+
+/* ============================================================
+SRI-D DOCUMENT CARDS — ALL NEWS IMAGE-FIRST OVERRIDES
+Scope: live Documents, Create News preview and document-modal sidebar.
+Retain the PDF reader's existing two-column layout and behavior.
+============================================================ */
+.samsung-document-grid {
+  align-items: stretch;
+}
+
+.samsung-document-card {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.055);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.samsung-document-card::before {
+  display: none;
+  content: none;
+}
+
+.samsung-document-card:hover {
+  transform: translateY(-2px);
+  border-color: #d5dce7;
+  box-shadow: 0 7px 18px rgba(15, 23, 42, 0.11);
+}
+
+.samsung-document-card-media {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 168px;
+  min-height: 168px;
+  flex: 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #eef1f6;
+  cursor: pointer;
+}
+
+.samsung-document-card-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 200ms ease;
+}
+
+.samsung-document-card:hover .samsung-document-card-media img {
+  transform: scale(1.025);
+}
+
+.samsung-document-card-media-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  background:
+    radial-gradient(circle at 78% 18%, rgba(20, 40, 160, 0.09), transparent 38%),
+    linear-gradient(140deg, #f4f6fb, #e9edf5);
+  color: #9aa7bb;
+}
+
+.samsung-document-card-media-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 20px);
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 7px;
+  background: rgba(13, 24, 53, 0.75);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.2;
+  backdrop-filter: blur(4px);
+}
+
+.samsung-document-card-media-badge svg {
+  flex: none;
+}
+
+.samsung-document-card-body {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  padding: 13px 14px 14px;
+  background: #ffffff;
+}
+
+.samsung-document-card-kind {
+  display: flex;
+  min-width: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+
+.samsung-document-card-kind > span {
+  color: #1428a0;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.samsung-document-card-kind small {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: #8a93a3;
+  font-size: 10px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.samsung-document-card-copy {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  align-content: start;
+}
+
+.samsung-document-card-title {
+  display: -webkit-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: #1a1a2e;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.42;
+  letter-spacing: -0.01em;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.samsung-document-card-title:hover {
+  color: #1428a0;
+}
+
+.samsung-document-card-copy p {
+  display: -webkit-box;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  color: #626b79;
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.samsung-document-card-action {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  margin-top: auto;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid #e9edf3;
+  border-radius: 0;
+  background: transparent;
+  color: #1428a0;
+  font-size: 11px;
+  font-weight: 750;
+  text-align: left;
+  cursor: pointer;
+}
+
+.samsung-document-card-media:focus-visible,
+.samsung-document-card-title:focus-visible,
+.samsung-document-card-action:focus-visible {
+  outline: 2px solid #1428a0;
+  outline-offset: -2px;
+}
+
+.samsung-document-card.is-preview {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* The shared card remains usable as the left side of the PDF reader. */
+.sri-document-modal-sidebar .samsung-document-card {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+}
+
+.sri-document-modal-sidebar .samsung-document-card-media {
+  height: 184px;
+  min-height: 184px;
+}
+
+.sri-document-modal-sidebar .samsung-document-card-body {
+  padding: 16px;
+}
+
+.sri-document-modal-sidebar .samsung-document-card-action {
+  margin-top: 10px;
+}
+
+@media (max-width: 700px) {
+  .samsung-document-card {
+    padding: 0;
+  }
+  .samsung-document-card-media {
+    height: 172px;
+    min-height: 172px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .samsung-document-card,
+  .samsung-document-card-media img {
+    transition: none;
+  }
+}
