@@ -54,7 +54,9 @@ export function documentSignalOf(record) {
     canonical_link: 'internal://' + record.id,
     title: record.title || 'Untitled document',
     summary: record.summary || '',
-    body: text(record.body).slice(0, 5000),
+    // Body is analyzed for tags/insight above; the news-style details modal
+    // stays concise instead of dumping thousands of extracted PDF characters.
+    body: '',
     why_matters: documentInsightOf(record),
     category: tag,
     keywords: [tag],
