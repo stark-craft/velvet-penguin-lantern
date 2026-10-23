@@ -10,14 +10,25 @@ function documentDescriptionOf(item) {
 }
 
 function documentImageOf(item) {
-  const candidate =
-    item?.image_url ||
-    item?.top_image ||
-    item?.imageUrl ||
-    '';
-  return typeof candidate === 'string'
-    ? candidate.trim()
+  const recordId = item?.id;
+  const cover = item?.cover;
+  const fallbackCoverUrl = cover && recordId
+    ? '/internal-content/' + encodeURIComponent(recordId) +
+      '/cover?v=' + encodeURIComponent(item?.updatedAt || item?.updated_at || '')
     : '';
+
+  const candidates = [
+    item?.image_url,
+    item?.top_image,
+    item?.imageUrl,
+    item?.coverUrl,
+    cover?.url,
+    typeof cover === 'string' ? cover : '',
+    fallbackCoverUrl,
+  ];
+  return candidates.find((value) =>
+    typeof value === 'string' && value.trim()
+  )?.trim() || '';
 }
 
 function categoryOf(item) {
