@@ -796,3 +796,15 @@ export const deleteContributionRecord = (id) => jsonFetch(`/internal-content/${i
 
 export const submitContributionDraft = async (id) =>
   fromBackendRecord(await jsonFetch(`/internal-content/${id}/submit`, { method: 'POST' }));
+
+
+// Published SRI-D documents use the SAME persistent viewer reaction store as
+// articles, with document authorization performed by /internal-content.
+export const getDocumentReactions = (id) =>
+  jsonFetch('/internal-content/' + encodeURIComponent(id) + '/reactions');
+
+export const setDocumentReaction = (id, reaction) =>
+  jsonFetch('/internal-content/' + encodeURIComponent(id) + '/reactions', {
+    method: 'PUT',
+    body: JSON.stringify({ reaction }),
+  });
