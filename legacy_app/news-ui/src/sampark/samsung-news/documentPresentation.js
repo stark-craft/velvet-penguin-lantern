@@ -45,8 +45,17 @@ export function documentSignalOf(record) {
   const owner = text(record.author) || text(record.ownerName) || text(record.owner_name);
   const sourceDocument = record.sourceDocument || record.source_document || null;
   const publishedAt = record.publishedAt || record.published_at || '';
-  const image = text(record.cover?.url) || (record.cover
-    ? '/internal-content/' + encodeURIComponent(record.id) + '/cover?v=' + encodeURIComponent(record.updatedAt || record.updated_at || '')
+  const secondary = record.secondaryCover || record.secondary_cover;
+  const cardSelection = record.cardImageSource || record.card_image_source || 'primary';
+  const pickedCover = cardSelection === 'secondary'
+    ? secondary || record.cover
+    : record.cover || secondary;
+  const image = text(pickedCover?.url) || (pickedCover
+    ? '/internal-content/' + encodeURIComponent(record.id) +
+      (cardSelection === 'secondary' && secondary
+        ? '/secondary-cover'
+        : '/cover') +
+      '?v=' + encodeURIComponent(record.updatedAt || record.updated_at || '')
     : '');
   const tag = documentTagOf(record);
   return {
