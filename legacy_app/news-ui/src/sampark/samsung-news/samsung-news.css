@@ -1093,3 +1093,22 @@ Only published document cards use this section.
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+
+
+/* Keep the extracted topic, two-line title and footer legible at 60/40. */
+.samsung-srid-documents .samsung-document-card {
+  height: 330px;
+  min-height: 330px;
+}
+.samsung-srid-documents .samsung-document-card .samsung-document-card-body {
+  padding: 10px 14px 9px;
+  gap: 4px;
+}
+.samsung-srid-documents .samsung-document-card .samsung-document-card-footer {
+  min-height: 36px;
+  padding-top: 7px;
+}
+.samsung-srid-documents .samsung-document-card .samsung-document-card-topic {
+  font-size: 9.5px;
+  padding: 2px 7px;
+}
