@@ -115,19 +115,20 @@ def _summary_points(article):
     points = [_clean(x) for x in authored if _clean(x)]
     if not points:
         points = [_clean(article.get("summary"))]
+    groups = [
+        re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", point) if len(point) > 130
+        else [point]
+        for point in points
+    ]
+    # Keep at least one point from each authored paragraph before taking extra
+    # sentences from any one paragraph.
     result = []
-    for point in points:
-        if len(result) >= 4:
-            break
-        if len(point) > 130:
-            segments = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", point)
-        else:
-            segments = [point]
-        for segment in segments:
-            if _clean(segment):
-                result.append(_clean(segment))
+    for depth in range(max((len(group) for group in groups), default=0)):
+        for group in groups:
             if len(result) >= 4:
-                break
+                return result
+            if depth < len(group) and _clean(group[depth]):
+                result.append(_clean(group[depth]))
     return result[:4]
 
 UNAVAILABLE = ("unavailable", "could not compute insight", "preparing detailed",
@@ -356,12 +357,17 @@ def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link="", sour
         start_pt = style.font.size.pt
     # Keep up to four bullets; fit the complete text before shortening anything.
     values = values[:4] if bullets else values[:1]
+    min_pt = min(min_pt, start_pt)
     pt = min_pt
-    for candidate_pt in [start_pt - step for step in range(5) if start_pt - step >= min_pt]:
+    # Try every half-point down to the floor; this preserves more original
+    # wording before the truncation fallback is considered.
+    candidate_pt = start_pt
+    while candidate_pt >= min_pt:
         lines = "\n".join(("• " + v) if bullets else v for v in values)
         if _fits(lines, shape, candidate_pt):
             pt = candidate_pt
             break
+        candidate_pt -= .5
 
     # Do not let a long first bullet starve the second one. Use a logarithmic
     # search rather than removing thousands of words one by one.
@@ -529,7 +535,7 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
                 _title(shape, values[marker], article.get("source", ""), article["link"])
             elif marker == "#SUMMARY":
                 points = _summary_points(article)
-                _paragraphs(shape, points, 16, 11, bullets=True, source=source)
+                _paragraphs(shape, points, 16, 10, bullets=True, source=source)
             elif marker == "#INSIGHT":
                 _paragraphs(shape, [values[marker]], 10.5, 9, source=source)
             elif marker == "#Targated_SRID_Team":
