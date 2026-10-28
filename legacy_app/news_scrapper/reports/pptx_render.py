@@ -249,14 +249,12 @@ def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link="", sour
         start_pt = style.font.size.pt
     # Two slide-friendly bullets maximum, not unbounded 18-point sentences.
     values = values[:2] if bullets else values[:1]
-    for pt in [start_pt, start_pt-1, start_pt-2, start_pt-3, start_pt-4]:
-        if pt < min_pt:
-            break
+    pt = min_pt
+    for candidate_pt in [start_pt - step for step in range(5) if start_pt - step >= min_pt]:
         lines = "\n".join(("• " + v) if bullets else v for v in values)
-        if _fits(lines, shape, pt):
+        if _fits(lines, shape, candidate_pt):
+            pt = candidate_pt
             break
-    else:
-        pt = min_pt
 
     # Do not let a long first bullet starve the second one. Use a logarithmic
     # search rather than removing thousands of words one by one.
