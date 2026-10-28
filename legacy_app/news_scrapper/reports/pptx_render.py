@@ -545,7 +545,7 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
                 points = _summary_points(article)
                 _paragraphs(shape, points, 16, 10, bullets=True, source=source)
             elif marker == "#INSIGHT":
-                insight = re.sub(r"^Insight\\s*:\\s*", "", _clean(values[marker]), flags=re.I)
+                insight = re.sub(r"^Insight\s*:\s*", "", _clean(values[marker]), flags=re.I)
                 _paragraphs(shape, ["Insight : " + insight], 10.5, 9, source=source)
             elif marker == "#Targated_SRID_Team":
                 _paragraphs(shape, [values[marker]], 12, 10, source=source)
