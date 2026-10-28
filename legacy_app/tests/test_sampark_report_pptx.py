@@ -79,9 +79,12 @@ def make_template(root, *, first=True, samples=3):
         for idx, token, y, height in (
             (13, "#INSIGHT", 4.4, .65),
             (14, "#Targated_SRID_Team", 5.15, .45),
-            (15, "#LINK", 6.0, .35),
+            (15, "#LINK", 6.677, .293),
         ):
-            add_placeholder(layout, idx, token, x=1.75, y=y, width=9.5, height=height)
+            add_placeholder(layout, idx, token, x=.86 if idx == 15 else 1.75,
+                            y=y, width=11.99 if idx == 15 else 9.5, height=height)
+    add_placeholder(first_layout, 16, "#DATE_HERE", x=8.3, y=1.22,
+                    width=3.43, height=.35)
     for i in range(samples):
         deck.slides.add_slide(first_layout if i % 2 == 0 else regular)
     deck.save(root / "template.pptx")
@@ -137,13 +140,13 @@ class SamparkPowerPointTests(TestCase):
         self.assertEqual(str(byline.font.color.rgb), "000000")
         self.assertFalse(byline.font.bold)
         self.assertIsNone(byline.hyperlink.address)
-        self.assertEqual(slide.placeholders[15].text, "Open original article")
+        self.assertEqual(slide.placeholders[15].text, "https://example.org/first")
         self.assertEqual(
             slide.placeholders[15].text_frame.paragraphs[0].runs[0].hyperlink.address,
             "https://example.org/first",
         )
 
-    def test_summary_uses_at_most_two_fitted_bullets(self):
+    def test_two_long_summary_bullets_remain_inside_container(self):
         long = "A very long paragraph about technology and future devices. " * 100
         html = ARTICLE_HTML.replace("First important summary sentence.", long).replace(
             "Second important summary sentence.", long
@@ -158,6 +161,76 @@ class SamparkPowerPointTests(TestCase):
         self.assertGreaterEqual(pt, 11)
         self.assertTrue(pptx_render._fits("\n".join(p.text for p in paras), shape, pt))
         self.assertIn("…", shape.text)
+
+
+    def test_four_short_summary_bullets_are_preserved(self):
+        four = (
+            "<p>GPUs are becoming more efficient.</p>"
+            "<p>New designs improve memory bandwidth.</p>"
+            "<p>Training costs are decreasing.</p>"
+            "<p>Research groups are evaluating deployment.</p>"
+        )
+        html = ARTICLE_HTML.replace(
+            "<p>First important summary sentence.</p><p>Second important summary sentence.</p>",
+            four,
+        )
+        slide = self.get_deck(html).slides[0]
+        shape = slide.placeholders[1]
+        paragraphs = shape.text_frame.paragraphs
+        self.assertEqual(len(paragraphs), 4)
+        self.assertTrue(all(para.text.startswith("• ") for para in paragraphs))
+        self.assertIn("Research groups are evaluating deployment.", paragraphs[3].text)
+        pt = paragraphs[0].runs[0].font.size.pt
+        self.assertTrue(pptx_render._fits("\n".join(para.text for para in paragraphs),
+                                           shape, pt))
+
+    def test_long_summary_can_create_up_to_four_sentence_bullets(self):
+        prose = (
+            "GPUs enable new training approaches. "
+            "Compute clusters require faster interconnects. "
+            "Memory bandwidth is also changing. "
+            "Teams are measuring performance at scale. "
+            "This fifth sentence should not become another bullet."
+        )
+        html = ARTICLE_HTML.replace(
+            "<p>First important summary sentence.</p><p>Second important summary sentence.</p>",
+            "<p>" + prose + "</p>",
+        )
+        slide = self.get_deck(html).slides[0]
+        self.assertEqual(len(slide.placeholders[1].text_frame.paragraphs), 4)
+
+    def test_link_displays_full_url_and_keeps_clickable_target_when_wrapped(self):
+        url = "https://example.org/technology/" + ("new-data-center-ai-research-" * 10)
+        html = ARTICLE_HTML.replace("https://example.org/first", url)
+        slide = self.get_deck(html).slides[0]
+        shape = slide.placeholders[15]
+        run = shape.text_frame.paragraphs[0].runs[0]
+        self.assertEqual(run.hyperlink.address, url)
+        self.assertEqual(run.text.replace("\v", ""), url)
+        self.assertGreater(shape.height, Inches(.293))
+        self.assertLess(shape.top + shape.height, Inches(7.5))
+        self.assertIn("\v", run.text)
+
+    def test_first_slide_date_is_abbreviated_month_and_year(self):
+        slide = self.get_deck().slides[0]
+        self.assertEqual(slide.placeholders[16].text, "Oct’ 26")
+        self.assertEqual(pptx_render._format_slide_date("2026-10-27"), "Oct’ 26")
+        self.assertEqual(pptx_render._format_slide_date("2026-10-27T10:30:00Z"), "Oct’ 26")
+
+    def test_existing_team_marker_displays_key_technology_not_team_name(self):
+        slide = self.get_deck().slides[0]
+        self.assertEqual(slide.placeholders[14].text,
+                         "Key Technology: Artificial Intelligence")
+        self.assertNotIn("AI Research", slide.placeholders[14].text)
+        self.assertEqual(pptx_render._key_technology({
+            "title": "GPU breakthrough",
+            "keywords_found": ["GPU", "Nvidia"],
+            "category": "Tech News",
+        }), "GPUs")
+        self.assertEqual(pptx_render._key_technology({
+            "title": "A partnership announcement",
+            "category": "Tech News",
+        }), "Not specified")
 
     def test_long_titles_fit_with_blue_link_on_whole_headline(self):
         long_title = "Nvidia and Meta deepen AI partnership with long-term commitments " * 9
