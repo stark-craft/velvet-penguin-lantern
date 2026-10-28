@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../news-scrapper/components/Icon.jsx';
 import {
@@ -13,16 +14,45 @@ import {
   buildHeroSlides,
   coverUrl,
   findPublishedFocusRecord,
+  isNewPublishedRecord,
+  mdMessageSignature,
   isSamsungSignal,
   rankTrending,
   resolveInternalImage,
   splitByScope,
 } from '../news-scrapper/internal/samsungInternalModel.js';
 import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
+import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
 
 function imageOf(item) {
   return resolveInternalImage(item) || item?.image_url || item?.top_image || '';
+}
+
+function SamsungMDMessageModal({ item, onClose }) {
+  const dialogRef = useModalFocus(Boolean(item), onClose);
+  if (!item) return null;
+  const message = String(item.body || item.summary || '').trim();
+  return createPortal(
+    <div className="sampark-modal-overlay" onMouseDown={(event)=>{ if (event.target===event.currentTarget) onClose(); }}>
+      <section className="sampark-dossier sampark-samsung-md-modal" ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="sampark-samsung-md-title" tabIndex={-1}>
+        <header className="sampark-dossier-header">
+          <div className="sampark-samsung-md-kicker">MD Message · SRI-D Tech AXis</div>
+          <button className="sampark-dossier-close" aria-label="Close MD message" onClick={onClose} type="button"><Icon name="x" size={18}/></button>
+        </header>
+        <div className="sampark-samsung-md-content">
+          <h2 id="sampark-samsung-md-title">{item.title}</h2>
+          {item.date && <div className="sampark-samsung-md-date">{item.date}</div>}
+          <div className="sampark-samsung-md-body">{message}</div>
+          <div className="sampark-samsung-md-signature">{mdMessageSignature(item)}</div>
+        </div>
+      </section>
+    </div>, document.body
+  );
+}
+
+function freshPublished(item, nowMs) {
+  return Boolean(item?._publishedId && isNewPublishedRecord({ status:'published', publishedAt:item.published_at }, nowMs));
 }
 
 function SamparkSamsungDossier({ item, onClose }) {
@@ -31,6 +61,7 @@ function SamparkSamsungDossier({ item, onClose }) {
   const articleId = item ? (item.canonical_link || item.link || item.url || item.id || item.title || '') : '';
   React.useEffect(()=>{ if(item && articleId) engagement.onDossierOpen(item); }, [articleId]);
   if (!item) return null;
+  if (item._isLeadership) return <SamsungMDMessageModal item={item} onClose={handleClose}/>;
   return (
     <ArticleModal
       item={item}
@@ -40,12 +71,12 @@ function SamparkSamsungDossier({ item, onClose }) {
   );
 }
 
-function LeadershipCard({ record, onOpen }) {
+function LeadershipCard({ record, onOpen, nowMs }) {
   const img = coverUrl(record);
   return (
     <section className="sampark-samsung-leadership">
       <div className="sampark-samsung-leadership-copy">
-        <span className="sampark-samsung-kicker">Samsung Research Institute Delhi</span>
+        <div className="sampark-samsung-leadership-labels"><span className="sampark-samsung-kicker">Samsung Research Institute Delhi</span>{isNewPublishedRecord(record, nowMs) && <span className="sampark-samsung-new-badge">NEW</span>}</div>
         <h2>{record.title}</h2>
         <p>{String(record.summary || record.body || '').slice(0, 260)}</p>
         <button className="btn-primary" onClick={onOpen} type="button">Read message</button>
@@ -57,21 +88,21 @@ function LeadershipCard({ record, onOpen }) {
   );
 }
 
-function SamparkSamsungTile({ item, onOpen }) {
+function SamparkSamsungTile({ item, onOpen, nowMs }) {
   const img = imageOf(item);
   return (
     <article className="sampark-samsung-latest-card">
       <button className="sampark-samsung-latest-media" onClick={() => onOpen(item)} style={img ? { backgroundImage: `url("${img}")` } : undefined} type="button" aria-label={`Open ${item.title}`}>
         {!img && <Icon name="layers" size={24} />}
       </button>
-      <div className="sampark-samsung-latest-tags">{item.source || item.src || 'Samsung'} | {item.category || 'Samsung News'}</div>
+      <div className="sampark-samsung-latest-tags">{item.source || item.src || 'Samsung'} | {item.category || 'Samsung News'}{freshPublished(item, nowMs) && <span className="sampark-samsung-new-badge">NEW</span>}</div>
       <button className="sampark-samsung-latest-title" onClick={() => onOpen(item)} type="button">{item.title}</button>
     </article>
   );
 }
 
 const CHANNELS = [
-  { id: 'internal', label: 'SRI-D' },
+  { id: 'internal', label: 'SRI-D Tech AXis' },
   { id: 'local', label: 'Local' },
   { id: 'global', label: 'Global' },
 ];
@@ -83,6 +114,12 @@ export default function SamparkSamsungNews() {
   const [tab, setTab] = useState('internal');
   const [channels, setChannels] = useState({ global: [], local: [], inside: [] });
   const [published, setPublished] = useState([]);
+  const [nowMs, setNowMs] = useState(()=>Date.now());
+  // The NEW tag must expire while this page stays open, not only on refresh.
+  useEffect(()=>{
+    const tick = setInterval(()=>setNowMs(Date.now()), 30 * 1000);
+    return ()=>clearInterval(tick);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [publishedError, setPublishedError] = useState('');
@@ -138,6 +175,7 @@ export default function SamparkSamsungNews() {
     source: r.author || r.ownerName || 'Samsung Internal',
     src: r.author || 'Samsung Internal',
     author: r.author || r.ownerName || '',
+    ownerName: r.ownerName || '',
     team: r.team || '',
     date: r.publishedAt ? String(r.publishedAt).slice(0,10) : 'Latest',
     published_at: r.publishedAt,
@@ -149,6 +187,7 @@ export default function SamparkSamsungNews() {
     id: r.id,
     canonical_link: `internal://${r.id}`,
     _publishedId: r.id,
+    _isLeadership: r.contentType === 'leadership',
     _isStory: true,
     audiences: ['all'],
   });
@@ -220,7 +259,7 @@ export default function SamparkSamsungNews() {
       </nav>
 
       {leadership && leadershipSignal && (
-        <LeadershipCard record={leadership} onOpen={()=> setOpenArticle(leadershipSignal)} />
+        <LeadershipCard record={leadership} nowMs={nowMs} onOpen={()=> setOpenArticle(leadershipSignal)} />
       )}
 
       {selected.length === 0 ? (
@@ -231,7 +270,7 @@ export default function SamparkSamsungNews() {
           {selected[0] ? (
             <button className="sampark-samsung-featured-media" onClick={()=> setOpenArticle(selected[0])} style={imageOf(selected[0]) ? { backgroundImage: `url("${imageOf(selected[0])}")` } : undefined} type="button">
               <div className="sampark-samsung-featured-overlay">
-                <span className="sampark-samsung-featured-kicker">{selected[0].source || selected[0].src || 'Samsung'} · {selected[0].date || 'Latest'}</span>
+                <span className="sampark-samsung-featured-kicker">{selected[0].source || selected[0].src || 'Samsung'} · {selected[0].date || 'Latest'}{freshPublished(selected[0], nowMs) && <span className="sampark-samsung-new-badge">NEW</span>}</span>
                 <h3>{selected[0].title}</h3>
                 <small>{selected[0].summary ? String(selected[0].summary).slice(0,120) : ''}</small>
               </div>
@@ -243,7 +282,7 @@ export default function SamparkSamsungNews() {
           <div className="sampark-samsung-stream-list">
             {stream.length ? stream.map((it)=>(
               <button key={it.title + it.date} className="sampark-samsung-stream-item" onClick={()=> setOpenArticle(it)} type="button">
-                <span className="sampark-samsung-stream-category">{it.category || 'Samsung'}</span>
+                <span className="sampark-samsung-stream-category">{it.category || 'Samsung'}{freshPublished(it, nowMs) && <span className="sampark-samsung-new-badge">NEW</span>}</span>
                 <strong>{it.title}</strong>
                 <small>{it.source || it.src || 'Samsung'} | {it.date || 'Latest'}</small>
               </button>
@@ -255,10 +294,10 @@ export default function SamparkSamsungNews() {
 
       {selected.length > 0 && (
       <section className="sampark-samsung-latest" aria-labelledby="sampark-samsung-latest-title">
-        <header><h3 id="sampark-samsung-latest-title">{tab==='internal' ? 'SRI-D News' : tab==='local' ? 'Local Samsung News' : 'Global Samsung News'} <span className="sampark-samsung-count">({selected.length} News)</span></h3><span className="sampark-samsung-hint">Tap a card to open the dossier</span></header>
+        <header><h3 id="sampark-samsung-latest-title">{tab==='internal' ? 'SRI-D Tech AXis News' : tab==='local' ? 'Local Samsung News' : 'Global Samsung News'} <span className="sampark-samsung-count">({selected.length} News)</span></h3><span className="sampark-samsung-hint">Tap a card to open the dossier</span></header>
         <div className="sampark-samsung-latest-scroll">
           {selected.map((it)=>(
-            <SamparkSamsungTile key={it.title + (it.date||'') + (it._publishedId||'')} item={it} onOpen={(item)=> setOpenArticle(item)} />
+            <SamparkSamsungTile key={it.title + (it.date||'') + (it._publishedId||'')} item={it} nowMs={nowMs} onOpen={(item)=> setOpenArticle(item)} />
           ))}
         </div>
       </section>
@@ -269,7 +308,7 @@ export default function SamparkSamsungNews() {
           <header><h3 id="sampark-samsung-announcements-title">Announcements <span className="sampark-samsung-count">({announcementSignals.length})</span></h3><span className="sampark-samsung-hint">Notices from colleagues</span></header>
           <div className="sampark-samsung-latest-scroll">
             {announcementSignals.map((it)=>(
-              <SamparkSamsungTile key={`ann-${it.id}`} item={it} onOpen={(item)=> setOpenArticle(item)} />
+              <SamparkSamsungTile key={`ann-${it.id}`} item={it} nowMs={nowMs} onOpen={(item)=> setOpenArticle(item)} />
             ))}
           </div>
         </section>
