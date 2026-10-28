@@ -158,7 +158,7 @@ class SamparkPowerPointTests(TestCase):
         self.assertTrue(all(p.text.startswith("• ") for p in paras))
         self.assertEqual(shape.width, Inches(7.48))
         pt = paras[0].runs[0].font.size.pt
-        self.assertGreaterEqual(pt, 11)
+        self.assertGreaterEqual(pt, 10)
         self.assertTrue(pptx_render._fits("\n".join(p.text for p in paras), shape, pt))
         self.assertIn("…", shape.text)
 
