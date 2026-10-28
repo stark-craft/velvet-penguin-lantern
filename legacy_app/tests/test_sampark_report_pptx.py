@@ -207,9 +207,34 @@ class SamparkPowerPointTests(TestCase):
         paragraph = shape.text_frame.paragraphs[0]
         self.assertEqual(shape.text.replace("\v", ""), url)
         self.assertTrue(all(run.hyperlink.address == url for run in paragraph.runs))
+        layout_link = slide.slide_layout.placeholders[15]
+        self.assertEqual((shape.left, shape.top, shape.width),
+                         (layout_link.left, layout_link.top, layout_link.width))
         self.assertGreater(shape.height, Inches(.293))
         self.assertLess(shape.top + shape.height, Inches(7.5))
         self.assertIn("\v", paragraph.text)
+
+    def test_short_link_stays_in_layout_link_position(self):
+        deck = self.get_deck()
+        for slide in deck.slides:
+            link = slide.placeholders[15]
+            layout_link = slide.slide_layout.placeholders[15]
+            self.assertEqual((link.left, link.top, link.width),
+                             (layout_link.left, layout_link.top, layout_link.width))
+            self.assertGreater(link.width, Inches(10))
+            self.assertGreater(link.left, 0)
+
+    def test_insight_has_one_prefix_even_for_already_labeled_input(self):
+        slide = self.get_deck().slides[0]
+        self.assertEqual(slide.placeholders[13].text,
+                         "Insight : Samsung device teams may monitor the change.")
+        html = ARTICLE_HTML.replace(
+            "Samsung device teams may monitor the change.",
+            "Insight : Samsung device teams may monitor the change.",
+        )
+        slide = self.get_deck(html).slides[0]
+        self.assertEqual(slide.placeholders[13].text,
+                         "Insight : Samsung device teams may monitor the change.")
 
     def test_first_slide_date_is_abbreviated_month_and_year(self):
         slide = self.get_deck().slides[0]
