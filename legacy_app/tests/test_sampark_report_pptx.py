@@ -1,8 +1,9 @@
-"""Regression tests for the Sampark Create Report -> PowerPoint export."""
-import tempfile
-import unittest
+"""Regression tests for both Sampark PowerPoint exports (no proprietary PPTX)."""
+from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import TestCase, main
 from unittest.mock import patch
 
 from bs4 import BeautifulSoup
@@ -10,146 +11,213 @@ from fastapi import HTTPException
 from pptx import Presentation
 from pptx.util import Inches
 
-from news_scrapper.reports import exports
+from news_scrapper.reports import exports, pptx_render
 
 
 ARTICLE_HTML = """
-<section data-kind="overview"><h1>Executive summary</h1><p>Not a PPT slide.</p></section>
-<section data-kind="article">
-  <h2>OpenAI launches a new AI product</h2>
-  <p>TechCrunch · 2026-10-28</p>
-  <div><h3>Summary</h3>
-    <div data-kind="article-summary"><p>First article summary.</p></div>
-    <div data-kind="samsung-impact"><h3>Why this matters to Samsung</h3>
-      <div data-kind="impact-body"><p>First insight for Samsung.</p></div>
-    </div>
-    <h3>Relevant teams</h3><p>AI Research</p>
-    <p><a href="https://example.org/first">Open original article</a></p>
-  </div>
+<section data-kind="overview">
+ <h1>Executive summary</h1><p>Opening analysis must not be a slide.</p>
 </section>
 <section data-kind="article">
-  <h2>Second report headline</h2>
-  <p>Reuters · 2026-10-27</p>
-  <div><h3>Summary</h3>
-    <div data-kind="article-summary"><p>Second article summary.</p></div>
-    <div data-kind="samsung-impact"><h3>Why this matters to Samsung</h3>
-      <div data-kind="impact-body"><p>Second insight.</p></div>
-    </div>
-    <h3>Relevant teams</h3><p>Device Solutions</p>
-    <p><a href="https://example.org/second">Open original article</a></p>
-  </div>
+ <h2>OpenAI launches an AI assistant</h2><p>TechCrunch · 2026-10-28</p>
+ <div><h3>Summary</h3><div data-kind="article-summary">
+  <p>First important summary sentence.</p><p>Second important summary sentence.</p>
+ </div>
+ <div data-kind="samsung-impact"><h3>Why this matters to Samsung</h3>
+  <div data-kind="impact-body"><p>Samsung device teams may monitor the change.</p></div>
+ </div>
+ <h3>Relevant teams</h3><p>AI Research</p>
+ <p><a href="https://example.org/first">Open original article</a></p>
+ </div>
+</section>
+<section data-kind="article">
+ <h2>Meta expands its AI research investment</h2><p>Reuters · 2026-10-27</p>
+ <div><h3>Summary</h3><div data-kind="article-summary">
+ <p>Second article summary.</p></div>
+ <div data-kind="samsung-impact"><h3>Why this matters to Samsung</h3>
+ <div data-kind="impact-body"><p>Samsung may assess competitive implications.</p></div>
+ </div>
+ <h3>Relevant teams</h3><p>Device Solutions</p>
+ <p><a href="https://example.org/second">Open original article</a></p></div>
 </section>
 """
 
 
-class SamparkPowerPointExportTests(unittest.TestCase):
+def add_placeholder(layout, number, marker, *, x, y, width, height):
+    """Create a layout placeholder using a safe clone of its existing BODY item."""
+    node = deepcopy(layout.placeholders[1]._element)
+    nv = node.xpath("./p:nvSpPr/p:cNvPr")[0]
+    nv.set("id", str(80 + number))
+    nv.set("name", "Regression placeholder " + str(number))
+    ph = node.xpath("./p:nvSpPr/p:nvPr/p:ph")[0]
+    ph.set("idx", str(number))
+    layout._element.spTree.append(node)
+    shape = layout.placeholders[number]
+    shape.text = marker
+    shape.left = Inches(x)
+    shape.top = Inches(y)
+    shape.width = Inches(width)
+    shape.height = Inches(height)
+
+
+def make_template(root, *, first=True, samples=3):
+    deck = Presentation()
+    first_layout, regular = deck.slide_layouts[1], deck.slide_layouts[2]
+    first_layout.name = "NewsLayoutFirst" if first else "UnusedLayout"
+    regular.name = "NewsLayout"
+    for layout in (first_layout, regular):
+        layout.placeholders[0].text = "#TITLE"
+        layout.placeholders[0].left = Inches(1.75)
+        layout.placeholders[0].top = Inches(1.1)
+        layout.placeholders[0].width = Inches(9.5)
+        layout.placeholders[0].height = Inches(.75)
+        layout.placeholders[1].text = "#SUMMARY"
+        layout.placeholders[1].left = Inches(1.75)
+        layout.placeholders[1].top = Inches(1.95)
+        layout.placeholders[1].width = Inches(7.48)
+        layout.placeholders[1].height = Inches(2.15)
+        for idx, token, y, height in (
+            (13, "#INSIGHT", 4.4, .65),
+            (14, "#Targated_SRID_Team", 5.15, .45),
+            (15, "#LINK", 6.0, .35),
+        ):
+            add_placeholder(layout, idx, token, x=1.75, y=y, width=9.5, height=height)
+    for i in range(samples):
+        deck.slides.add_slide(first_layout if i % 2 == 0 else regular)
+    deck.save(root / "template.pptx")
+
+
+class SamparkPowerPointTests(TestCase):
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.addCleanup(self.directory.cleanup)
-        self.root = Path(self.directory.name)
-        self.root_patch = patch.object(exports, 'PROJECT_ROOT', self.root)
-        self.image_patch = patch.object(exports, 'image_data', return_value=None)
-        self.root_patch.start()
-        self.image_patch.start()
-        self.addCleanup(self.root_patch.stop)
-        self.addCleanup(self.image_patch.stop)
+        temp = TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        make_template(self.root)
+        root_patch = patch.object(exports, "PROJECT_ROOT", self.root)
+        image_patch = patch.object(exports, "image_data", return_value=None)
+        root_patch.start()
+        image_patch.start()
+        self.addCleanup(root_patch.stop)
+        self.addCleanup(image_patch.stop)
 
-    def create_template(self, paired=True):
-        """Built-in layouts stand in for article layouts; no proprietary template needed."""
-        deck = Presentation()
-        first, regular = deck.slide_layouts[1], deck.slide_layouts[2]
-        first.name = 'NewsLayoutFirst' if paired else 'UnusedLayout'
-        regular.name = 'NewsLayout'
-        for layout in (first, regular):
-            layout.placeholders[0].text = '#TITLE'
-            layout.placeholders[1].text = '#SUMMARY'
-        # Verify export discards any design-sample slides from the input template.
-        deck.slides.add_slide(first)
-        deck.save(str(self.root / 'template.pptx'))
+    def get_deck(self, html=ARTICLE_HTML):
+        binary, mime, ext = exports.export_snapshot("pptx", "Selected news", html)
+        self.assertEqual(mime, pptx_render.PPTX_MIME)
+        self.assertEqual(ext, "pptx")
+        return Presentation(BytesIO(binary))
 
-    def test_first_article_uses_first_layout_and_skips_overview(self):
-        self.create_template()
-        result, mime, extension = exports.export_snapshot('pptx', 'Test report', ARTICLE_HTML)
-        self.assertEqual(extension, 'pptx')
-        self.assertEqual(mime, 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
-        deck = Presentation(BytesIO(result))
+    def test_removes_three_sample_slides_and_no_cover_or_overview(self):
+        self.assertEqual(len(Presentation(self.root / "template.pptx").slides), 3)
+        deck = self.get_deck()
         self.assertEqual(len(deck.slides), 2)
-        self.assertEqual([s.slide_layout.name for s in deck.slides],
-                         ['NewsLayoutFirst', 'NewsLayout'])
-        self.assertIn('OpenAI launches', deck.slides[0].placeholders[0].text)
-        self.assertIn('Second report', deck.slides[1].placeholders[0].text)
-        self.assertNotIn('Executive summary', deck.slides[0].placeholders[0].text)
-        self.assertEqual(deck.slides[0].placeholders[1].text, 'First article summary.')
-        self.assertEqual(deck.slides[1].placeholders[1].text, 'Second article summary.')
-        self.assertEqual(len(Presentation(str(self.root / 'template.pptx')).slides), 1)
+        self.assertEqual(
+            [s.slide_layout.name for s in deck.slides],
+            ["NewsLayoutFirst", "NewsLayout"],
+        )
+        self.assertIn("OpenAI launches", deck.slides[0].placeholders[0].text)
+        self.assertIn("Meta expands", deck.slides[1].placeholders[0].text)
+        self.assertNotIn("Executive summary", " ".join(
+            shape.text for slide in deck.slides for shape in slide.shapes if shape.has_text_frame
+        ))
+        self.assertEqual(len(Presentation(self.root / "template.pptx").slides), 3)
+        self.assertIn("article-first", deck.core_properties.subject)
 
-    def test_headline_is_linked_and_black_byline_is_not(self):
-        self.create_template()
-        result, _, _ = exports.export_snapshot('pptx', 'Test report', ARTICLE_HTML)
-        deck = Presentation(BytesIO(result))
-        paragraph = deck.slides[0].placeholders[0].text_frame.paragraphs[0]
+    def test_entire_headline_blue_bold_linked_black_byline_unlinked(self):
+        slide = self.get_deck().slides[0]
+        paragraph = slide.placeholders[0].text_frame.paragraphs[0]
         self.assertEqual(len(paragraph.runs), 2)
         headline, byline = paragraph.runs
-        self.assertEqual(headline.text, 'OpenAI launches a new AI product')
-        self.assertEqual(headline.hyperlink.address, 'https://example.org/first')
-        self.assertEqual(headline.font.name, 'Calibri')
+        self.assertEqual(headline.text, "OpenAI launches an AI assistant")
+        self.assertEqual(headline.hyperlink.address, "https://example.org/first")
+        self.assertEqual(str(headline.font.color.rgb), "0070C0")
         self.assertTrue(headline.font.bold)
-        self.assertEqual(str(headline.font.color.rgb), '0070C0')
-        self.assertEqual(byline.text, ' By TechCrunch')
-        self.assertIsNone(byline.hyperlink.address)
+        self.assertFalse(headline.font.underline)
+        self.assertEqual(headline.font.name, "Calibri")
+        self.assertEqual(byline.text, " By TechCrunch")
+        self.assertEqual(str(byline.font.color.rgb), "000000")
         self.assertFalse(byline.font.bold)
-        self.assertEqual(str(byline.font.color.rgb), '000000')
-
-    def test_summary_and_long_title_are_fitted_without_widening_boxes(self):
-        self.create_template()
-        deck = Presentation(str(self.root / 'template.pptx'))
-        for layout in (deck.slide_layouts[1], deck.slide_layouts[2]):
-            layout.placeholders[0].width = Inches(9.519)
-            layout.placeholders[0].height = Inches(.703)
-            layout.placeholders[1].width = Inches(7.481)
-            layout.placeholders[1].height = Inches(2.148)
-        deck.save(str(self.root / 'template.pptx'))
-        long_title = 'A significantly extended story with multiple technologies and important considerations ' * 7
-        long_summary = 'A significant technical development was reported. ' * 120
-        html = ARTICLE_HTML.replace('OpenAI launches a new AI product', long_title).replace(
-            'First article summary.', long_summary
+        self.assertIsNone(byline.hyperlink.address)
+        self.assertEqual(slide.placeholders[15].text, "Open original article")
+        self.assertEqual(
+            slide.placeholders[15].text_frame.paragraphs[0].runs[0].hyperlink.address,
+            "https://example.org/first",
         )
-        result, _, _ = exports.export_snapshot('pptx', 'Test report', html)
-        slide = Presentation(BytesIO(result)).slides[0]
-        title = slide.placeholders[0]
-        summary = slide.placeholders[1]
-        self.assertIn('By TechCrunch', title.text)
-        self.assertIn('…', title.text)
-        self.assertTrue(exports._pptx_fits(title.text, title, title.text_frame.paragraphs[0].runs[0].font.size.pt, True))
-        self.assertTrue(summary.text.endswith('…'))
-        self.assertTrue(exports._pptx_fits(summary.text, summary, 16))
-        self.assertAlmostEqual(summary.width / 914400, 7.481, places=2)
 
-    def test_extract_article_uses_edited_snapshot_not_overview_or_link_as_team(self):
-        article = BeautifulSoup(ARTICLE_HTML, 'html.parser').select_one('section[data-kind="article"]')
-        parsed = exports._pptx_article(article)
-        self.assertEqual(parsed['source'], 'TechCrunch')
-        self.assertEqual(parsed['date'], '2026-10-28')
-        self.assertEqual(parsed['insight'], 'First insight for Samsung.')
-        self.assertEqual(parsed['team'], 'AI Research')
-        self.assertEqual(parsed['link'], 'https://example.org/first')
+    def test_summary_uses_at_most_two_fitted_bullets(self):
+        long = "A very long paragraph about technology and future devices. " * 100
+        html = ARTICLE_HTML.replace("First important summary sentence.", long).replace(
+            "Second important summary sentence.", long
+        )
+        slide = self.get_deck(html).slides[0]
+        shape = slide.placeholders[1]
+        paras = shape.text_frame.paragraphs
+        self.assertEqual(len(paras), 2)
+        self.assertTrue(all(p.text.startswith("• ") for p in paras))
+        self.assertEqual(shape.width, Inches(7.48))
+        pt = paras[0].runs[0].font.size.pt
+        self.assertGreaterEqual(pt, 11)
+        self.assertTrue(pptx_render._fits("\n".join(p.text for p in paras), shape, pt))
+        self.assertIn("…", shape.text)
 
-    def test_missing_first_layout_is_a_clear_configuration_error(self):
-        self.create_template(paired=False)
-        with self.assertRaises(HTTPException) as captured:
-            exports.export_snapshot('pptx', 'Test report', ARTICLE_HTML)
-        self.assertEqual(captured.exception.status_code, 409)
-        self.assertIn('NewsLayoutFirst', captured.exception.detail)
+    def test_long_titles_fit_with_blue_link_on_whole_headline(self):
+        long_title = "Nvidia and Meta deepen AI partnership with long-term commitments " * 9
+        html = ARTICLE_HTML.replace("OpenAI launches an AI assistant", long_title)
+        slide = self.get_deck(html).slides[0]
+        shape = slide.placeholders[0]
+        runs = shape.text_frame.paragraphs[0].runs
+        self.assertEqual(len(runs), 2)
+        self.assertIn("…", runs[0].text)
+        self.assertTrue(runs[0].text.startswith("Nvidia and Meta"))
+        self.assertTrue(runs[0].font.bold)
+        self.assertEqual(str(runs[0].font.color.rgb), "0070C0")
+        self.assertEqual(runs[0].hyperlink.address, "https://example.org/first")
+        self.assertTrue(pptx_render._fits(shape.text, shape, runs[0].font.size.pt, True))
 
-    def test_zero_articles_are_not_exported_as_overview_slides(self):
-        self.create_template()
-        with self.assertRaises(HTTPException) as captured:
-            exports.export_snapshot(
-                'pptx', 'Test report',
-                '<section data-kind="overview"><h1>Executive summary</h1></section>',
-            )
-        self.assertEqual(captured.exception.status_code, 422)
+    def test_missing_insight_calls_samsung_provider_not_a_failure_string(self):
+        html = ARTICLE_HTML.replace(
+            "Samsung device teams may monitor the change.",
+            "Insight generation unavailable.",
+        )
+        with patch.object(pptx_render, "_samsung_slide_insight",
+                          return_value="Samsung could evaluate potential device AI implications.") as chat:
+            slide = self.get_deck(html).slides[0]
+        self.assertEqual(chat.call_count, 1)
+        self.assertIn("Samsung could evaluate", slide.placeholders[13].text)
+        self.assertNotIn("unavailable", slide.placeholders[13].text)
+
+    def test_missing_samsung_chat_fails_visibly_not_silently(self):
+        html = ARTICLE_HTML.replace(
+            "Samsung device teams may monitor the change.", "Insight generation unavailable."
+        )
+        with patch.object(pptx_render, "_samsung_slide_insight",
+                          side_effect=HTTPException(503, "Configure Samsung Chat")):
+            with self.assertRaises(HTTPException) as raised:
+                self.get_deck(html)
+        self.assertEqual(raised.exception.status_code, 503)
+
+    def test_missing_required_layout_fails_clearly(self):
+        make_template(self.root, first=False)
+        with self.assertRaises(HTTPException) as raised:
+            self.get_deck()
+        self.assertEqual(raised.exception.status_code, 409)
+
+    def test_draft_export_accepts_newsitems_via_common_renderer(self):
+        news = [
+            dict(title="Nvidia and Meta deepen AI partnership",
+                 source="TechCrunch", link="https://example.org/a",
+                 summary="Partnership includes data center work.",
+                 insight="Samsung may monitor AI hardware demand.",
+                 team="Hardware Team", date="2026-10-28", image=""),
+        ]
+        result = pptx_render.render_articles_pptx(
+            news, self.root / "template.pptx", lambda _: None
+        )
+        deck = Presentation(BytesIO(result))
+        self.assertEqual(len(deck.slides), 1)
+        self.assertEqual(deck.slides[0].slide_layout.name, "NewsLayoutFirst")
+        self.assertEqual(deck.slides[0].placeholders[0].text_frame.paragraphs[0].runs[0].text,
+                         news[0]["title"])
 
 
-if __name__ == '__main__':
-    unittest.main()
+if __name__ == "__main__":
+    main()
