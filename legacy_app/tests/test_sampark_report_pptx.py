@@ -173,6 +173,20 @@ class SamparkPowerPointTests(TestCase):
         self.assertEqual(runs[0].hyperlink.address, "https://example.org/first")
         self.assertTrue(pptx_render._fits(shape.text, shape, runs[0].font.size.pt, True))
 
+    def test_standard_placeholder_preserves_master_color_and_font(self):
+        from pptx.dml.color import RGBColor
+        deck = Presentation(self.root / "template.pptx")
+        for layout in (deck.slide_layouts[1], deck.slide_layouts[2]):
+            marker = layout.placeholders[1].text_frame.paragraphs[0].runs[0]
+            marker.font.name = "Malgun Gothic"
+            marker.font.color.rgb = RGBColor(45, 62, 91)
+            marker.font.size = None
+        deck.save(self.root / "template.pptx")
+        slide = self.get_deck().slides[0]
+        run = slide.placeholders[1].text_frame.paragraphs[0].runs[0]
+        self.assertEqual(run.font.name, "Malgun Gothic")
+        self.assertEqual(str(run.font.color.rgb), "2D3E5B")
+
     def test_missing_insight_calls_samsung_provider_not_a_failure_string(self):
         html = ARTICLE_HTML.replace(
             "Samsung device teams may monitor the change.",
