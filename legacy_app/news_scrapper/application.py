@@ -4001,6 +4001,9 @@ async def export_ppt(http_request: Request, request: ExportRequest):
             "image": item.top_image or "",
             "insight": item.why_it_matters or "",
             "team": determine_target_team(item.title, item.master_summary),
+            "keywords_found": item.keywords_found,
+            "category": item.category,
+            "article_intent": item.article_intent,
         })
     pptx_bytes = render_articles_pptx(
         articles,
