@@ -444,7 +444,12 @@ def _write_full_url(shape, url, deck, source=None):
     max_height = deck.slide_height - shape.top - Inches(.12)
     if max_height <= 0:
         raise HTTPException(409, "PowerPoint #LINK is positioned outside the slide.")
-    original_height = shape.height
+    # A slide placeholder inherits geometry from its layout. Setting only
+    # shape.height materializes a local transform with width=0 in python-pptx,
+    # which makes the URL print vertically at the slide's left edge. Snapshot
+    # and explicitly restore all four geometry coordinates on the slide shape.
+    original_left, original_top = shape.left, shape.top
+    original_width, original_height = shape.width, shape.height
     choices = sorted(set([preferred, 10, 9.5, 9, 8.5, 8]), reverse=True)
     choices = [pt for pt in choices if pt <= preferred]
     for pt in choices:
@@ -458,6 +463,9 @@ def _write_full_url(shape, url, deck, source=None):
         required_height = Inches((lines * pt * 1.32 / .85 + margins + 2) / 72)
         if required_height > max_height:
             continue
+        shape.left = original_left
+        shape.top = original_top
+        shape.width = original_width
         shape.height = max(original_height, required_height)
         paragraph = _para(frame.paragraphs[0])
         for index, segment in enumerate(wrapped.split("\v")):
@@ -537,7 +545,8 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
                 points = _summary_points(article)
                 _paragraphs(shape, points, 16, 10, bullets=True, source=source)
             elif marker == "#INSIGHT":
-                _paragraphs(shape, [values[marker]], 10.5, 9, source=source)
+                insight = re.sub(r"^Insight\\s*:\\s*", "", _clean(values[marker]), flags=re.I)
+                _paragraphs(shape, ["Insight : " + insight], 10.5, 9, source=source)
             elif marker == "#Targated_SRID_Team":
                 _paragraphs(shape, [values[marker]], 12, 10, source=source)
             elif marker == "#LINK":
