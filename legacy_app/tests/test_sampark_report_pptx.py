@@ -52,7 +52,7 @@ def add_placeholder(layout, number, marker, *, x, y, width, height):
     ph = node.xpath("./p:nvSpPr/p:nvPr/p:ph")[0]
     ph.set("idx", str(number))
     layout._element.spTree.append(node)
-    shape = layout.placeholders[number]
+    shape = next(p for p in layout.placeholders if p.placeholder_format.idx == number)
     shape.text = marker
     shape.left = Inches(x)
     shape.top = Inches(y)
