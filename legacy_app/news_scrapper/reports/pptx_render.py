@@ -23,6 +23,113 @@ TEMPLATE_MARKERS = {
     "#LINK": "link",
     "#DATE_HERE": "date",
 }
+
+TECHNOLOGY_PATTERNS = (
+    ("Large Language Models", r"\b(?:large language models?|LLMs?)\b"),
+    ("Generative AI", r"\b(?:generative AI|genAI)\b"),
+    ("AI Agents", r"\b(?:AI agents?|agentic AI|autonomous AI agents?)\b"),
+    ("AI Accelerators", r"\b(?:AI accelerators?|tensor cores?)\b"),
+    ("GPUs", r"\b(?:GPUs?|graphics processing units?|CUDA)\b"),
+    ("Semiconductors", r"\b(?:semiconductors?|chipmaking|chipsets?|microchips?)\b"),
+    ("Data Centers", r"\b(?:data cent(?:er|re)s?|server farms?)\b"),
+    ("Cloud Computing", r"\b(?:cloud computing|cloud infrastructure|hyperscalers?)\b"),
+    ("Quantum Computing", r"\b(?:quantum comput(?:ers?|ing)|qubits?)\b"),
+    ("Edge AI", r"\b(?:edge AI|on-device AI)\b"),
+    ("Robotics", r"\b(?:robotics?|humanoid robots?)\b"),
+    ("Autonomous Driving", r"\b(?:autonomous driv(?:ing|ers?)|self-driving)\b"),
+    ("Cybersecurity", r"\b(?:cybersecurity|zero trust|encryption)\b"),
+    ("6G", r"\b6G\b"),
+    ("5G", r"\b5G\b"),
+    ("Wi-Fi", r"\bWi[- ]?Fi\b"),
+    ("MicroLED", r"\bmicro[- ]?LED\b"),
+    ("OLED", r"\b(?:QD[- ]?OLED|OLED)\b"),
+    ("AR/VR", r"\b(?:augmented reality|virtual reality|mixed reality|AR/VR|XR)\b"),
+    ("Computer Vision", r"\bcomputer vision\b"),
+    ("Natural Language Processing", r"\b(?:natural language processing|NLP)\b"),
+    ("Batteries", r"\b(?:solid[- ]state batter(?:y|ies)|battery technolog(?:y|ies))\b"),
+    ("Artificial Intelligence", r"\b(?:artificial intelligence|AI)\b"),
+)
+GENERIC_TECH_CATEGORIES = {"tech news", "technology", "general", "news", "other", "all", "unknown"}
+
+
+def _key_technology(article):
+    """Select evidence-backed technologies, never reuse Samsung team names."""
+    explicit = article.get("key_technology") or article.get("key_technologies")
+    if isinstance(explicit, (tuple, list)):
+        explicit = ", ".join(map(str, explicit[:3]))
+    if _clean(explicit):
+        return _clean(explicit)
+    keywords = article.get("keywords_found") or []
+    if isinstance(keywords, str):
+        keywords = [keywords]
+    context = " ".join([
+        _clean(article.get("title")),
+        " ".join(map(str, keywords[:20])),
+        _clean(article.get("category")),
+        _clean(article.get("summary"))[:2500],
+    ])
+    selected = []
+    for name, pattern in TECHNOLOGY_PATTERNS:
+        if re.search(pattern, context, flags=re.I):
+            selected.append(name)
+        if len(selected) >= 3:
+            break
+    if selected:
+        if "Artificial Intelligence" in selected and len(selected) > 1:
+            selected.remove("Artificial Intelligence")
+        return ", ".join(selected[:3])
+    category = _clean(article.get("category"))
+    if category and category.casefold() not in GENERIC_TECH_CATEGORIES:
+        return category[:80]
+    return "Not specified"
+
+
+def _format_slide_date(value):
+    """Format known article dates as Oct’ 26; never substitute today's date."""
+    from datetime import datetime
+    value = _clean(value)
+    if not value:
+        return ""
+    try:
+        # Handles YYYY-MM-DD and ISO timestamps, including offsets.
+        date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        date = None
+        for fmt in ("%d %b %Y", "%b %d, %Y", "%b %Y", "%Y-%m",
+                    "%d %B %Y", "%B %d, %Y", "%B %Y"):
+            try:
+                date = datetime.strptime(value, fmt)
+                break
+            except ValueError:
+                continue
+    if date is None:
+        return value
+    return f"{date:%b}\u2019 {date:%y}"
+
+
+def _summary_points(article):
+    """Preserve authored bullets; split long prose into up to four sentences."""
+    authored = article.get("summary_points") or []
+    if isinstance(authored, str):
+        authored = [authored]
+    points = [_clean(x) for x in authored if _clean(x)]
+    if not points:
+        points = [_clean(article.get("summary"))]
+    result = []
+    for point in points:
+        if len(result) >= 4:
+            break
+        if len(point) > 130:
+            segments = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", point)
+        else:
+            segments = [point]
+        for segment in segments:
+            if _clean(segment):
+                result.append(_clean(segment))
+            if len(result) >= 4:
+                break
+    return result[:4]
+
 UNAVAILABLE = ("unavailable", "could not compute insight", "preparing detailed",
                "preparing samsung", "generation failed", "generating insight")
 
@@ -247,8 +354,8 @@ def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link="", sour
     style = _style_run(source)
     if style is not None and style.font.size is not None:
         start_pt = style.font.size.pt
-    # Two slide-friendly bullets maximum, not unbounded 18-point sentences.
-    values = values[:2] if bullets else values[:1]
+    # Keep up to four bullets; fit the complete text before shortening anything.
+    values = values[:4] if bullets else values[:1]
     pt = min_pt
     for candidate_pt in [start_pt - step for step in range(5) if start_pt - step >= min_pt]:
         lines = "\n".join(("• " + v) if bullets else v for v in values)
@@ -290,6 +397,69 @@ def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link="", sour
         para = _para(frame.paragraphs[0] if i == 0 else frame.add_paragraph())
         _run(para, ("• " if bullets else "") + value, pt, link=link, style=style)
 
+
+
+def _wrap_visible_url(url, width_pt, font_pt):
+    """Insert only visual line breaks; hyperlink target remains the original URL."""
+    lines = []
+    rest = url
+    while rest:
+        if _width(rest, font_pt) <= width_pt:
+            lines.append(rest)
+            break
+        low, high, chosen = 1, len(rest), 1
+        while low <= high:
+            middle = (low + high) // 2
+            if _width(rest[:middle], font_pt) <= width_pt:
+                chosen, low = middle, middle + 1
+            else:
+                high = middle - 1
+        if chosen < 1:
+            return None
+        # Prefer URL separator boundaries without omitting any characters.
+        boundary = max((i + 1 for i, char in enumerate(rest[:chosen])
+                        if char in "/?&#=._-"), default=0)
+        if boundary >= chosen * .65:
+            chosen = boundary
+        lines.append(rest[:chosen])
+        rest = rest[chosen:]
+    return "\v".join(lines)
+
+
+def _write_full_url(shape, url, deck, source=None):
+    """Show the entire URL, resizing only its own bottom textbox if necessary."""
+    from pptx.util import Inches, Pt
+
+    frame = _frame(shape)
+    if not url:
+        return
+    style = _style_run(source)
+    preferred = style.font.size.pt if style is not None and style.font.size else 10
+    max_height = deck.slide_height - shape.top - Inches(.12)
+    if max_height <= 0:
+        raise HTTPException(409, "PowerPoint #LINK is positioned outside the slide.")
+    original_height = shape.height
+    choices = sorted(set([preferred, 10, 9.5, 9, 8.5, 8]), reverse=True)
+    choices = [pt for pt in choices if pt <= preferred]
+    for pt in choices:
+        width, _ = _capacity(shape, pt)
+        wrapped = _wrap_visible_url(url, width, pt)
+        if wrapped is None:
+            continue
+        lines = wrapped.count("\v") + 1
+        # Match the conservative line-height estimate used by _capacity.
+        margins = (frame.margin_top + frame.margin_bottom) / 12700
+        required_height = Inches((lines * pt * 1.32 / .85 + margins + 2) / 72)
+        if required_height > max_height:
+            continue
+        shape.height = max(original_height, required_height)
+        paragraph = _para(frame.paragraphs[0])
+        _run(paragraph, wrapped, pt, link=url, style=style)
+        return
+    raise HTTPException(
+        422, "An article has a URL too long to display fully in the "
+             "PowerPoint link area without overflowing. The source link was not shortened."
+    )
 
 def _marker_layout(layout):
     from pptx.enum.shapes import PP_PLACEHOLDER
@@ -343,9 +513,9 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
             "#TITLE": article.get("title", ""),
             "#SUMMARY": article.get("summary", ""),
             "#INSIGHT": article.get("insight", ""),
-            "#Targated_SRID_Team": article.get("team", ""),
+            "#Targated_SRID_Team": "Key Technology: " + _key_technology(article),
             "#LINK": article["link"],
-            "#DATE_HERE": article.get("date", ""),
+            "#DATE_HERE": _format_slide_date(article.get("date", "")),
         }
         if _missing_insight(values["#INSIGHT"]):
             values["#INSIGHT"] = (insight_provider or _samsung_slide_insight)(article)
@@ -355,18 +525,14 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
             if marker == "#TITLE":
                 _title(shape, values[marker], article.get("source", ""), article["link"])
             elif marker == "#SUMMARY":
-                points = article.get("summary_points") or []
-                if not points:
-                    # Keep two authored sentences/paragraphs, rather than unlimited bullets.
-                    points = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", _clean(values[marker]), maxsplit=2)[:2]
+                points = _summary_points(article)
                 _paragraphs(shape, points, 16, 11, bullets=True, source=source)
             elif marker == "#INSIGHT":
                 _paragraphs(shape, [values[marker]], 10.5, 9, source=source)
             elif marker == "#Targated_SRID_Team":
                 _paragraphs(shape, [values[marker]], 12, 10, source=source)
             elif marker == "#LINK":
-                label = "Open original article" if article["link"] else ""
-                _paragraphs(shape, [label], 10, 9, link=article["link"], source=source)
+                _write_full_url(shape, article["link"], deck, source=source)
             elif marker == "#DATE_HERE":
                 _paragraphs(shape, [values[marker]], 10, 9, source=source)
         if image_idx is not None and article.get("image"):
