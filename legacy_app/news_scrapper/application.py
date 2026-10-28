@@ -3974,126 +3974,47 @@ def get_profile_settings_access(request: Request):
 # ==========================================
 @app.post("/export-ppt")
 async def export_ppt(http_request: Request, request: ExportRequest):
+    """Draft Export uses the same article-first Sampark renderer as Create Report."""
     REQUEST_LIMITER.check(
         "export", get_client_ip(http_request), limit=20, window_seconds=60 * 60
     )
     if get_active_profile_name(http_request) == BROADCAST_PROFILE:
         raise HTTPException(
-            status_code=403,
-            detail="PowerPoint export is disabled for Broadcast profile.",
+            status_code=403, detail="PowerPoint export is disabled for Broadcast profile."
         )
+    from news_scrapper.reports.pptx_render import render_articles_pptx, PPTX_MIME
+
     safe_filename = sanitize_filename(request.filename)
-    template_path = PROJECT_ROOT / "template.pptx"
-    if not template_path.exists():
-        raise HTTPException(status_code=404, detail="template.pptx not found")
-
-    prs = Presentation(template_path)
-    cover_layout = None
-    news_layout = None
-    for layout in prs.slide_layouts:
-        if layout.name == "CoverLayout":
-            cover_layout = layout
-        if layout.name == "NewsLayout":
-            news_layout = layout
-
-    if not cover_layout:
-        cover_layout = prs.slide_layouts[0]
-    if not news_layout:
-        news_layout = prs.slide_layouts[0] if len(prs.slide_layouts) == 1 else prs.slide_layouts[1]
-
-    ph_map = {"title": -1, "summary": -1, "link": -1, "insight": -1, "picture": -1, "date": -1, "team": -1}
-    for shape in news_layout.placeholders:
-        idx = shape.placeholder_format.idx
-        if shape.placeholder_format.type == PP_PLACEHOLDER.PICTURE:
-            ph_map["picture"] = idx
-            continue
-        if shape.has_text_frame:
-            text = shape.text.strip()
-            if "#TITLE" in text: ph_map["title"] = idx
-            elif "#SUMMARY" in text: ph_map["summary"] = idx
-            elif "#LINK" in text: ph_map["link"] = idx
-            elif "#INSIGHT" in text: ph_map["insight"] = idx
-            elif "#DATE_HERE" in text: ph_map["date"] = idx
-            elif "#Targated_SRID_Team" in text: ph_map["team"] = idx
-
-    slide = prs.slides.add_slide(cover_layout)
-    for shape in slide.shapes:
-        if shape.has_text_frame and "#DATE_HERE" in shape.text:
-            shape.text = datetime.datetime.now().strftime("%b'%y")
-
+    articles = []
     for item in request.items:
-        slide = prs.slides.add_slide(news_layout)
-        ai_opinion = generate_opinion(item.master_summary)
-        target_team = determine_target_team(item.title, item.master_summary)
-
-        for shape in slide.placeholders:
-            idx = shape.placeholder_format.idx
-            if idx == ph_map["title"]:
-                tf = shape.text_frame
-                tf.clear()
-                p = tf.paragraphs[0]
-                kw = item.keywords_found[0] if item.keywords_found else ""
-                if kw:
-                    parts = re.split(f"({re.escape(kw)})", item.title, flags=re.IGNORECASE)
-                    for part in parts:
-                        run = p.add_run()
-                        run.text = part
-                        if part.lower() == kw.lower():
-                            run.font.bold = True
-                            run.font.underline = True
-                            run.font.color.rgb = RGBColor(0, 112, 192)
-                        else:
-                            run.font.bold = True
-                            run.font.color.rgb = RGBColor(0, 0, 0)
-                else:
-                    run = p.add_run()
-                    run.text = item.title
-                    run.font.bold = True
-                    run.font.color.rgb = RGBColor(0, 0, 0)
-            elif idx == ph_map["summary"]:
-                tf = shape.text_frame
-                tf.clear()
-                target_summary = item.ppt_summary if item.ppt_summary else item.master_summary
-                sentences = [s.strip() + "." for s in target_summary.split(". ") if s.strip()]
-                if not sentences: sentences = [target_summary]
-                for i, sentence in enumerate(sentences):
-                    p = tf.add_paragraph() if i > 0 else tf.paragraphs[0]
-                    p.text = f"• {sentence}"
-                    p.font.name = "Calibri"
-                    p.font.size = Pt(18)
-            elif idx == ph_map["link"]:
-                shape.text = item.link
-                try: shape.text_frame.paragraphs[0].font.size = Pt(10)
-                except: pass
-            elif idx == ph_map["insight"]:
-                shape.text = f"Insight : {ai_opinion}"
-                try: shape.text_frame.paragraphs[0].font.size = Pt(14)
-                except: pass
-            elif idx == ph_map["date"]:
-                shape.text = datetime.datetime.now().strftime("%b'%y")
-            elif idx == ph_map["team"]:
-                shape.text = f"Targeted SRID TEAM : {target_team}"
-            elif idx == ph_map["picture"] or shape.placeholder_format.type == PP_PLACEHOLDER.PICTURE:
-                img_stream = download_image_for_export(item.top_image, add_border=False)
-                if img_stream:
-                    try:
-                        left, top = shape.left, shape.top
-                        width, height = shape.width, shape.height
-                        pic = slide.shapes.add_picture(img_stream, left, top, width, height)
-                        try: pic.click_action.hyperlink.address = item.link
-                        except: pass
-                    except Exception as e:
-                        print(f"   [PPT] Insert Error: {e}")
-
-    output = io.BytesIO()
-    prs.save(output)
-    output.seek(0)
-    return StreamingResponse(
-        output,
-        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        headers={"Content-Disposition": f"attachment; filename={safe_filename}"},
+        source = next(
+            (source.name for source in item.sources if source.name.strip()), ""
+        )
+        summary = item.ppt_summary or item.master_summary or item.summary_lead
+        articles.append({
+            "title": item.title,
+            "summary": summary,
+            "summary_points": [] if item.ppt_summary else item.summary_points,
+            "source": source,
+            "date": item.date,
+            "link": item.link,
+            "image": item.top_image or "",
+            "insight": item.why_it_matters or "",
+            "team": determine_target_team(item.title, item.master_summary),
+        })
+    pptx_bytes = render_articles_pptx(
+        articles,
+        PROJECT_ROOT / "template.pptx",
+        image_loader=lambda url: download_image_for_export(url, add_border=False),
     )
-
+    return StreamingResponse(
+        io.BytesIO(pptx_bytes),
+        media_type=PPTX_MIME,
+        headers={
+            "Content-Disposition": f"attachment; filename={safe_filename}",
+            "X-Sampark-PPTX-Exporter": "article-first-v3",
+        },
+    )
 
 # ==========================================
 # --- EXPORT: EXCEL ---
