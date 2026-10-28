@@ -130,7 +130,7 @@ export const NEW_PUBLISHED_WINDOW_MS = 48 * 60 * 60 * 1000;
 export function isNewPublishedRecord(record, nowMs = Date.now()) {
   if (!record || record.status !== 'published') return false;
   const stamp = stampOf(record);
-  if (!stamp || !/(?:T|\\s)\\d{2}:\\d{2}/.test(stamp)) return false;
+  if (!stamp || !/(?:T|\s)\d{2}:\d{2}/.test(stamp)) return false;
   const publishedMs = Date.parse(stamp);
   const ageMs = nowMs - publishedMs;
   return Number.isFinite(publishedMs) && ageMs >= 0 && ageMs < NEW_PUBLISHED_WINDOW_MS;
