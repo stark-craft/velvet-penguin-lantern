@@ -218,7 +218,7 @@ def _title(shape, headline, publisher, link):
 
 
 def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link=""):
-    values = [re.sub(r"^(?:[•\\-]\\s*)+", "", _clean(v)).strip()
+    values = [re.sub(r"^[•\-]\s*", "", _clean(v)).strip()
               for v in values if _clean(v)]
     if not values:
         _frame(shape)
