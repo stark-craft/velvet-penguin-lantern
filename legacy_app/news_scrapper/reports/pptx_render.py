@@ -454,7 +454,10 @@ def _write_full_url(shape, url, deck, source=None):
             continue
         shape.height = max(original_height, required_height)
         paragraph = _para(frame.paragraphs[0])
-        _run(paragraph, wrapped, pt, link=url, style=style)
+        for index, segment in enumerate(wrapped.split("\v")):
+            if index:
+                paragraph.add_line_break()
+            _run(paragraph, segment, pt, link=url, style=style)
         return
     raise HTTPException(
         422, "An article has a URL too long to display fully in the "
