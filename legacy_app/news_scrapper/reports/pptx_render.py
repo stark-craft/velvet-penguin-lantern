@@ -183,10 +183,18 @@ def _run(para, value, pt, *, bold=False, blue=False, link=""):
 
 def _para(para):
     from pptx.util import Pt
+    from pptx.oxml.xmlchemy import OxmlElement
     para.level = 0
     para.space_before = Pt(0)
     para.space_after = Pt(0)
     para.line_spacing = 1.0
+    # BODY placeholders may inherit bullets from the master; suppress those
+    # before writing our own exactly-two-bullet summary.
+    ppr = para._p.get_or_add_pPr()
+    for child in list(ppr):
+        if child.tag.rsplit('}', 1)[-1] in {'buChar', 'buAutoNum', 'buBlip', 'buNone'}:
+            ppr.remove(child)
+    ppr.insert_element_before(OxmlElement('a:buNone'), 'a:tabLst', 'a:defRPr')
     return para
 
 
@@ -210,7 +218,8 @@ def _title(shape, headline, publisher, link):
 
 
 def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link=""):
-    values = [_clean(v) for v in values if _clean(v)]
+    values = [re.sub(r"^(?:[•\\-]\\s*)+", "", _clean(v)).strip()
+              for v in values if _clean(v)]
     if not values:
         _frame(shape)
         return
