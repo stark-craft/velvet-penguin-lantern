@@ -3994,7 +3994,7 @@ async def export_ppt(http_request: Request, request: ExportRequest):
         articles.append({
             "title": item.title,
             "summary": summary,
-            "summary_points": [] if item.ppt_summary else item.summary_points,
+            "summary_points": item.summary_points,
             "source": source,
             "date": item.date,
             "link": item.link,
