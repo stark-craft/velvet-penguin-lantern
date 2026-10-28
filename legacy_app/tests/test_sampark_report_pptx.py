@@ -204,12 +204,12 @@ class SamparkPowerPointTests(TestCase):
         html = ARTICLE_HTML.replace("https://example.org/first", url)
         slide = self.get_deck(html).slides[0]
         shape = slide.placeholders[15]
-        run = shape.text_frame.paragraphs[0].runs[0]
-        self.assertEqual(run.hyperlink.address, url)
-        self.assertEqual(run.text.replace("\v", ""), url)
+        paragraph = shape.text_frame.paragraphs[0]
+        self.assertEqual(shape.text.replace("\v", ""), url)
+        self.assertTrue(all(run.hyperlink.address == url for run in paragraph.runs))
         self.assertGreater(shape.height, Inches(.293))
         self.assertLess(shape.top + shape.height, Inches(7.5))
-        self.assertIn("\v", run.text)
+        self.assertIn("\v", paragraph.text)
 
     def test_first_slide_date_is_abbreviated_month_and_year(self):
         slide = self.get_deck().slides[0]
