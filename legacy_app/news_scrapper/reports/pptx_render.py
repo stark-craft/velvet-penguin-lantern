@@ -225,22 +225,31 @@ def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link=""):
     else:
         pt = min_pt
 
-    # Do not let one long first bullet starve the second bullet.
+    # Do not let a long first bullet starve the second one. Use a logarithmic
+    # search rather than removing thousands of words one by one.
     def prepared(vs):
         return "\n".join(("• " + v) if bullets else v for v in vs)
+
     if not _fits(prepared(values), shape, pt):
-        words = [v.split() for v in values]
-        while any(words) and not _fits(
-            prepared([" ".join(w) + ("…" if len(w) < len(orig.split()) else "")
-                      for w, orig in zip(words, values)]), shape, pt
-        ):
-            idx = max(range(len(words)), key=lambda i: len(words[i]))
-            if words[idx]:
-                words[idx].pop()
+        word_lists = [v.split() for v in values]
+        best = []
+        low, high = 0, 1024
+        while low <= high:
+            mid = (low + high) // 2
+            proposed = []
+            for words in word_lists:
+                count = max(1, len(words) * mid // 1024)
+                count = min(len(words), count)
+                proposed.append(
+                    " ".join(words[:count]).rstrip(" ,;:")
+                    + ("…" if count < len(words) else "")
+                )
+            if _fits(prepared(proposed), shape, pt):
+                best, low = proposed, mid + 1
             else:
-                break
-        values = [" ".join(w).rstrip(" ,;:") + ("…" if len(w) < len(orig.split()) else "")
-                  for w, orig in zip(words, values)]
+                high = mid - 1
+        if best:
+            values = best
     if not _fits(prepared(values), shape, pt):
         # Extremely narrow boxes: an ellipsis is better than overlap.
         values = [_truncate(prepared(values), shape, pt)]
