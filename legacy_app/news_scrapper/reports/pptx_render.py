@@ -218,6 +218,8 @@ def _para(para):
 
 def _title(shape, headline, publisher, link):
     headline, publisher = _clean(headline) or "Untitled article", _clean(publisher)
+    if publisher.casefold() in {"unknown", "n/a", "none", "unavailable"}:
+        publisher = ""
     byline = f" By {publisher[:50]}" if publisher else ""
     for pt in (24, 22, 20, 18, 16):
         if _fits(headline + byline, shape, pt, True):
