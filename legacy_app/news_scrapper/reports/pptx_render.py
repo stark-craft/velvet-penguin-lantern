@@ -163,23 +163,41 @@ def _frame(shape):
     return frame
 
 
-def _run(para, value, pt, *, bold=False, blue=False, link=""):
+def _style_run(source):
+    if source is not None and source.has_text_frame:
+        for para in source.text_frame.paragraphs:
+            if para.runs:
+                return para.runs[0]
+    return None
+
+
+def _run(para, value, pt, *, bold=None, blue=None, link="", style=None):
+    """Preserve layout marker typography unless intentionally overriding it."""
+    from copy import deepcopy
     from pptx.dml.color import RGBColor
     from pptx.util import Pt
+
     run = para.add_run()
     run.text = value
-    run.font.name = "Calibri"
+    if style is not None and style._r.rPr is not None:
+        current = run._r.rPr
+        if current is not None:
+            run._r.remove(current)
+        run._r.insert(0, deepcopy(style._r.rPr))
+    if style is None:
+        run.font.name = "Calibri"
     run.font.size = Pt(pt)
-    run.font.bold = bold
-    run.font.underline = False
-    run.font.color.rgb = RGBColor(0, 112, 192) if blue else RGBColor(0, 0, 0)
+    if bold is not None:
+        run.font.bold = bold
+    if blue is True:
+        run.font.color.rgb = RGBColor(0, 112, 192)
+    elif blue is False:
+        run.font.color.rgb = RGBColor(0, 0, 0)
     if link:
         run.hyperlink.address = link
-        # The link must be visibly blue but the underline is optional.
         run.font.underline = False
         run.font.color.rgb = RGBColor(0, 112, 192)
     return run
-
 
 def _para(para):
     from pptx.util import Pt
@@ -214,15 +232,19 @@ def _title(shape, headline, publisher, link):
     paragraph = _para(frame.paragraphs[0])
     _run(paragraph, headline, pt, bold=True, blue=True, link=link)
     if byline:
-        _run(paragraph, byline, pt)
+        _run(paragraph, byline, pt, bold=False, blue=False)
 
 
-def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link=""):
+def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link="", source=None):
     values = [re.sub(r"^[•\-]\s*", "", _clean(v)).strip()
               for v in values if _clean(v)]
     if not values:
         _frame(shape)
         return
+    # Honor explicit font size from the PowerPoint master for this placeholder.
+    style = _style_run(source)
+    if style is not None and style.font.size is not None:
+        start_pt = style.font.size.pt
     # Two slide-friendly bullets maximum, not unbounded 18-point sentences.
     values = values[:2] if bullets else values[:1]
     for pt in [start_pt, start_pt-1, start_pt-2, start_pt-3, start_pt-4]:
@@ -266,7 +288,7 @@ def _paragraphs(shape, values, start_pt, min_pt, *, bullets=False, link=""):
     frame = _frame(shape)
     for i, value in enumerate(values):
         para = _para(frame.paragraphs[0] if i == 0 else frame.add_paragraph())
-        _run(para, ("• " if bullets else "") + value, pt, link=link)
+        _run(para, ("• " if bullets else "") + value, pt, link=link, style=style)
 
 
 def _marker_layout(layout):
@@ -329,6 +351,7 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
             values["#INSIGHT"] = (insight_provider or _samsung_slide_insight)(article)
         for marker, idx in markers.items():
             shape = slide.placeholders[idx]
+            source = next((s for s in layout.placeholders if s.placeholder_format.idx == idx), None)
             if marker == "#TITLE":
                 _title(shape, values[marker], article.get("source", ""), article["link"])
             elif marker == "#SUMMARY":
@@ -336,16 +359,16 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
                 if not points:
                     # Keep two authored sentences/paragraphs, rather than unlimited bullets.
                     points = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9])", _clean(values[marker]), maxsplit=2)[:2]
-                _paragraphs(shape, points, 16, 11, bullets=True)
+                _paragraphs(shape, points, 16, 11, bullets=True, source=source)
             elif marker == "#INSIGHT":
-                _paragraphs(shape, [values[marker]], 10.5, 9)
+                _paragraphs(shape, [values[marker]], 10.5, 9, source=source)
             elif marker == "#Targated_SRID_Team":
-                _paragraphs(shape, [values[marker]], 12, 10)
+                _paragraphs(shape, [values[marker]], 12, 10, source=source)
             elif marker == "#LINK":
                 label = "Open original article" if article["link"] else ""
-                _paragraphs(shape, [label], 10, 9, link=article["link"])
+                _paragraphs(shape, [label], 10, 9, link=article["link"], source=source)
             elif marker == "#DATE_HERE":
-                _paragraphs(shape, [values[marker]], 10, 9)
+                _paragraphs(shape, [values[marker]], 10, 9, source=source)
         if image_idx is not None and article.get("image"):
             shape = slide.placeholders[image_idx]
             data = image_loader(article["image"])
