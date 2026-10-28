@@ -104,12 +104,12 @@ def _width(text, pt, bold=False):
     return sum(1 if ord(c) > 0x2E80 else 0.7 if c.isupper() else 0.6 for c in text) * pt
 
 
-def _capacity(shape, pt):
+def _capacity(shape, pt, bold=False):
     # Use deliberately conservative metrics; PowerPoint remains the final renderer.
     frame = shape.text_frame
     width = max(1, (shape.width - frame.margin_left - frame.margin_right) / 12700 * .91)
-    height = max(1, (shape.height - frame.margin_top - frame.margin_bottom) / 12700 * .85)
-    return width, max(1, int(height / (pt * 1.32)))
+    height = max(1, (shape.height - frame.margin_top - frame.margin_bottom) / 12700 * (.93 if bold else .85))
+    return width, max(1, int(height / (pt * (1.14 if bold else 1.32))))
 
 
 def _line_count(text, width, pt, bold=False):
@@ -134,7 +134,7 @@ def _line_count(text, width, pt, bold=False):
 
 
 def _fits(text, shape, pt, bold=False):
-    width, max_lines = _capacity(shape, pt)
+    width, max_lines = _capacity(shape, pt, bold)
     return _line_count(text, width, pt, bold) <= max_lines
 
 
@@ -332,7 +332,9 @@ def render_articles_pptx(items, template_path, image_loader, insight_provider=No
             shape = slide.placeholders[image_idx]
             data = image_loader(article["image"])
             if data:
-                shape.insert_picture(data)
+                picture = shape.insert_picture(data)
+                if article["link"]:
+                    picture.click_action.hyperlink.address = article["link"]
     if len(deck.slides) != len(items):
         raise RuntimeError("PowerPoint article count mismatch.")
     deck.core_properties.subject = "Sampark article-first PPTX export v3"
