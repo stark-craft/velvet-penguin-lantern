@@ -212,21 +212,31 @@ def _pptx_font_pt(source, fallback):
     return fallback
 
 
-def _pptx_text_width(text, font_pt, bold=False):
-    """Conservative point-width estimate; prefer installed Calibri via Pillow."""
+from functools import lru_cache
+
+
+@lru_cache(maxsize=32)
+def _pptx_measure_font(font_pt, bold):
     try:
         from PIL import ImageFont
         import os
-        fonts = ['calibrib.ttf' if bold else 'calibri.ttf', 'arialbd.ttf' if bold else 'arial.ttf', 'DejaVuSans-Bold.ttf' if bold else 'DejaVuSans.ttf']
-        for name in fonts:
+        names = ('calibrib.ttf', 'arialbd.ttf', 'DejaVuSans-Bold.ttf') if bold else ('calibri.ttf', 'arial.ttf', 'DejaVuSans.ttf')
+        for name in names:
             for candidate in (os.path.join(os.environ.get('WINDIR', 'C:/Windows'), 'Fonts', name), name):
                 try:
-                    font = ImageFont.truetype(candidate, max(1, round(font_pt * 4)))
-                    return font.getlength(text) / 4
+                    return ImageFont.truetype(candidate, max(1, round(font_pt * 4)))
                 except OSError:
                     continue
     except ImportError:
         pass
+    return None
+
+
+def _pptx_text_width(text, font_pt, bold=False):
+    """Conservative point-width estimate; cache fonts for large article exports."""
+    font = _pptx_measure_font(font_pt, bold)
+    if font is not None:
+        return font.getlength(text) / 4
     return sum(1.0 if ord(ch) > 0x2e80 else 0.65 if ch.isupper() else 0.54 for ch in text) * font_pt
 
 
