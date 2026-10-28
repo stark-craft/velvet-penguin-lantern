@@ -154,232 +154,60 @@ def export_snapshot(fmt, title, html):
         return export_ppt(title, soup)
     raise HTTPException(422, 'Unsupported export format.')
 
-
-
 def _pptx_article(section):
-    """Read the edited article snapshot; never regenerate or guess its content."""
-    heading = section.find(['h1', 'h2'])
-    meta = heading.find_next_sibling('p') if heading else None
-    metadata = text_of(meta) if meta else ''
-    source, sep, date = metadata.rpartition(' · ')
-    if not sep:
-        source, date = metadata, ''
+    """Extract one article from the editor's current (sanitized) HTML snapshot."""
+    heading = section.find(["h1", "h2"])
+    metadata = heading.find_next_sibling("p") if heading else None
+    meta = text_of(metadata) if metadata else ""
+    source, separator, date = meta.rpartition(" · ")
+    if not separator:
+        source, date = meta, ""
 
-    def from_area(kind):
-        area = section.find(attrs={'data-kind': kind})
-        return ' '.join(text_of(node) for node in area.find_all(['p', 'li']) if not node.find_parent('li')) if area else ''
+    def region(kind):
+        area = section.find(attrs={"data-kind": kind})
+        return [
+            text_of(node) for node in area.find_all(["p", "li"])
+            if not node.find_parent("li")
+        ] if area else []
 
-    def after_heading(label):
-        h3 = next((h for h in section.find_all('h3') if label in text_of(h).casefold()), None)
+    def after(label):
+        h3 = next(
+            (node for node in section.find_all("h3") if label in text_of(node).casefold()),
+            None,
+        )
         if h3 is None:
-            return ''
-        parts = []
+            return []
+        result = []
         for node in h3.next_siblings:
-            if getattr(node, 'name', None) in ('h1', 'h2', 'h3', 'h4'):
+            if getattr(node, "name", None) in ("h1", "h2", "h3", "h4"):
                 break
-            if getattr(node, 'name', None) in ('p', 'li') and not node.find('a', href=True):
-                parts.append(text_of(node))
-            elif getattr(node, 'name', None) == 'div':
-                parts.extend(text_of(p) for p in node.find_all(['p', 'li']) if not p.find('a', href=True) and not p.find_parent('li'))
-        return ' '.join(parts)
+            if getattr(node, "name", None) in ("p", "li") and not node.find("a", href=True):
+                result.append(text_of(node))
+        return result
 
-    links = [a for a in section.find_all('a', href=True) if safe_url(a.get('href'))]
-    preferred = next((a for a in links if 'original article' in text_of(a).casefold()), None)
-    link = safe_url((preferred or (links[0] if links else None)).get('href')) if links else ''
+    links = [a for a in section.find_all("a", href=True) if safe_url(a.get("href"))]
+    preferred = next(
+        (a for a in links if "original article" in text_of(a).casefold()),
+        links[0] if links else None,
+    )
     return {
-        'title': text_of(heading) if heading else 'Untitled article',
-        'source': source.strip(),
-        'date': date.strip(),
-        'summary': from_area('article-summary') or after_heading('summary'),
-        'insight': from_area('impact-body') or after_heading('samsung') or after_heading('matter'),
-        'team': after_heading('team'),
-        'link': link,
+        "title": text_of(heading) if heading else "Untitled article",
+        "source": source.strip(),
+        "date": date.strip(),
+        "summary": " ".join(region("article-summary") or after("summary")),
+        "summary_points": region("article-summary") or after("summary"),
+        "insight": " ".join(region("impact-body") or after("samsung")),
+        "team": " ".join(after("team")),
+        "link": safe_url(preferred.get("href")) if preferred else "",
+        "image": section.find("img").get("src", "") if section.find("img") else "",
     }
 
 
-def _pptx_template_run(source):
-    if source is not None and source.has_text_frame:
-        for para in source.text_frame.paragraphs:
-            if para.runs:
-                return para.runs[0]
-    return None
-
-
-def _pptx_font_pt(source, fallback):
-    run = _pptx_template_run(source)
-    if run is not None and run.font.size is not None:
-        return run.font.size.pt
-    return fallback
-
-
-from functools import lru_cache
-
-
-@lru_cache(maxsize=32)
-def _pptx_measure_font(font_pt, bold):
-    try:
-        from PIL import ImageFont
-        import os
-        names = ('calibrib.ttf', 'arialbd.ttf', 'DejaVuSans-Bold.ttf') if bold else ('calibri.ttf', 'arial.ttf', 'DejaVuSans.ttf')
-        for name in names:
-            for candidate in (os.path.join(os.environ.get('WINDIR', 'C:/Windows'), 'Fonts', name), name):
-                try:
-                    return ImageFont.truetype(candidate, max(1, round(font_pt * 4)))
-                except OSError:
-                    continue
-    except ImportError:
-        pass
-    return None
-
-
-def _pptx_text_width(text, font_pt, bold=False):
-    """Conservative point-width estimate; cache fonts for large article exports."""
-    font = _pptx_measure_font(font_pt, bold)
-    if font is not None:
-        return font.getlength(text) / 4
-    return sum(1.0 if ord(ch) > 0x2e80 else 0.65 if ch.isupper() else 0.54 for ch in text) * font_pt
-
-
-def _pptx_fits(text, shape, pt, bold=False):
-    import re
-    frame = shape.text_frame
-    # EMU to points: 12,700 EMU per point.
-    width = max(0, (shape.width - frame.margin_left - frame.margin_right) / 12700 * 0.96)
-    height = max(0, (shape.height - frame.margin_top - frame.margin_bottom) / 12700 * 0.92)
-    max_lines = max(1, int(height / (pt * 1.18)))
-    if not width:
-        return False
-    lines, line = 1, ''
-    for word in re.findall(r'\S+', text):
-        proposed = (line + ' ' + word).strip()
-        if _pptx_text_width(proposed, pt, bold) <= width:
-            line = proposed
-        elif line and _pptx_text_width(word, pt, bold) <= width:
-            lines, line = lines + 1, word
-        else:
-            return False  # Overwide unbreakable token; truncate, don't overflow.
-        if lines > max_lines:
-            return False
-    return True
-
-
-def _pptx_fit_text(text, shape, pt, bold=False, suffix=''):
-    """Keep the largest word-boundary prefix fitting the fixed placeholder."""
-    import re
-    clean = re.sub(r'\s+', ' ', str(text or '')).strip()
-    if _pptx_fits(clean + suffix, shape, pt, bold):
-        return clean
-    words = clean.split(' ')
-    low, high, best = 0, len(words), ''
-    while low <= high:
-        mid = (low + high) // 2
-        candidate = ' '.join(words[:mid]).rstrip(' ,;:') + '…'
-        if _pptx_fits(candidate + suffix, shape, pt, bold):
-            best, low = candidate, mid + 1
-        else:
-            high = mid - 1
-    return best or ('…' if _pptx_fits('…' + suffix, shape, pt, bold) else '')
-
-
-def _pptx_set_placeholder(shape, source, text, hyperlink=''):
-    """Copy the marker run styling instead of destroying template formatting."""
-    from copy import deepcopy
-    from pptx.enum.text import MSO_AUTO_SIZE
-    frame = shape.text_frame
-    frame.clear()
-    frame.word_wrap = True
-    frame.auto_size = MSO_AUTO_SIZE.NONE
-    para = frame.paragraphs[0]
-    template_run = _pptx_template_run(source)
-    if source is not None and source.has_text_frame:
-        original_para = source.text_frame.paragraphs[0]
-        if original_para._p.pPr is not None:
-            para._p.insert(0, deepcopy(original_para._p.pPr))
-    run = para.add_run()
-    run.text = text
-    if template_run is not None and template_run._r.rPr is not None:
-        run._r.insert(0, deepcopy(template_run._r.rPr))
-    if hyperlink:
-        run.hyperlink.address = hyperlink
-    return run
-
-
-def _pptx_set_headline(shape, source, headline, publisher, link):
-    from pptx.dml.color import RGBColor
-    from pptx.util import Pt
-    import re
-    headline = re.sub(r'\s+', ' ', headline).strip()
-    publisher = re.sub(r'\s+', ' ', publisher).strip()[:80]
-    byline = f' By {publisher}' if publisher else ''
-    size = next((pt for pt in (24, 22, 20, 18) if _pptx_fits(headline + byline, shape, pt, True)), 18)
-    headline = _pptx_fit_text(headline, shape, size, True, byline)
-    run = _pptx_set_placeholder(shape, source, headline, link)
-    run.font.name = 'Calibri'
-    run.font.size = Pt(size)
-    run.font.bold = True
-    run.font.color.rgb = RGBColor(0, 112, 192)
-    if byline:
-        following = shape.text_frame.paragraphs[0].add_run()
-        following.text = byline
-        following.font.name = 'Calibri'
-        following.font.size = Pt(size)
-        following.font.bold = False
-        following.font.color.rgb = RGBColor(0, 0, 0)
-
-
 def export_ppt(title, soup):
-    from pptx import Presentation
-    from pptx.enum.shapes import PP_PLACEHOLDER
-    path = PROJECT_ROOT / 'template.pptx'
-    if not path.is_file():
-        raise HTTPException(409, 'Add template.pptx to the application root to export PowerPoint.')
-    deck = Presentation(str(path))
-    layouts = {layout.name: layout for layout in deck.slide_layouts}
-    if 'NewsLayoutFirst' not in layouts or 'NewsLayout' not in layouts:
-        raise HTTPException(409, 'template.pptx needs both NewsLayoutFirst and NewsLayout layouts.')
-    articles = soup.select('section[data-kind="article"]')
-    if not articles:
-        raise HTTPException(422, 'Select at least one article to export as PowerPoint.')
-    # Sample slides are not user report content.
-    while deck.slides:
-        slide_id = deck.slides._sldIdLst[0]
-        deck.part.drop_rel(slide_id.rId)
-        deck.slides._sldIdLst.remove(slide_id)
-    for index, section in enumerate(articles):
-        layout = layouts['NewsLayoutFirst' if index == 0 else 'NewsLayout']
-        slide = deck.slides.add_slide(layout)
-        article = _pptx_article(section)
-        image_node = section.find('img')
-        for shape in slide.placeholders:
-            if shape.placeholder_format.type == PP_PLACEHOLDER.PICTURE:
-                data = image_data(image_node.get('src', '')) if image_node else None
-                if data and hasattr(shape, 'insert_picture'):
-                    shape.insert_picture(data)
-                continue
-            if not shape.has_text_frame:
-                continue
-            source = layout.placeholders.get(shape.placeholder_format.idx)
-            marker = (source.text if source is not None and source.has_text_frame else shape.text).strip()
-            if '#TITLE' in marker:
-                _pptx_set_headline(shape, source, article['title'], article['source'], article['link'])
-                continue
-            mapping = {
-                '#SUMMARY': ('summary', 16),
-                '#INSIGHT': ('insight', 10.5),
-                '#Targated_SRID_Team': ('team', 12),
-                '#DATE_HERE': ('date', 10),
-                '#LINK': ('link', 10),
-            }
-            for token, (field, fallback_pt) in mapping.items():
-                if token not in marker:
-                    continue
-                value = article[field]
-                if token == '#LINK':
-                    value = 'Open original article' if value else ''
-                pt = _pptx_font_pt(source, fallback_pt)
-                value = _pptx_fit_text(value, shape, pt)
-                _pptx_set_placeholder(shape, source, value, article['link'] if token == '#LINK' else '')
-                break
-    out = BytesIO()
-    deck.save(out)
-    return out.getvalue(), 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx'
+    from .pptx_render import render_articles_pptx, PPTX_MIME
+
+    articles = [_pptx_article(s) for s in soup.select('section[data-kind="article"]')]
+    output = render_articles_pptx(
+        articles, PROJECT_ROOT / "template.pptx", image_loader=image_data
+    )
+    return output, PPTX_MIME, "pptx"
