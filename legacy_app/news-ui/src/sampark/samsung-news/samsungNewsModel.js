@@ -20,7 +20,7 @@ export const SAMSUNG_NEW_BADGE_WINDOW_MS = 48 * 60 * 60 * 1000;
 export function isRecentlyPublishedSamsungItem(item, nowMs = Date.now()) {
   if (!item?._isInternalPublished || !item?._publishedId) return false;
   const value = item.published_at;
-  if (typeof value !== 'string' || !/T\\d{2}:\\d{2}/.test(value)) return false;
+  if (typeof value !== 'string' || !/T\d{2}:\d{2}/.test(value)) return false;
   const publishedAt = Date.parse(value);
   if (!Number.isFinite(publishedAt)) return false;
   const elapsed = nowMs - publishedAt;
