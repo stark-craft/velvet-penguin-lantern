@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../news-scrapper/components/Icon.jsx';
 import { getHistoryList, getHistoryFile } from '../news-scrapper/api.js';
 import { normalizeList } from '../news-scrapper/utils/normalize.js';
@@ -6,13 +6,21 @@ import { articleKey } from '../news-scrapper/utils/intelligence.js';
 import SamparkWorkspaceShell from './shared/SamparkWorkspaceShell.jsx';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
 import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
+import CreateJiraAction from './shared/CreateJiraAction.jsx';
+import './sampark-jira.css';
 
-export default function SamparkHistory() {
+export default function SamparkHistory({ capabilities = [] }) {
   const [runs, setRuns] = useState([]);
   const [state, setState] = useState({ status: 'loading', error: '' });
   const [selected, setSelected] = useState(null);
   const [items, setItems] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
+  const [checkedKeys, setCheckedKeys] = useState(new Set());
+  const canCreateJira = capabilities.includes('review.news.submit');
+  const checkedArticles = useMemo(
+    () => items.filter((item) => checkedKeys.has(articleKey(item))),
+    [items, checkedKeys],
+  );
 
   const load = async () => {
     setState({ status: 'loading', error: '' });
@@ -35,6 +43,7 @@ export default function SamparkHistory() {
   const openArticleId = openArticle ? articleKey(openArticle) : '';
   useEffect(()=>{ if(openArticle && openArticleId) engagement.onDossierOpen(openArticle); }, [openArticleId]);
   const openRun = async (run) => {
+    setCheckedKeys(new Set());
     setSelected(run);
     setLoadingItems(true);
     setDetailError('');
@@ -83,12 +92,39 @@ export default function SamparkHistory() {
         <div className="sampark-history-detail">
           {!selected ? <p className="sampark-history-hint">Select an archive date to view its briefing.</p> : loadingItems ? <div className="sampark-workspace-loading"><span className="sampark-spinner" /> Loading archive…</div> : detailError ? <div role="alert" className="sampark-workspace-empty is-error"><Icon name="warning" size={20} /><p>{detailError}</p><button className="btn-secondary" onClick={()=> selected && openRun(selected)} type="button">Retry</button></div> : !items.length ? <p>No stories</p> : (
             <div className="sampark-history-grid">
-              {items.slice(0, 30).map((item) => (
-                <button key={articleKey(item)} className="sampark-history-card" type="button" onClick={()=> setOpenArticle(item)} style={{ textAlign:'left', cursor:'pointer' }}>
-                  <small>{item.src || item.source || 'Source'} · {item.date || ''}</small>
-                  <strong>{item.title}</strong>
-                </button>
-              ))}
+              {items.slice(0, 30).map((item) => {
+                const key = articleKey(item);
+                return (
+                  <div key={key} className={`sampark-history-card${checkedKeys.has(key) ? ' is-jira-checked' : ''}`}>
+                    {canCreateJira && (
+                      <label className="sampark-history-jira-select">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${item.title || 'article'} for Jira`}
+                          checked={checkedKeys.has(key)}
+                          onChange={(event) => setCheckedKeys((current) => {
+                            const nextKeys = new Set(current);
+                            if (event.target.checked) nextKeys.add(key); else nextKeys.delete(key);
+                            return nextKeys;
+                          })}
+                        />
+                        Select
+                      </label>
+                    )}
+                    <button className="sampark-history-jira-open" type="button" onClick={() => setOpenArticle(item)}>
+                      <small>{item.src || item.source || 'Source'} · {item.date || ''}</small>
+                      <strong>{item.title}</strong>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {canCreateJira && checkedArticles.length > 0 && (
+            <div className="sampark-history-jira-bar" role="group" aria-label="Selected archive actions">
+              <strong>{checkedArticles.length} selected</strong>
+              <button type="button" className="btn-dark-secondary h-9" onClick={() => setCheckedKeys(new Set())}>Clear</button>
+              <CreateJiraAction items={checkedArticles} />
             </div>
           )}
           {openArticle && (
