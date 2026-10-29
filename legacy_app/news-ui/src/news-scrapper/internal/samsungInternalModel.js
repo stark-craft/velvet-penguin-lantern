@@ -123,24 +123,6 @@ function stampOf(record) {
   return textOf(record?.publishedAt ?? record?.published_at ?? '');
 }
 
-export const NEW_PUBLISHED_WINDOW_MS = 48 * 60 * 60 * 1000;
-
-// NEW is based on when an internal record was *published*, not when it was
-// authored, edited or imported. Never treat missing/future dates as fresh.
-export function isNewPublishedRecord(record, nowMs = Date.now()) {
-  if (!record || record.status !== 'published') return false;
-  const stamp = stampOf(record);
-  if (!stamp || !/(?:T|\s)\d{2}:\d{2}/.test(stamp)) return false;
-  const publishedMs = Date.parse(stamp);
-  const ageMs = nowMs - publishedMs;
-  return Number.isFinite(publishedMs) && ageMs >= 0 && ageMs < NEW_PUBLISHED_WINDOW_MS;
-}
-
-export function mdMessageSignature(record) {
-  const name = textOf(record?.author || record?.ownerName || record?.owner_name).trim();
-  return `— ${[name, 'NMEA'].filter(Boolean).join(' ')}`;
-}
-
 export function activeLeadership(publishedRecords) {
   const visions = (publishedRecords || []).filter(
     (record) => channelOf(record) === 'leadership' && record?.status === 'published',
