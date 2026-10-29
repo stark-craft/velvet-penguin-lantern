@@ -332,33 +332,36 @@
 /* Published SRI-D content: small NEW marker for first 48 hours after publishing.
    Scoped here so All News, Create News draft previews, Global and Local stay unchanged. */
 .samsung-news-page .samsung-published-new-badge {
+  /* Match the Local / Global cut-edge ribbons in All News. */
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
   width: fit-content;
-  padding: 3px 8px;
-  border: 1px solid rgba(255, 255, 255, .58);
-  border-radius: 999px;
-  background: #1428a0;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(20, 40, 160, .92);
   color: #fff;
   font-size: 10px;
-  line-height: 1.2;
   font-weight: 800;
-  letter-spacing: .055em;
+  letter-spacing: .075em;
+  text-transform: uppercase;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, .16);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .14);
+  clip-path: polygon(6px 0,100% 0,calc(100% - 4px) 14%,100% 28%,calc(100% - 4px) 42%,100% 58%,calc(100% - 4px) 72%,100% 86%,calc(100% - 6px) 100%,0 100%,4px 84%,0 68%,4px 50%,0 32%,4px 16%);
 }
 .samsung-news-page .samsung-published-new-badge.is-story {
+  /* Keep the SRI-D ribbon visible on the opposite corner. */
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 0;
+  left: 0;
   z-index: 2;
 }
 .samsung-news-page .samsung-published-new-badge.is-document {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 0;
+  right: 0;
   z-index: 2;
 }
 .samsung-announcement-date-badges {
