@@ -386,7 +386,8 @@ export const getViewerActivitySummary = (tz) => {
 // remain server-side.
 export const createJiraNewsTicket = (items) => jsonFetch('/jira/news-tickets', {
   method: 'POST',
-  timeoutMs: 120_000,
+  // A single request can require SSO login plus sequential image attachments.
+  timeoutMs: 600_000,
   body: JSON.stringify({
     articles: (items || []).map((item) => ({
       title: String(item?.title || '').trim(),
