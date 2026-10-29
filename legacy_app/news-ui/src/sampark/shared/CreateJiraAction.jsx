@@ -27,6 +27,10 @@ export default function CreateJiraAction({
 
   const create = async () => {
     if (!items.length || busy || disabled || result) return;
+    if (items.length > 30) {
+      setError('Select up to 30 articles to create a Jira ticket.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
