@@ -18,7 +18,7 @@ export default function LeadershipMessageModal({ item, onClose }) {
   const image = item?.cover?.url || item?.image_url || item?.top_image || '';
   const message = item?.body || item?.summary || '';
   // Use the author's published name; do not infer the signature from the viewer.
-  const authorName = String(item?.author || item?.ownerName || item?.owner_name || '').trim();
+  const authorName = String(item?.signatureAuthor || '').trim();
   const signature = authorName ? `— ${authorName} NMEA` : '— NMEA';
   const imageScale = imageScaleOf(item);
   return createPortal(
