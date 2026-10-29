@@ -381,6 +381,24 @@ export const getViewerActivitySummary = (tz) => {
   return jsonFetch(`/viewer/activity-summary?tz=${param}`);
 };
 
+// ---------- Jira (one issue containing all selected news) ----------
+// Only card metadata travels to FastAPI. Browser SSO and Jira credentials
+// remain server-side.
+export const createJiraNewsTicket = (items) => jsonFetch('/jira/news-tickets', {
+  method: 'POST',
+  timeoutMs: 120_000,
+  body: JSON.stringify({
+    articles: (items || []).map((item) => ({
+      title: String(item?.title || '').trim(),
+      summary: String(item?.master_summary || item?.summary || item?.summary_lead || item?.ppt_summary || item?.snippet || '').trim().slice(0, 15000),
+      image_url: String(item?.image_url || item?.imageUrl || item?.thumbnail_url || item?.og_image || item?.top_image || item?.image || item?.thumbnail || '').trim().slice(0, 3000),
+      source_url: String(item?.canonical_link || item?.link || item?.url || '').trim().slice(0, 3000),
+      source: String(item?.src || item?.source || '').trim().slice(0, 500),
+      date: String(item?.date || item?.published_at || '').trim().slice(0, 100),
+    })),
+  }),
+});
+
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
 export const selectWorkflow = (article) =>
