@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import html
 import importlib
-import os
 import re
 import tempfile
 import threading
@@ -120,6 +119,16 @@ def _download_image(url: str, destination_dir: str, index: int) -> Path:
                 output.write(chunk)
         if not size:
             raise ValueError("Image was empty.")
+        # Reject obvious HTML or invalid media masquerading as an image.
+        signature = target.read_bytes()[:16]
+        if content_type == "image/png" and not signature.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            raise ValueError("Image bytes are not PNG.")
+        if content_type == "image/jpeg" and not signature.startswith(b"\\xff\\xd8\\xff"):
+            raise ValueError("Image bytes are not JPEG.")
+        if content_type == "image/gif" and not signature.startswith((b"GIF87a", b"GIF89a")):
+            raise ValueError("Image bytes are not GIF.")
+        if content_type == "image/webp" and not (signature.startswith(b"RIFF") and signature[8:12] == b"WEBP"):
+            raise ValueError("Image bytes are not WebP.")
         return target
 
 
