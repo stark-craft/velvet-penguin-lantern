@@ -5,6 +5,7 @@ import { SignalVisual } from '../components/ArticleCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import NameModal from '../components/modals/NameModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
+import CreateJiraAction from '../../sampark/shared/CreateJiraAction.jsx';
 import Bouncer from '../components/Bouncer.jsx';
 import ContinuousSignalStream from '../components/ContinuousSignalStream.jsx';
 import useAutoplayState, { autoplayDelay } from '../hooks/useAutoplayState.js';
@@ -959,6 +960,7 @@ export default function FeedScreen({ capabilities = [] }) {
           title: `${selectedBatch.length} selected signals`
         })} type="button">              Send to Review Queue            </button>
 <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={() => setDraftExportOpen(true)} type="button">              Draft Export            </button>
+<CreateJiraAction items={selectedBatch} disabled={batchBusy} />
 </div>
 </div>}    </div>;
 }
