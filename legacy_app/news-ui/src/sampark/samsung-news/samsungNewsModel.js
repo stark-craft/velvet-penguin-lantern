@@ -95,6 +95,8 @@ export function publishedRecordToSignal(record) {
     source: author,
     src: author,
     author,
+    // Keep the real human author separate from the source-label fallback.
+    signatureAuthor: record?.author || record?.ownerName || record?.owner_name || '',
     team: record.team || '',
     region: 'SRI-D',
     date: publishedAt ? String(publishedAt).slice(0, 10) : 'Latest',
