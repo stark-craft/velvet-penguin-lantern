@@ -12,6 +12,8 @@ python-dotenv>=1,<2
 python-multipart>=0.0.9,<1
 python-pptx>=0.6.23,<2
 requests>=2.32,<3
+# Guy X's headless Jira SSO bridge communicates via Chrome DevTools.
+websocket-client>=1.6,<2
 sacremoses>=0.1,<1
 sentencepiece>=0.2,<1
 lxml-html-clean>=0.4,<1
