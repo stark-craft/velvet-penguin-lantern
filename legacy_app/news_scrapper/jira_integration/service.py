@@ -121,9 +121,9 @@ def _download_image(url: str, destination_dir: str, index: int) -> Path:
             raise ValueError("Image was empty.")
         # Reject obvious HTML or invalid media masquerading as an image.
         signature = target.read_bytes()[:16]
-        if content_type == "image/png" and not signature.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        if content_type == "image/png" and not signature.startswith(b"\x89PNG\r\n\x1a\n"):
             raise ValueError("Image bytes are not PNG.")
-        if content_type == "image/jpeg" and not signature.startswith(b"\\xff\\xd8\\xff"):
+        if content_type == "image/jpeg" and not signature.startswith(b"\xff\xd8\xff"):
             raise ValueError("Image bytes are not JPEG.")
         if content_type == "image/gif" and not signature.startswith((b"GIF87a", b"GIF89a")):
             raise ValueError("Image bytes are not GIF.")
