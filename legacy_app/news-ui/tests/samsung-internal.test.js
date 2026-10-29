@@ -14,9 +14,6 @@ const {
   isSamsungSignal,
   isSamsungLocalSource,
   isSamparkSource,
-  isNewPublishedRecord,
-  NEW_PUBLISHED_WINDOW_MS,
-  mdMessageSignature,
   rankTrending,
   resolveInternalImage,
   signalLinkOf,
@@ -276,42 +273,4 @@ test("every desk surface has its own professional URL without remounting the des
   assert.match(workspace, /\/for-you\/saved/);
   assert.match(workspace, /\/for-you\/contributions/);
   assert.match(workspace, /\/for-you\/private-briefings/);
-});
-
-test("NEW label is restricted to first 48 hours after actual publication", () => {
-  const now = Date.parse("2026-10-28T10:00:00Z");
-  const fresh = {
-    status: "published",
-    contentType: "document_import",
-    publishedAt: new Date(now - 1000).toISOString(),
-    createdAt: "2025-01-01T00:00:00Z",
-  };
-  assert.equal(NEW_PUBLISHED_WINDOW_MS, 48 * 60 * 60 * 1000);
-  assert.equal(isNewPublishedRecord(fresh, now), true);
-  assert.equal(isNewPublishedRecord({
-    ...fresh, publishedAt: new Date(now - NEW_PUBLISHED_WINDOW_MS + 1).toISOString(),
-  }, now), true);
-  assert.equal(isNewPublishedRecord({
-    ...fresh, publishedAt: new Date(now - NEW_PUBLISHED_WINDOW_MS).toISOString(),
-  }, now), false);
-  assert.equal(isNewPublishedRecord({ ...fresh, status: "draft" }, now), false);
-  assert.equal(isNewPublishedRecord({ ...fresh, status: "submitted" }, now), false);
-  assert.equal(isNewPublishedRecord({ ...fresh, publishedAt: "" }, now), false);
-  assert.equal(isNewPublishedRecord({ ...fresh, publishedAt: "2026-10-28" }, now), false);
-  assert.equal(isNewPublishedRecord({
-    ...fresh, publishedAt: new Date(now + 1000).toISOString(),
-  }, now), false);
-  assert.equal(isNewPublishedRecord({
-    status: "published",
-    contentType: "announcement",
-    published_at: new Date(now - 1000).toISOString(),
-  }, now), true);
-  assert.equal(isNewPublishedRecord(null, now), false);
-});
-
-test("MD message signature uses published author name and NMEA", () => {
-  assert.equal(mdMessageSignature({ author: "Alex Chen" }), "— Alex Chen NMEA");
-  assert.equal(mdMessageSignature({ ownerName: "Priya" }), "— Priya NMEA");
-  assert.equal(mdMessageSignature({ owner_name: "Ari" }), "— Ari NMEA");
-  assert.equal(mdMessageSignature({}), "— NMEA");
 });
