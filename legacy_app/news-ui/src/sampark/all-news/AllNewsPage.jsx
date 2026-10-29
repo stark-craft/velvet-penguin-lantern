@@ -29,6 +29,7 @@ import AllNewsRail from './AllNewsRail.jsx';
 import LatestNews from './LatestNews.jsx';
 import FilterPanel from './FilterPanel.jsx';
 import DayWiseNews from './DayWiseNews.jsx';
+import CreateJiraAction from '../shared/CreateJiraAction.jsx';
 import './all-news.css';
 const ReportEditor = React.lazy(() => import('../report-editor/ReportEditor.jsx'));
 
