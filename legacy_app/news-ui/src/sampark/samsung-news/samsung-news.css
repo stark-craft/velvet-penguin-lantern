@@ -161,3 +161,170 @@
 .samsung-news-notice{display:flex;align-items:center;gap:10px;min-height:42px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#5f6878;font-size:13px;box-shadow:0 2px 8px rgba(15,23,42,.055)}
 .samsung-news-notice svg{color:#1428a0;flex:none}
 .samsung-news-notice .btn-secondary{margin-left:auto}
+
+/* Responsive behavior for feature rail, modals and cards. */
+@media(max-width:1200px){
+.samsung-news-page .samsung-news-featured-rail{height:auto;overflow:visible}
+.samsung-news-page .samsung-news-featured-rail>.tsan-featured,
+.samsung-news-page .samsung-news-featured-rail>.samsung-leadership-hero,
+.samsung-news-page .samsung-news-featured-rail>.tsan-rail{height:320px;max-height:320px;min-height:0}
+}
+@media(max-width:1150px){.samsung-document-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1050px){
+.sri-document-modal{width:calc(100vw - 28px);height:calc(100vh - 28px);max-height:calc(100vh - 28px)}
+.sri-document-modal-layout{grid-template-columns:300px minmax(0,1fr)}
+.sri-document-modal-sidebar{padding:22px 16px}
+}
+@media(max-width:800px){
+.samsung-announcement-grid{grid-template-columns:1fr}
+.samsung-announcement-card.has-image{grid-template-columns:130px minmax(0,1fr)}
+}
+@media(max-width:760px){
+.samsung-news-page .samsung-news-featured-rail>.samsung-leadership-hero,
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-hero{height:auto;max-height:none;min-height:0;grid-template-columns:minmax(0,1fr)}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-image{height:240px}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-copy{padding:22px}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-footer{flex-wrap:wrap}
+.sri-leadership-modal,.sri-story-modal{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}
+.sri-leadership-modal{height:calc(100vh - 24px)}
+.sri-leadership-modal .sri-leadership-layout{display:block;height:100%;min-height:0;max-height:none;overflow-y:auto;overflow-x:hidden}
+.sri-leadership-modal .sri-leadership-portrait{height:320px;min-height:320px;background:#fff}
+.sri-leadership-modal .sri-leadership-portrait img{object-fit:contain;object-position:center top;transform:none!important}
+.sri-leadership-modal .sri-leadership-copy{height:auto;min-height:0;overflow:visible;padding:34px 22px 38px}
+.sri-leadership-copy h1{padding-right:30px;font-size:28px}
+.sri-story-modal-scroll{max-height:calc(100vh - 24px);padding:48px 18px 28px}
+.sri-document-modal{width:calc(100vw - 18px);height:calc(100vh - 18px);max-height:calc(100vh - 18px);border-radius:14px}
+.sri-document-modal-layout{display:block;height:100%;overflow-y:auto}
+.sri-document-modal-sidebar{overflow:visible;padding:20px 14px 18px;border-right:0;border-bottom:1px solid #e3e7ed}
+.sri-document-modal-reader{height:min(720px,78vh);min-height:560px}
+.sri-document-modal-reader-head{min-height:62px;padding:12px 56px 12px 14px}
+.sri-document-modal-viewer{padding:8px}
+.sri-document-modal-loading,.sri-document-modal-error{inset:8px}
+.sri-document-pdf-frame{border-radius:8px}
+}
+@media(max-width:700px){
+.samsung-news-page{gap:18px}
+.samsung-channel-archive-header{align-items:flex-start;flex-direction:column;gap:6px}
+.samsung-channel-archive-header h2{font-size:18px}
+.samsung-news-notice{align-items:flex-start;flex-wrap:wrap}
+.samsung-news-notice .btn-secondary{margin-left:0}
+.samsung-srid-type-groups{gap:26px}
+.samsung-srid-type-header{flex-wrap:wrap;gap:10px}
+.samsung-srid-type-header h3{font-size:14px}
+.samsung-srid-type-header .tsan-day-rule{flex:1 1 20px}
+.samsung-srid-section-tools{width:100%;justify-content:space-between;gap:10px}
+.samsung-srid-date-filter{width:176px;max-width:55%}
+.samsung-document-grid{grid-template-columns:1fr}
+.samsung-document-card{min-height:0;padding:20px 18px}
+.samsung-document-card-details{align-items:flex-start;flex-direction:column;gap:5px}
+.samsung-document-card-copy p{min-height:0}
+}
+@media(max-width:600px){
+.samsung-announcement-card.has-image{display:block}
+.samsung-announcement-media{height:190px}
+.sri-internal-modal{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}
+.sri-internal-modal-copy{padding:32px 20px 30px}
+}
+@media(min-width:1500px){
+.sri-document-modal{width:min(1560px,calc(100vw - 64px))}
+.sri-document-modal-layout{grid-template-columns:370px minmax(0,1fr)}
+}
+/* SRI-D compact aqua announcements; preserve other channels. */
+.samsung-channel-content.is-internal.samsung-announcement-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;width:100%;align-items:stretch}
+.samsung-channel-content.is-internal.samsung-announcement-card{position:relative;display:flex;flex-direction:column;width:100%;min-width:0;min-height:238px;height:100%;overflow:hidden;border:1px solid #dce8f5;border-radius:14px;background:radial-gradient(circle at 10% 10%,rgba(78,185,232,.09),transparent 48%),radial-gradient(circle at 95% 85%,rgba(20,40,160,.055),transparent 46%),#fff;box-shadow:0 3px 12px rgba(15,40,100,.055);transition:transform 240ms ease,border-color 240ms ease,box-shadow 240ms ease}
+.samsung-channel-content.is-internal.samsung-announcement-card.is-text-only::before{display:none;content:none}
+.samsung-channel-content.is-internal.samsung-announcement-card::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,transparent 0%,rgba(70,180,235,.25) 18%,rgba(45,170,245,.85) 42%,rgba(125,225,250,.95) 50%,rgba(20,40,160,.55) 65%,transparent 100%);background-size:220% 100%;pointer-events:none;animation:samsungAquaFlow 6s linear infinite}
+@keyframes samsungAquaFlow{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.samsung-channel-content.is-internal.samsung-announcement-card:hover{transform:translateY(-3px);border-color:#9bd5f1;box-shadow:0 8px 24px rgba(34,133,205,.12),0 0 18px rgba(83,197,246,.12)}
+.samsung-channel-content.is-internal.samsung-announcement-card:hover::after{height:4px;filter:drop-shadow(0 0 5px rgba(49,169,240,.8))}
+.samsung-channel-content.is-internal.samsung-announcement-card.has-image{display:flex;flex-direction:column}
+.samsung-channel-content.is-internal.samsung-announcement-media{display:block;width:100%;height:112px;min-height:112px;flex:0 0 auto;background-position:center;background-size:cover}
+.samsung-channel-content.is-internal.samsung-announcement-content{flex:1 1 auto;min-width:0;padding:16px}
+.samsung-channel-content.is-internal.samsung-announcement-title{font-size:15px;line-height:1.35;font-weight:700;overflow-wrap:anywhere}
+.samsung-channel-content.is-internal.samsung-announcement-content p{margin:10px 0 16px;font-size:12px;line-height:1.6;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.samsung-channel-content.is-internal.samsung-announcement-read{margin-top:auto;padding-top:12px;font-size:11.5px;font-weight:700}
+@media(max-width:1299px){.samsung-channel-content.is-internal .samsung-announcement-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1000px){.samsung-channel-content.is-internal .samsung-announcement-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.samsung-channel-content.is-internal .samsung-announcement-grid{grid-template-columns:minmax(0,1fr)}}
+@media(prefers-reduced-motion:reduce){.samsung-channel-content.is-internal .samsung-announcement-card,.samsung-channel-content.is-internal .samsung-announcement-card::after{animation:none;transition:none}}
+/* SRI-D announcements: scrollable long preview, separators. */
+.samsung-channel-content.is-internal.samsung-announcement-card.samsung-announcement-meta{margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #e7edf5}
+.samsung-channel-content.is-internal.samsung-announcement-card.samsung-announcement-content p{display:block;margin:0 0 14px;padding:0 7px 0 0;max-height:230px;min-height:0;overflow-x:hidden;overflow-y:auto;color:#626b79;font-size:12px;line-height:1.7;-webkit-line-clamp:unset;-webkit-box-orient:initial;scrollbar-width:thin;scrollbar-color:#cbd9e7 transparent}
+.samsung-channel-content.is-internal.samsung-announcement-card.samsung-announcement-content p::-webkit-scrollbar{width:4px}
+.samsung-channel-content.is-internal.samsung-announcement-card.samsung-announcement-content p::-webkit-scrollbar-thumb{background:#cbd9e7;border-radius:8px}
+.samsung-channel-content.is-internal.samsung-announcement-card.samsung-announcement-read{display:inline-flex;width:100%;align-items:center;justify-content:flex-start;gap:7px;margin-top:auto;padding:14px 0 0;border:0;border-top:1px solid #e7edf5;border-radius:0;background:transparent;color:#1428a0;font-size:11.5px;font-weight:700}
+.samsung-channel-content.is-internal.samsung-announcement-card.samsung-announcement-content{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;padding:16px}
+@media(prefers-reduced-motion:reduce){.samsung-channel-content.is-internal .samsung-announcement-card .samsung-announcement-content p{scroll-behavior:auto}}
+@media(min-width:761px){.samsung-news-page .samsung-news-featured-rail .samsung-leadership-copy p{max-width:100%;margin-bottom:12px;font-size:13.5px;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden}}
+.samsung-document-card-action{width:100%;display:inline-flex;align-items:center;justify-content:flex-start;gap:7px;margin-top:auto;padding:14px 0 0;border:none;border-top:1px solid #e7edf5;border-radius:0;background:transparent;color:#1428a0;font-size:11.5px;font-weight:750}
+.samsung-news-page .samsung-leadership-copy{text-align:left}
+.samsung-news-page .samsung-leadership-copy h2,.samsung-news-page .samsung-leadership-copy p{text-align:left}
+/* SRI-D PDF cards image-first (All News style). */
+.samsung-document-grid{align-items:stretch}
+.samsung-document-card{display:flex;min-width:0;min-height:0;flex-direction:column;overflow:hidden;padding:0;border:1px solid #e5e7eb;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.055);transition:transform 160ms ease,box-shadow 160ms ease,border-color 160ms ease}
+.samsung-document-card::before{display:none;content:none}
+.samsung-document-card:hover{transform:translateY(-2px);border-color:#d5dce7;box-shadow:0 7px 18px rgba(15,23,42,.11)}
+.samsung-document-card-media{position:relative;display:block;width:100%;height:168px;min-height:168px;flex:0 0 auto;padding:0;overflow:hidden;border:0;border-radius:0;background:#eef1f6;cursor:pointer}
+.samsung-document-card-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;transition:transform 200ms ease}
+.samsung-document-card:hover .samsung-document-card-media img{transform:scale(1.025)}
+.samsung-document-card-media-placeholder{display:grid;width:100%;height:100%;place-items:center;background:radial-gradient(circle at 78% 18%,rgba(20,40,160,.09),transparent 38%),linear-gradient(140deg,#f4f6fb,#e9edf5);color:#9aa7bb}
+.samsung-document-card-media-badge{position:absolute;bottom:10px;left:10px;display:inline-flex;align-items:center;gap:6px;max-width:calc(100% - 20px);padding:5px 9px;border:1px solid rgba(255,255,255,.24);border-radius:7px;background:rgba(13,24,53,.75);color:#fff;font-size:10px;font-weight:750;line-height:1.2;backdrop-filter:blur(4px)}
+.samsung-document-card-media-badge svg{flex:none}
+.samsung-document-card-body{display:flex;min-width:0;min-height:0;flex:1 1 auto;flex-direction:column;gap:10px;padding:13px 14px 14px;background:#fff}
+.samsung-document-card-kind{display:flex;min-width:0;flex-direction:row;flex-wrap:wrap;align-items:center;gap:5px 8px}
+.samsung-document-card-kind>span{color:#1428a0;font-size:10px;font-weight:750;letter-spacing:.045em;text-transform:uppercase}
+.samsung-document-card-kind small{min-width:0;max-width:100%;overflow:hidden;color:#8a93a3;font-size:10px;font-weight:550;text-overflow:ellipsis;white-space:nowrap}
+.samsung-document-card-copy{display:grid;min-width:0;gap:8px;align-content:start}
+.samsung-document-card-title{display:-webkit-box;width:100%;min-width:0;padding:0;overflow:hidden;border:0;background:transparent;color:#1a1a2e;font-size:14px;font-weight:700;line-height:1.42;letter-spacing:-.01em;text-align:left;overflow-wrap:anywhere;cursor:pointer;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.samsung-document-card-title:hover{color:#1428a0}
+.samsung-document-card-copy p{display:-webkit-box;min-height:0;margin:0;overflow:hidden;color:#626b79;font-size:12px;line-height:1.55;overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.samsung-document-card-action{display:inline-flex;width:100%;align-items:center;justify-content:flex-start;gap:7px;margin-top:auto;padding:12px 0 0;border:0;border-top:1px solid #e9edf3;border-radius:0;background:transparent;color:#1428a0;font-size:11px;font-weight:750;text-align:left;cursor:pointer}
+.samsung-document-card-media:focus-visible,.samsung-document-card-title:focus-visible,.samsung-document-card-action:focus-visible{outline:2px solid #1428a0;outline-offset:-2px}
+.samsung-document-card.is-preview{width:100%;max-width:720px;margin:0 auto}
+.sri-document-modal-sidebar .samsung-document-card{width:100%;max-width:none;min-height:0;margin:0}
+.sri-document-modal-sidebar .samsung-document-card-media{height:184px;min-height:184px}
+.sri-document-modal-sidebar .samsung-document-card-body{padding:16px}
+.sri-document-modal-sidebar .samsung-document-card-action{margin-top:10px}
+@media(max-width:700px){.samsung-document-card{padding:0}.samsung-document-card-media{height:172px;min-height:172px}}
+@media(prefers-reduced-motion:reduce){.samsung-document-card,.samsung-document-card-media img{transition:none}}
+/* Final SRI-D document card: 60/40 image / content, no summary. */
+.samsung-document-card{height:302px;min-height:302px;display:grid;grid-template-rows:minmax(0,3fr) minmax(0,2fr)}
+.samsung-document-card .samsung-document-card-media{width:100%;height:100%;min-height:0;min-width:0;align-self:stretch;overflow:hidden;border:0;background:#eef1f6}
+.samsung-document-card .samsung-document-card-media img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 35%;transform:none;background:transparent}
+.samsung-document-card:hover .samsung-document-card-media img{transform:none}
+.samsung-document-card .samsung-document-card-body{min-height:0;display:flex;flex-direction:column;justify-content:space-between;gap:6px;padding:14px 15px 11px}
+.samsung-document-card .samsung-document-card-title{width:100%;margin:0;font-size:15px;font-weight:700;line-height:1.4;text-align:left;-webkit-line-clamp:2}
+.samsung-document-card-footer{display:flex;align-items:center;justify-content:space-between;flex:0 0 auto;gap:9px;width:100%;min-height:43px;padding-top:10px;border-top:1px solid #e6eaf0}
+.samsung-document-card .samsung-document-card-action{display:inline-flex;width:auto;max-width:calc(100% - 48px);flex:0 1 auto;align-items:center;justify-content:flex-start;gap:6px;margin:0;padding:5px 0;border:0;background:transparent;color:#1428a0;font-size:11.5px;font-weight:750;cursor:pointer}
+.samsung-document-card-like{display:inline-flex;flex:0 0 auto;min-width:34px;min-height:34px;align-items:center;justify-content:center;gap:5px;padding:6px;border:1px solid #e5e9f0;border-radius:8px;background:#fff;color:#8992a2;font-size:11px;cursor:pointer;transition:color 150ms ease,border-color 150ms ease,background 150ms ease}
+.samsung-document-card-like:hover,.samsung-document-card-like.is-active{border-color:#bcc6ef;background:#f0f3ff;color:#1428a0}
+.samsung-document-card-like:focus-visible{outline:2px solid #1428a0;outline-offset:2px}
+.samsung-document-card-like:disabled,.samsung-document-card button:disabled{cursor:default}
+.samsung-document-card.is-preview{height:302px;max-width:720px}
+.sri-document-modal-sidebar .samsung-document-card{height:302px;min-height:302px}
+.sri-document-modal-sidebar .samsung-document-card-media{height:100%;min-height:0}
+.sri-document-modal-sidebar .samsung-document-card-body{padding:14px 15px 11px}
+@media(max-width:700px){.samsung-document-card,.samsung-document-card.is-preview{height:294px;min-height:294px;padding:0}}
+@media(prefers-reduced-motion:reduce){.samsung-document-card-like{transition:none}}
+.sri-document-modal-summary{margin-top:18px;padding:18px 16px 20px;border:1px solid #e4e9f1;border-radius:10px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.035)}
+.sri-document-modal-summary h2{margin:0 0 10px;color:#202a3d;font-size:13px;font-weight:750;line-height:1.4}
+.sri-document-modal-summary p{margin:0;color:#566172;font-size:12.5px;line-height:1.75;overflow-wrap:anywhere;white-space:pre-wrap}
+@media(max-width:760px){.sri-document-modal-summary{margin-top:14px;padding:16px}}
+/* Full-card keyboard accessible hit area. */
+.samsung-document-card{cursor:pointer;isolation:isolate}
+.samsung-document-card-open-hitarea{position:absolute;inset:0;z-index:3;display:block;width:100%;height:100%;margin:0;padding:0;border:0;border-radius:inherit;background:transparent;box-shadow:none;cursor:pointer}
+.samsung-document-card-open-hitarea:focus-visible{outline:3px solid #1428a0;outline-offset:-3px}
+.samsung-document-card-open-hitarea:disabled{cursor:default}
+.samsung-document-card-footer{justify-content:space-between}
+.samsung-document-card-contributor{flex:1 1 auto;min-width:0;overflow:hidden;color:#7b8495;font-size:11px;font-weight:550;line-height:1.4;text-overflow:ellipsis;white-space:nowrap}
+.samsung-document-card .samsung-document-card-action{display:inline-flex;flex:0 0 auto;width:auto;max-width:55%;margin:0 0 0 auto;padding:4px 0;justify-content:flex-end;align-items:center;gap:4px;border:0;color:#1428a0;font-size:11px;font-weight:750;white-space:nowrap}
+.samsung-document-card .samsung-document-card-action svg{flex:none}
+.samsung-document-card:hover .samsung-document-card-action svg{transform:translateX(2px)}
+.samsung-document-card .samsung-document-card-media,.samsung-document-card .samsung-document-card-title{cursor:inherit}
+/* Local PDF reload stays inside reader. */
+.sri-document-modal-reader-actions{display:inline-flex;align-items:center;flex:0 0 auto;gap:9px}
+.sri-document-modal-retry{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:30px;padding:6px 9px;border:1px solid #dfe4eb;border-radius:7px;background:#fff;color:#1428a0;font-size:11px;font-weight:650;cursor:pointer}
+.sri-document-modal-retry:hover:not(:disabled){background:#f0f3ff;border-color:#bac6f2}
+.sri-document-modal-retry:focus-visible{outline:2px solid #1428a0;outline-offset:2px}
+.sri-document-modal-retry:disabled{opacity:.5;cursor:default}
+@media(max-width:760px){.sri-document-modal-reader-actions{gap:5px}.sri-document-modal-retry{padding:6px 7px;font-size:10px}}
