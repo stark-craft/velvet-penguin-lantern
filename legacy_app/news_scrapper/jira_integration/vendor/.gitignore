@@ -1,0 +1,10 @@
+# Guy X's browser SSO profile and per-machine secrets must not be committed.
+.env
+.env.*
+cdp-state.json
+*-profile/
+chrome-profile/
+status_arch_diagram.png
+status_workflow_diagram.png
+__pycache__/
+*.pyc
