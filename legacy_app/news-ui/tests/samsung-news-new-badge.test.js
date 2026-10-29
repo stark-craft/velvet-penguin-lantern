@@ -53,3 +53,17 @@ test('NEW does not accept unpublished, feed-only, date-only or edited-only conte
   const source = published(1000);
   assert.equal(isRecentlyPublishedSamsungItem({ ...source, _isInternalPublished: false }, now), false);
 });
+
+test('MD signature uses the real contributor name, never institutional fallback', () => {
+  const named = publishedRecordToSignal({
+    id: 'md1', contentType: 'leadership', status: 'published',
+    author: 'Taylor', publishedAt: '2026-10-29T07:00:00Z',
+  });
+  assert.equal(named.signatureAuthor, 'Taylor');
+  const unnamed = publishedRecordToSignal({
+    id: 'md2', contentType: 'leadership', status: 'published',
+    publishedAt: '2026-10-29T07:00:00Z',
+  });
+  assert.equal(unnamed.signatureAuthor, '');
+  assert.equal(unnamed.author, 'Samsung Research Institute Delhi');
+});
