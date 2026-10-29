@@ -63,6 +63,12 @@ export default function SamsungNewsPage() {
   const [activeChannel, setActiveChannel] = useState('internal');
   const [feed, setFeed] = useState({ global: [], local: [], inside: [], sampark: [] });
   const [published, setPublished] = useState([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  // The NEW badge expires while the page remains open, without a refresh.
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [publishedError, setPublishedError] = useState('');
@@ -161,7 +167,7 @@ export default function SamsungNewsPage() {
       </div>}
       {/* SRI-D / Samsung Global / Samsung Local */}
       <SamsungChannelTabs activeChannel={activeChannel} model={model} onChange={setActiveChannel} />
-      <SamsungChannelContent channel={selectedChannel} onOpen={setOpenArticle} />
+      <SamsungChannelContent channel={selectedChannel} onOpen={setOpenArticle} nowMs={nowMs} />
       <SamsungDossier item={openArticle} onClose={() => setOpenArticle(null)} />
     </div>
   );
