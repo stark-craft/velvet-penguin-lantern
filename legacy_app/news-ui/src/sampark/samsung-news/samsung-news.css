@@ -1,0 +1,163 @@
+/* ============================================================
+   SAMPARK — SAMSUNG NEWS
+   Samsung-specific presentation. All News tsan-* components stay shared.
+   Dev baseline reconstructed from supplied two-part CSS (Oct 29, 2026).
+   ============================================================ */
+.samsung-news-page{width:100%;min-width:0;display:grid;gap:24px;padding:4px 0 24px;background:#fff;box-sizing:border-box}
+.samsung-channel-tabs{width:100%;margin:0}
+.samsung-channel-tab{display:inline-flex;align-items:center;gap:7px}
+.samsung-channel-tab svg{flex:none}
+.samsung-channel-tab small{color:#9ca3af;font-size:11px;font-weight:500}
+.samsung-channel-tab.is-active small{color:rgba(20,40,160,.68)}
+.samsung-channel-content{width:100%;min-width:0;display:grid;gap:28px}
+.samsung-news-page .samsung-news-featured-rail{width:100%;height:320px;min-height:0;align-items:stretch}
+.samsung-news-page .samsung-news-featured-rail>.tsan-featured,
+.samsung-news-page .samsung-news-featured-rail>.samsung-leadership-hero,
+.samsung-news-page .samsung-news-featured-rail>.tsan-rail{height:100%;max-height:320px;min-height:0;box-sizing:border-box}
+.samsung-news-page .samsung-news-featured-rail .tsan-rail{min-height:0;overflow:hidden}
+.samsung-news-page .samsung-news-featured-rail .tsan-rail-window{flex:1 1 auto;min-height:0;overflow:hidden}
+.samsung-news-page .tsan-rail,.samsung-news-page .tsan-rail-item{background:#fff}
+/* MD hero is 320px: left 238px portrait, right text. */
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-hero{position:relative;display:grid;grid-template-columns:238px minmax(0,1fr);width:100%;height:320px;min-width:0;min-height:0;overflow:hidden;border:1px solid #e5e9f0;border-radius:14px;background:#fff;box-shadow:0 5px 20px rgba(15,23,42,.07);box-sizing:border-box}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-image{position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-width:0;min-height:0;margin:0;padding:0;overflow:hidden;background:#f4f5f7}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-image::after{display:none;content:none}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-image img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center center;transform:none!important;transform-origin:center center}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-copy{position:relative;display:flex;flex-direction:column;justify-content:center;min-width:0;min-height:0;padding:24px clamp(22px,2.6vw,38px);overflow:hidden;background:#fff}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-copy::before{display:none;content:none}
+.samsung-leadership-quote{position:absolute;top:6px;right:18px;color:rgba(20,40,160,.045);font-family:Georgia,serif;font-size:112px;font-weight:700;line-height:1;pointer-events:none}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-copy h2{position:relative;z-index:2;max-width:100%;margin:0 0 12px;color:#172033;font-size:27px;font-weight:700;line-height:1.25;letter-spacing:-.02em}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-copy p{position:relative;z-index:2;display:-webkit-box;max-width:100%;margin:0 0 14px;overflow:hidden;color:#667085;font-size:13.5px;line-height:1.6;-webkit-box-orient:vertical;-webkit-line-clamp:4}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-footer{position:relative;z-index:2;display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:8px}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-read{display:inline-flex;flex:0 0 auto;align-items:center;justify-content:center;gap:7px;padding:5px 0;border:0;border-radius:0;background:transparent;color:#1428a0;font-size:12px;font-weight:700;white-space:nowrap;box-shadow:none;cursor:pointer;transition:color .2s ease}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-read:hover{background:transparent;color:#0b1b79;box-shadow:none}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-read svg{transition:transform .2s ease}
+.samsung-news-page .samsung-news-featured-rail .samsung-leadership-read:hover svg{transform:translateX(4px)}
+/* Archive headings, type grouping and publication date dropdowns. */
+.samsung-channel-archive{width:100%;min-width:0;display:grid;gap:20px}
+.samsung-channel-archive-header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding-bottom:12px;border-bottom:1px solid #e5e7eb}
+.samsung-channel-archive-header>div{display:grid;gap:3px}
+.samsung-channel-kicker{color:#1428a0;font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.samsung-channel-archive-header h2{margin:0;color:#1a1a2e;font-size:20px;font-weight:650;line-height:1.3}
+.samsung-channel-total{color:#8b94a5;font-size:12px;font-weight:500;white-space:nowrap}
+.samsung-srid-type-groups{display:grid;gap:32px;min-width:0}
+.samsung-srid-type-section{display:grid;gap:16px;min-width:0}
+.samsung-srid-type-header{display:flex;align-items:center;gap:12px;min-height:42px;padding-bottom:11px;border-bottom:1px solid #edf0f5}
+.samsung-srid-type-header h3{margin:0;flex:0 0 auto;color:#1a1a2e;font-size:15px;font-weight:750;letter-spacing:.015em;text-transform:none}
+.samsung-srid-type-header .tsan-day-rule{flex:1 1 auto;min-width:12px;height:1px;background:#e6e9f0}
+.samsung-srid-section-tools{display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;gap:14px}
+.samsung-srid-section-tools .tsan-day-count{color:#8992a2;font-size:11px;font-weight:500;white-space:nowrap}
+.samsung-srid-date-filter{position:relative;display:inline-flex;align-items:center;width:176px;max-width:100%;height:36px;flex:0 0 auto;border:1px solid #e0e5ed;border-radius:9px;background:#fff;box-shadow:0 2px 6px rgba(15,23,42,.035);transition:border-color 160ms ease,background-color 160ms ease,box-shadow 160ms ease}
+.samsung-srid-date-filter:hover{border-color:#b9c4e8;background:#f9faff}
+.samsung-srid-date-filter:focus-within{border-color:#1428a0;box-shadow:0 0 0 3px rgba(20,40,160,.09)}
+.samsung-srid-date-filter select{width:100%;height:100%;min-width:0;padding:0 34px 0 13px;border:0;border-radius:inherit;outline:0;appearance:none;-webkit-appearance:none;background:transparent;color:#334155;font-family:inherit;font-size:12px;font-weight:650;line-height:1.2;text-overflow:ellipsis;cursor:pointer}
+.samsung-srid-date-filter .samsung-srid-date-chevron{position:absolute;right:11px;top:50%;display:grid;place-items:center;color:#64748b;transform:translateY(-50%);pointer-events:none}
+.samsung-srid-date-filter:hover .samsung-srid-date-chevron{color:#1428a0}
+.samsung-srid-date-filter select option{background:#fff;color:#1f2937;font-size:12px}
+/* Story cards reuse All News geometry. */
+.samsung-news-card{background:#fff;border-color:#e8ebf0;box-shadow:0 2px 8px rgba(15,23,42,.055)}
+.samsung-news-card:hover{box-shadow:0 7px 18px rgba(15,23,42,.11)}
+.samsung-news-card .tsan-news-card-region-tag.is-internal{background:rgba(20,40,160,.92)}
+.samsung-news-card .tsan-news-card-body{background:#fff}
+.samsung-news-card.is-srid .tsan-news-card-body{padding-bottom:14px}
+.samsung-news-card.is-srid .tsan-news-card-category-badge{max-width:76%}
+.samsung-channel-content.is-internal .tsan-featured-tags>span:first-child,
+.samsung-channel-content.is-internal .tsan-featured-kicker,
+.samsung-channel-content.is-internal .tsan-rail-meta{display:none}
+/* Announcement cards. */
+.samsung-announcement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.samsung-announcement-card{min-width:0;overflow:hidden;border:1px solid #e4e8ef;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(15,23,42,.055);transition:transform .15s ease,box-shadow .15s ease}
+.samsung-announcement-card:hover{transform:translateY(-2px);box-shadow:0 7px 18px rgba(15,23,42,.10)}
+.samsung-announcement-card.has-image{display:grid;grid-template-columns:minmax(130px,35%) minmax(0,1fr);min-height:190px}
+.samsung-announcement-media{position:relative;width:100%;height:100%;min-height:190px;padding:0;border:0;background:#eef1f6 center/cover no-repeat}
+.samsung-announcement-media-badge{position:absolute;left:10px;bottom:10px;display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border:1px solid rgba(255,255,255,.34);border-radius:999px;background:rgba(10,18,45,.65);color:#fff;font-size:9px;font-weight:750;letter-spacing:.05em;text-transform:uppercase;backdrop-filter:blur(5px)}
+.samsung-announcement-card.is-text-only{position:relative;min-height:190px;background:radial-gradient(circle at 92% 8%,rgba(20,40,160,.11),transparent 36%),radial-gradient(circle at 4% 100%,rgba(61,166,151,.09),transparent 42%),#fff}
+.samsung-announcement-card.is-text-only::before{position:absolute;top:0;bottom:0;left:0;width:4px;background:#1428a0;content:""}
+.samsung-announcement-content{display:flex;min-width:0;flex-direction:column;padding:17px 18px}
+.samsung-announcement-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.samsung-announcement-meta>span{display:inline-flex;align-items:center;gap:6px;color:#1428a0;font-size:10px;font-weight:750;letter-spacing:.065em;text-transform:uppercase}
+.samsung-announcement-meta small{color:#8b94a5;font-size:10px;white-space:nowrap}
+.samsung-announcement-title{padding:0;border:0;background:transparent;color:#1a1a2e;font-size:16px;font-weight:650;line-height:1.35;text-align:left}
+.samsung-announcement-content p{display:-webkit-box;overflow:hidden;margin:9px 0 14px;color:#626b79;font-size:12px;line-height:1.55;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.samsung-announcement-read{display:inline-flex;width:fit-content;align-items:center;gap:5px;margin-top:auto;padding:0;border:0;background:transparent;color:#1428a0;font-size:11px;font-weight:700}
+/* Document / PDF card - shared between Create News preview and SRI-D. */
+.samsung-document-card{position:relative;display:flex;min-width:0;min-height:280px;flex-direction:column;overflow:hidden;padding:22px 22px 20px;border:1px solid #e4e8ef;border-radius:14px;background:radial-gradient(circle at 100% 0%,rgba(20,40,160,.09),transparent 34%),linear-gradient(145deg,#fff 0%,#fbfcff 100%);box-shadow:0 3px 11px rgba(15,23,42,.065);transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.samsung-document-card::before{position:absolute;top:0;right:0;left:0;height:4px;background:linear-gradient(90deg,#1428a0 0%,#3047c8 58%,#6978db 100%);content:""}
+.samsung-document-card:hover{transform:translateY(-2px);border-color:rgba(20,40,160,.20);box-shadow:0 9px 24px rgba(15,23,42,.105)}
+.samsung-document-card-top{display:flex;align-items:center;gap:13px;min-width:0;margin-bottom:20px}
+.samsung-document-card-icon{position:relative;display:grid;width:48px;height:54px;flex:0 0 auto;place-items:center;overflow:hidden;border:1px solid rgba(20,40,160,.14);border-radius:9px;background:linear-gradient(145deg,#eef1ff,#fff);color:#1428a0}
+.samsung-document-card-icon::after{position:absolute;top:0;right:0;width:13px;height:13px;border-bottom:1px solid rgba(20,40,160,.13);border-left:1px solid rgba(20,40,160,.13);background:#fff;content:""}
+.samsung-document-card-icon>span{position:absolute;bottom:4px;color:#1428a0;font-size:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.samsung-document-card-icon svg{transform:translateY(-4px)}
+.samsung-document-card-kind{display:flex;min-width:0;flex-direction:column;gap:3px}
+.samsung-document-card-kind>span{color:#1428a0;font-size:10px;font-weight:800;letter-spacing:.075em;text-transform:uppercase}
+.samsung-document-card-kind small{overflow:hidden;color:#8992a2;font-size:11px;font-weight:500;text-overflow:ellipsis;white-space:nowrap}
+.samsung-document-card-copy{display:grid;min-width:0;gap:10px}
+.samsung-document-card-title{width:100%;padding:0;border:0;background:transparent;color:#171a22;font-size:18px;font-weight:660;line-height:1.34;letter-spacing:-.012em;text-align:left}
+.samsung-document-card-title:hover{color:#1428a0}
+.samsung-document-card-copy p{display:-webkit-box;min-height:57px;overflow:hidden;margin:0;color:#616a79;font-size:12.5px;line-height:1.55;-webkit-box-orient:vertical;-webkit-line-clamp:3}
+.samsung-document-card-details{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:18px;padding-top:13px;border-top:1px solid #edf0f4}
+.samsung-document-card-details>span{min-width:0;overflow:hidden;color:#7b8495;font-size:10.5px;font-weight:550;text-overflow:ellipsis;white-space:nowrap}
+.samsung-document-card-details>span:first-child{color:#525d70;font-weight:650}
+.samsung-document-card-file{display:flex;align-items:center;gap:6px;min-width:0;margin-top:9px;color:#8a93a3;font-size:10.5px}
+.samsung-document-card-file svg{flex:none;color:#1428a0}
+.samsung-document-card-file span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.samsung-document-card-action{display:inline-flex;width:fit-content;align-items:center;gap:6px;margin-top:auto;padding:18px 0 0;border:0;background:transparent;color:#1428a0;font-size:11.5px;font-weight:750}
+.samsung-document-card-action svg{transition:transform .15s ease}
+.samsung-document-card-action:hover svg{transform:translateX(2px)}
+.samsung-document-card.is-preview{width:100%;max-width:720px;margin:0 auto}
+.samsung-document-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+/* Shared published-content reader modal surfaces. */
+.sri-leadership-modal,.sri-story-modal{position:relative;width:min(1080px,calc(100vw - 40px));max-height:min(90vh,920px);overflow:hidden;border:1px solid #e4e8ef;border-radius:18px;background:#fff;box-shadow:0 28px 80px rgba(15,23,42,.24)}
+.sri-content-modal-close{position:absolute;top:16px;right:16px;z-index:5;display:grid;width:34px;height:34px;place-items:center;border:1px solid rgba(15,23,42,.10);border-radius:50%;background:rgba(255,255,255,.94);color:#263142;box-shadow:0 3px 10px rgba(15,23,42,.10);transition:transform .16s ease,box-shadow .16s ease}
+.sri-content-modal-close:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(15,23,42,.14)}
+.sri-leadership-modal{width:min(1400px,calc(100vw - 48px));max-width:1400px;height:min(760px,90vh);max-height:90vh;overflow:hidden}
+.sri-leadership-modal .sri-leadership-layout{display:grid;grid-template-columns:min(568px,67.31vh,53%) minmax(0,1fr);width:100%;height:100%;min-height:0;max-height:none;overflow:hidden}
+.sri-leadership-modal .sri-leadership-portrait{display:block;width:100%;height:100%;min-height:0;margin:0;padding:0;overflow:hidden;background:#fff}
+.sri-leadership-modal .sri-leadership-portrait img{display:block;width:100%;height:100%;object-fit:cover;object-position:center top;transform:none!important;transform-origin:center top}
+.sri-leadership-modal .sri-leadership-copy{min-width:0;min-height:0;height:100%;padding:54px clamp(36px,4vw,64px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#cbd3e1 transparent;box-sizing:border-box}
+.sri-leadership-modal .sri-leadership-copy::-webkit-scrollbar{width:6px}
+.sri-leadership-modal .sri-leadership-copy::-webkit-scrollbar-thumb{background:#cbd3e1;border-radius:10px}
+.sri-leadership-copy h1{max-width:20ch;margin:0 0 28px;color:#111827;font-size:clamp(30px,2.25vw,42px);font-weight:650;line-height:1.15;letter-spacing:-.025em}
+.sri-leadership-message{color:#374151;font-size:16px;line-height:1.9;white-space:pre-wrap}
+.sri-story-modal{width:min(1120px,calc(100vw - 40px))}
+.sri-story-modal-scroll{max-height:min(90vh,920px);overflow-y:auto;padding:54px 42px 46px;background:#fff}
+.sri-story-modal.sampark-create-rendered{margin:0;background:#fff}
+.sri-internal-modal{position:relative;width:min(900px,calc(100vw - 40px));max-height:min(90vh,900px);overflow:hidden;border:1px solid #e4e8ef;border-radius:18px;background:#fff;box-shadow:0 28px 80px rgba(15,23,42,.24)}
+.sri-internal-modal-scroll{max-height:min(90vh,900px);overflow-y:auto}
+.sri-internal-modal-media{width:100%;max-height:390px;overflow:hidden;background:#eef1f6}
+.sri-internal-modal-media img{display:block;width:100%;max-height:390px;object-fit:cover}
+.sri-internal-modal-copy{padding:38px 42px 42px}
+.sri-internal-modal-meta{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+.sri-internal-modal-meta>span{color:#1428a0;font-size:11px;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+.sri-internal-modal-meta small{color:#8b94a5;font-size:11px}
+.sri-internal-modal-copy h1{margin:0 0 14px;color:#111827;font-size:clamp(27px,2.3vw,38px);font-weight:650;line-height:1.18;letter-spacing:-.025em}
+.sri-internal-modal-summary{margin:0 0 24px;color:#4b5563;font-size:16px;font-weight:500;line-height:1.7}
+.sri-internal-modal-body{color:#374151;font-size:15px;line-height:1.85;white-space:pre-wrap}
+.sri-internal-modal-copy footer{margin-top:30px;padding-top:16px;border-top:1px solid #e5e7eb;color:#7b8495;font-size:12px}
+/* PDF document reader - left card, right original PDF. */
+.sri-document-modal{position:relative;width:min(1480px,calc(100vw - 44px));height:min(900px,calc(100vh - 44px));max-height:calc(100vh - 44px);overflow:hidden;border:1px solid #dfe4eb;border-radius:18px;background:#f5f7fa;box-shadow:0 30px 90px rgba(15,23,42,.28)}
+.sri-document-modal .sri-content-modal-close{top:14px;right:14px;z-index:20;background:rgba(255,255,255,.96);backdrop-filter:blur(8px)}
+.sri-document-modal-layout{display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);width:100%;height:100%;min-height:0}
+.sri-document-modal-sidebar{min-width:0;min-height:0;overflow-y:auto;padding:26px 22px 28px;border-right:1px solid #e3e7ed;background:linear-gradient(180deg,#fff 0%,#f8f9fc 100%)}
+.sri-document-modal-sidebar-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;padding:0 2px 13px;border-bottom:1px solid #edf0f4}
+.sri-document-modal-sidebar-head>span{color:#1428a0;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.sri-document-modal-sidebar-head>strong{color:#7d8696;font-size:11px;font-weight:600}
+.sri-document-modal-sidebar .samsung-document-card{width:100%;max-width:none;margin:0}
+.sri-document-modal-sidebar .samsung-document-card-action{margin-top:18px}
+.sri-document-modal-reader{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0;min-height:0;overflow:hidden;background:#eef1f5}
+.sri-document-modal-reader-head{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:18px;min-height:68px;padding:13px 68px 13px 20px;border-bottom:1px solid #dde2e9;background:rgba(255,255,255,.97);box-shadow:0 1px 5px rgba(15,23,42,.04)}
+.sri-document-modal-reader-head>div{display:grid;min-width:0;gap:3px}
+.sri-document-modal-reader-head>div>span{color:#8a93a3;font-size:9px;font-weight:750;letter-spacing:.07em;text-transform:uppercase}
+.sri-document-modal-reader-head>div>strong{overflow:hidden;color:#222733;font-size:12px;font-weight:650;line-height:1.35;text-overflow:ellipsis;white-space:nowrap}
+.sri-document-modal-reader-status{display:inline-flex;flex:none;align-items:center;justify-content:center;min-width:42px;padding:5px 9px;border:1px solid rgba(20,40,160,.14);border-radius:999px;background:rgba(20,40,160,.06);color:#1428a0;font-size:9px;font-weight:800;letter-spacing:.07em}
+.sri-document-modal-viewer{position:relative;min-width:0;min-height:0;overflow:hidden;padding:14px;background:linear-gradient(145deg,#e9edf2,#f3f5f8)}
+.sri-document-pdf-frame{display:block;width:100%;height:100%;min-height:0;overflow:hidden;border:0;border-radius:10px;background:#fff;box-shadow:0 3px 14px rgba(15,23,42,.10)}
+.sri-document-modal-loading{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid #e1e5eb;border-radius:10px;background:#fff;color:#667085;font-size:13px;box-shadow:0 3px 14px rgba(15,23,42,.07)}
+.sri-document-modal-error{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;gap:12px;padding:28px;border:1px solid #efd7d7;border-radius:10px;background:#fff;color:#525866;box-shadow:0 3px 14px rgba(15,23,42,.07)}
+.sri-document-modal-error>svg{flex:none;color:#b42318}
+.sri-document-modal-error>div{display:grid;gap:4px}
+.sri-document-modal-error strong{color:#272b34;font-size:14px}
+.sri-document-modal-error p{margin:0;color:#727b8a;font-size:12px;line-height:1.5}
+.samsung-news-notice{display:flex;align-items:center;gap:10px;min-height:42px;padding:10px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#5f6878;font-size:13px;box-shadow:0 2px 8px rgba(15,23,42,.055)}
+.samsung-news-notice svg{color:#1428a0;flex:none}
+.samsung-news-notice .btn-secondary{margin-left:auto}
