@@ -4,7 +4,7 @@ import {
 } from '../../news-scrapper/internal/samsungInternalModel.js';
 
 export const SAMPARK_SAMSUNG_CHANNELS = [
-  { id: 'internal', label: 'SRI-D', icon: 'layers' },
+  { id: 'internal', label: 'SRI-D Tech AXis', icon: 'layers' },
   { id: 'global', label: 'Samsung Global', icon: 'globe' },
   { id: 'local', label: 'Samsung Local', icon: 'radar' },
 ];
@@ -12,6 +12,21 @@ const CONTENT_LABELS = {
   leadership: 'Leadership Message', announcement: 'Announcement',
   story: 'Story', document_import: 'Document',
 };
+
+export const SAMSUNG_NEW_BADGE_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+// Show NEW only for records actually published within the last 48 hours.
+// No marker for a draft, a feed item, a date-only value, or future timestamps.
+export function isRecentlyPublishedSamsungItem(item, nowMs = Date.now()) {
+  if (!item?._isInternalPublished || !item?._publishedId) return false;
+  const value = item.published_at;
+  if (typeof value !== 'string' || !/T\\d{2}:\\d{2}/.test(value)) return false;
+  const publishedAt = Date.parse(value);
+  if (!Number.isFinite(publishedAt)) return false;
+  const elapsed = nowMs - publishedAt;
+  return elapsed >= 0 && elapsed < SAMSUNG_NEW_BADGE_WINDOW_MS;
+}
+
 function recordContentType(record) {
   return String(record?.contentType ?? record?.content_type ?? '').trim();
 }
@@ -83,7 +98,9 @@ export function publishedRecordToSignal(record) {
     team: record.team || '',
     region: 'SRI-D',
     date: publishedAt ? String(publishedAt).slice(0, 10) : 'Latest',
-    published_at: publishedAt,
+    // Badge eligibility must use the actual publication time only.
+    // Never substitute an edit/creation timestamp.
+    published_at: record?.publishedAt || record?.published_at || '',
     source_count: 1,
     image_url: image,
     top_image: image,
@@ -148,7 +165,7 @@ export function buildSamparkSamsungModel({ feed, published }) {
     signalContentType(item) !== 'leadership')).slice(0, 10);
   return {
     internal: buildChannel({
-      id: 'internal', label: 'SRI-D', items: internalItems,
+      id: 'internal', label: 'SRI-D Tech AXis', items: internalItems,
       hero: internalHero, stream: internalStream,
     }),
     global: buildChannel({ id: 'global', label: 'Samsung Global', items: global }),
