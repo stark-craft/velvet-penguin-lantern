@@ -500,6 +500,7 @@ export default function AllNewsPage({ capabilities=[] }){
           <button className="btn-dark-primary h-9" disabled={batchBusy} onClick={()=>setBatchSelect({ title:`${selectedBatch.length} selected articles` })} type="button">Send to Review Queue</button>
           <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setReportItems(selectedBatch.slice())} type="button">Create Report</button>
           <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setDraftExportOpen(true)} type="button">Draft Export</button>
+          <CreateJiraAction items={selectedBatch} disabled={batchBusy} />
         </div>
       </div>}
     </div>
