@@ -4,7 +4,7 @@ import FeaturedCarousel from '../all-news/FeaturedCarousel.jsx';
 import AllNewsRail from '../all-news/AllNewsRail.jsx';
 import LeadershipMessageHero from './LeadershipMessageHero.jsx';
 import SriDDocumentCard from './SriDDocumentCard.jsx';
-import { samsungItemKey } from './samsungNewsModel.js';
+import { isRecentlyPublishedSamsungItem, samsungItemKey } from './samsungNewsModel.js';
 
 function imageOf(item) { return item?.image_url || item?.top_image || ''; }
 function localDateKey(date) {
@@ -81,7 +81,7 @@ function buildSriDSections(groups) {
       .sort((a, b) => b.date.localeCompare(a.date)),
   })).filter((section) => section.entries.length > 0);
 }
-function SamsungStoryCard({ item, internal = false, onOpen }) {
+function SamsungStoryCard({ item, internal = false, onOpen, nowMs }) {
   const image = imageOf(item);
   const source = item?.src || item?.source || 'Samsung';
   const region = regionOf(item);
@@ -111,6 +111,9 @@ function SamsungStoryCard({ item, internal = false, onOpen }) {
           <span className="tsan-news-card-category-badge">{internal ? contentTypeLabel(item) : category}</span>
         </span>
         <span className={`tsan-news-card-region-tag ${regionClass}`}>{region}</span>
+        {internal && isRecentlyPublishedSamsungItem(item, nowMs) && (
+          <span className="samsung-published-new-badge is-story">NEW</span>
+        )}
       </button>
       <div className="tsan-news-card-body">
         <button className="tsan-news-card-title" onClick={() => onOpen?.(item)} type="button">{item?.title || ''}</button>
@@ -121,7 +124,7 @@ function SamsungStoryCard({ item, internal = false, onOpen }) {
     </article>
   );
 }
-function SamsungAnnouncementCard({ item, onOpen }) {
+function SamsungAnnouncementCard({ item, onOpen, nowMs }) {
   const image = imageOf(item);
   const text = String(item?.summary || item?.body || '').trim();
   return (
@@ -134,7 +137,10 @@ function SamsungAnnouncementCard({ item, onOpen }) {
       <div className="samsung-announcement-content">
         <div className="samsung-announcement-meta">
           <span><Icon name="megaphone" size={13} /> Announcement</span>
-          <small>{item?.date || 'Latest'}</small>
+          <div className="samsung-announcement-date-badges">
+            {isRecentlyPublishedSamsungItem(item, nowMs) && <span className="samsung-published-new-badge">NEW</span>}
+            <small>{item?.date || 'Latest'}</small>
+          </div>
         </div>
         <button className="samsung-announcement-title" onClick={() => onOpen?.(item)}
           type="button">{item?.title || ''}</button>
@@ -147,7 +153,7 @@ function SamsungAnnouncementCard({ item, onOpen }) {
   );
 }
 // Independent date filter per SRI-D content-type section.
-function SriDTypeSection({ section, onOpen }) {
+function SriDTypeSection({ section, onOpen, nowMs }) {
   const [dateFilter, setDateFilter] = useState('all');
   const dates = [...new Set(section.entries.map((entry) => entry.date))].sort((a, b) => {
     if (a === 'undated') return 1;
@@ -183,16 +189,16 @@ function SriDTypeSection({ section, onOpen }) {
         {visibleEntries.map(({ item }) => {
           const key = samsungItemKey(item);
           if (section.key === 'announcement')
-            return <SamsungAnnouncementCard item={item} key={key} onOpen={onOpen} />;
+            return <SamsungAnnouncementCard item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
           if (section.key === 'document')
-            return <SriDDocumentCard item={item} key={key} onOpen={onOpen} />;
-          return <SamsungStoryCard internal item={item} key={key} onOpen={onOpen} />;
+            return <SriDDocumentCard item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
+          return <SamsungStoryCard internal item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
         })}
       </div>
     </section>
   );
 }
-export default function SamsungChannelContent({ channel, onOpen }) {
+export default function SamsungChannelContent({ channel, onOpen, nowMs }) {
   if (!channel) return null;
   const isInternal = channel.id === 'internal';
   const heroItems = isInternal
@@ -218,7 +224,7 @@ export default function SamsungChannelContent({ channel, onOpen }) {
         <header className="samsung-channel-archive-header">
           <div>
             <span className="samsung-channel-kicker">{isInternal ? 'Internal publishing' : 'Samsung News'}</span>
-            <h2 id="samsung-channel-news-heading">{isInternal ? 'SRI-D' : `${channel.label} News`}</h2>
+            <h2 id="samsung-channel-news-heading">{isInternal ? 'SRI-D Tech AXis' : `${channel.label} News`}</h2>
           </div>
           <span className="samsung-channel-total">{channel.count} {isInternal
             ? channel.count === 1 ? 'item' : 'items'
@@ -231,7 +237,7 @@ export default function SamsungChannelContent({ channel, onOpen }) {
         ) : isInternal ? (
           <div className="tsan-daywise samsung-srid-type-groups">
             {sridSections.map((section) => <SriDTypeSection
-              key={section.key} section={section} onOpen={onOpen} />)}
+              key={section.key} section={section} onOpen={onOpen} nowMs={nowMs} />)}
           </div>
         ) : (
           <div className="tsan-daywise">
