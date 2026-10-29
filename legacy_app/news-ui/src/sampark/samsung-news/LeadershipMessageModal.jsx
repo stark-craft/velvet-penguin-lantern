@@ -17,6 +17,9 @@ export default function LeadershipMessageModal({ item, onClose }) {
   if (!item) return null;
   const image = item?.cover?.url || item?.image_url || item?.top_image || '';
   const message = item?.body || item?.summary || '';
+  // Use the author's published name; do not infer the signature from the viewer.
+  const authorName = String(item?.author || item?.ownerName || item?.owner_name || '').trim();
+  const signature = authorName ? `— ${authorName} NMEA` : '— NMEA';
   const imageScale = imageScaleOf(item);
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
@@ -31,6 +34,7 @@ export default function LeadershipMessageModal({ item, onClose }) {
           <div className="sri-leadership-copy">
             <h1 id="sri-leadership-title">{item.title}</h1>
             <div className="sri-leadership-message">{message}</div>
+            <div className="sri-leadership-signature">{signature}</div>
           </div>
         </div>
       </section>
