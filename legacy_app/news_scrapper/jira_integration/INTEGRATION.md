@@ -41,7 +41,7 @@ changes, reducing accidental duplicate issues.
    requirements are optional for this integration.
 4. Install `pip install -r requirements.txt` in your existing backend venv.
 5. For safe local validation, keep `JIRA_NEWS_ENABLED=false` and run:
-   `python -m unittest tests.test_jira_news_integration`
+   `python -m unittest discover -s tests -p test_jira_news_integration.py`
 6. Confirm the corporate Windows account used to start FastAPI can log in
    through Guy X's headless SSO, and the project supports Status Report.
 7. Set `JIRA_NEWS_PROJECT=SRIDRDSG`, `JIRA_NEWS_ISSUE_TYPE=Task`,
