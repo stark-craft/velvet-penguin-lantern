@@ -3,6 +3,7 @@ import Icon from '../components/Icon.jsx';
 import { SignalVisual } from '../components/ArticleCard.jsx';
 import ArticleModal from '../components/modals/ArticleModal.jsx';
 import DraftExportModal from '../components/modals/DraftExportModal.jsx';
+import CreateJiraAction from '../../sampark/shared/CreateJiraAction.jsx';
 import DateRangePicker from '../components/DateRangePicker.jsx';
 import { correctRegion, getHistoryFile, getHistoryList, getHistoryRange, getWorkflow, importWorkflow } from '../api.js';
 import { normalizeList } from '../utils/normalize.js';
@@ -644,6 +645,9 @@ export default function HistoryScreen({ reviewAllowed = false }) {
               <Icon name="upload" size={15} />
               {importing ? 'Importing…' : `Send to review${checkedArticles.length ? ` (${checkedArticles.length})` : ''}`}
             </button>}
+            {reviewAllowed && checkedArticles.length > 0 && (
+              <CreateJiraAction items={checkedArticles} disabled={importing} buttonClassName="archive-v2-secondary-button" />
+            )}
             {checkedArticles.length > 0 && (
               <button className="archive-v2-clear-button" onClick={() => setCheckedKeys(new Set())} type="button" aria-label="Clear all selected archive signals">
                 <Icon name="x" size={15} />
