@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
+import { isRecentlyPublishedSamsungItem } from './samsungNewsModel.js';
 
 /**
  * Published documents receive a mapped image_url. Draft previews can receive
@@ -41,7 +42,7 @@ function documentContributorOf(item) {
   return 'SRI-D document';
 }
 
-export default function SriDDocumentCard({ item, onOpen, preview = false }) {
+export default function SriDDocumentCard({ item, onOpen, preview = false, nowMs }) {
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = documentImageOf(item);
   const canOpen = typeof onOpen === 'function';
@@ -60,6 +61,9 @@ export default function SriDDocumentCard({ item, onOpen, preview = false }) {
         <span className="samsung-document-card-media-badge">
           <Icon name="file" size={12} /> PDF
         </span>
+        {!preview && isRecentlyPublishedSamsungItem(item, nowMs) && (
+          <span className="samsung-published-new-badge is-document">NEW</span>
+        )}
       </div>
       <div className="samsung-document-card-body">
         <h3 className="samsung-document-card-title">{item?.title || 'Untitled document'}</h3>
