@@ -32,6 +32,10 @@ class CreateDrafts(BaseModel):
     articles: list[NewsArticle] = Field(min_length=1, max_length=30)
 
 
+class RegenerateInsight(BaseModel):
+    draft: dict[str, Any]
+
+
 class PublishDrafts(BaseModel):
     drafts: list[dict[str, Any]] = Field(min_length=1, max_length=30)
 
@@ -77,11 +81,11 @@ def publish_reports(draft_job_id: str, payload: PublishDrafts, request: Request)
 
 
 @router.post("/news-drafts/{draft_job_id}/insights/{index}", status_code=202)
-def regenerate_insight(draft_job_id: str, index: int, request: Request):
+def regenerate_insight(draft_job_id: str, index: int, payload: RegenerateInsight, request: Request):
     actor = _actor(request)
     REQUEST_LIMITER.check("jira.news.insight", actor, limit=8, window_seconds=600)
     try:
-        identifier = jobs.begin_insight_regeneration(actor, draft_job_id, index)
+        identifier = jobs.begin_insight_regeneration(actor, draft_job_id, index, payload.draft)
         return {"job_id": identifier, "status": "queued"}
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
