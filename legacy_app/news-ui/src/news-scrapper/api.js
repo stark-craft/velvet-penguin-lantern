@@ -381,24 +381,39 @@ export const getViewerActivitySummary = (tz) => {
   return jsonFetch(`/viewer/activity-summary?tz=${param}`);
 };
 
-// ---------- Jira (one issue containing all selected news) ----------
-// Only card metadata travels to FastAPI. Browser SSO and Jira credentials
-// remain server-side.
-export const createJiraNewsTicket = (items) => jsonFetch('/jira/news-tickets', {
-  method: 'POST',
-  // A single request can require SSO login plus sequential image attachments.
-  timeoutMs: 600_000,
-  body: JSON.stringify({
-    articles: (items || []).map((item) => ({
-      title: String(item?.title || '').trim(),
-      summary: String(item?.master_summary || item?.summary || item?.summary_lead || item?.ppt_summary || item?.snippet || '').trim().slice(0, 15000),
-      image_url: String(item?.image_url || item?.imageUrl || item?.thumbnail_url || item?.og_image || item?.top_image || item?.image || item?.thumbnail || '').trim().slice(0, 3000),
-      source_url: String(item?.canonical_link || item?.link || item?.url || '').trim().slice(0, 3000),
-      source: String(item?.src || item?.source || '').trim().slice(0, 500),
-      date: String(item?.date || item?.published_at || '').trim().slice(0, 100),
-    })),
-  }),
+// ---------- Tech Sensing Jira (independent per-article drafts) ----------
+const jiraSourceList = (item) => {
+  for (const list of [item?.sources, item?.source_links, item?.original_sources, item?.references]) {
+    if (Array.isArray(list)) return list.slice(0, 30);
+  }
+  return [];
+};
+export const prepareJiraArticle = (item = {}) => ({
+  title: String(item?.title || '').trim().slice(0, 500),
+  summary: String(item?.master_summary || item?.summary || item?.summary_lead || item?.ppt_summary || item?.snippet || '').trim().slice(0, 15000),
+  image_url: String(item?.image_url || item?.imageUrl || item?.thumbnail_url || item?.og_image || item?.top_image || item?.image || item?.thumbnail || '').trim().slice(0, 3000),
+  source_url: String(item?.canonical_link || item?.link || item?.url || '').trim().slice(0, 3000),
+  source: String(item?.src || item?.source || '').trim().slice(0, 500),
+  date: String(item?.date || item?.published_at || '').trim().slice(0, 100),
+  category: item?.category || '',
+  tags: Array.isArray(item?.tags) ? item.tags.slice(0, 20) : [],
+  sources: jiraSourceList(item),
 });
+export const startJiraNewsDrafts = (items) => jsonFetch('/jira/news-drafts', {
+  method: 'POST',
+  timeoutMs: 30_000,
+  body: JSON.stringify({ articles: (items || []).map(prepareJiraArticle) }),
+});
+export const getJiraNewsJob = (id) =>
+  jsonFetch(`/jira/news-jobs/${encodeURIComponent(id)}`, { timeoutMs: 30_000 });
+export const publishJiraNewsDrafts = (draftJobId, drafts) => jsonFetch(
+  `/jira/news-drafts/${encodeURIComponent(draftJobId)}/publish`,
+  {
+    method: 'POST',
+    timeoutMs: 30_000,
+    body: JSON.stringify({ drafts }),
+  },
+);
 
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
