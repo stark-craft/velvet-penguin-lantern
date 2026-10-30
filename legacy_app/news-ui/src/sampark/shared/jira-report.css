@@ -1,0 +1,28 @@
+/* Scoped Tech Sensing draft review. No changes to existing Sampark card CSS. */
+.tsjira-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(8,15,29,.75);padding:16px}
+.tsjira-dialog{width:min(880px,100%);max-height:92vh;overflow:hidden;display:flex;flex-direction:column;border-radius:16px;background:#fff;color:#182336;box-shadow:0 25px 80px #0005;font:14px/1.5 system-ui,Arial,sans-serif}
+.tsjira-header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid #dae1eb;gap:16px}
+.tsjira-header strong{font-size:19px}.tsjira-header p{margin:4px 0 0;color:#566579}
+.tsjira-header button{border:0;background:transparent;color:#455268;font-size:28px;cursor:pointer}
+.tsjira-content{padding:20px 24px;overflow:auto}
+.tsjira-progress{padding:28px 24px;display:flex;flex-direction:column;gap:10px}
+.tsjira-progress progress{width:100%;height:10px;accent-color:#2563eb}
+.tsjira-progress p,.tsjira-progress small{margin:0;color:#526277}
+.tsjira-progress .tsjira-pause{font-weight:700;color:#9a5912}
+.tsjira-error{margin:12px 24px;padding:10px 12px;border-radius:8px;background:#fff1f2;color:#a41d31}
+.tsjira-draft{padding:20px;margin:0 0 18px;border:1px solid #d7deeb;border-radius:12px;display:flex;flex-direction:column;gap:10px;background:#fff}
+.tsjira-draft>strong{margin-top:8px;font-size:14px;color:#1e3b69}
+.tsjira-draft label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:650;color:#48566c}
+.tsjira-draft label.tsjira-select{flex-direction:row;align-items:center;color:#1c3e77;font-size:13px}
+.tsjira-draft input:not([type=checkbox]),.tsjira-draft textarea{padding:9px 11px;border:1px solid #becadd;border-radius:7px;background:#fff;color:#162235;font:14px/1.5 inherit;width:100%;min-width:0;box-sizing:border-box}
+.tsjira-draft textarea{font:14px/1.5 system-ui,Arial,sans-serif;resize:vertical}
+.tsjira-sources{display:flex;flex-wrap:wrap;gap:8px 14px}
+.tsjira-sources a,.tsjira-result a{color:#174fa5;text-decoration:underline}
+.tsjira-image{max-width:min(400px,100%);max-height:220px;object-fit:contain;align-self:center;border:1px solid #dde3eb;border-radius:6px}
+.tsjira-actions{display:flex;justify-content:flex-end;gap:12px;padding:12px 0}
+.tsjira-actions button{background:#edf2fa;border:1px solid #c8d2e1;border-radius:7px;color:#193653;padding:10px 14px;cursor:pointer;font-weight:650}
+.tsjira-actions button.tsjira-primary{background:#165cc3;color:white;border-color:#165cc3}
+.tsjira-actions button:disabled{opacity:.5;cursor:not-allowed}
+.tsjira-result{padding:14px;margin:10px 0;border:1px solid #d8e1ed;border-radius:9px;display:flex;gap:9px;flex-direction:column}
+.tsjira-result p,.tsjira-hint{margin:0;color:#6b4050}
+@media(max-width:600px){.tsjira-header,.tsjira-content{padding:14px}.tsjira-overlay{padding:8px}.tsjira-dialog{max-height:96vh}.tsjira-actions{flex-direction:column}}
