@@ -231,7 +231,7 @@ def _run_publish(identifier):
     _update(identifier, state="done", current="")
 
 
-def begin_insight_regeneration(owner, draft_job_id, index):
+def begin_insight_regeneration(owner, draft_job_id, index, edits):
     """Regenerate an insight without modifying the already extracted Key Facts."""
     with _LOCK:
         parent = _JOBS.get(draft_job_id)
@@ -241,6 +241,13 @@ def begin_insight_regeneration(owner, draft_job_id, index):
         if not matched:
             raise ValueError("Selected draft was not successfully prepared.")
         draft = copy.deepcopy(matched[0]["draft"])
+        for field in ("title", "category", "insight", "key_facts"):
+            if field in edits:
+                draft[field] = edits[field]
+        facts = draft.get("key_facts")
+        if (not isinstance(facts, list) or len(facts) != 3 or
+            any(not isinstance(point, str) or not 12 <= len(point.strip()) <= 1200 for point in facts)):
+            raise ValueError("Three valid Key Facts are required to regenerate Our Insights.")
     identifier = _new_job(owner, "insight", [draft], parent=draft_job_id)
     _WORKER.submit(_run_insight, identifier, index)
     return identifier
