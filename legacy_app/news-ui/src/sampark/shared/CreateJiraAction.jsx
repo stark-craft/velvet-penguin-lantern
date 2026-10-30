@@ -49,7 +49,7 @@ export default function CreateJiraAction({
     return () => clearInterval(clock);
   }, [open]);
 
-  const jobId = stage === 'publishing' || stage === 'results' ? publishJobId : draftJobId;
+  const jobId = stage === 'publishing' ? publishJobId : stage === 'generating' ? draftJobId : '';
   useEffect(() => {
     if (!jobId) return undefined;
     let cancelled = false;
