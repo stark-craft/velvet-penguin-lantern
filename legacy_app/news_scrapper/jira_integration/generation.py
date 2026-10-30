@@ -74,7 +74,7 @@ def _retry_after(error, attempt):
                 suggested = max(0, int((date - datetime.now(timezone.utc)).total_seconds()) + 1)
             except (TypeError, ValueError, OverflowError):
                 pass
-    return min(MAX_WAIT_SECONDS, max(60 * (2 ** (attempt - 1)), suggested))
+    return max(suggested, min(MAX_WAIT_SECONDS, 60 * (2 ** (attempt - 1))))
 
 
 def _limited_call(operation, invoke, on_pause):
