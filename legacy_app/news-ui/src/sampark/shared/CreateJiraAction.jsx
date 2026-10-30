@@ -141,7 +141,7 @@ export default function CreateJiraAction({
     setError('');
     setInsightJobId('');
     try {
-      const result = await regenerateJiraInsight(draftJobId, index);
+      const result = await regenerateJiraInsight(draftJobId, index, drafts.find(d => d.index === index));
       setInsightJobId(result.job_id);
     } catch (err) {
       setError(err?.message || 'Could not start insight regeneration.');
