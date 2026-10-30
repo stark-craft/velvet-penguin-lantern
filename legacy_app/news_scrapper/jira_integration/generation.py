@@ -62,7 +62,7 @@ def article_sources(article):
 
 def _retry_after(error, attempt):
     message = str(error)
-    found = re.search(r"Retry-After:\\s*([^\\n;]+)", message, re.I)
+    found = re.search(r"Retry-After:\s*([^\n;]+)", message, re.I)
     suggested = 0
     if found:
         raw = found.group(1).strip()
