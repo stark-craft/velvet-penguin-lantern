@@ -75,6 +75,17 @@ def publish_reports(draft_job_id: str, payload: PublishDrafts, request: Request)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
+@router.post("/news-drafts/{draft_job_id}/insights/{index}", status_code=202)
+def regenerate_insight(draft_job_id: str, index: int, request: Request):
+    actor = _actor(request)
+    REQUEST_LIMITER.check("jira.news.insight", actor, limit=8, window_seconds=600)
+    try:
+        identifier = jobs.begin_insight_regeneration(actor, draft_job_id, index)
+        return {"job_id": identifier, "status": "queued"}
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
 @router.post("/news-tickets", status_code=410)
 def obsolete_bulk_creation(request: Request):
     _actor(request)
