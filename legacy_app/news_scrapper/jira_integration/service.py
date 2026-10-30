@@ -42,51 +42,111 @@ def _safe(value: object) -> str:
 
 
 def build_status_report(articles: list[dict], attachments: dict[int, dict] | None = None) -> str:
-    """HTML used by customfield_15302. Indices are stable across uploads."""
+    """Samsung Tech Sensing / Jira JEditor format; safely escaped article data.
+
+    Each published ticket is a standalone article. An attachment's index is
+    still 0, preserving the existing create -> attach -> update workflow.
+    """
+    from datetime import datetime
+    from urllib.parse import urlsplit
+
     attachments = attachments or {}
-    lines = [
-        '<h1 dir="auto"><b><span style="color:#000000">TechScout — Selected News</span></b></h1>',
-        f'<p><b>{len(articles)} selected news article(s)</b></p>',
-    ]
+    parts: list[str] = []
+
+    def p(value: str) -> str:
+        return f'<p dir="auto" style="margin-bottom:11px"><span style="font-size:14pt">{value}</span></p>'
+
+    def source_link(url: str, name: str, date: str) -> str:
+        try:
+            split = urlsplit(url)
+            if split.scheme.lower() not in {"http", "https"} or not split.hostname or split.username or split.password:
+                return ""
+        except ValueError:
+            return ""
+        date_text = str(date or "").strip()[:10].replace("-", ".").replace("/", ".")
+        return f'<a href="{_safe(url)}">{_safe(name or split.hostname)}{f" ({_safe(date_text)})" if date_text else ""}</a>'
+
     for index, article in enumerate(articles):
-        lines.append(
-            f'<h2 dir="auto"><b><span style="color:#000099">'
-            f'[{index + 1}] {_safe(article.get("title"))}</span></b></h2>'
+        title = str(article.get("title") or "Untitled article").strip()
+        if not title.lower().startswith("[tech sensing]"):
+            title = "[Tech Sensing] " + title
+        parts.append(
+            '<h1 dir="auto"><b style="font-size:16pt; font-weight:bold">'
+            f'{_safe(title)}</b></h1>'
         )
-        if article.get("summary"):
-            # Preserve paragraphs; never treat scraper text as trusted HTML.
-            paragraphs = [segment.strip() for segment in str(article["summary"]).splitlines() if segment.strip()]
-            for paragraph in paragraphs:
-                lines.append(f'<p><span style="color:#000000">{_safe(paragraph)}</span></p>')
-        metadata = []
-        if article.get("source"):
-            metadata.append(f'Source: {_safe(article["source"])}')
-        if article.get("date"):
-            metadata.append(f'Date: {_safe(article["date"])}')
-        if metadata:
-            lines.append(f'<p><small>{" · ".join(metadata)}</small></p>')
-        if article.get("source_url"):
-            # Display article links as text unless they pass the canonical public URL check.
-            # These links aren't fetched server-side.
-            from urllib.parse import urlsplit
-            raw_url = str(article["source_url"]).strip()
-            try:
-                parsed = urlsplit(raw_url)
-                if parsed.scheme.lower() in {"https", "http"} and parsed.netloc and not parsed.username and not parsed.password:
-                    lines.append(f'<p><a href="{_safe(raw_url)}">Read original article</a></p>')
-            except ValueError:
-                pass
+        parts.append('<ul dir="auto">')
+        raw_categories = article.get("category") or article.get("tags") or "Technology"
+        if isinstance(raw_categories, (list, tuple)):
+            categories = " / ".join(str(x.get("name", "") if isinstance(x, dict) else x).strip() for x in raw_categories if x)
+        else:
+            categories = str(raw_categories)
+        parts.append(
+            '<li style="margin-bottom:11px">'
+            f'<span style="font-size:14pt"><b>Category:</b> <b>{_safe(categories)}</b></span></li>'
+        )
+
+        facts = article.get("key_facts")
+        if not isinstance(facts, list) or len(facts) != 3:
+            # Compatibility with older existing callers, not AI-created facts.
+            facts = [str(article.get("summary") or "").strip()]
+        parts.append('<li style="margin-bottom:11px">')
+        parts.append(p('<b>Key facts</b>:'))
+        parts.append('<ul>')
+        for fact in facts:
+            if str(fact or "").strip():
+                parts.append('<li style="margin-bottom:11px">' + p(_safe(fact)) + '</li>')
+        parts.append('</ul></li>')
+
+        original_sources = article.get("sources")
+        if not isinstance(original_sources, list):
+            original_sources = []
+        rendered_sources = []
+        seen = set()
+        for source in original_sources:
+            if not isinstance(source, dict):
+                continue
+            url = str(source.get("url") or source.get("link") or "")
+            if url in seen:
+                continue
+            link = source_link(url, source.get("name") or source.get("title") or "", source.get("date") or article.get("date") or "")
+            if link:
+                seen.add(url)
+                rendered_sources.append(link)
+        legacy_url = str(article.get("source_url") or "")
+        if legacy_url and legacy_url not in seen:
+            legacy = source_link(legacy_url, article.get("source") or "", article.get("date") or "")
+            if legacy:
+                rendered_sources.append(legacy)
+        parts.append('<li style="margin-bottom:11px">' + p('<b>Source: </b>' + (", ".join(rendered_sources) or "Not provided")) + '</li>')
+
+        insight = str(article.get("insight") or "").strip()
+        parts.append('<li style="margin-bottom:11px">' + p('<b>Our Insights:</b>'))
+        parts.append('<ul>')
+        if insight:
+            parts.append('<li style="margin-bottom:11px">' + p(_safe(insight)) + '</li>')
+        parts.append('</ul></li></ul>')
+
         attachment = attachments.get(index)
         if attachment:
-            identifier = str(attachment.get("id", ""))
-            filename = str(attachment.get("filename", ""))
+            identifier = str(attachment.get("id") or "")
+            filename = str(attachment.get("filename") or "")
             if identifier.isdigit() and filename:
-                safe_filename = quote(filename, safe="")
-                lines.append(
-                    f'<p><img src="/secure/attachment/{identifier}/{safe_filename}" '
-                    f'alt="{_safe(article.get("title"))}" style="max-width:560px;" /></p>'
+                caption = article.get("image_caption") or title.removeprefix("[Tech Sensing] ").strip()
+                parts.append(
+                    '<p dir="auto" style="margin-bottom:11px;text-align:center">'
+                    f'[{_safe(caption)}]</p>'
                 )
-    return "\n\n".join(lines)
+                parts.append(
+                    '<p dir="auto" style="margin-bottom:11px;text-align:center">'
+                    '<span class="image-wrap">'
+                    f'<img src="/secure/attachment/{identifier}/{quote(filename, safe="")}" '
+                    f'alt="{_safe(filename)}" '
+                    'style="max-width:560px;border:0px solid black" />'
+                    '</span></p>'
+                )
+        if index + 1 < len(articles):
+            parts.append('<hr/>')
+    return "\n".join(parts)
 
 
 def _download_image(url: str, destination_dir: str, index: int) -> Path:
@@ -146,8 +206,9 @@ def _load_jira_ops():
 
 def _summary(articles: list[dict]) -> str:
     if len(articles) == 1:
-        return str(articles[0]["title"]).strip()[:200]
-    return f"TechScout: {len(articles)} selected news articles ({date.today().isoformat()})"
+        title = str(articles[0]["title"]).strip()
+        return (title if title.lower().startswith("[tech sensing]") else f"[Tech Sensing] {title}")[:255]
+    return f"[Tech Sensing] {len(articles)} selected articles ({date.today().isoformat()})"
 
 
 def create_news_ticket(articles: list[dict], project: str, issue_type: str = "Task") -> dict:
