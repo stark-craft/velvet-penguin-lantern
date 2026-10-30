@@ -141,6 +141,10 @@ def call_samsung_chat(prompt: str) -> dict:
         stream=False,
     )
     if response.status_code >= 400:
+        # Preserve the upstream quota reset hint for automatic Jira draft retries.
+        if response.status_code == 429:
+            retry_after = str(response.headers.get("Retry-After") or "").strip()
+            raise RuntimeError("Samsung Chat HTTP 429 rate limit." + (f" Retry-After: {retry_after}" if retry_after else ""))
         excerpt = safe_error_excerpt(response)
         route_hint = (
             " The configured SAMSUNG_CHAT_URL route was not found; copy the "
