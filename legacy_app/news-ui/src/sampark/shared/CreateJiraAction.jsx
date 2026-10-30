@@ -186,7 +186,7 @@ export default function CreateJiraAction({
       <button
         className={buttonClassName}
         aria-busy={working}
-        disabled={disabled || !items.length || working}
+        disabled={disabled || !items.length}
         onClick={stage === 'idle' ? start : () => setOpen(true)}
         type="button"
       >
