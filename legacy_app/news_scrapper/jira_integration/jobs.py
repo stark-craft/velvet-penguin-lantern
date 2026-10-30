@@ -229,3 +229,43 @@ def _run_publish(identifier):
             job.update(completed=index + 1)
         ))
     _update(identifier, state="done", current="")
+
+
+def begin_insight_regeneration(owner, draft_job_id, index):
+    """Regenerate an insight without modifying the already extracted Key Facts."""
+    with _LOCK:
+        parent = _JOBS.get(draft_job_id)
+        if parent is None or parent["owner"] != owner or parent["kind"] != "draft" or parent["state"] != "done":
+            raise ValueError("Complete your own draft job before regenerating its insight.")
+        matched = [entry for entry in parent["entries"] if entry["index"] == index and entry["status"] == "ready"]
+        if not matched:
+            raise ValueError("Selected draft was not successfully prepared.")
+        draft = copy.deepcopy(matched[0]["draft"])
+    identifier = _new_job(owner, "insight", [draft], parent=draft_job_id)
+    _WORKER.submit(_run_insight, identifier, index)
+    return identifier
+
+
+def _run_insight(identifier, original_index):
+    _update(identifier, state="running", current="Regenerating Our Insights")
+    with _LOCK:
+        draft = copy.deepcopy(_JOBS[identifier]["articles"][0])
+    def pause(operation, seconds, attempt):
+        _update(
+            identifier, state="paused",
+            current=f"{operation} rate-limited; retry {attempt} scheduled automatically",
+            retry_at=time.time() + seconds,
+        )
+    try:
+        insight = generation.regenerate_insight(draft, on_pause=pause)
+        entry = {"index": original_index, "status": "ready", "insight": insight}
+    except Exception as error:
+        entry = {
+            "index": original_index, "status": "failed",
+            "error": str(error) if isinstance(error, generation.GenerationError)
+            else "Unable to regenerate insight.",
+        }
+    _mutate(identifier, lambda job: (
+        job["entries"].append(entry),
+        job.update(completed=1, state="done", current="", retry_at=None)
+    ))
