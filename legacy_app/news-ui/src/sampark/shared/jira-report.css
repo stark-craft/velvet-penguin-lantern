@@ -19,6 +19,7 @@
 .tsjira-sources{display:flex;flex-wrap:wrap;gap:8px 14px}
 .tsjira-sources a,.tsjira-result a{color:#174fa5;text-decoration:underline}
 .tsjira-image{max-width:min(400px,100%);max-height:220px;object-fit:contain;align-self:center;border:1px solid #dde3eb;border-radius:6px}
+.tsjira-regen{align-self:flex-start;padding:8px 12px;border:1px solid #aac1e7;border-radius:7px;background:#eef5ff;color:#18509f;font-weight:650;cursor:pointer}
 .tsjira-actions{display:flex;justify-content:flex-end;gap:12px;padding:12px 0}
 .tsjira-actions button{background:#edf2fa;border:1px solid #c8d2e1;border-radius:7px;color:#193653;padding:10px 14px;cursor:pointer;font-weight:650}
 .tsjira-actions button.tsjira-primary{background:#165cc3;color:white;border-color:#165cc3}
