@@ -404,9 +404,9 @@ export const startJiraNewsDrafts = (items) => jsonFetch('/jira/news-drafts', {
   timeoutMs: 30_000,
   body: JSON.stringify({ articles: (items || []).map(prepareJiraArticle) }),
 });
-export const regenerateJiraInsight = (draftJobId, index) => jsonFetch(
+export const regenerateJiraInsight = (draftJobId, index, draft) => jsonFetch(
   '/jira/news-drafts/' + encodeURIComponent(draftJobId) + '/insights/' + encodeURIComponent(index),
-  { method: 'POST', timeoutMs: 30_000 },
+  { method: 'POST', timeoutMs: 30_000, body: JSON.stringify({ draft }) },
 );
 export const getJiraNewsJob = (id) =>
   jsonFetch(`/jira/news-jobs/${encodeURIComponent(id)}`, { timeoutMs: 30_000 });
