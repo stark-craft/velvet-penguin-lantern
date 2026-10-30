@@ -10,6 +10,8 @@ import json
 import os
 import re
 import time
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from urllib.parse import urlparse
 
 from news_scrapper.adapters import samsung_chat as chat
@@ -59,10 +61,19 @@ def article_sources(article):
 
 
 def _retry_after(error, attempt):
-    text = str(error)
-    # Samsung adapters' 429 error excerpts may include Retry-After text.
-    found = re.search(r"retry[- ]after[^\d]{0,12}(\d{1,4})", text, re.I)
-    suggested = int(found.group(1)) if found else 0
+    message = str(error)
+    found = re.search(r"Retry-After:\\s*([^\\n;]+)", message, re.I)
+    suggested = 0
+    if found:
+        raw = found.group(1).strip()
+        if raw.isdigit():
+            suggested = int(raw)
+        else:
+            try:
+                date = parsedate_to_datetime(raw)
+                suggested = max(0, int((date - datetime.now(timezone.utc)).total_seconds()) + 1)
+            except (TypeError, ValueError, OverflowError):
+                pass
     return min(MAX_WAIT_SECONDS, max(60 * (2 ** (attempt - 1)), suggested))
 
 
