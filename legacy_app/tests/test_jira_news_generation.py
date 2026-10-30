@@ -92,6 +92,40 @@ class JobTests(unittest.TestCase):
             self.assertEqual(jobs._previous(ARTICLE), created)
             self.assertEqual(jobs.identity(ARTICLE), jobs.identity({**ARTICLE, "title": "Edited title"}))
 
+    def test_two_articles_produce_two_independent_jira_issues(self):
+        second = {
+            **ARTICLE,
+            "title": "Second article",
+            "source_url": "https://example.org/second",
+        }
+        calls = []
+
+        def fake_create(items, project, issue_type):
+            calls.append((items, project, issue_type))
+            number = len(calls)
+            return {
+                "key": f"SRIDRDSG-{number}",
+                "url": f"https://jira.sec.samsung.net/browse/SRIDRDSG-{number}",
+                "warnings": [],
+                "article_count": 1,
+                "image_count": 0,
+            }
+
+        with tempfile.TemporaryDirectory() as directory, \\
+             patch.dict("os.environ", {
+                 "JIRA_NEWS_DB_PATH": str(Path(directory) / "issues.db"),
+                 "JIRA_NEWS_PROJECT": "SRIDRDSG",
+                 "JIRA_NEWS_ISSUE_TYPE": "Task",
+             }), patch.object(jobs.service, "create_news_ticket", side_effect=fake_create):
+            job_id = jobs._new_job("publisher", "publish", [ARTICLE, second])
+            jobs._run_publish(job_id)
+            entries = jobs.get_job(job_id, "publisher")["entries"]
+            self.assertEqual([e["status"] for e in entries], ["created", "created"])
+            self.assertEqual(len(calls), 2)
+            self.assertTrue(all(len(call[0]) == 1 for call in calls))
+            jobs._run_publish(job_id)
+            self.assertEqual(len(calls), 2)
+
     def test_job_details_are_isolated_by_viewer(self):
         identifier = jobs._new_job("actor-one", "draft", [ARTICLE])
         self.assertIsNotNone(jobs.get_job(identifier, "actor-one"))
