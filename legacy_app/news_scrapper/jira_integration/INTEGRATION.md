@@ -1,69 +1,75 @@
-# TechScout "Create Jira" integration
+# TechScout → Samsung Jira Tech Sensing reports (feature branch)
 
-## Behavior
-A user checks one or more news cards and clicks **Create Jira**.
-The browser sends **one** `POST /jira/news-tickets` request with the selected
-article title, summary, source, date, article URL and image URL.
+## User workflow
+- Check 1–30 news cards and select **Create Jira**.
+- `POST /jira/news-drafts` returns a job ID immediately; the React panel polls
+  `GET /jira/news-jobs/{job_id}` for progress.
+- Each article receives its **own** Samsung Chat draft with exactly three factual
+  Key Facts and one Samsung/India-first strategic Our Insights paragraph.
+- Optional Samsung Web Search adds public research context only. The published
+  Source section uses **only links already attached to the article**.
+- Review and edit title, category, all three facts, Our Insights and caption.
+- `POST /jira/news-drafts/{job_id}/publish` starts one independent Jira issue
+  per approved draft, and returns another job ID for progress and issue links.
+- Reporter remains the backend's Jira SSO account. Assignee behavior follows
+  the locally deployed JiraOps/service configuration and project defaults.
 
-The backend creates **one Jira issue** containing a separate section for each
-selected article in Jira's rich **Status Report** field
-(`customfield_15302`). The normal Jira description remains empty.
-Images are downloaded only from validated public HTTP(S) URLs, with redirects
-disabled, a 5 MB limit, and accepted image MIME types. Each successfully
-downloaded image is attached through Guy X's Jira CDP client, then referenced
-inside the Status Report via `/secure/attachment/{id}/{filename}`.
+## Jira field formatting
+- Summary: `[Tech Sensing] <headline>`
+- Description: **empty string**
+- Status Report: `customfield_15302`, with 16pt heading, 14pt category,
+  nested exactly three factual Key Facts, links and publication dates,
+  Our Insights, and a centered embedded image/caption.
+- Images are uploaded with Guy X's `attach_file_to_jira` and embedded as
+  `/secure/attachment/{id}/{filename}` in a follow-up `update_ticket`.
+- Missing image or failed attachment does not throw away a created ticket.
 
-The UI displays the issue key and an **Open Jira** link. If images fail after
-issue creation, the backend still returns the existing Jira issue URL with
-warnings; clicking again for the same selection is disabled until selection
-changes, reducing accidental duplicate issues.
+## Quotas and automatic continuation
+- The existing `samsung_chat` and `samsung_web_search` adapters each
+  share an app-wide `PacedRateLimiter`: at most **3 requests/minute**,
+  spaced at least **20 seconds** between request starts per API, including
+  calls made elsewhere in TechScout.
+- On HTTP 429, only the **read-only Chat/Search** call is paused and retried,
+  using at least 60 seconds of delay, exponentially increasing to 600 seconds.
+  The panel displays the automatic retry countdown and progress.
+- The worker processes the selected articles sequentially. Do **not** restart
+  the backend during an in-progress job; running jobs are **in-memory**, so
+  they cannot resume after a process restart. Auto-resume applies to live
+  rate-limited jobs, not server restarts.
+- **Jira CREATE is never auto-retried** because an uncertain response could
+  hide an already-created ticket.
 
-## Files touched
-- `news-ui/src/sampark/all-news/AllNewsPage.jsx` (bottom selection bar)
-- `news-ui/src/sampark/SamparkHistory.jsx` (archive checkboxes + bottom bar)
-- `news-ui/src/news-scrapper/screens/FeedScreen.jsx` (legacy bottom bar)
-- `news-ui/src/news-scrapper/screens/HistoryScreen.jsx` (legacy archive controls)
-- `news-ui/src/sampark/shared/CreateJiraAction.jsx` (common action/status)
-- `news-ui/src/news-scrapper/api.js` (same-origin request wrapper)
-- `news_scrapper/jira_integration/router.py` (FastAPI boundary)
-- `news_scrapper/jira_integration/service.py` (Jira mapping)
-- `news_scrapper/jira_integration/vendor/` (Guy X source files, copy locally)
-- `main.py` and `news-ui/vite.config.js` (API routing)
-- `.env.example` and `requirements.txt` (server configuration)
+## Duplicate protection and failure handling
+- A SQLite file tracks successful Jira issue URLs by normalized article link,
+  or article title+source+date as a fallback. It survives normal restarts.
+  Configure `JIRA_NEWS_DB_PATH` if persistent backend data lives elsewhere.
+- `JIRA_NEWS_DB_PATH` defaults to `data/jira_news_issues.sqlite3` relative
+  to the server's current working directory. Keep it in writable persistent
+  storage, not a disposable portable package folder.
+- Existing issues return their original link instead of a second create.
+- Per-article failures are shown separately. Unconfirmed Jira writes are
+  **not automatically retried**; check Jira before retrying manually.
+- Jobs are access-controlled by the TechScout viewer principal and limited
+  per viewer to 8 draft/publish starts per ten minutes.
 
-## Development and server-PC setup
-1. Preserve the latest working `C:\scrappyV3` working tree and back up any
-   uncommitted local edits. The GitHub Samsung News snapshot may differ.
-2. Merge/cherry-pick this feature branch only after comparing it with the
-   current local branch.
-3. Copy the **four original** supplied files to
-   `news_scrapper\jira_integration\vendor\`. The test script and standalone
-   requirements are optional for this integration.
-4. Install `pip install -r requirements.txt` in your existing backend venv.
-5. For safe local validation, keep `JIRA_NEWS_ENABLED=false` and run:
-   `python -m unittest discover -s tests -p test_jira_news_integration.py`
-6. Confirm the corporate Windows account used to start FastAPI can log in
-   through Guy X's headless SSO, and the project supports Status Report.
-7. Set `JIRA_NEWS_PROJECT=SRIDRDSG`, `JIRA_NEWS_ISSUE_TYPE=Task`,
-   and **only when ready for real issue creation** `JIRA_NEWS_ENABLED=true`
-   in `legacy_app/.env`. Restart FastAPI.
-8. Run `uvicorn main:app --reload` from `legacy_app`; start Vite as usual
-   in `news-ui`. Test with one selected news card first.
-9. For the server PC, repeat the vendor copy + dependency install, use an
-   appropriately secured dedicated Chrome/Edge SSO profile and confirm the
-   Windows service account can use Kerberos/AD under corporate policy.
+## Configuration
+Keep the original Samsung Chat, Samsung Web Search, Jira and browser settings
+in the backend's private `.env`. No tokens go into React or the GitHub branch.
+Use `JIRA_NEWS_ENABLED=false` until publishing is intended. Draft generation
+requires Samsung Chat configured; research is optional when Web Search is unset.
 
-## Security and operational limitations
-- Jira creation is gated by `review.news.submit` capability and rate-limited
-  (8 requests per signed viewer per 10 minutes). A stricter `jira.create`
-  capability may be introduced after permissions are agreed.
-- The API is opt-in via `JIRA_NEWS_ENABLED`; no client receives Jira cookies.
-- The original CDP session is a **server-side** identity, not the individual
-  viewer's Jira identity. All Jira issues are created under that SSO account.
-- The CDP browser is serialized with a single lock in this process. Do not use
-  multiple FastAPI workers with the same CDP Chrome profile.
-- If the Jira POST succeeds but the HTTP connection fails before returning a
-  key, Jira may have created a ticket. Check Jira before manually retrying.
-- Downloading external news images depends on external access and valid TLS;
-  failures return warnings without destroying created tickets.
-- No live Jira requests were made or verified by creating this branch.
+**Install original Guy X bundle (never reconstructed from chat)**:
+`news_scrapper/jira_integration/vendor/{jira_ops.py,cdp_api.py,cdp_browser.py,config.py}`.
+Keep `websocket-client>=1.6,<2` installed in the backend venv.
+
+## Deployment caution
+This feature branch is based on a reconstructed `legacy_app/` snapshot,
+while the office `C:\\scrappyV3` and App_Portable deployments may be newer.
+**Do not overwrite existing project files blindly**. For the new version,
+copy the new `generation.py`, `jobs.py` and `jira-report.css` plus targeted
+updates to `router.py`, `service.py`,
+`news-ui/src/news-scrapper/api.js` and
+`news-ui/src/sampark/shared/CreateJiraAction.jsx`.
+Other Sampark pages already use the shared CreateJiraAction component.
+Do not copy `legacy_app/` as a folder into the project root.
+Keep `WEB_CONCURRENCY=1` for one shared Chrome CDP profile.
