@@ -168,6 +168,10 @@ def fetch_exact_article_content(url: str) -> dict:
     if response is None:
         raise RuntimeError("exact article fetch returned no response")
     if response.status_code >= 400:
+        # Preserve the upstream quota reset hint for automatic Jira draft retries.
+        if response.status_code == 429:
+            retry_after = str(response.headers.get("Retry-After") or "").strip()
+            raise RuntimeError("Samsung Web Search HTTP 429 rate limit." + (f" Retry-After: {retry_after}" if retry_after else ""))
         raise RuntimeError(
             f"exact article fetch returned HTTP {response.status_code}"
         )
