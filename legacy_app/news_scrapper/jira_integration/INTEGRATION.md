@@ -29,8 +29,9 @@
   share an app-wide `PacedRateLimiter`: at most **3 requests/minute**,
   spaced at least **20 seconds** between request starts per API, including
   calls made elsewhere in TechScout.
-- On HTTP 429, only the **read-only Chat/Search** call is paused and retried,
-  using at least 60 seconds of delay, exponentially increasing to 600 seconds.
+- On HTTP 429, only the **read-only Chat/Search** call is paused and retried.
+  It honors the upstream `Retry-After` header (including an HTTP-date), or
+  uses a 60-second minimum exponential fallback capped at 600 seconds.
   The panel displays the automatic retry countdown and progress.
 - The worker processes the selected articles sequentially. Do **not** restart
   the backend during an in-progress job; running jobs are **in-memory**, so
@@ -70,6 +71,10 @@ copy the new `generation.py`, `jobs.py` and `jira-report.css` plus targeted
 updates to `router.py`, `service.py`,
 `news-ui/src/news-scrapper/api.js` and
 `news-ui/src/sampark/shared/CreateJiraAction.jsx`.
-Other Sampark pages already use the shared CreateJiraAction component.
+The new Jira generation also updates the existing
+`news_scrapper/adapters/samsung_chat.py` and
+`news_scrapper/adapters/samsung_web_search.py` in two small 429 handling
+blocks to expose Retry-After response headers. Other Sampark pages already
+use the shared CreateJiraAction component.
 Do not copy `legacy_app/` as a folder into the project root.
 Keep `WEB_CONCURRENCY=1` for one shared Chrome CDP profile.
