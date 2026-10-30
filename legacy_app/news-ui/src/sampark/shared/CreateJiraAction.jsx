@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { articleKey } from '../../news-scrapper/utils/intelligence.js';
 import {
   getJiraNewsJob,
+  regenerateJiraInsight,
   publishJiraNewsDrafts,
   startJiraNewsDrafts,
 } from '../../news-scrapper/api.js';
@@ -24,6 +25,7 @@ export default function CreateJiraAction({
   const [stage, setStage] = useState('idle');
   const [draftJobId, setDraftJobId] = useState('');
   const [publishJobId, setPublishJobId] = useState('');
+  const [insightJobId, setInsightJobId] = useState('');
   const [job, setJob] = useState(null);
   const [drafts, setDrafts] = useState([]);
   const [selected, setSelected] = useState(new Set());
@@ -36,6 +38,7 @@ export default function CreateJiraAction({
     setOpen(false);
     setDraftJobId('');
     setPublishJobId('');
+    setInsightJobId('');
     setDrafts([]);
     setSelected(new Set());
     setResults([]);
@@ -49,7 +52,7 @@ export default function CreateJiraAction({
     return () => clearInterval(clock);
   }, [open]);
 
-  const jobId = stage === 'publishing' ? publishJobId : stage === 'generating' ? draftJobId : '';
+  const jobId = stage === 'publishing' ? publishJobId : stage === 'generating' ? draftJobId : stage === 'regenerating' ? insightJobId : '';
   useEffect(() => {
     if (!jobId) return undefined;
     let cancelled = false;
@@ -69,6 +72,17 @@ export default function CreateJiraAction({
           setSelected(new Set(ready.map(item => item.index)));
           setStage('preview');
           if (!ready.length) setError('No reports could be generated. Review the errors and regenerate.');
+        }
+        if (current.state === 'done' && current.kind === 'insight') {
+          const changed = current.entries?.[0];
+          if (changed?.status === 'ready') {
+            setDrafts(previous => previous.map(d =>
+              d.index === changed.index ? { ...d, insight: changed.insight } : d
+            ));
+          } else {
+            setError(changed?.error || 'Could not regenerate Our Insights.');
+          }
+          setStage('preview');
         }
         if (current.state === 'done' && current.kind === 'publish') {
           setResults(current.entries || []);
@@ -120,6 +134,21 @@ export default function CreateJiraAction({
     }));
   };
 
+  const regenerateInsight = async (index) => {
+    if (stage !== 'preview') return;
+    setStage('regenerating');
+    setJob(null);
+    setError('');
+    setInsightJobId('');
+    try {
+      const result = await regenerateJiraInsight(draftJobId, index);
+      setInsightJobId(result.job_id);
+    } catch (err) {
+      setError(err?.message || 'Could not start insight regeneration.');
+      setStage('preview');
+    }
+  };
+
   const publish = async () => {
     if (stage !== 'preview' || !selected.size) return;
     const toPublish = drafts.filter(item => selected.has(item.index));
@@ -147,7 +176,7 @@ export default function CreateJiraAction({
   const pausedSeconds = job?.retry_at
     ? Math.max(0, Math.ceil(job.retry_at - now / 1000))
     : 0;
-  const working = stage === 'generating' || stage === 'publishing';
+  const working = stage === 'generating' || stage === 'publishing' || stage === 'regenerating';
   const failedDrafts = stage === 'preview'
     ? (job?.entries || []).filter(entry => entry.status === 'failed')
     : [];
@@ -177,7 +206,7 @@ export default function CreateJiraAction({
 
             {working && (
               <div className="tsjira-progress" role="status">
-                <strong>{stage === 'generating' ? 'Generating AI reports' : 'Creating Jira issues'}</strong>
+                <strong>{stage === 'generating' ? 'Generating AI reports' : stage === 'regenerating' ? 'Regenerating Our Insights' : 'Creating Jira issues'}</strong>
                 <span>{job?.completed || 0} / {job?.total || items.length} completed</span>
                 <progress value={job?.completed || 0} max={job?.total || items.length} />
                 <p>{job?.current || 'Waiting for the report queue…'}</p>
@@ -228,6 +257,9 @@ export default function CreateJiraAction({
                       </label>
                     ))}
                     <strong>Source</strong>
+                    {draft.verification === 'summary_only' && (
+                      <p className="tsjira-hint">Independent web verification was unavailable; review the three facts against the linked sources.</p>
+                    )}
                     <div className="tsjira-sources">
                       {draft.sources?.length
                         ? draft.sources.map((source, i) => (
@@ -240,6 +272,9 @@ export default function CreateJiraAction({
                     <label>Our Insights
                       <textarea rows={4} value={draft.insight} maxLength={2400} onChange={event => edit(draft.index, 'insight', event.target.value)} />
                     </label>
+                    <button type="button" className="tsjira-regen" onClick={() => regenerateInsight(draft.index)}>
+                      Regenerate Our Insights only
+                    </button>
                     <label>Image caption
                       <input value={draft.image_caption || ''} maxLength={350} onChange={event => edit(draft.index, 'image_caption', event.target.value)} />
                     </label>
