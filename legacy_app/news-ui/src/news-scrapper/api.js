@@ -382,12 +382,11 @@ export const getViewerActivitySummary = (tz) => {
 };
 
 // ---------- Tech Sensing Jira (independent per-article drafts) ----------
-const jiraSourceList = (item) => {
-  for (const list of [item?.sources, item?.source_links, item?.original_sources, item?.references]) {
-    if (Array.isArray(list)) return list.slice(0, 30);
-  }
-  return [];
-};
+const jiraSourceList = (item) =>
+  [item?.sources, item?.source_links, item?.original_sources, item?.references]
+    .filter(Array.isArray)
+    .flat()
+    .slice(0, 30);
 export const prepareJiraArticle = (item = {}) => ({
   title: String(item?.title || '').trim().slice(0, 500),
   summary: String(item?.master_summary || item?.summary || item?.summary_lead || item?.ppt_summary || item?.snippet || '').trim().slice(0, 15000),
