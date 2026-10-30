@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from core.request_limits import REQUEST_LIMITER
@@ -52,8 +52,9 @@ def generate_drafts(payload: CreateDrafts, request: Request):
 
 
 @router.get("/news-jobs/{job_id}")
-def job_status(job_id: str, request: Request):
+def job_status(job_id: str, request: Request, response: Response):
     actor = _actor(request)
+    response.headers["Cache-Control"] = "no-store"
     job = jobs.get_job(job_id, actor)
     if not job:
         raise HTTPException(status_code=404, detail="Jira job not found.")
