@@ -111,7 +111,7 @@ class JobTests(unittest.TestCase):
                 "image_count": 0,
             }
 
-        with tempfile.TemporaryDirectory() as directory, \\
+        with tempfile.TemporaryDirectory() as directory, \
              patch.dict("os.environ", {
                  "JIRA_NEWS_DB_PATH": str(Path(directory) / "issues.db"),
                  "JIRA_NEWS_PROJECT": "SRIDRDSG",
