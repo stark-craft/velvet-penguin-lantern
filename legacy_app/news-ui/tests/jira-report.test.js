@@ -42,10 +42,10 @@ test('Jira report dialog escapes the backdrop-blurred batch action bar', () => {
   const style = read('../src/sampark/shared/jira-report.css');
   const allNews = read('../src/sampark/all-news/AllNewsPage.jsx');
 
-  assert.match(allNews, /batch-action-bar[\\s\\S]*backdrop-blur-xl/);
-  assert.match(action, /import \\{ createPortal \\} from 'react-dom'/);
-  assert.match(action, /createPortal\\(/);
-  assert.match(action, /document\\.body/);
-  assert.match(style, /\\.tsjira-overlay\\s*\\{[\\s\\S]*position:\\s*fixed/);
-  assert.match(style, /\\.tsjira-dialog\\s*\\{[\\s\\S]*width:\\s*min\\(960px,/);
+  assert.match(allNews, /batch-action-bar[\s\S]*backdrop-blur-xl/);
+  assert.match(action, /import \{ createPortal \} from 'react-dom'/);
+  assert.match(action, /createPortal\(/);
+  assert.match(action, /document\.body/);
+  assert.match(style, /\.tsjira-overlay\s*\{[\s\S]*position:\s*fixed/);
+  assert.match(style, /\.tsjira-dialog\s*\{[\s\S]*width:\s*min\(960px,/);
 });
