@@ -274,3 +274,98 @@ html[data-theme="dark"] .sde-footer button:hover:not(:disabled) {background:#345
   .sde-option {transition:none;}
   .sde-spinner {animation:none;}
 }
+
+
+/* Draft Export Studio v2: a distinct, high-contrast surface rather than
+   white-on-white panels. Scoped to the Sampark portal; Sense stays unchanged.
+   Intentionally placed AFTER light and dark theme rules so portal styling is
+   identical regardless of the caller's theme scope. */
+.sde-overlay.sde-overlay--sampark {
+  isolation:isolate;
+  background:rgba(4,12,27,.82);
+}
+.sde-overlay--sampark .sde-dialog {
+  border:1px solid #47688e;
+  background:#14263f;
+  color:#edf5ff;
+  color-scheme:dark;
+  box-shadow:0 34px 100px rgba(0,6,22,.65),0 1px 0 rgba(255,255,255,.06) inset;
+}
+.sde-overlay--sampark .sde-header {
+  background:radial-gradient(ellipse at 85% 0%,rgba(72,145,255,.22),transparent 55%),
+    linear-gradient(115deg,#0c182c,#193d68);
+  border-bottom:1px solid #37577d;
+}
+.sde-overlay--sampark .sde-kicker {color:#b5d5ff;}
+.sde-overlay--sampark .sde-content {
+  background:linear-gradient(155deg,#142945,#101d32);
+}
+.sde-overlay--sampark .sde-summary {gap:12px;}
+.sde-overlay--sampark .sde-count {
+  background:#234b79;color:#e0efff;border:1px solid #4d83c5;
+}
+.sde-overlay--sampark .sde-summary-separator {background:#446080;}
+.sde-overlay--sampark .sde-draft-label {color:#c8dcf5;}
+.sde-overlay--sampark .sde-description {color:#b9cfe9;}
+.sde-overlay--sampark .sde-format-head {color:#91b2d9;}
+.sde-overlay--sampark .sde-options {gap:13px;}
+.sde-overlay--sampark .sde-option {
+  background:#203854;
+  border:1px solid #476587;
+  color:#ecf6ff;
+  box-shadow:0 5px 20px rgba(0,9,27,.14);
+}
+.sde-overlay--sampark .sde-option:hover:not(:disabled),
+.sde-overlay--sampark .sde-option:focus-visible {
+  border-color:#87baff;
+  background:#2b4c75;
+  box-shadow:0 7px 24px rgba(8,21,42,.35);
+}
+.sde-overlay--sampark .sde-option-copy strong {
+  color:#f6faff;
+  font-size:16px;
+  letter-spacing:-.015em;
+}
+.sde-overlay--sampark .sde-option-copy>span {color:#c3d5ea;}
+.sde-overlay--sampark .sde-option-icon {
+  background:#48396b;color:#dbc8ff;border:1px solid #76649b;
+}
+.sde-overlay--sampark .sde-option--blue .sde-option-icon {
+  background:#254f83;color:#c3dfff;border-color:#427cbf;
+}
+.sde-overlay--sampark .sde-option--green .sde-option-icon {
+  background:#245950;color:#a8eed6;border-color:#478678;
+}
+.sde-overlay--sampark .sde-option-action {
+  background:#e5f1ff;
+  border:1px solid #e5f1ff;
+  color:#1853a1;
+}
+.sde-overlay--sampark .sde-option:hover:not(:disabled) .sde-option-action {
+  background:#78b0ff;border-color:#78b0ff;color:#072648;
+}
+.sde-overlay--sampark .sde-option.is-working {border-color:#9bc8ff;}
+.sde-overlay--sampark .sde-option.is-working .sde-option-action {
+  background:#c4dfff;border-color:#c4dfff;color:#174b85;
+}
+.sde-overlay--sampark .sde-notice {
+  background:#382e22;border-color:#8b6e42;color:#ffe1a6;
+}
+.sde-overlay--sampark .sde-notice svg {color:#ffca6e;}
+.sde-overlay--sampark .sde-working {
+  background:#254b75;color:#e2f0ff;border-color:#598ac4;
+}
+.sde-overlay--sampark .sde-error {
+  background:#492532;color:#ffe1e8;border-color:#b36a7f;
+}
+.sde-overlay--sampark .sde-footer {
+  background:#0e1b2f;
+  border-top:1px solid #355170;
+}
+.sde-overlay--sampark .sde-footer>span {color:#a9c3e2;}
+.sde-overlay--sampark .sde-footer button {
+  background:#264464;border:1px solid #6384af;color:#e9f4ff;
+}
+.sde-overlay--sampark .sde-footer button:hover:not(:disabled) {
+  background:#375b85;color:#fff;
+}
