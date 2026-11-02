@@ -228,11 +228,17 @@ export default function CreateJiraAction({
     <>
       <button
         className={buttonClassName}
-        disabled={!items.length || disabled || busy || isWorking}
-        onClick={start}
+        disabled={!items.length || disabled || busy}
+        onClick={() => {
+          if (phase === 'idle') start();
+          else setOpen(true);
+        }}
         type="button"
       >
-        Create Jira
+        {phase === 'published' ? 'View Jira results'
+          : phase === 'preview' ? 'Review Jira drafts'
+          : isWorking ? 'View Jira progress'
+          : 'Create Jira'}
       </button>
 
       {open && (
