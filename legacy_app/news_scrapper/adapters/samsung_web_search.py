@@ -168,6 +168,9 @@ def fetch_exact_article_content(url: str) -> dict:
     if response is None:
         raise RuntimeError("exact article fetch returned no response")
     if response.status_code >= 400:
+        retry_after = str(response.headers.get('Retry-After') or '').strip()[:120] if response.status_code == 429 else ''
+        if retry_after:
+            raise RuntimeError(f'Samsung Web Search HTTP 429. Retry-After: {retry_after};')
         raise RuntimeError(
             f"exact article fetch returned HTTP {response.status_code}"
         )
