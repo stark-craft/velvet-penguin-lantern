@@ -10,7 +10,11 @@ test('Sampark Draft Export uses a portal with its own contrast-safe UI', () => {
   const allNews = read('../src/sampark/all-news/AllNewsPage.jsx');
 
   assert.match(allNews, /<DraftExportModal[^>]*source="sampark-all-news"/);
-  assert.match(source, /source\.startsWith\('sampark'\)/);
+  assert.match(source, /String\(source \|\| ''\)\.startsWith\('sampark'\)/);
+  assert.match(source, /window\.location\.pathname/);
+  assert.match(source, /samparkRoute/);
+  assert.match(source, /data-sampark-draft-export="studio-v2"/);
+  assert.match(source, /sde-overlay--sampark/);
   assert.match(source, /createPortal\(/);
   assert.match(source, /document\.body/);
   assert.match(source, /useModalFocus\(open, busy \? undefined : onClose\)/);
@@ -19,6 +23,10 @@ test('Sampark Draft Export uses a portal with its own contrast-safe UI', () => {
   assert.match(source, /className="sde-dialog"/);
   assert.match(source, /import '\.\/draft-export-sampark\.css'/);
   assert.match(style, /\.sde-dialog\s*\{/);
+  assert.match(style, /\.sde-overlay--sampark \.sde-dialog/);
+  assert.match(style, /background:#14263f/);
+  assert.match(style, /\.sde-overlay--sampark \.sde-option/);
+  assert.match(style, /background:#203854/);
   assert.match(style, /\.sde-option\s*\{/);
   assert.match(style, /html\[data-theme="dark"\] \.sde-dialog/);
   assert.match(style, /@media\(max-width:600px\)/);
