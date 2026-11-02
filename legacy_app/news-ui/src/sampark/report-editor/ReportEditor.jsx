@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Undo2, Redo2, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, ImagePlus, Scissors, Sparkles, History, Save, X, FileText, PanelLeft, Download, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Undo2, Redo2, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, ImagePlus, Scissors, Sparkles, History, Save, X, FileText, PanelLeft, Download, ChevronRight } from 'lucide-react';
 import useModalFocus from '../../news-scrapper/components/modals/useModalFocus.js';
 import { reportRequest } from './reportApi.js';
 import { seedReport, escapeHtml, paragraphs } from './reportModel.js';
@@ -324,7 +324,7 @@ export default function ReportEditor({items, onClose}) {
   const tools=[['Undo','undo',Undo2],['Redo','redo',Redo2],['Bold','bold',Bold],['Italic','italic',Italic],['Underline','underline',Underline],['Bulleted list','insertUnorderedList',List],['Numbered list','insertOrderedList',ListOrdered],['Align left','justifyLeft',AlignLeft],['Align center','justifyCenter',AlignCenter],['Align right','justifyRight',AlignRight]];
   const aiWorking=automaticAnalysis?.status==='loading' || Boolean(automaticImpact.state?.pending);
   return createPortal(
-    <div className="sampark-report-overlay">
+    <div className="sampark-report-overlay sr-studio-overlay">
       <section ref={modal} className="sampark-report-workspace sr-studio" role="dialog" aria-modal="true" aria-label="Editable selected-news report" tabIndex={-1}>
         <header className="sr-studio-header">
           <div className="sr-studio-brand">
