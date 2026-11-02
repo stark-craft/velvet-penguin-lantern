@@ -61,7 +61,48 @@ class ReportTests(unittest.TestCase):
         self.assertIn("https://example.org/other", markup)
         self.assertIn("/secure/attachment/454/chip.png", markup)
         self.assertIn("Our Insights", markup)
-        self.assertEqual(markup.count("<li>"), 5)
+        # Only the three Key Facts remain list items; sources are inline links.
+        self.assertEqual(markup.count("<li>"), 3)
+        self.assertIn(
+            '<a href="https://example.com/ai-chip">Source One (2026-10-30)</a>, '
+            '<a href="https://example.org/other">Source Two (2026-10-29)</a>',
+            markup,
+        )
+        self.assertNotIn('>https://example.com/ai-chip</a>', markup)
+
+    def test_source_name_and_date_are_clickable_and_escaped(self):
+        article = {
+            **REPORT,
+            "sources": [
+                {
+                    "name": "<Publisher & Partners>",
+                    "date": "2026-11-02",
+                    "url": "https://example.com/story?a=1&b=2",
+                },
+                {
+                    "name": "Not Safe",
+                    "date": "2026-11-02",
+                    "url": "javascript:alert(1)",
+                },
+            ],
+        }
+        markup = service.build_article_status_report(article)
+        self.assertIn(
+            '<a href="https://example.com/story?a=1&amp;b=2">'
+            '&lt;Publisher &amp; Partners&gt; (2026-11-02)</a>',
+            markup,
+        )
+        self.assertNotIn("javascript:", markup)
+        self.assertNotIn("<Publisher & Partners>", markup)
+
+    def test_primary_source_fallback_uses_clickable_name_and_date(self):
+        article = {**REPORT, "sources": []}
+        markup = service.build_article_status_report(article)
+        self.assertIn(
+            '<a href="https://example.com/ai-chip">Source One (2026-10-30)</a>',
+            markup,
+        )
+        self.assertNotIn("Original source link not available", markup)
 
     def test_facts_must_be_exactly_three(self):
         with self.assertRaises(ValueError):
