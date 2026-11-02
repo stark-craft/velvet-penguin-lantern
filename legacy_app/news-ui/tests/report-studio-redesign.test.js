@@ -73,3 +73,82 @@ test('AI progress is real and user-edited passages still require review before r
   assert.match(editor, /!replaceEdited && !canApplyAutomaticImpact/);
   assert.match(editor, /reportStartup\.current\?\.cancel\(\)/);
 });
+
+test('Inline AI indicators decorate their own document blocks and are excluded from exports', async () => {
+  const {
+    updateReportLiveStates, stripReportLiveStates,
+  } = await import('../src/sampark/report-editor/reportLiveStates.js');
+
+  const makeNode = () => {
+    const attributes = new Map();
+    return {
+      attributes,
+      setAttribute: (name, value) => attributes.set(name, value),
+      removeAttribute: (name) => attributes.delete(name),
+      getAttribute: (name) => attributes.get(name),
+      closest: () => null,
+    };
+  };
+  const comparison = makeNode();
+  const impactOne = makeNode();
+  const impactTwo = makeNode();
+  const bodyOne = makeNode();
+  const bodyTwo = makeNode();
+  bodyOne.closest = () => impactOne;
+  bodyTwo.closest = () => impactTwo;
+  const boxes = [impactOne, impactTwo];
+  const known = new Set([comparison, impactOne, impactTwo, bodyOne, bodyTwo]);
+  const root = {
+    contains: (node) => known.has(node),
+    querySelector: (selector) => selector === '[data-kind="cross-analysis"]' ? comparison
+      : selector === '[data-kind="samsung-impact"]' ? impactOne : null,
+    querySelectorAll: (selector) => selector === '[data-kind="samsung-impact"]'
+      ? boxes : selector === '[data-sr-ai-state]'
+        ? [comparison, ...boxes].filter(node=>node.attributes.has('data-sr-ai-state'))
+        : [],
+  };
+  updateReportLiveStates(root, {status:'loading'}, null);
+  assert.equal(comparison.getAttribute('data-sr-ai-state'), 'loading');
+  assert.equal(impactOne.getAttribute('data-sr-ai-state'), 'queued');
+  assert.equal(impactTwo.getAttribute('data-sr-ai-state'), 'queued');
+
+  const pending = {index:1,total:2,body:bodyOne,targets:[bodyOne,bodyTwo]};
+  updateReportLiveStates(root, null, {pending,issues:[]});
+  assert.equal(impactOne.getAttribute('data-sr-ai-state'), 'loading');
+  assert.equal(impactTwo.getAttribute('data-sr-ai-state'), 'queued');
+  assert.equal(comparison.getAttribute('data-sr-ai-state'), undefined);
+
+  updateReportLiveStates(root, null, {pending:null,issues:[
+    {status:'error',target:{body:bodyOne},message:'Source summary unavailable'},
+    {status:'proposal',target:{body:bodyTwo}},
+  ]});
+  assert.equal(impactOne.getAttribute('data-sr-ai-state'), 'error');
+  assert.equal(impactOne.getAttribute('data-sr-ai-detail'), 'Source summary unavailable');
+  assert.equal(impactTwo.getAttribute('data-sr-ai-state'), 'review');
+  stripReportLiveStates(root);
+  for (const block of [comparison, ...boxes]) {
+    assert.equal(block.getAttribute('data-sr-ai-state'), undefined);
+    assert.equal(block.getAttribute('data-sr-ai-label'), undefined);
+    assert.equal(block.getAttribute('data-sr-ai-detail'), undefined);
+  }
+});
+
+test('Inline generation effects are CSS-only and do not contaminate persisted report HTML', () => {
+  const editor = read('../src/sampark/report-editor/ReportEditor.jsx');
+  const css = read('../src/sampark/report-editor/report-studio.css');
+  const module = read('../src/sampark/report-editor/reportLiveStates.js');
+  const impact = read('../src/sampark/report-editor/useAutomaticImpact.js');
+
+  assert.match(editor, /stripReportLiveStates\(clone\)/);
+  assert.match(editor, /updateReportLiveStates\(editor\.current, automaticAnalysis, automaticImpact\.state\)/);
+  assert.match(module, /data-sr-ai-state/);
+  assert.match(module, /data-sr-ai-label/);
+  assert.match(module, /data-sr-ai-detail/);
+  assert.match(impact, /body:target\.body,targets:bodies/);
+  assert.match(css, /\[data-sr-ai-state="loading"\]/);
+  assert.match(css, /\[data-sr-ai-state="error"\]/);
+  assert.match(css, /\[data-sr-ai-state="queued"\]/);
+  assert.match(css, /\[data-sr-ai-state="review"\]/);
+  assert.match(css, /sr-inline-ai-flow/);
+  assert.match(css, /prefers-reduced-motion/);
+});
