@@ -68,7 +68,7 @@ test('AI progress is real and user-edited passages still require review before r
   assert.match(analysis, /onRetry/);
   assert.match(analysis, /onApply\(state\.result,state\.target,true\)/);
   assert.match(hook, /completed\.current/);
-  assert.match(hook, /target\.body\.innerHTML/);
+  assert.match(hook, /completed\.current\.add\(target\.body\)/);
   assert.match(editor, /!replaceEdited && !canApplyAnalysis/);
   assert.match(editor, /!replaceEdited && !canApplyAutomaticImpact/);
   assert.match(editor, /reportStartup\.current\?\.cancel\(\)/);
