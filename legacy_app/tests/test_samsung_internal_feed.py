@@ -15,7 +15,7 @@ class SamsungInternalFeedTests(unittest.TestCase):
     def test_explicit_sources_route_to_local_and_sampark(self):
         with tempfile.TemporaryDirectory() as root:
             archive = self.write_archive(root, "2026-08-23", "080000", [
-                {"id": "global", "title": "Samsung launches a display", "source": "Reuters", "date": "2026-08-23"},
+                {"id": "global", "title": "Samsung launches a display", "source": "Samsung Newsroom", "date": "2026-08-23"},
                 {"id": "local", "title": "Retail update", "source": "Samsung India", "date": "2026-08-23"},
                 {"id": "inside", "title": "Town hall notes", "source": "Sampark", "date": "2026-08-23"},
                 {"id": "not-local", "title": "Samsung phone review", "source": "Indian Express", "region": "India", "date": "2026-08-23"},
@@ -23,7 +23,47 @@ class SamsungInternalFeedTests(unittest.TestCase):
             feed = build_samsung_internal_feed([archive])
             self.assertEqual([item["id"] for item in feed["local"]], ["local"])
             self.assertEqual([item["id"] for item in feed["sampark"]], ["inside"])
-            self.assertCountEqual([item["id"] for item in feed["global"]], ["global", "not-local"])
+            self.assertEqual([item["id"] for item in feed["global"]], ["global"])
+
+    def test_global_requires_an_allowed_primary_or_co_source(self):
+        with tempfile.TemporaryDirectory() as root:
+            archive = self.write_archive(root, "2026-08-23", "080000", [
+                {"id": "sammobile", "title": "New wearable", "source": "SamMobile"},
+                {"id": "newsroom", "title": "New display", "source": "Samsung Newsroom"},
+                {
+                    "id": "co-sourced", "title": "Galaxy launch with multiple sources",
+                    "source": "Reuters",
+                    "sources": [{"name": "Reuters"}, {"name": "Samsung Newsroom"}],
+                },
+                {
+                    "id": "sammobile-co-source", "title": "Phone launch",
+                    "source": "The Verge",
+                    "sources": [{"name": "SamMobile"}, {"name": "The Verge"}],
+                },
+                {
+                    "id": "not-eligible", "title": "Samsung Galaxy announcement",
+                    "source": "Reuters", "summary": "Samsung launches a new phone.",
+                },
+                {
+                    "id": "newsroom-in-title", "title": "Samsung Newsroom article reviewed",
+                    "source": "TechRadar",
+                },
+                {
+                    "id": "local-wins", "title": "Samsung India launch",
+                    "source": "Samsung India", "sources": [{"name": "SamMobile"}],
+                },
+                {"id": "local", "title": "Local retail launch", "source": "Samsung Local"},
+                {"id": "inside", "title": "Sampark town hall", "source": "Sampark"},
+            ])
+            feed = build_samsung_internal_feed([archive])
+            self.assertCountEqual(
+                [item["id"] for item in feed["global"]],
+                ["sammobile", "newsroom", "co-sourced", "sammobile-co-source"],
+            )
+            self.assertCountEqual(
+                [item["id"] for item in feed["local"]], ["local", "local-wins"]
+            )
+            self.assertEqual([item["id"] for item in feed["sampark"]], ["inside"])
 
     def test_retained_history_fills_to_100(self):
         with tempfile.TemporaryDirectory() as root:
@@ -33,7 +73,7 @@ class SamsungInternalFeedTests(unittest.TestCase):
                     "id": f"day-{day}-{index}",
                     "title": f"Samsung retained story {day}-{index}",
                     "link": f"https://example.com/{day}/{index}",
-                    "source": "Global Desk",
+                    "source": "SamMobile",
                     "date": f"2026-08-0{day}",
                 } for index in range(50)]
                 paths.append(self.write_archive(root, f"2026-08-0{day}", "080000", records))
@@ -45,8 +85,8 @@ class SamsungInternalFeedTests(unittest.TestCase):
     def test_multi_source_cluster_ranks_before_newer_single_source(self):
         with tempfile.TemporaryDirectory() as root:
             archive = self.write_archive(root, "2026-08-23", "080000", [
-                {"id": "new", "title": "Samsung newest", "link": "https://x/new", "source": "A", "source_count": 1, "date": "2026-08-23"},
-                {"id": "cluster", "title": "Samsung cluster", "link": "https://x/cluster", "source": "A", "source_count": 4, "date": "2026-08-20"},
+                {"id": "new", "title": "Samsung newest", "link": "https://x/new", "source": "SamMobile", "source_count": 1, "date": "2026-08-23"},
+                {"id": "cluster", "title": "Samsung cluster", "link": "https://x/cluster", "source": "Reuters", "sources": [{"name": "Samsung Newsroom"}, {"name": "Reuters"}], "source_count": 4, "date": "2026-08-20"},
             ])
             feed = build_samsung_internal_feed([archive])
             self.assertEqual(feed["global"][0]["id"], "cluster")
@@ -76,15 +116,15 @@ class SamsungInternalFeedTests(unittest.TestCase):
                 },
             ])
             feed = build_samsung_internal_feed([archive])
-            self.assertEqual([item["id"] for item in feed["global"]], ["galaxy"])
+            self.assertEqual([item["id"] for item in feed["global"]], [])
 
     def test_same_url_across_archives_is_returned_once(self):
         with tempfile.TemporaryDirectory() as root:
             older = self.write_archive(root, "2026-08-20", "080000", [
-                {"id": "old", "title": "Samsung duplicate", "link": "https://x/duplicate", "source": "A", "source_count": 1, "date": "2026-08-20"},
+                {"id": "old", "title": "Samsung duplicate", "link": "https://x/duplicate", "source": "SamMobile", "source_count": 1, "date": "2026-08-20"},
             ])
             newer = self.write_archive(root, "2026-08-23", "080000", [
-                {"id": "new", "title": "Samsung duplicate", "link": "https://x/duplicate", "source": "A", "source_count": 3, "date": "2026-08-23"},
+                {"id": "new", "title": "Samsung duplicate", "link": "https://x/duplicate", "source": "SamMobile", "source_count": 3, "date": "2026-08-23"},
             ])
             feed = build_samsung_internal_feed([older, newer])
             self.assertEqual(len(feed["global"]), 1)
@@ -93,7 +133,7 @@ class SamsungInternalFeedTests(unittest.TestCase):
     def test_projection_cache_hits_until_archive_signature_changes(self):
         with tempfile.TemporaryDirectory() as root:
             archive = self.write_archive(root, "2026-08-23", "080000", [
-                {"id": "first", "title": "Samsung first projection", "link": "https://x/first", "source": "A"},
+                {"id": "first", "title": "Samsung first projection", "link": "https://x/first", "source": "SamMobile"},
             ])
 
             first = build_samsung_internal_feed([archive])
