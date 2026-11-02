@@ -45,7 +45,12 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
 
   // Sampark uses its own contrast-safe dialog. The legacy Sense export modal
   // keeps its original markup and classes to avoid any browser-side regressions.
-  if (source.startsWith('sampark')) {
+  // Explicit Sampark source is preferred. Also recognize the /sampark route
+  // so an older AllNewsPage that omitted the source prop cannot silently
+  // fall back to the legacy Sense modal (the white-on-white failure).
+  const samparkRoute = typeof window !== 'undefined'
+    && /(?:^|\\/)sampark(?:\\/|$)/i.test(window.location.pathname);
+  if (String(source || '').startsWith('sampark') || samparkRoute) {
     const selectedCount = items.length;
     const labels = [
       { id: 'ppt', icon: Presentation, title: 'PowerPoint', detail: 'Presentation slides', tone: 'violet' },
@@ -54,7 +59,7 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
     ];
 
     return createPortal(
-      <div className="sde-overlay" onMouseDown={busy ? undefined : onClose}>
+      <div className="sde-overlay sde-overlay--sampark" data-sampark-draft-export="studio-v2" onMouseDown={busy ? undefined : onClose}>
         <section
           ref={dialogRef}
           className="sde-dialog"
@@ -67,7 +72,7 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
         >
           <header className="sde-header">
             <div className="sde-heading">
-              <span className="sde-kicker">SAMPARK / DOCUMENT EXPORT</span>
+              <span className="sde-kicker">SAMPARK / DRAFT EXPORT STUDIO</span>
               <div className="sde-title-row">
                 <span className="sde-title-icon"><ArrowDownToLine size={23}/></span>
                 <div>
