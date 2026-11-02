@@ -49,7 +49,7 @@ export default function DraftExportModal({ items, open, onClose, source = 'brief
   // so an older AllNewsPage that omitted the source prop cannot silently
   // fall back to the legacy Sense modal (the white-on-white failure).
   const samparkRoute = typeof window !== 'undefined'
-    && /(?:^|\\/)sampark(?:\\/|$)/i.test(window.location.pathname);
+    && /(?:^|\/)sampark(?:\/|$)/i.test(window.location.pathname);
   if (String(source || '').startsWith('sampark') || samparkRoute) {
     const selectedCount = items.length;
     const labels = [
