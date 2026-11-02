@@ -67,11 +67,16 @@ export function updateReportLiveStates(root, analysis, impact) {
   // queued/loading states. The original generated/editable text stays intact.
   for (const issue of impact?.issues || []) {
     const box = impactBox(root, issue?.target?.body);
-    if (!box) continue;
+    // A batch-level error (for example, too many selected articles) has no
+    // single article target. Surface it in the first impact section as well.
+    const display = box || (issue.status === 'error' && !issue?.target
+      ? root.querySelector('[data-kind="samsung-impact"]') : null);
+    if (!display) continue;
     if (issue.status === 'error') {
-      setState(box, 'error', 'Samsung impact could not finish', String(issue.message || 'Please use Retry Samsung impact above.'));
+      setState(display, 'error', 'Samsung impact could not finish',
+        String(issue.message || 'Please use Retry Samsung impact above.').slice(0, 500));
     } else if (issue.status === 'proposal') {
-      setState(box, 'review', 'Samsung impact ready for review', 'Your existing edits were kept. Review the suggestion above.');
+      setState(display, 'review', 'Samsung impact ready for review', 'Your existing edits were kept. Review the suggestion above.');
     }
   }
 }
