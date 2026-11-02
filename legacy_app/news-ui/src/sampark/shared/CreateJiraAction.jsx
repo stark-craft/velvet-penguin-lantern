@@ -16,6 +16,7 @@ function makePreview(entry) {
     index: entry.index,
     selected: entry.status === 'ready',
     error: entry.error || '',
+    warning: entry.warning || '',
     ...(entry.draft || {}),
     sources: (entry.draft?.sources || []).map((source) => ({ ...source })),
     key_facts: [...(entry.draft?.key_facts || ['', '', ''])],
@@ -279,6 +280,7 @@ export default function CreateJiraAction({
                         </>
                       ) : (
                         <>
+                          {draft.warning && <p className="tsjira-hint" role="status">{draft.warning}</p>}
                           <label className="tsjira-select">
                             <input
                               type="checkbox"
