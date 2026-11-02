@@ -22,6 +22,7 @@ from news_scrapper.recommendation import router as recommendation_router
 from news_scrapper.translation import router as translation_router
 from news_scrapper.reports.router import router as reports_router
 from venture_lens.router import router as venture_lens_router
+from news_scrapper.jira_integration.router import router as jira_news_router
 
 
 app.include_router(venture_lens_router)
@@ -30,6 +31,7 @@ app.include_router(recommendation_router)
 app.include_router(internal_content_router)
 app.include_router(access_control_router)
 app.include_router(reports_router)
+app.include_router(jira_news_router)
 
 
 SPA_API_COLLISION_ROUTES = {"/for-you", "/voc", "/scheduler"}
@@ -84,6 +86,7 @@ API_ROUTES = {
     "internal-content",
     "access-control",
     "assets",
+    "jira",
 }
 
 
