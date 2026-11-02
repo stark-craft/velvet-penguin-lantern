@@ -59,7 +59,7 @@ class SamsungInternalFeedTests(unittest.TestCase):
             feed = build_samsung_internal_feed([archive])
             self.assertCountEqual(
                 [item["id"] for item in feed["global"]],
-                ["sammobile", "newsroom", "co-sourced", "sammobile-co-source"],
+                ["sammobile", "sam-mobile-spaced", "newsroom", "co-sourced", "sammobile-co-source"],
             )
             self.assertCountEqual(
                 [item["id"] for item in feed["local"]], ["local", "local-wins"]
