@@ -29,6 +29,7 @@ class SamsungInternalFeedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             archive = self.write_archive(root, "2026-08-23", "080000", [
                 {"id": "sammobile", "title": "New wearable", "source": "SamMobile"},
+                {"id": "sam-mobile-spaced", "title": "New feature", "source": "Sam Mobile"},
                 {"id": "newsroom", "title": "New display", "source": "Samsung Newsroom"},
                 {
                     "id": "co-sourced", "title": "Galaxy launch with multiple sources",
