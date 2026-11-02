@@ -381,6 +381,42 @@ export const getViewerActivitySummary = (tz) => {
   return jsonFetch(`/viewer/activity-summary?tz=${param}`);
 };
 
+// ---------- Jira (one issue containing all selected news) ----------
+// Only card metadata travels to FastAPI.
+// Browser SSO and Jira credentials remain server-side.
+export const createJiraNewsTicket = (items) => jsonFetch('/jira/news-tickets', {
+  method: 'POST',
+  timeoutMs: 600_000,
+  body: JSON.stringify({
+    articles: (items || []).map((item) => ({
+      title: String(item?.title || '').trim(),
+      summary: String(
+        item?.master_summary
+        || item?.summary
+        || item?.summary_lead
+        || item?.ppt_summary
+        || item?.snippet
+        || ''
+      ).trim().slice(0, 15000),
+      image_url: String(
+        item?.image_url
+        || item?.imageUrl
+        || item?.thumbnail_url
+        || item?.og_image
+        || item?.top_image
+        || item?.image
+        || item?.thumbnail
+        || ''
+      ).trim().slice(0, 3000),
+      source_url: String(
+        item?.canonical_link || item?.link || item?.url || ''
+      ).trim().slice(0, 3000),
+      source: String(item?.src || item?.source || '').trim().slice(0, 500),
+      date: String(item?.date || item?.published_at || '').trim().slice(0, 100),
+    })),
+  }),
+});
+
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
 export const selectWorkflow = (article) =>
@@ -696,6 +732,9 @@ const toBackendDraftFields = (draft) => ({
   content_type: draft.contentType || '',
   layout: draft.layout || '',
   display_section: draft.displaySection || '',
+  image_scale: Number(draft.imageScale || 1),
+  template_data: draft.templateData || {},
+  card_image_source: draft.cardImageSource || 'primary',
 });
 
 const fromBackendRecord = (record) => ({
@@ -711,6 +750,13 @@ const fromBackendRecord = (record) => ({
   author: record.author || '',
   layout: record.layout || '',
   displaySection: record.display_section || '',
+  imageScale: Number(record.image_scale || 1),
+  templateData: record.template_data && typeof record.template_data === 'object'
+    ? {
+      desc0: record.template_data.desc0 || '',
+      desc1: record.template_data.desc1 || '',
+    }
+    : { desc0: '', desc1: '' },
   ownerName: record.owner_name || '',
   cover: record.cover
     ? {
@@ -725,6 +771,22 @@ const fromBackendRecord = (record) => ({
         url: `/internal-content/${record.id}/cover?v=${encodeURIComponent(record.updated_at || '')}`,
       }
     : null,
+  secondaryCover: record.secondary_cover
+    ? {
+        name: record.secondary_cover.name || '',
+        type: record.secondary_cover.type || '',
+        size: Number(record.secondary_cover.size) || 0,
+        width: Number(record.secondary_cover.width) || 0,
+        height: Number(record.secondary_cover.height) || 0,
+        focalX: Number.isFinite(Number(record.secondary_cover.focal_x))
+          ? Number(record.secondary_cover.focal_x)
+          : 0.5,
+        focalY: Number.isFinite(Number(record.secondary_cover.focal_y))
+          ? Number(record.secondary_cover.focal_y)
+          : 0.5,
+        url: `/internal-content/${record.id}/secondary-cover?v=${encodeURIComponent(record.updated_at || '')}`,
+      }
+    : null,
   sourceDocument: record.source_document
     ? {
         name: record.source_document.name || '',
@@ -732,7 +794,8 @@ const fromBackendRecord = (record) => ({
         size: Number(record.source_document.size) || 0,
         pageCount: record.source_document.page_count ?? null,
         extractedCharacters: Number(record.source_document.extracted_characters) || 0,
-        url: `/internal-content/${record.id}/document`,
+        url: `/internal-content/${encodeURIComponent(record.id)}/document`
+          + `?v=${encodeURIComponent(record.updated_at || '')}`,
       }
     : null,
   status: record.status || 'draft',
@@ -741,7 +804,22 @@ const fromBackendRecord = (record) => ({
   updatedAt: record.updated_at || '',
   submittedAt: record.submitted_at || null,
   publishedAt: record.published_at || null,
+  cardImageSource: record.card_image_source === 'secondary' ? 'secondary' : 'primary',
 });
+
+/**
+ * Returns the selected card image URL for external surfaces (All News, SRI-D cards).
+ * Uses the persisted card_image_source selection with fallback to primary.
+ * @param {Object} record - Backend contribution record with cover/secondary_cover/card_image_source
+ * @returns {string} URL to use for the card image, or empty string if no image available
+ */
+export function contributionCardImage(record = {}) {
+  const cardSource = record.card_image_source || 'primary';
+  if (cardSource === 'secondary' && record.secondary_cover?.url) {
+    return record.secondary_cover.url;
+  }
+  return record.cover?.url || '';
+}
 
 export const getMyContributions = async () => {
   const response = await jsonFetch('/internal-content/mine');
@@ -771,6 +849,34 @@ export const importContributionDocument = async (file, ownerName = '', contentTy
   return fromBackendRecord(await uploadFetch('/internal-content/import', form));
 };
 
+export const replaceContributionDocument = async (
+  id,
+  pdf,
+  filename = 'edited-document.pdf',
+) => {
+  if (!id) {
+    throw new Error('A contribution ID is required to save the edited PDF.');
+  }
+  if (!pdf) {
+    throw new Error('No edited PDF was provided.');
+  }
+
+  // The PDF editor typically returns a Blob; send a named PDF file to FastAPI.
+  const uploadFile = pdf instanceof File
+    ? pdf
+    : new File([pdf], filename || 'edited-document.pdf', {
+        type: pdf.type || 'application/pdf',
+      });
+  const form = new FormData();
+  form.append('document', uploadFile);
+  const record = await uploadFetch(
+    `/internal-content/${encodeURIComponent(id)}/document`,
+    form,
+    'PUT',
+  );
+  return fromBackendRecord(record);
+};
+
 export const createContributionDraft = async (fields) =>
   fromBackendRecord(
     await jsonFetch('/internal-content/drafts', { method: 'POST', body: JSON.stringify(toBackendDraftFields(fields)) }),
@@ -792,7 +898,41 @@ export const uploadContributionCover = async (id, file, focalX = 0.5, focalY = 0
 export const deleteContributionCover = (id) =>
   jsonFetch(`/internal-content/${encodeURIComponent(id)}/cover`, { method: 'DELETE' });
 
+export const uploadContributionSecondaryCover = async (
+  id,
+  file,
+  focalX = 0.5,
+  focalY = 0.5,
+) => {
+  const form = new FormData();
+  form.append('cover', file);
+  form.append('focal_x', String(focalX));
+  form.append('focal_y', String(focalY));
+  return fromBackendRecord(
+    await uploadFetch(
+      `/internal-content/${id}/secondary-cover`,
+      form,
+    ),
+  );
+};
+
+export const deleteContributionSecondaryCover = (id) =>
+  jsonFetch(
+    `/internal-content/${encodeURIComponent(id)}/secondary-cover`,
+    { method: 'DELETE' },
+  );
+
 export const deleteContributionRecord = (id) => jsonFetch(`/internal-content/${id}`, { method: 'DELETE' });
+
+// SRI-D document reactions
+export const getDocumentReactions = (id) =>
+  jsonFetch(`/internal-content/${encodeURIComponent(id)}/reactions`);
+
+export const setDocumentReaction = (id, reaction) =>
+  jsonFetch(`/internal-content/${encodeURIComponent(id)}/reactions`, {
+    method: 'PUT',
+    body: JSON.stringify({ reaction }),
+  });
 
 export const submitContributionDraft = async (id) =>
   fromBackendRecord(await jsonFetch(`/internal-content/${id}/submit`, { method: 'POST' }));
