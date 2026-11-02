@@ -14,6 +14,7 @@ import sqlite3
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -33,17 +34,22 @@ def _db_path() -> Path:
                 str(Path(NEWS_RUNTIME_DIR) / "jira_news_issues.sqlite3")).resolve()
 
 
+@contextmanager
 def _connection():
     path = _db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(str(path), timeout=15)
-    db.execute(
-        "CREATE TABLE IF NOT EXISTS jira_news_issues ("
-        "identity TEXT PRIMARY KEY, issue_key TEXT NOT NULL, "
-        "url TEXT NOT NULL, saved_at REAL NOT NULL)"
-    )
-    db.commit()
-    return db
+    try:
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS jira_news_issues ("
+            "identity TEXT PRIMARY KEY, issue_key TEXT NOT NULL, "
+            "url TEXT NOT NULL, saved_at REAL NOT NULL)"
+        )
+        db.commit()
+        with db:
+            yield db
+    finally:
+        db.close()
 
 
 def identity(article):
