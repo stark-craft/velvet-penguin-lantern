@@ -164,6 +164,7 @@ export default function CreateJiraAction({
     if (busy || activeJob || regenIndex !== null) return;
     setBusy(true);
     setRegenIndex(draft.index);
+    setJob(null);
     setError('');
     try {
       const response = await regenerateJiraNewsInsight(
@@ -225,7 +226,8 @@ export default function CreateJiraAction({
   const isWorking = phase === 'generating' || phase === 'publishing';
   // Progress is based on completed articles reported by the server, not time.
   const progressTotal = Math.max(1, Number(job?.total) || (
-    phase === 'publishing' ? selected.length : items.length
+    activeJob?.kind === 'insight' ? 1
+      : phase === 'publishing' ? selected.length : items.length
   ));
   const progressDone = Math.min(
     progressTotal,
@@ -233,7 +235,8 @@ export default function CreateJiraAction({
   );
   const progressPercent = Math.round((progressDone / progressTotal) * 100);
   const progressPaused = job?.state === 'paused';
-  const progressStage = phase === 'publishing' ? 'Jira publishing' : 'Draft generation';
+  const progressStage = activeJob?.kind === 'insight' ? 'Regenerating Our Insights'
+    : phase === 'publishing' ? 'Jira publishing' : 'Draft generation';
   const close = () => setOpen(false);
 
   // The action button is nested in the fixed, backdrop-blurred batch toolbar.
