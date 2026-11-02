@@ -74,6 +74,7 @@ test("Scope split uses explicit Samsung Local, Samsung India and Sampark source 
 
 test("Samsung Global requires a named SamMobile or Samsung Newsroom source", () => {
   assert.equal(isSamsungGlobalSource(signal({ source: "SamMobile" })), true);
+  assert.equal(isSamsungGlobalSource(signal({ source: "Sam Mobile" })), true);
   assert.equal(isSamsungGlobalSource(signal({ source: "Samsung Newsroom" })), true);
   assert.equal(isSamsungGlobalSource(signal({
     source: "Reuters",
