@@ -190,6 +190,31 @@ def generate_draft(article, on_pause=lambda *_: None):
     }
 
 
+
+def editable_fallback(article: dict) -> dict:
+    """Provide an empty, factuality-safe draft if Samsung Chat is unavailable.
+
+    Do not manufacture facts or Samsung implications to fill the template.
+    The reviewer must supply all three facts and the complete insight.
+    """
+    title = _clean(article.get("title"), 500)
+    return {
+        "title": title,
+        "original_title": title,
+        "category": _clean(article.get("category"), 300) or "Technology",
+        "key_facts": ["", "", ""],
+        "insight": "",
+        "image_caption": title,
+        "sources": article_sources(article),
+        "image_url": _http_url(article.get("image_url")),
+        "source_url": _http_url(article.get("source_url")),
+        "source": _clean(article.get("source"), 200),
+        "date": _clean(article.get("date"), 80),
+        "summary": _clean(article.get("summary"), 15000),
+        "verification": "manual_review_required",
+    }
+
+
 def regenerate_insight(draft, on_pause=lambda *_: None):
     """Change only Our Insights; preserve the three approved factual bullets."""
     if not all((chat.URL, chat.CLIENT, chat.TOKEN, chat.MODEL_ID)):
