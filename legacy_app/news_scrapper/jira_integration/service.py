@@ -363,10 +363,10 @@ def build_article_status_report(
     ]
     for fact in facts:
         parts.append(f'<li>{_safe(fact)}</li>')
-    parts.extend(['</ul>', '<p><b>Original Sources</b></p>', '<ul dir="auto">'])
+    parts.extend(['</ul>', '<p><b>Original Sources</b></p>'])
 
     sources = article.get("sources") or []
-    added = 0
+    source_links = []
     seen = set()
     for source in sources if isinstance(sources, list) else []:
         if not isinstance(source, dict):
@@ -377,24 +377,18 @@ def build_article_status_report(
         seen.add(url)
         label = _safe(source.get("name") or source.get("publisher") or "Original article")
         date_label = _safe(source.get("date") or article.get("date"))
-        parts.append(
-            f'<li>{label}'
-            f'{" (" + date_label + ")" if date_label else ""}: '
-            f'<a href="{_safe(url)}">{_safe(url)}</a></li>'
-        )
-        added += 1
-    if not added:
+        visible_label = f'{label} ({date_label})' if date_label else label
+        # Display the publisher and date as the link, not a long raw URL.
+        source_links.append(f'<a href="{_safe(url)}">{visible_label}</a>')
+    if not source_links:
         url = original_url(article.get("source_url"))
         if url:
-            parts.append(
-                '<li>'
-                f'{_safe(article.get("source") or "Original article")}: '
-                f'<a href="{_safe(url)}">{_safe(url)}</a></li>'
-            )
-        else:
-            parts.append('<li>Original source link not available</li>')
+            label = _safe(article.get("source") or "Original article")
+            date_label = _safe(article.get("date"))
+            visible_label = f'{label} ({date_label})' if date_label else label
+            source_links.append(f'<a href="{_safe(url)}">{visible_label}</a>')
     parts.extend([
-        '</ul>',
+        f'<p>{", ".join(source_links) if source_links else "Original source link not available"}</p>',
         '<p><b>Our Insights</b></p>',
         f'<p>{_safe(insight)}</p>',
     ])
