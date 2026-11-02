@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { articleKey } from '../../news-scrapper/utils/intelligence.js';
 import {
   createJiraNewsDrafts,
@@ -224,6 +225,26 @@ export default function CreateJiraAction({
   const isWorking = phase === 'generating' || phase === 'publishing';
   const close = () => setOpen(false);
 
+  // The action button is nested in the fixed, backdrop-blurred batch toolbar.
+  // That toolbar creates a containing block for descendants using position:fixed,
+  // so the dialog must be portalled to document.body to cover the actual viewport.
+  useEffect(() => {
+    if (!open || typeof document === 'undefined') return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
   return (
     <>
       <button
@@ -241,7 +262,7 @@ export default function CreateJiraAction({
           : 'Create Jira'}
       </button>
 
-      {open && (
+      {open && typeof document !== 'undefined' && createPortal(
         <div className="tsjira-overlay" role="presentation">
           <section className="tsjira-dialog" role="dialog" aria-modal="true" aria-label="Tech Sensing Jira reports">
             <header className="tsjira-header">
@@ -419,7 +440,8 @@ export default function CreateJiraAction({
               )}
             </main>
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
