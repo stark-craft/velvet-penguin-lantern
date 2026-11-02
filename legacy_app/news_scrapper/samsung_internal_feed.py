@@ -25,7 +25,7 @@ _PROJECTION_CACHE_LOCK = threading.Lock()
 
 SAMSUNG_LOCAL_SOURCE = re.compile(r"\bsamsung[\s_-]+(?:local|india)\b", re.I)
 # Global articles must have at least one of these actual source labels.
-SAMSUNG_GLOBAL_SOURCE = re.compile(r"\b(?:sam[\\s_-]*mobile|samsung[\s_-]+newsroom)\b", re.I)
+SAMSUNG_GLOBAL_SOURCE = re.compile(r"\b(?:sam[\s_-]*mobile|samsung[\s_-]+newsroom)\b", re.I)
 SAMPARK_SOURCE = re.compile(r"\bsampark\b", re.I)
 SAMSUNG_OUTLET = re.compile(
     r"sammobile|samsung\s+newsroom|samsung\.com|samsungmobilepress|sammyfans",
