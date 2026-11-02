@@ -157,8 +157,15 @@ def _run_drafts(identifier):
         try:
             draft = generation.generate_draft(article, on_pause=pause)
             entry = {"index": index, "status": "ready", "draft": draft}
-        except Exception as error:
-            entry = {"index": index, "status": "failed", "error": str(error) if isinstance(error, generation.GenerationError) else "AI generation failed; retry this article."}
+        except Exception:
+            # No fabricated AI output: the editor can manually fill all facts
+            # and the insight, without losing this article from the batch.
+            entry = {
+                "index": index,
+                "status": "ready",
+                "warning": "AI verification was unavailable. Enter three source-backed facts and a 60–100-word insight before publishing.",
+                "draft": generation.editable_fallback(article),
+            }
         _mutate(identifier, lambda job: (
             job["entries"].append(entry),
             job.update(completed=index + 1, retry_at=None, state="running")
