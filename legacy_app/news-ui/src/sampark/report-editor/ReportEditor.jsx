@@ -13,6 +13,7 @@ import { startReportIntelligence } from './reportStartup.js';
 import { currentAnalysisInputs, analysisSignature, canApplyAnalysis } from './reportAnalysis.js';
 import { prepareImpactSections, reportImpactArticles, canApplyImpact, canApplyAutomaticImpact } from './reportImpact.js';
 import { IMAGE_ACCEPT, readReportImage } from './reportImages.js';
+import { updateReportLiveStates, stripReportLiveStates } from './reportLiveStates.js';
 import './report-editor.css';
 import './report-studio.css';
 
@@ -23,6 +24,9 @@ function documentHtml(element) {
   clone.querySelectorAll('img').forEach(image=>{
     ['data-report-selected','tabindex','role','aria-label','title'].forEach(attribute=>image.removeAttribute(attribute));
   });
+  // AI shimmer, queued, review and error indicators are ephemeral UI-only
+  // attributes. They must never end up in saved drafts or exported documents.
+  stripReportLiveStates(clone);
   return clone.innerHTML;
 }
 
@@ -121,6 +125,12 @@ export default function ReportEditor({items, onClose}) {
     observer.observe(root,{subtree:true,childList:true,characterData:true});
     return ()=>observer.disconnect();
   },[]);
+  // Paint generation/error states inside the actual document sections.
+  // This only updates transient attributes; document text and AI prompts are
+  // untouched. Existing top-level retry/review controls remain available.
+  useEffect(()=>{
+    updateReportLiveStates(editor.current, automaticAnalysis, automaticImpact.state);
+  },[automaticAnalysis, automaticImpact.state]);
   const snapshot = ()=>({title,html:documentHtml(editor.current) || initial,...draft.current});
   useEffect(()=>{
     const startup=startReportIntelligence({
