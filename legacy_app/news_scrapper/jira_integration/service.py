@@ -319,6 +319,110 @@ def build_status_report(
     return "\n\n".join(html_parts)
 
 
+def build_article_status_report(
+    article: dict,
+    attachments: dict[int, dict] | None = None,
+) -> str:
+    """One standalone, escaped Tech Sensing report in Jira's JEditor field.
+
+    The issue description intentionally stays empty. Attachments use the
+    existing JiraOps upload path; never embed arbitrary remote image URLs.
+    """
+    from urllib.parse import urlsplit
+
+    def original_url(value: object) -> str:
+        value = str(value or "").strip()
+        try:
+            parsed = urlsplit(value)
+            if parsed.scheme.lower() in {"http", "https"} and parsed.hostname and not parsed.username and not parsed.password:
+                return value
+        except ValueError:
+            pass
+        return ""
+
+    facts = article.get("key_facts") or []
+    if not isinstance(facts, list) or len(facts) != 3 or not all(
+        isinstance(fact, str) and 12 <= len(fact.strip()) <= 1200 for fact in facts
+    ):
+        raise ValueError("Exactly three factual Key Facts are required.")
+
+    title = _safe(article.get("title"))
+    category = _safe(article.get("category") or "Technology")
+    insight = str(article.get("insight") or "").strip()
+    if not 60 <= len(insight.split()) <= 100:
+        raise ValueError("Our Insights must contain 60–100 words.")
+
+    parts = [
+        '<h1 dir="auto"><b><span style="font-size:16pt;color:#172b4d">'
+        '[Tech Sensing]</span></b></h1>',
+        f'<p><b>{title}</b></p>',
+        '<h2 dir="auto"><b><span style="font-size:14pt;color:#172b4d">'
+        f'Category: {category}</span></b></h2>',
+        '<p><b>Key Facts</b></p>',
+        '<ul dir="auto">',
+    ]
+    for fact in facts:
+        parts.append(f'<li>{_safe(fact)}</li>')
+    parts.extend(['</ul>', '<p><b>Original Sources</b></p>', '<ul dir="auto">'])
+
+    sources = article.get("sources") or []
+    added = 0
+    seen = set()
+    for source in sources if isinstance(sources, list) else []:
+        if not isinstance(source, dict):
+            continue
+        url = original_url(source.get("url") or source.get("link"))
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        label = _safe(source.get("name") or source.get("publisher") or "Original article")
+        date_label = _safe(source.get("date") or article.get("date"))
+        parts.append(
+            f'<li>{label}'
+            f'{" (" + date_label + ")" if date_label else ""}: '
+            f'<a href="{_safe(url)}">{_safe(url)}</a></li>'
+        )
+        added += 1
+    if not added:
+        url = original_url(article.get("source_url"))
+        if url:
+            parts.append(
+                '<li>'
+                f'{_safe(article.get("source") or "Original article")}: '
+                f'<a href="{_safe(url)}">{_safe(url)}</a></li>'
+            )
+        else:
+            parts.append('<li>Original source link not available</li>')
+    parts.extend([
+        '</ul>',
+        '<p><b>Our Insights</b></p>',
+        f'<p>{_safe(insight)}</p>',
+    ])
+
+    attachment = (attachments or {}).get(0)
+    if attachment:
+        attachment_id = str(attachment.get("id") or "")
+        filename = str(attachment.get("filename") or "")
+        if attachment_id.isdigit() and filename:
+            safe_filename = quote(filename, safe="")
+            caption = _safe(article.get("image_caption") or article.get("title") or "")
+            parts.append(
+                '<p style="text-align:center">'
+                f'<img src="/secure/attachment/{attachment_id}/{safe_filename}" '
+                f'alt="{caption}" style="display:block;margin:0 auto;'
+                'max-width:560px;max-height:400px;" />'
+                '</p>'
+                f'<p style="text-align:center"><i>{caption}</i></p>'
+            )
+    return "\n".join(parts)
+
+
+def _status_report_for(articles: list[dict], attachments=None) -> str:
+    if len(articles) == 1 and isinstance(articles[0].get("key_facts"), list):
+        return build_article_status_report(articles[0], attachments)
+    return build_status_report(articles, attachments)
+
+
 def _download_image(url: str, destination_dir: str, index: int) -> Path:
     """Fetch a bounded public image. Reject redirects and private/local addresses."""
     checked = assert_public_http_url(url)
@@ -400,7 +504,11 @@ def _authenticated_jira_username(jira) -> str:
 
 def _summary(articles: list[dict]) -> str:
     if len(articles) == 1:
-        return str(articles[0]["title"]).strip()[:200]
+        article = articles[0]
+        if isinstance(article.get("key_facts"), list):
+            original = str(article.get("original_title") or article.get("title") or "").strip()
+            return ("[Tech Sensing] " + original)[:255]
+        return str(article["title"]).strip()[:200]
     return f"TechScout: {len(articles)} selected news articles ({date.today().isoformat()})"
 
 
@@ -426,7 +534,7 @@ def create_news_ticket(articles: list[dict], project: str, issue_type: str = "Ta
                 issue_type=issue_type,
                 description="",
                 assignee=jira_username,
-                status_report=build_status_report(articles),
+                status_report=_status_report_for(articles),
             )
         except Exception as error:
             import traceback
@@ -465,7 +573,7 @@ def create_news_ticket(articles: list[dict], project: str, issue_type: str = "Ta
             try:
                 jira.update_ticket(
                     key, "status_report",
-                    build_status_report(articles, attachments),
+                    _status_report_for(articles, attachments),
                 )
             except Exception:
                 warnings.append(
