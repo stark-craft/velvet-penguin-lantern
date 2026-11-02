@@ -253,7 +253,7 @@ def build_samsung_internal_feed(
         elif is_samsung_local_source(record):
             record["samsung_internal_channel"] = "local"
             local_records.append(record)
-        elif is_samsung_global_source(record):
+        elif is_samsung_global_source(record) and is_samsung_related(record):
             record["samsung_internal_channel"] = "global"
             global_records.append(record)
 
