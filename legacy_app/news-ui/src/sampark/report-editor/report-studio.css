@@ -1,6 +1,6 @@
 /* Report Studio / Sampark — presentation only.
    Existing report HTML, AI requests, editing commands, saving and exports are unchanged. */
-.sampark-report-overlay:has(.sr-studio) {
+.sampark-report-overlay.sr-studio-overlay {
   inset:0; padding:0; z-index:10000;
   background:#0b1424; backdrop-filter:none;
 }
