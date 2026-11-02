@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from news_scrapper.adapters import samsung_chat as chat
 from news_scrapper.adapters import samsung_web_search as search
 
-MAX_ATTEMPTS = 6
+MAX_ATTEMPTS = 12
 MAX_WAIT_SECONDS = 600
 
 
@@ -74,7 +74,7 @@ def _retry_after(error, attempt):
                 suggested = max(0, int((date - datetime.now(timezone.utc)).total_seconds()) + 1)
             except (TypeError, ValueError, OverflowError):
                 pass
-    return min(MAX_WAIT_SECONDS, max(suggested, 60 * (2 ** (attempt - 1))))
+    return max(suggested, min(MAX_WAIT_SECONDS, 60 * (2 ** (attempt - 1))))
 
 
 def _limited_call(operation, invoke, on_pause):
