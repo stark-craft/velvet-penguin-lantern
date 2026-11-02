@@ -49,3 +49,19 @@ test('Jira report dialog escapes the backdrop-blurred batch action bar', () => {
   assert.match(style, /\.tsjira-overlay\s*\{[\s\S]*position:\s*fixed/);
   assert.match(style, /\.tsjira-dialog\s*\{[\s\S]*width:\s*min\(960px,/);
 });
+
+test('Jira progress meter reflects completed backend articles and keeps active work visible', () => {
+  const action = read('../src/sampark/shared/CreateJiraAction.jsx');
+  const style = read('../src/sampark/shared/jira-report.css');
+
+  assert.match(action, /const progressDone = Math\.min\(/);
+  assert.match(action, /const progressPercent = Math\.round/);
+  assert.match(action, /role="progressbar"/);
+  assert.match(action, /aria-valuenow=\{progressDone\}/);
+  assert.match(action, /aria-valuemax=\{progressTotal\}/);
+  assert.match(action, /tsjira-progress-fill/);
+  assert.match(action, /tsjira-progress-activity/);
+  assert.match(style, /\.tsjira-progress-track/);
+  assert.match(style, /\.tsjira-progress-fill/);
+  assert.match(style, /prefers-reduced-motion/);
+});
