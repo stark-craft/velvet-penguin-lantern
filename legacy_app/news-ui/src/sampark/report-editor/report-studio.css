@@ -1,0 +1,321 @@
+/* Report Studio / Sampark — presentation only.
+   Existing report HTML, AI requests, editing commands, saving and exports are unchanged. */
+.sampark-report-overlay:has(.sr-studio) {
+  inset:0; padding:0; z-index:10000;
+  background:#0b1424; backdrop-filter:none;
+}
+.sr-studio {
+  --report-bg:#fff;
+  --report-soft:#f7f9fd;
+  --report-text:#1c2b43;
+  --report-muted:#64748b;
+  --report-line:#e0e7f0;
+  --report-blue:#eaf2ff;
+  --sr-canvas:#eef2f8;
+  --sr-accent:#255fc5;
+  --sr-paper:#fff;
+  --sr-shadow:0 14px 48px rgba(24,45,80,.09),0 3px 10px rgba(24,45,80,.05);
+  width:100%; height:100%; border:0; border-radius:0;
+  background:var(--report-bg); color:var(--report-text);
+  box-shadow:none;
+  font-family:Inter,"Geist Variable","Segoe UI",system-ui,sans-serif;
+  letter-spacing:normal;
+}
+.sr-studio :where(button,select,input,textarea) { font-family:inherit }
+.sr-studio button { transition:background-color .14s ease,border-color .14s ease,box-shadow .14s ease,transform .14s ease }
+.sr-studio button:disabled { opacity:.48 }
+.sr-studio button:focus-visible { outline:3px solid #7caaf5;outline-offset:2px }
+
+/* Application masthead */
+.sr-studio-header {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:20px; min-height:76px; padding:12px 27px;
+  background:linear-gradient(112deg,#111d34 0%,#162c4c 74%,#18345c 100%);
+  border-bottom:1px solid rgba(255,255,255,.10); color:#f8fbff;
+  flex-shrink:0;
+}
+.sr-studio-brand,.sr-studio-header-actions { display:flex;align-items:center;gap:13px;min-width:0 }
+.sr-studio-brand-mark { display:grid;place-items:center;width:43px;height:43px;flex:0 0 auto;
+  color:#e6f2ff;background:linear-gradient(145deg,#3f82e7,#164daa);border:1px solid rgba(255,255,255,.28);
+  border-radius:13px;box-shadow:0 5px 20px #06132966 }
+.sr-studio-brand-copy { display:flex; flex-direction:column; gap:1px; min-width:0 }
+.sr-studio-brand-copy>span { font-size:9px;letter-spacing:.18em;font-weight:800;color:#9bbbe3 }
+.sr-studio-brand-copy strong { font-size:20px;letter-spacing:-.035em;font-weight:750;line-height:1.25;white-space:nowrap }
+.sr-studio-version { font-size:9px;font-weight:800;letter-spacing:.12em;color:#a6c9ff;
+  border:1px solid rgba(157,192,244,.3);padding:4px 8px;border-radius:6px;margin-left:2px }
+.sr-studio-header-actions { gap:17px }
+.sr-studio-article-count { white-space:nowrap;padding:7px 10px;border:1px solid #456386;border-radius:7px;
+  background:#ffffff0d;font-size:12px;color:#d8e7ff }
+.sr-studio-save-state { display:flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap;color:#c5d8f0 }
+.sr-studio-state-dot { width:7px;height:7px;border-radius:50%;background:#52dca6;box-shadow:0 0 0 3px #52dca618 }
+.sr-studio-save-state.is-unsaved .sr-studio-state-dot { background:#ffc46b;box-shadow:0 0 0 3px #ffc46b18 }
+.sr-studio .sr-studio-save { border:1px solid #77a8f0;border-radius:9px;background:#f6f9ff;color:#244472;
+  padding:10px 15px;font-size:12px;font-weight:750;white-space:nowrap;box-shadow:0 3px 12px #08152e22 }
+.sr-studio .sr-studio-save:hover:not(:disabled) { background:#e1edff }
+.sr-studio .sr-studio-close { color:#dbe7f8;border:1px solid #ffffff2b;width:37px;height:37px;border-radius:9px;padding:0 }
+.sr-studio .sr-studio-close:hover { color:#fff;background:#ffffff19 }
+
+/* AI commands first, formatting tools second, document tools last */
+.sr-studio .sr-studio-toolbar {
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:nowrap;gap:13px;
+  flex-shrink:0; padding:10px 25px; min-height:65px;
+  background:#fff;border-bottom:1px solid var(--report-line);box-shadow:0 3px 12px #1d3b6111;z-index:3;
+}
+.sr-studio-ai-tools,.sr-studio-format-tools,.sr-studio-view-tools,.sr-studio-format-group,
+.sr-studio-format-selects { display:flex;align-items:center;gap:4px }
+.sr-studio-ai-tools { gap:8px;flex-shrink:0 }
+.sr-studio .sr-studio-ai-button {
+  border:1px solid #bfd6f5;border-radius:9px;padding:10px 13px;
+  font-size:12px;font-weight:750;white-space:nowrap;color:#1553a6;
+  background:#ecf4ff;gap:7px;
+}
+.sr-studio .sr-studio-ai-button:first-child { color:#fff;border-color:#2761bb;
+  background:linear-gradient(135deg,#2466cb,#1553af);box-shadow:0 3px 8px #286acc28 }
+.sr-studio .sr-studio-ai-button:hover:not(:disabled) { filter:brightness(1.045);transform:translateY(-1px) }
+.sr-studio .sr-studio-ai-button.is-active { box-shadow:0 0 0 3px #74a4e355 }
+.sr-studio-toolbar-divider,.sr-studio-format-divider {width:1px;height:28px;flex:0 0 auto;background:var(--report-line)}
+.sr-studio .sr-studio-format-tools { flex:1;flex-wrap:nowrap;min-width:0;justify-content:center;gap:9px }
+.sr-studio .sr-studio-format-group { gap:2px }
+.sr-studio .sr-studio-format-group button,.sr-studio .sr-studio-view-tools button {
+  flex:0 0 auto; width:31px;height:34px;padding:0;border:1px solid transparent;
+  border-radius:8px;color:#48607e
+}
+.sr-studio .sr-studio-format-group button:hover,.sr-studio .sr-studio-view-tools button:hover {
+  border-color:#d7e5f5;background:#eff5ff;color:#205cb4
+}
+.sr-studio .sr-studio-format-selects select {padding:8px 6px;border:1px solid #d9e3ef;
+  border-radius:8px;max-width:95px;background:#f8fafd;color:#3d4d64;font-size:12px }
+.sr-studio .sr-studio-view-tools {flex-shrink:0;gap:7px}
+.sr-studio .sr-studio-view-tools .sr-studio-outline-toggle {width:auto;padding:7px 10px;gap:7px;
+  font-size:12px;font-weight:700;border:1px solid #d8e3f0;background:#f8fafd;color:#354e73 }
+.sr-studio .sr-studio-view-tools .sr-studio-outline-toggle.is-active {background:#e9f2ff;border-color:#b5d2f6;color:#215da9}
+.sr-studio .sr-studio-view-tools .sr-studio-history {border:1px solid #d8e3f0;background:#f8fafd}
+
+/* Filename and live document status */
+.sr-studio .sr-studio-meta {
+  padding:13px 27px 14px;flex-shrink:0;min-height:76px;
+  display:flex;align-items:center;gap:20px;background:#f8fafe;border-bottom:1px solid var(--report-line)
+}
+.sr-studio-filename {flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.sr-studio-filename>span {color:#8a9ab0;font-size:9px;letter-spacing:.13em;font-weight:850}
+.sr-studio .sr-studio-filename input {font-size:20px;font-weight:720;letter-spacing:-.025em;
+  padding:0;width:min(480px,100%);border:0!important;outline-offset:3px;color:var(--report-text)!important }
+.sr-studio-document-stats {display:flex;align-items:center;gap:13px;flex-wrap:wrap;
+  font-size:11px;color:#7b8ba1;justify-content:flex-end }
+.sr-studio-document-stats strong {color:#41536a;font-variant-numeric:tabular-nums}
+.sr-studio-document-stats>span+span {border-left:1px solid var(--report-line);padding-left:13px}
+.sr-studio-live {display:inline-flex;align-items:center;gap:7px;font-weight:750;color:#2962b3!important}
+.sr-studio-live span {width:7px;height:7px;border-radius:50%;background:#3d82f3;animation:sr-live-pulse 1.6s infinite}
+@keyframes sr-live-pulse {50%{box-shadow:0 0 0 5px #4285ed2b}}
+
+/* Three-panel workbench: outline / live document / AI side panel */
+.sr-studio .sr-studio-body { position:relative;display:flex;flex:1;min-height:0;min-width:0;background:var(--sr-canvas) }
+.sr-studio-outline { display:flex;flex-direction:column;flex:0 0 235px;min-width:0;
+  background:#fbfcff;border-right:1px solid var(--report-line);overflow:hidden;z-index:1 }
+.sr-studio-outline-header {display:flex;justify-content:space-between;gap:8px;align-items:center;
+  padding:25px 17px 17px;color:#798ca5;font-size:9px;font-weight:850;letter-spacing:.12em }
+.sr-studio-outline-header strong {font-size:10px;letter-spacing:0;color:#647a9b;
+  padding:4px 7px;background:#ecf1f8;border-radius:6px;white-space:nowrap }
+.sr-studio-outline-list {flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:0 10px 12px }
+.sr-studio .sr-studio-outline-item {display:flex;align-items:center;text-align:left;gap:10px;
+  width:100%;border:1px solid transparent;border-radius:9px;padding:10px 11px;background:transparent;
+  color:#596c85;justify-content:flex-start;font-size:12px;font-weight:550;min-height:43px }
+.sr-studio .sr-studio-outline-item:hover {background:#edf3fd;color:#245aa8}
+.sr-studio .sr-studio-outline-item.is-active {background:#eaf2ff;border-color:#d3e5ff;color:#2059a9;font-weight:750}
+.sr-studio-outline-number {display:grid;place-items:center;min-width:24px;height:23px;
+  font-size:10px;font-weight:800;font-variant-numeric:tabular-nums;border-radius:6px;background:#eef2f8;color:#7e8da3 }
+.sr-studio-outline-item.is-active .sr-studio-outline-number {color:#fff;background:#3376d5}
+.sr-studio-outline-text {flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35;white-space:normal}
+.sr-studio-outline-tip {display:flex;align-items:flex-start;gap:9px;margin:12px;padding:14px;
+  border:1px solid #dce8fa;border-radius:10px;background:#f0f6ff;color:#6081ae }
+.sr-studio-outline-tip svg {flex:0 0 auto;margin-top:1px;color:#387bd4}
+.sr-studio-outline-tip p {font-size:11px;line-height:1.55;margin:0}
+.sr-studio .sr-studio-canvas {background:var(--sr-canvas);scroll-behavior:smooth;
+  min-width:0;padding:33px clamp(16px,3vw,48px) 55px;overscroll-behavior:contain}
+.sr-studio-paper-wrap {width:min(875px,100%);min-width:0;min-height:680px;
+  margin:0 auto;background:var(--sr-paper);border-radius:4px;box-shadow:var(--sr-shadow);
+  border:1px solid #e4e9f1;overflow:hidden}
+.sr-studio-paper-top {display:flex;align-items:center;gap:8px;padding:16px 40px 0;
+  font-size:9px;letter-spacing:.13em;font-weight:850;color:#9baac1;user-select:none }
+.sr-studio-paper-dot {width:6px;height:6px;border-radius:50%;background:#4f8ce9}
+.sr-studio-paper-edit {margin-left:auto;letter-spacing:0;font-size:10px;font-weight:500;color:#9aabc1}
+.sr-studio .sampark-report-document { min-height:610px;padding:32px clamp(25px,5vw,70px) 85px;
+  font:15px/1.8 "Segoe UI",system-ui,sans-serif;background:var(--sr-paper)!important;
+  color:#27364e;outline:0!important;overflow-wrap:break-word }
+.sr-studio .sampark-report-document section {margin:0 0 36px;scroll-margin-top:20px}
+.sr-studio .sampark-report-document section[data-kind=overview] {padding-bottom:22px;border-bottom:1px solid #dfe7f1}
+.sr-studio .sampark-report-document h1 {font-size:33px;line-height:1.25;letter-spacing:-.04em;
+  font-weight:780;color:#142d50;margin:0 0 28px }
+.sr-studio .sampark-report-document h2 {font-size:23px;line-height:1.35;letter-spacing:-.025em;
+  font-weight:740;color:#1c3355;margin:25px 0 14px }
+.sr-studio .sampark-report-document h3 {font-size:12px;line-height:1.55;letter-spacing:.06em;
+  font-weight:800;color:#557293;text-transform:uppercase;margin:23px 0 8px}
+.sr-studio .sampark-report-document p {font-size:14px;line-height:1.85;margin:0 0 15px;min-height:1em}
+.sr-studio .sampark-report-document section[data-kind=article] {padding-top:16px;border-top:0;
+  border-bottom:1px solid #e8edf4;padding-bottom:30px;clear:both}
+.sr-studio .sampark-report-document section[data-kind=article]>h2 {margin:4px 0 8px}
+.sr-studio .sampark-report-document section[data-kind=article]>p:first-of-type {font-size:12px;color:#8897aa;margin-bottom:16px}
+.sr-studio .sampark-report-document img {border-radius:11px;box-shadow:0 6px 18px #19345417}
+.sr-studio .sampark-report-document [data-kind=samsung-impact] {clear:both;margin:25px 0 18px;padding:20px 23px;
+  background:#f2f7ff;border:1px solid #dbe7fa;border-left:3px solid #397bdb;border-radius:10px}
+.sr-studio .sampark-report-document [data-kind=samsung-impact]>h3 {color:#2860b5;
+  font-size:13px;letter-spacing:0;text-transform:none;margin:0 0 9px}
+.sr-studio .sampark-report-document [data-kind=impact-body]>:last-child {margin-bottom:0}
+.sr-studio .sampark-report-document [data-kind=cross-analysis] {
+  min-height:40px;padding:16px 19px;background:#f7faff;border:1px solid #e0eaf7;border-radius:10px;
+}
+.sr-studio .sampark-report-document a {color:#2769c5;text-decoration-thickness:1px;text-underline-offset:3px}
+.sr-studio .sampark-report-document img[data-report-selected] {outline:3px solid #3b82f6}
+.sr-studio .sampark-report-document [data-kind=page-break] {border-top:1px dashed #9fb8d9}
+
+/* AI and history rail — same existing components, new visual shell */
+.sr-studio .sampark-report-panel {width:370px;max-width:43%;min-width:292px;flex-shrink:0;
+  padding:24px;border-left:1px solid var(--report-line);background:#fbfcff;
+  box-shadow:-6px 0 22px #122c4b09;z-index:2 }
+.sr-studio .sampark-report-panel-head {gap:10px;margin-bottom:19px;padding-bottom:16px;
+  border-bottom:1px solid var(--report-line);font-size:16px;color:#17355b }
+.sr-studio .sampark-report-panel-head strong {font-size:17px;letter-spacing:-.025em}
+.sr-studio .sampark-report-panel-head button {border:1px solid #dce5ef;border-radius:8px;background:#fff;width:29px;height:29px;padding:0}
+.sr-studio .sampark-report-panel p {font-size:13px;line-height:1.7;color:#566783}
+.sr-studio .sampark-report-panel label {color:#435673;font-weight:700;font-size:12px}
+.sr-studio .sampark-report-panel textarea,.sr-studio .sampark-report-panel select {border-radius:10px;border:1px solid #cfdceb;
+  background:#fff!important;line-height:1.55;padding:12px}
+.sr-studio .sampark-report-panel textarea:focus {outline:2px solid #a4c8ff;border-color:#7ba8e8}
+.sr-studio .sampark-report-quota {background:#eaf2ff;padding:13px 15px;border:1px solid #d3e5ff;border-radius:10px;
+  font-size:12px;font-weight:650;color:#335f9d!important}
+.sr-studio .sampark-report-workspace .sampark-report-primary,
+.sr-studio .sampark-report-primary {border:1px solid #255fc5;border-radius:9px;padding:10px 13px;background:#245fc4;color:#fff;
+  font-size:12px;font-weight:750}
+.sr-studio .sampark-report-primary:hover {background:#1b51ac;color:#fff}
+.sr-studio .sampark-report-panel .sampark-report-answer {border-top-color:#dae4f3;padding-top:12px}
+.sr-studio .sampark-report-panel .sampark-report-history-row button {font-size:12px;text-align:left}
+.sr-studio .sampark-report-panel .sampark-report-history-row button:first-child {min-width:0;overflow:hidden;text-overflow:ellipsis}
+
+/* Real-time generation and non-destructive review proposals */
+.sr-studio-intelligence {flex-shrink:0;background:#f8fafd}
+.sr-studio .sampark-report-analysis-status {padding:12px 27px;border-bottom:1px solid #dfe7f3;background:#f3f7ff;
+  font-size:12px;color:#315680}
+.sr-studio .sampark-report-analysis-status small {color:#647c9d}
+.sr-studio .sr-generation-status {display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.sr-studio .sr-generation-status>svg {color:#3777cb;flex-shrink:0}
+.sr-studio .sr-generation-label {font-weight:750;color:#275aa0}
+.sr-studio .sr-generation-note {font-size:11px;margin-left:auto}
+.sr-studio .sr-generation-progress {display:flex;align-items:center;gap:7px;min-width:80px}
+.sr-studio .sr-generation-track {height:6px;border-radius:50px;min-width:80px;max-width:180px;flex:1;
+  background:#cddcf0;overflow:hidden }
+.sr-studio .sr-generation-fill {height:100%;border-radius:inherit;background:#3a7ad4;transition:width .3s ease}
+.sr-studio .sr-generation-tally {font-size:11px;font-weight:700;white-space:nowrap;color:#4a6b9c}
+.sr-studio .sr-generation-pulse {height:6px;width:78px;border-radius:50px;background:linear-gradient(90deg,#dce8f9 20%,#5893e3 50%,#dce8f9 80%);
+  background-size:200% 100%;animation:sr-generation-shimmer 1.6s linear infinite }
+@keyframes sr-generation-shimmer {to{background-position:-200% 0}}
+.sr-studio .sampark-report-analysis-status details {max-height:210px;border:1px solid #d9e5f6;background:#fff;border-radius:10px;padding:12px}
+.sr-studio .sampark-report-analysis-status details summary {font-weight:750;color:#285aa2}
+.sr-studio .sampark-report-notice {gap:12px;padding:10px 27px;background:#e9f4ff;color:#2e578c;font-size:12px}
+.sr-studio .sampark-report-notice button {margin-left:auto}
+.sr-studio .sampark-report-image-actions {padding:9px 27px;gap:10px;font-size:12px;background:#e9f3ff}
+
+/* Sticky export actions */
+.sr-studio .sr-studio-footer {flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  gap:16px;min-height:75px;padding:12px 27px;border-top:1px solid #dfe6f0;background:#fff;z-index:4;
+  box-shadow:0 -4px 14px rgba(22,41,70,.04)}
+.sr-studio-footer-left {display:flex;align-items:center;gap:11px;min-width:0}
+.sr-studio-footer-left>svg {color:#527da9;flex-shrink:0}
+.sr-studio-footer-left>span {display:flex;flex-direction:column;min-width:0;gap:2px}
+.sr-studio-footer-left strong {font-size:13px;color:#294362;white-space:nowrap}
+.sr-studio-footer-left small {font-size:11px;color:#8b9ab0;line-height:1.4}
+.sr-studio-export-buttons {display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:7px}
+.sr-studio .sr-studio-export-buttons button {border:1px solid #d8e3f0;background:#f8fafd;border-radius:8px;
+  padding:9px 12px;color:#426080;font-size:12px;font-weight:730;white-space:nowrap }
+.sr-studio .sr-studio-export-buttons button:hover:not(:disabled) {border-color:#a8c8ed;background:#edf4fe;color:#245ca9}
+.sr-studio .sr-studio-export-buttons button.sr-studio-export-primary {background:#265fc5;border-color:#265fc5;color:#fff}
+.sr-studio .sr-studio-export-buttons button.sr-studio-export-primary:hover:not(:disabled) {background:#184b9e;color:#fff}
+.sr-studio .sampark-report-confirm {z-index:10}
+.sr-studio .sampark-report-confirm>div {box-shadow:0 22px 65px #0a152f38}
+.sr-studio .sampark-report-workspace button:focus-visible {outline:2px solid #7d9ed0}
+
+/* Dark Sampark mode, document remains high contrast */
+html[data-theme=dark] .sr-studio {
+  --report-bg:#192331;--report-soft:#202d3e;--report-text:#eaf1fc;
+  --report-muted:#9bafca;--report-line:#38495e;--report-blue:#263b5d;
+  --sr-canvas:#131c2a;--sr-paper:#eaf0f8;
+}
+html[data-theme=dark] .sr-studio .sr-studio-toolbar,
+html[data-theme=dark] .sr-studio .sr-studio-footer {background:#1e2a3a;border-color:#34475e}
+html[data-theme=dark] .sr-studio .sr-studio-meta {background:#202e40}
+html[data-theme=dark] .sr-studio .sr-studio-format-selects select,
+html[data-theme=dark] .sr-studio .sr-studio-view-tools button {background:#29384c;color:#d2e2fb;border-color:#475c78}
+html[data-theme=dark] .sr-studio .sr-studio-format-group button {color:#c1d4ed}
+html[data-theme=dark] .sr-studio .sr-studio-format-group button:hover {background:#2e4360;color:#f4f8ff}
+html[data-theme=dark] .sr-studio .sr-studio-outline {background:#1b2737}
+html[data-theme=dark] .sr-studio .sr-studio-outline-header {color:#9bb4d6}
+html[data-theme=dark] .sr-studio .sr-studio-outline-item {color:#afc0d6}
+html[data-theme=dark] .sr-studio .sr-studio-outline-item.is-active {color:#e3efff;background:#2a4266;border-color:#385c91}
+html[data-theme=dark] .sr-studio .sr-studio-outline-tip {background:#233854;border-color:#304f77;color:#bbcee8}
+html[data-theme=dark] .sr-studio .sr-studio-paper-wrap {background:#f3f6fc;border-color:#26364b}
+html[data-theme=dark] .sr-studio .sr-studio-paper-top {color:#8799b3}
+html[data-theme=dark] .sr-studio .sampark-report-document {background:#f3f6fc!important;color:#26364a}
+html[data-theme=dark] .sr-studio .sampark-report-panel {background:#202c3d;color:#e3edfa}
+html[data-theme=dark] .sr-studio .sampark-report-panel-head strong,
+html[data-theme=dark] .sr-studio .sampark-report-panel label {color:#e2ecfc}
+html[data-theme=dark] .sr-studio .sampark-report-panel p {color:#b9cbe4}
+html[data-theme=dark] .sr-studio .sampark-report-panel textarea,
+html[data-theme=dark] .sr-studio .sampark-report-panel select {background:#27364b!important;color:#ebf1fb;border-color:#445b7a}
+html[data-theme=dark] .sr-studio .sr-studio-footer-left strong {color:#e2eefe}
+html[data-theme=dark] .sr-studio .sr-studio-export-buttons button:not(.sr-studio-export-primary) {background:#27384d;color:#c8daef;border-color:#405875}
+html[data-theme=dark] .sr-studio .sampark-report-analysis-status {background:#253952;color:#dbe8ff;border-color:#3b577b}
+html[data-theme=dark] .sr-studio .sr-generation-label {color:#b9d6ff}
+
+/* Responsive and zoom-safe layout */
+@media(max-width:1480px) {
+  .sr-studio .sr-studio-toolbar {gap:8px;padding:9px 17px}
+  .sr-studio .sr-studio-format-tools {gap:6px}
+  .sr-studio .sr-studio-format-selects select {max-width:79px}
+  .sr-studio .sr-studio-ai-button {padding:9px 10px}
+  .sr-studio-outline {flex-basis:215px}
+  .sr-studio .sampark-report-panel {width:328px;min-width:285px}
+}
+@media(max-width:1150px) {
+  .sr-studio .sr-studio-toolbar {overflow-x:auto;justify-content:flex-start}
+  .sr-studio .sr-studio-format-tools {flex:0 0 auto}
+  .sr-studio .sr-studio-view-tools {margin-left:auto}
+  .sr-studio-outline {flex-basis:194px}
+  .sr-studio .sr-studio-canvas {padding:22px 17px 40px}
+  .sr-studio .sampark-report-panel {position:absolute;right:0;top:0;bottom:0;
+    max-width:min(430px,90%);width:380px;z-index:5;box-shadow:-16px 0 40px #071a3540}
+}
+@media(max-width:840px) {
+  .sr-studio .sr-studio-header {padding:12px 15px;gap:8px}
+  .sr-studio-brand-copy strong {font-size:17px}
+  .sr-studio-version,.sr-studio-article-count,.sr-studio-save-state {display:none}
+  .sr-studio .sr-studio-meta {padding:10px 15px}
+  .sr-studio .sr-studio-filename input {font-size:17px}
+  .sr-studio-document-stats .sr-studio-editable {display:none}
+  .sr-studio-outline {position:absolute;top:0;bottom:0;left:0;z-index:6;width:min(275px,87%);
+    box-shadow:10px 0 30px #10264833}
+  .sr-studio .sr-studio-canvas {padding:13px 9px 27px}
+  .sr-studio-paper-wrap {border-radius:5px;min-height:480px}
+  .sr-studio-paper-top {padding:15px 19px 0}
+  .sr-studio .sampark-report-document {padding:23px 20px 56px;min-height:450px}
+  .sr-studio .sampark-report-document section[data-kind=article] img {float:none;width:100%;max-height:300px;margin:10px 0 16px}
+  .sr-studio .sr-studio-footer {padding:11px 15px}
+  .sr-studio-footer-left small {display:none}
+}
+@media(max-width:550px) {
+  .sr-studio .sr-studio-header {min-height:66px}
+  .sr-studio .sr-studio-save {padding:8px;font-size:0}
+  .sr-studio .sr-studio-save svg {width:19px;height:19px}
+  .sr-studio .sr-studio-meta {min-height:63px}
+  .sr-studio-document-stats {display:none}
+  .sr-studio .sr-studio-toolbar {padding:8px}
+  .sr-studio .sr-studio-footer {align-items:flex-start;gap:8px}
+  .sr-studio-footer-left {display:none}
+  .sr-studio-export-buttons {justify-content:center;width:100%}
+  .sr-studio .sr-studio-export-buttons button {flex:1;padding:9px 7px;font-size:11px}
+  .sr-studio-paper-edit {display:none}
+  .sr-studio .sampark-report-panel {max-width:100%;width:100%}
+}
+@media(prefers-reduced-motion:reduce) {
+  .sr-studio button,.sr-studio .sr-studio-ai-button {transition:none}
+  .sr-studio-live span,.sr-studio .sr-generation-pulse {animation:none}
+}
