@@ -223,6 +223,17 @@ export default function CreateJiraAction({
   };
 
   const isWorking = phase === 'generating' || phase === 'publishing';
+  // Progress is based on completed articles reported by the server, not time.
+  const progressTotal = Math.max(1, Number(job?.total) || (
+    phase === 'publishing' ? selected.length : items.length
+  ));
+  const progressDone = Math.min(
+    progressTotal,
+    Math.max(0, Number(job?.completed) || 0),
+  );
+  const progressPercent = Math.round((progressDone / progressTotal) * 100);
+  const progressPaused = job?.state === 'paused';
+  const progressStage = phase === 'publishing' ? 'Jira publishing' : 'Draft generation';
   const close = () => setOpen(false);
 
   // The action button is nested in the fixed, backdrop-blurred batch toolbar.
@@ -277,12 +288,39 @@ export default function CreateJiraAction({
 
             <main className="tsjira-content">
               {(isWorking || activeJob) && (
-                <div className="tsjira-progress" role="status">
-                  <strong>{job?.current || (phase === 'publishing' ? 'Creating individual Jira issues…' : 'Preparing verified article drafts…')}</strong>
-                  <progress value={job?.completed || 0} max={Math.max(1, job?.total || items.length)} />
-                  <p>{job?.completed || 0} of {job?.total || items.length} complete</p>
-                  {job?.state === 'paused' && (
-                    <small className="tsjira-pause">
+                <div className="tsjira-progress">
+                  <div className="tsjira-progress-top">
+                    <div className="tsjira-progress-copy">
+                      <span className="tsjira-progress-eyebrow">{progressStage}</span>
+                      <strong>{job?.current || (phase === 'publishing' ? 'Creating individual Jira issues…' : 'Preparing verified article drafts…')}</strong>
+                    </div>
+                    <span className="tsjira-progress-percent" aria-hidden="true">{progressPercent}%</span>
+                  </div>
+                  <div
+                    className={`tsjira-progress-track${progressPaused ? ' is-paused' : ''}`}
+                    role="progressbar"
+                    aria-label={progressStage}
+                    aria-valuemin={0}
+                    aria-valuemax={progressTotal}
+                    aria-valuenow={progressDone}
+                    aria-valuetext={`${progressDone} of ${progressTotal} articles complete`}
+                  >
+                    <div
+                      className="tsjira-progress-fill"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                    {!progressPaused && progressDone < progressTotal && (
+                      <div className="tsjira-progress-activity" aria-hidden="true" />
+                    )}
+                  </div>
+                  <div className="tsjira-progress-footer">
+                    <span>{progressDone} of {progressTotal} {progressTotal === 1 ? 'article' : 'articles'} completed</span>
+                    {!progressPaused && progressDone < progressTotal && (
+                      <span>Working on article {progressDone + 1}</span>
+                    )}
+                  </div>
+                  {progressPaused && (
+                    <small className="tsjira-pause" role="status">
                       Samsung API quota reached. Retrying automatically
                       {job.retry_at ? ' after the required wait.' : '.'}
                     </small>
