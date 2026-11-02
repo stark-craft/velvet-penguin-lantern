@@ -319,3 +319,104 @@ html[data-theme=dark] .sr-studio .sr-generation-label {color:#b9d6ff}
   .sr-studio button,.sr-studio .sr-studio-ai-button {transition:none}
   .sr-studio-live span,.sr-studio .sr-generation-pulse {animation:none}
 }
+
+
+/* IN-DOCUMENT AI ACTIVITY
+   These indicators are CSS-generated from transient DOM attributes. They do
+   not become report content, nor appear in saved drafts, PDFs or PPT exports. */
+.sr-studio .sampark-report-document [data-sr-ai-state] {
+  position:relative;
+  isolation:isolate;
+  transition:background-color .3s ease,border-color .3s ease,box-shadow .3s ease;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state]::before {
+  content: "✦  " attr(data-sr-ai-label);
+  box-sizing:border-box;
+  display:block;
+  width:fit-content;
+  max-width:100%;
+  margin:0 0 12px;
+  padding:7px 11px;
+  border-radius:8px;
+  background:#e0edff;
+  color:#225db1;
+  font:700 11px/1.45 "Segoe UI",system-ui,sans-serif;
+  letter-spacing:.005em;
+  white-space:normal;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="loading"] {
+  border:1px solid #79a8e7!important;
+  box-shadow:0 0 0 3px rgb(49 118 210 / 9%),0 8px 23px rgb(53 105 177 / 9%);
+  background-image:linear-gradient(106deg,#eff6ff 12%,#d6e9ff 40%,#bcd9ff 49%,#d6e9ff 58%,#eff6ff 85%)!important;
+  background-size:250% 100%!important;
+  animation:sr-inline-ai-flow 2.4s linear infinite;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="loading"]::before {
+  background:#d7e9ff;color:#1b55a4;box-shadow:0 1px 8px #215db51a;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="loading"]::after {
+  content:"";
+  display:block;
+  width:100%;height:4px;
+  margin-top:14px;
+  border-radius:99px;
+  background:linear-gradient(90deg,transparent,#347ee1 30%,#80bbff 50%,#347ee1 70%,transparent);
+  background-size:175% 100%;
+  animation:sr-inline-ai-flow 1.55s ease-in-out infinite;
+}
+@keyframes sr-inline-ai-flow {from{background-position:175% 0}to{background-position:-65% 0}}
+.sr-studio .sampark-report-document [data-sr-ai-state="queued"] {
+  border:1px dashed #afcbed!important;
+  background:#f7fbff!important;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="queued"]::before {
+  background:#eaf2fb;color:#6882a8;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="error"] {
+  border:1px solid #e7a0aa!important;
+  border-left:4px solid #d55467!important;
+  background:#fff6f7!important;
+  box-shadow:0 0 0 3px rgb(212 84 103 / 6%);
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="error"]::before {
+  content:"⚠  " attr(data-sr-ai-label);
+  background:#ffe4e8;color:#a32d45;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="error"]::after {
+  content:attr(data-sr-ai-detail);
+  display:block;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  margin-top:8px;
+  padding:11px 12px;
+  border:1px solid #f2c7ce;
+  border-radius:8px;
+  background:#fff;
+  color:#993b4d;
+  font:500 12px/1.6 "Segoe UI",system-ui,sans-serif;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="review"] {
+  border:1px solid #e5ba68!important;
+  background:#fffbf0!important;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="review"]::before {
+  content:"✦  " attr(data-sr-ai-label);
+  background:#fff0c8;color:#825d1d;
+}
+.sr-studio .sampark-report-document [data-sr-ai-state="review"]::after {
+  content:attr(data-sr-ai-detail);
+  display:block;
+  padding:6px 0;
+  color:#7b602c;
+  font:500 12px/1.6 "Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-reduced-motion:reduce) {
+  .sr-studio .sampark-report-document [data-sr-ai-state="loading"],
+  .sr-studio .sampark-report-document [data-sr-ai-state="loading"]::after {
+    animation:none;
+    background-position:50% 0;
+  }
+}
+html[data-theme=dark] .sr-studio .sampark-report-document [data-sr-ai-state="loading"] {
+  color:#1c3355;
+}
