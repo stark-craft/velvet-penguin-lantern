@@ -138,9 +138,14 @@ def call_samsung_chat(prompt: str) -> dict:
             if response.status_code == 404
             else ""
         )
+        retry_after = (
+            str(response.headers.get("Retry-After") or "").strip()[:120]
+            if response.status_code == 429 else ""
+        )
         raise RuntimeError(
             f"Samsung Chat HTTP {response.status_code} at {URL}.{route_hint} "
-            f"Response: {excerpt or '[empty body]'}"
+            + (f"Retry-After: {retry_after}; " if retry_after else "")
+            + f"Response: {excerpt or '[empty body]'}"
         )
     data = response.json()
     if data.get("status") and clean(data.get("status")).upper() != "SUCCESS":
