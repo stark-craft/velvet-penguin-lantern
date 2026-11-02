@@ -417,6 +417,58 @@ export const createJiraNewsTicket = (items) => jsonFetch('/jira/news-tickets', {
   }),
 });
 
+// ---------- Tech Sensing Jira (draft, review, one issue per article) ----------
+function toJiraArticle(item) {
+  const sources = item?.sources || item?.source_list || [];
+  return {
+    title: String(item?.title || '').trim().slice(0, 500),
+    summary: String(
+      item?.master_summary || item?.summary || item?.summary_lead
+      || item?.ppt_summary || item?.snippet || ''
+    ).trim().slice(0, 15000),
+    category: String(item?.category || '').trim().slice(0, 300),
+    full_contents: String(item?.full_contents || item?.full_content || '').slice(0, 24000),
+    sources: (Array.isArray(sources) ? sources : []).slice(0, 30).map((source) => (
+      typeof source === 'string'
+        ? { url: source }
+        : {
+            name: String(source?.name || source?.source || source?.publisher || '').slice(0, 120),
+            url: String(source?.url || source?.link || '').slice(0, 3000),
+            date: String(source?.date || item?.date || '').slice(0, 60),
+          }
+    )),
+    image_url: String(
+      item?.image_url || item?.imageUrl || item?.thumbnail_url
+      || item?.og_image || item?.top_image || item?.image || item?.thumbnail || ''
+    ).trim().slice(0, 3000),
+    source_url: String(
+      item?.source_url || item?.canonical_link || item?.link || item?.url || ''
+    ).trim().slice(0, 3000),
+    source: String(item?.src || item?.source || '').trim().slice(0, 500),
+    date: String(item?.date || item?.published_at || '').trim().slice(0, 100),
+  };
+}
+
+export const createJiraNewsDrafts = (items) => jsonFetch('/jira/news-drafts', {
+  method: 'POST',
+  body: JSON.stringify({ articles: (items || []).map(toJiraArticle) }),
+});
+
+export const getJiraNewsJob = (jobId) =>
+  jsonFetch(`/jira/news-jobs/${encodeURIComponent(jobId)}`);
+
+export const publishJiraNewsDrafts = (jobId, reports) =>
+  jsonFetch(`/jira/news-drafts/${encodeURIComponent(jobId)}/publish`, {
+    method: 'POST',
+    body: JSON.stringify({ reports }),
+  });
+
+export const regenerateJiraNewsInsight = (jobId, index, edits) =>
+  jsonFetch(`/jira/news-drafts/${encodeURIComponent(jobId)}/insights/${index}`, {
+    method: 'POST',
+    body: JSON.stringify(edits),
+  });
+
 // ---------- Workflow ----------
 export const getWorkflow = () => jsonFetch('/workflow');
 export const selectWorkflow = (article) =>
