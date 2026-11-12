@@ -18,7 +18,7 @@ from core.network_safety import assert_public_http_url
 ENDPOINT = (
     os.environ.get("SAMSUNG_WEB_SEARCH_URL")
     or os.environ.get("SAMSUNG_WEB_SEARCH_ENDPOINT")
-    or ""
+    or "https://genai-openapi.sec.samsung.net/swahq/trial/api-web-search/openapi/web-search/v1/search"
 ).strip()
 TIMEOUT = int(os.environ.get("SAMSUNG_WEB_SEARCH_TIMEOUT", "90"))
 ARTICLE_FETCH_TIMEOUT = int(
@@ -168,6 +168,9 @@ def fetch_exact_article_content(url: str) -> dict:
     if response is None:
         raise RuntimeError("exact article fetch returned no response")
     if response.status_code >= 400:
+        retry_after = str(response.headers.get('Retry-After') or '').strip()[:120] if response.status_code == 429 else ''
+        if retry_after:
+            raise RuntimeError(f'Samsung Web Search HTTP 429. Retry-After: {retry_after};')
         raise RuntimeError(
             f"exact article fetch returned HTTP {response.status_code}"
         )
@@ -288,7 +291,13 @@ def check_samsung_web_search() -> dict:
         }
 
 
-def enrich_article_with_web_search(item, keywords=None, chat_id=None, min_content_chars=40, min_match_score=25):
+def enrich_article_with_web_search(
+    item,
+    keywords=None,
+    chat_id=None,
+    min_content_chars=40,
+    min_match_score=25,
+):
     output = dict(item or {})
     query = build_query(output, keywords)
     try:
@@ -298,6 +307,7 @@ def enrich_article_with_web_search(item, keywords=None, chat_id=None, min_conten
                 "Scrapy candidate did not contain an authoritative HTTP(S) "
                 "article URL; Web Search title-only substitution is disabled"
             )
+
         data = call_samsung_web_search_api(query, chat_id)
         refs = extract_references(data)
         best, score = choose_best_reference(output, refs)
@@ -306,14 +316,54 @@ def enrich_article_with_web_search(item, keywords=None, chat_id=None, min_conten
                 "Web Search did not return the exact discovered article "
                 f"URL ({requested_url}); unrelated references were rejected"
             )
-        content = clean_join(
+
+        answer_content = clean_text(data.get("content"))
+        article_marker = re.search(
+            r"\barticle\s+text\s*:\s*",
+            answer_content,
+            flags=re.IGNORECASE,
+        )
+        if article_marker:
+            extracted_answer_content = answer_content[
+                article_marker.end():
+            ].strip()
+        else:
+            extracted_answer_content = answer_content
+
+        reference_content = clean_join(
             [
-                best.get("description"), best.get("content"), best.get("scraping"),
-                output.get("rss_snippet"), output.get("snippet"),
+                best.get("description"),
+                best.get("content"),
             ]
         )
-        final_url = clean_text(best.get("link") or best.get("url") or output.get("link"))
-        publisher = clean_text(best.get("publisher")) or output.get("source") or domain(final_url) or "Web Search"
+        crawler_content = clean_join(
+            [
+                output.get("full_contents"),
+                output.get("full_content"),
+                output.get("rss_snippet"),
+                output.get("snippet"),
+            ]
+        )
+
+        # Samsung Web Search can return the article in top-level
+        # data["content"] while the exact matched reference reports
+        # content="" and scraping=false. This is still a successful
+        # exact-URL enrichment result.
+        content = (
+            reference_content
+            or extracted_answer_content
+            or crawler_content
+        )
+
+        final_url = clean_text(
+            best.get("link") or best.get("url") or output.get("link")
+        )
+        publisher = (
+            clean_text(best.get("publisher"))
+            or output.get("source")
+            or domain(final_url)
+            or "Web Search"
+        )
         published_time = clean_text(
             best.get("published_time")
             or best.get("publishedTime")
@@ -324,9 +374,13 @@ def enrich_article_with_web_search(item, keywords=None, chat_id=None, min_conten
             similarity = float(best.get("similarity"))
         except (TypeError, ValueError):
             similarity = None
+
         was_scraped = best.get("scraping") is True
         completion = None
-        if best.get("scraping") is False:
+        if (
+            best.get("scraping") is False
+            and len(content) < min_content_chars
+        ):
             try:
                 completion = fetch_exact_article_content(final_url)
                 content = completion["content"]
@@ -336,16 +390,28 @@ def enrich_article_with_web_search(item, keywords=None, chat_id=None, min_conten
                     "Web Search returned only a reference snippet and exact "
                     f"article completion failed: {type(error).__name__}: {error}"
                 ) from error
+
         if completion:
             published_time = published_time or completion.get("date", "")
             output["top_image"] = (
                 output.get("top_image") or completion.get("top_image", "")
             )
+
         if len(content) < min_content_chars:
             raise RuntimeError(
                 "Web Search reference did not contain enough article text"
             )
-        summary = clean_join([best.get("description"), best.get("content"), output.get("snippet")]) or content[:1200]
+
+        summary = (
+            clean_join(
+                [
+                    best.get("description"),
+                    best.get("content"),
+                    output.get("snippet"),
+                ]
+            )
+            or content[:1200]
+        )
         output.update(
             {
                 "link": final_url,
@@ -368,20 +434,65 @@ def enrich_article_with_web_search(item, keywords=None, chat_id=None, min_conten
                 "web_search_content_scope": (
                     "targeted_article_fetch"
                     if completion
-                    else "scraped_article"
-                    if was_scraped
-                    else "reference_snippet"
+                    else "reference_content"
+                    if reference_content
+                    else "api_response_article"
+                    if extracted_answer_content
+                    else "crawler_or_rss_fallback"
                 ),
                 "enrichment_status": "success",
                 "enrichment_error": None,
                 "enriched_by": "samsung_web_search",
                 "needs_web_search_enrichment": False,
-                "sources": [{"name": publisher, "link": final_url, "date": output.get("date", "")}],
+                "sources": [
+                    {
+                        "name": publisher,
+                        "link": final_url,
+                        "date": output.get("date", ""),
+                    }
+                ],
             }
         )
+
         if DEBUG:
-            output["_web_search_debug"] = {"reference_count": len(refs), "match_score": score}
+            output["_web_search_debug"] = {
+                "reference_count": len(refs),
+                "match_score": score,
+                "requested_url": requested_url,
+                "matched_url": normalize_url(final_url),
+                "reference_content_chars": len(reference_content),
+                "api_answer_content_chars": len(extracted_answer_content),
+                "crawler_content_chars": len(crawler_content),
+                "selected_content_chars": len(content),
+                "selected_content_scope": output.get(
+                    "web_search_content_scope"
+                ),
+                "reference_scraping_flag": best.get("scraping"),
+                "direct_fetch_attempted": completion is not None,
+            }
+            print(
+                "[WEB_SEARCH] "
+                f"exact_url_match="
+                f"{requested_url == normalize_url(final_url)} "
+                f"score={score} "
+                f"references={len(refs)} "
+                f"reference_chars={len(reference_content)} "
+                f"api_answer_chars={len(extracted_answer_content)} "
+                f"crawler_chars={len(crawler_content)} "
+                f"selected_scope="
+                f"{output.get('web_search_content_scope')} "
+                f"selected_chars={len(content)} "
+                f"direct_fetch={completion is not None}",
+                flush=True,
+            )
     except Exception as error:
         output["enrichment_status"] = "failed"
         output["enrichment_error"] = str(error)[:500]
+        if DEBUG:
+            print(
+                "[WEB_SEARCH] FAILED "
+                f"title={clean_text(output.get('title'))[:100]!r} "
+                f"error={type(error).__name__}: {error}",
+                flush=True,
+            )
     return output

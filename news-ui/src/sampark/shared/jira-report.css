@@ -1,0 +1,133 @@
+/* Scoped Tech Sensing draft review. No changes to existing Sampark card CSS. */
+.tsjira-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100dvh;
+  overflow-y: auto;
+  padding: 16px;
+  background: rgba(8, 15, 29, 0.75);
+  isolation: isolate;
+}
+.tsjira-dialog {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: min(960px, 100%);
+  max-height: calc(100dvh - 32px);
+  min-height: 180px;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #fff;
+  color: #182336;
+  box-shadow: 0 25px 80px #0005;
+  font: 14px/1.5 system-ui, Arial, sans-serif;
+}
+.tsjira-header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;border-bottom:1px solid #dae1eb;gap:16px}
+.tsjira-header strong{font-size:19px}.tsjira-header p{margin:4px 0 0;color:#566579}
+.tsjira-header button{border:0;background:transparent;color:#455268;font-size:28px;cursor:pointer}
+.tsjira-content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+/* Completion is tied to the backend's completed article count (not a timer).
+   The subtle moving glint only signals activity between completed articles. */
+.tsjira-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 8px 0 16px;
+  padding: 24px;
+  border: 1px solid #dce6f7;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f7faff, #fff);
+}
+.tsjira-progress-top, .tsjira-progress-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.tsjira-progress-copy { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.tsjira-progress-copy strong { font-size: 15px; line-height: 1.5; color: #172b4d; }
+.tsjira-progress-eyebrow { color: #4970aa; font-weight: 700; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; }
+.tsjira-progress-percent { font-size: 25px; line-height: 1; color: #1d59bc; font-weight: 750; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tsjira-progress-track {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #dce6f5;
+  box-shadow: inset 0 1px 2px rgb(15 36 65 / 9%);
+}
+.tsjira-progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2377db, #448ff3);
+  transition: width 450ms ease;
+}
+.tsjira-progress-activity {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 2;
+  width: 22%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgb(96 165 250 / 46%), transparent);
+  animation: tsjira-progress-sweep 1.9s ease-in-out infinite;
+  pointer-events: none;
+}
+.tsjira-progress-track.is-paused .tsjira-progress-fill { background: #a2adc3; }
+.tsjira-progress-footer { color: #526277; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tsjira-progress .tsjira-pause { font-size: 12px; color: #9a5912; font-weight: 700; }
+@keyframes tsjira-progress-sweep {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(480%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tsjira-progress-fill { transition: none; }
+  .tsjira-progress-activity { animation: none; display: none; }
+}
+@media (max-width: 480px) {
+  .tsjira-progress { padding: 16px; }
+  .tsjira-progress-footer { align-items: flex-start; flex-direction: column; gap: 4px; }
+}
+.tsjira-error{margin:12px 24px;padding:10px 12px;border-radius:8px;background:#fff1f2;color:#a41d31}
+.tsjira-draft{padding:20px;margin:0 0 18px;border:1px solid #d7deeb;border-radius:12px;display:flex;flex-direction:column;gap:10px;background:#fff}
+.tsjira-draft>strong{margin-top:8px;font-size:14px;color:#1e3b69}
+.tsjira-draft label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:650;color:#48566c}
+.tsjira-draft label.tsjira-select{flex-direction:row;align-items:center;color:#1c3e77;font-size:13px}
+.tsjira-draft input:not([type=checkbox]),.tsjira-draft textarea{padding:9px 11px;border:1px solid #becadd;border-radius:7px;background:#fff;color:#162235;font:14px/1.5 inherit;width:100%;min-width:0;box-sizing:border-box}
+.tsjira-draft textarea{font:14px/1.5 system-ui,Arial,sans-serif;resize:vertical}
+.tsjira-sources{display:flex;flex-wrap:wrap;gap:8px 14px}
+.tsjira-sources a,.tsjira-result a{color:#174fa5;text-decoration:underline}
+.tsjira-image{max-width:min(400px,100%);max-height:220px;object-fit:contain;align-self:center;border:1px solid #dde3eb;border-radius:6px}
+.tsjira-regen{align-self:flex-start;padding:8px 12px;border:1px solid #aac1e7;border-radius:7px;background:#eef5ff;color:#18509f;font-weight:650;cursor:pointer}
+.tsjira-actions{display:flex;justify-content:flex-end;gap:12px;padding:12px 0}
+.tsjira-actions button{background:#edf2fa;border:1px solid #c8d2e1;border-radius:7px;color:#193653;padding:10px 14px;cursor:pointer;font-weight:650}
+.tsjira-actions button.tsjira-primary{background:#165cc3;color:white;border-color:#165cc3}
+.tsjira-actions button:disabled{opacity:.5;cursor:not-allowed}
+.tsjira-result{padding:14px;margin:10px 0;border:1px solid #d8e1ed;border-radius:9px;display:flex;gap:9px;flex-direction:column}
+.tsjira-result p,.tsjira-hint{margin:0;color:#6b4050}
+@media (max-width: 600px) {
+  .tsjira-header, .tsjira-content { padding: 14px; }
+  .tsjira-overlay { padding: 8px; }
+  .tsjira-dialog { max-height: calc(100dvh - 16px); }
+  .tsjira-actions { flex-direction: column; }
+}
+
+.tsjira-source { display:grid;grid-template-columns:1fr 1.5fr 1fr;align-items:end;gap:8px;padding:8px;border:1px solid #e0e6ef;border-radius:8px; }
+.tsjira-source a { font-size:12px;word-break:break-all; }
+.tsjira-insight-tools { display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap; }
+.tsjira-insight-tools small { color:#536175; }
+.tsjira-draft label input[type="url"] { min-width:0; }
+@media(max-width:650px) { .tsjira-source { grid-template-columns:1fr; } }

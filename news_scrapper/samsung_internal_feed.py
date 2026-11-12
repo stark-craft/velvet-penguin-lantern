@@ -18,12 +18,14 @@ from pathlib import Path
 from typing import Iterable
 
 
-PROJECTION_CLASSIFIER_VERSION = "samsung-channels-v2"
+PROJECTION_CLASSIFIER_VERSION = "samsung-channels-v3-global-source-only"
 _PROJECTION_CACHE: dict[tuple, dict] = {}
 _PROJECTION_CACHE_LOCK = threading.Lock()
 
 
 SAMSUNG_LOCAL_SOURCE = re.compile(r"\bsamsung[\s_-]+(?:local|india)\b", re.I)
+# Global articles must have at least one of these actual source labels.
+SAMSUNG_GLOBAL_SOURCE = re.compile(r"\b(?:sam[\s_-]*mobile|samsung[\s_-]+newsroom)\b", re.I)
 SAMPARK_SOURCE = re.compile(r"\bsampark\b", re.I)
 SAMSUNG_OUTLET = re.compile(
     r"sammobile|samsung\s+newsroom|samsung\.com|samsungmobilepress|sammyfans",
@@ -70,6 +72,14 @@ def source_names(article: dict) -> list[str]:
 
 def is_samsung_local_source(article: dict) -> bool:
     return any(SAMSUNG_LOCAL_SOURCE.search(name) for name in source_names(article))
+
+
+def is_samsung_global_source(article: dict) -> bool:
+    """Require SamMobile or Samsung Newsroom in primary or co-sources."""
+    return any(
+        SAMSUNG_GLOBAL_SOURCE.search(name)
+        for name in source_names(article)
+    )
 
 
 def is_sampark_source(article: dict) -> bool:
@@ -243,7 +253,7 @@ def build_samsung_internal_feed(
         elif is_samsung_local_source(record):
             record["samsung_internal_channel"] = "local"
             local_records.append(record)
-        elif is_samsung_related(record):
+        elif is_samsung_global_source(record) and is_samsung_related(record):
             record["samsung_internal_channel"] = "global"
             global_records.append(record)
 

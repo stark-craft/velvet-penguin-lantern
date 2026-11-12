@@ -11,16 +11,22 @@ import requests
 
 from core.rate_limit import PacedRateLimiter
 from core.secure_http import tls_verify
-from news_scrapper.recommendation.hooks import ensure_article_hooks, validate_hook
 
 
-DEFAULT_URL = ""
+DEFAULT_URL = (
+    "https://genai-openapi.sec.samsung.net/swahq/trial/"
+    "api-chat/openapi/chat/v1/messages"
+)
 
 
 def normalize_chat_url(value: str) -> str:
-    """Normalize the fully configured company-internal messages URL."""
-
-    return str(value or "").strip().rstrip("/")
+    """Upgrade the legacy product base URL to the proven messages route."""
+    url = str(value or "").strip().rstrip("/")
+    if not url:
+        return DEFAULT_URL
+    if url.endswith("/api-chat"):
+        return f"{url}/openapi/chat/v1/messages"
+    return url
 
 
 URL = normalize_chat_url(os.environ.get("SAMSUNG_CHAT_URL", DEFAULT_URL))
@@ -60,29 +66,15 @@ def clean_points(value, maximum: int = 5) -> list[str]:
 
 
 def extract_json(value: str) -> dict:
-    """Merge complete objects, including separately fenced model responses."""
     text = str(value or "").strip()
-    decoder = json.JSONDecoder()
-    merged = {}
-    position = 0
-    found = False
-    while position < len(text):
-        start = text.find("{", position)
-        if start < 0:
-            break
-        try:
-            parsed, position = decoder.raw_decode(text, start)
-        except json.JSONDecodeError as exc:
-            # Do not mistake a nested fragment in a malformed object for a
-            # complete response, or silently accept a truncated later block.
-            raise RuntimeError("Samsung Chat response did not contain valid JSON") from exc
-        # raw_decode advances beyond braces inside strings and nested objects.
-        # If the model corrects a field in a later block, its last value wins.
-        merged.update(parsed)
-        found = True
-    if not found:
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.I)
+    try:
+        return json.loads(text)
+    except ValueError:
+        start, end = text.find("{"), text.rfind("}")
+        if start >= 0 and end > start:
+            return json.loads(text[start : end + 1])
         raise RuntimeError("Samsung Chat response did not contain valid JSON")
-    return merged
 
 
 def safe_error_excerpt(response, limit: int = 1200) -> str:
@@ -104,8 +96,6 @@ def safe_error_excerpt(response, limit: int = 1200) -> str:
 
 
 def call_samsung_chat(prompt: str) -> dict:
-    if not URL:
-        raise RuntimeError("Missing SAMSUNG_CHAT_URL")
     if not CLIENT:
         raise RuntimeError("Missing SAMSUNG_CHAT_CLIENT")
     if not TOKEN:
@@ -143,14 +133,19 @@ def call_samsung_chat(prompt: str) -> dict:
     if response.status_code >= 400:
         excerpt = safe_error_excerpt(response)
         route_hint = (
-            " The configured SAMSUNG_CHAT_URL route was not found; copy the "
-            "full messages endpoint from the internal service documentation."
+            " The configured SAMSUNG_CHAT_URL route was not found; use the "
+            "full /openapi/chat/v1/messages route."
             if response.status_code == 404
             else ""
         )
+        retry_after = (
+            str(response.headers.get("Retry-After") or "").strip()[:120]
+            if response.status_code == 429 else ""
+        )
         raise RuntimeError(
             f"Samsung Chat HTTP {response.status_code} at {URL}.{route_hint} "
-            f"Response: {excerpt or '[empty body]'}"
+            + (f"Retry-After: {retry_after}; " if retry_after else "")
+            + f"Response: {excerpt or '[empty body]'}"
         )
     data = response.json()
     if data.get("status") and clean(data.get("status")).upper() != "SUCCESS":
@@ -210,17 +205,12 @@ Return strict JSON only with these keys:
 - key_points: an array of 3 to 5 factual, non-repetitive important points
 - ppt_summary: a concise presentation-ready summary
 - why_it_matters: one or two sentences describing strategic impact without repeating the summary
-- attention_hook: 18 to 35 grounded words explaining why this development deserves attention now
-- what_changed: the concrete new development, independently understandable
-- why_now: timing or decision-window context, or an empty string when unsupported
-- watch_next: a verifiable next event or signal to monitor, or an empty string when unsupported
-- hook_type: exactly change, risk, opportunity, follow_up, disagreement, or watch
 - article_intent: one concise label such as Product Launch, Research, Regulation, Partnership, Investment, Market Update, Security, or Corporate Strategy
 - category: a concise technology category
 - region: exactly Global or Local
 - importance_score: an integer from 1 to 10
 
-Do not invent facts, numbers, quotations, dates, urgency, consequences, or implications. Use only the supplied article and source metadata. Preserve uncertainty. Do not use curiosity gaps or phrases such as "You won't believe", "shocking", or "game-changing". Return an empty string when the evidence does not support a hook field.
+Do not invent facts, numbers, quotations, dates, or implications. Use only the supplied article and source metadata.
 
 Title: {clean(output.get('title'))}
 Source: {clean(output.get('source'))}
@@ -250,13 +240,6 @@ Article: {content}"""
         output["ppt_summary"] = clean(parsed.get("ppt_summary")) or combined_summary
         output["why_it_matters"] = clean(parsed.get("why_it_matters"))
         output["why_matters"] = output["why_it_matters"]
-        output["attention_hook"] = validate_hook(parsed.get("attention_hook"), output)
-        output["what_changed"] = clean(parsed.get("what_changed"))
-        output["why_now"] = clean(parsed.get("why_now"))
-        output["watch_next"] = clean(parsed.get("watch_next"))
-        output["hook_type"] = clean(parsed.get("hook_type")).lower()
-        output["hook_source"] = "samsung_chat"
-        output["hook_grounded"] = bool(output["attention_hook"])
         output["article_intent"] = clean(parsed.get("article_intent"))
         output["category"] = clean(parsed.get("category")) or output.get("category", "Tech News")
         output["region"] = "Local" if clean(parsed.get("region")).lower() == "local" else "Global"
@@ -272,4 +255,110 @@ Article: {content}"""
     except Exception as error:
         output["chat_summary_status"] = "failed"
         output["chat_summary_error"] = str(error)[:500]
-    return ensure_article_hooks(output)
+    return output
+
+
+# ---------------------------------------------------------------------------
+# Internal document metadata generation
+# ---------------------------------------------------------------------------
+
+DOCUMENT_METADATA_MAX_INPUT_CHARS = 24_000
+
+
+def suggest_document_metadata_with_chat(
+    filename: str,
+    extracted_text: str,
+    detected_title: str = "",
+) -> dict:
+    """
+    Generate editable metadata for an imported internal document.
+
+    This function never changes or rewrites the original PDF.
+    It receives only bounded extracted text and asks Samsung Chat for:
+    - a concise document title
+    - a short reader-facing description
+
+    Failure is non-fatal. The caller can keep the uploaded document and
+    allow the author to enter/edit metadata manually.
+    """
+    source_text = str(extracted_text or "").strip()
+    meaningful_text = re.sub(
+        r"\s+",
+        "",
+        source_text,
+    )
+    if len(meaningful_text) < 40:
+        return {
+            "status": "skipped",
+            "title": clean(detected_title)[:120],
+            "description": "",
+            "error": (
+                "Not enough extracted text was available "
+                "for automatic document metadata."
+            ),
+            "model_id": MODEL_ID,
+            "input_characters": 0,
+        }
+
+    bounded_text = source_text[:DOCUMENT_METADATA_MAX_INPUT_CHARS]
+    prompt = f"""You are preparing metadata for an internal Samsung document that will appear
+as a document card in an employee news and intelligence application.
+Read only the supplied extracted document text.
+Return STRICT VALID JSON ONLY using exactly these keys:
+{{
+  "title": "",
+  "description": ""
+}}
+TITLE REQUIREMENTS:
+- Maximum 120 characters.
+- Clear, factual and professional.
+- Describe what the document actually is about.
+- Preserve important product, technology, project or organization names.
+- Do not invent facts.
+- Do not use marketing language or clickbait.
+- Do not add information that is unsupported by the supplied text.
+DESCRIPTION REQUIREMENTS:
+- Maximum 300 characters.
+- Prefer 1 or 2 concise sentences.
+- Explain what the document covers and why a reader would open it.
+- Use only information supported by the supplied document.
+- Do not invent conclusions, dates, numbers, decisions or implications.
+- Do not mention that you are an AI.
+- Do not say "this PDF" unless that wording is genuinely useful.
+- Do not output bullet points.
+The title and description are suggestions. A human author will be able to
+edit both before submitting the document for approval.
+Original filename:
+{clean(filename)}
+Existing detected title:
+{clean(detected_title)}
+Extracted document text:
+{bounded_text}""".strip()
+    try:
+        data = call_samsung_chat(prompt)
+        parsed = extract_json(data.get("content", ""))
+        suggested_title = clean(parsed.get("title"))[:120]
+        description = clean(
+            parsed.get("description") or parsed.get("summary")
+        )[:300]
+        if not description:
+            raise RuntimeError(
+                "Samsung Chat did not return a document description"
+            )
+        return {
+            "status": "success",
+            "title": suggested_title or clean(detected_title)[:120],
+            "description": description,
+            "error": None,
+            "model_id": MODEL_ID,
+            "input_characters": len(bounded_text),
+        }
+    except Exception as error:
+        return {
+            "status": "failed",
+            "title": clean(detected_title)[:120],
+            "description": "",
+            "error": str(error)[:500],
+            "model_id": MODEL_ID,
+            "input_characters": len(bounded_text),
+        }
