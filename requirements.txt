@@ -1,5 +1,30 @@
-# Complete Signalroom Python environment: backend runtime, Hugging Face ML,
-# and the developer/test toolchain. Run from the repository root. This is
-# intentionally non-editable so a packaged Python runtime has no absolute .pth
-# reference back to the source machine.
-./backend[dev,ml]
+apscheduler>=3.10,<4
+fastapi>=0.115,<1
+numpy>=1.26,<2.5
+newspaper3k>=0.2.8,<1
+openpyxl>=3.1,<4
+pandas>=2.2,<3
+pillow>=10,<13
+python-docx>=1.1,<2
+pypdf>=4,<7
+python-dateutil>=2.9,<3
+python-dotenv>=1,<2
+python-multipart>=0.0.9,<1
+python-pptx>=0.6.23,<2
+requests>=2.32,<3
+sacremoses>=0.1,<1
+sentencepiece>=0.2,<1
+lxml-html-clean>=0.4,<1
+scikit-learn==1.6.1
+scipy>=1.11.4,<1.16
+scrapy>=2.11,<3
+sentence-transformers>=3,<6
+torch>=2.6,<3
+transformers>=4.44,<5
+truststore>=0.10,<1
+urllib3>=2,<3
+uvicorn[standard]>=0.30,<1
+
+# Private report snapshot sanitization and PDF export.
+beautifulsoup4>=4.12,<5
+reportlab>=4,<5

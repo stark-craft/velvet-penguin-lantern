@@ -1,1 +1,0 @@
-"""Signalroom backend tests."""

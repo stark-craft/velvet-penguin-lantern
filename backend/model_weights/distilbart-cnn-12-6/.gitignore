@@ -1,3 +1,0 @@
-# Keep the destination folder in Git, but never commit downloaded model files.
-*
-!.gitignore

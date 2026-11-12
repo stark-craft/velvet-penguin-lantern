@@ -1,67 +1,45 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+news-ui/node_modules/
+news-ui/dist/
+frontend/dist/
+python_embed/
+App_Portable/
+.pytest_cache/
+.coverage
+htmlcov/
+playwright-report/
+test-results/
+local_miniLM_model
+local_bart_model
+flan-t5-local
+semantic_model
+model_weights/*
+!model_weights/.gitkeep
+news_scrapper/runtime/
+venture_lens/runtime/
+ui_results_*.json
+clustered_results_*.json
+manual_search_logs.xlsx
+*.tmp
 
-# dependencies
-/node_modules
-*.egg-info/
-/.pnp
-.pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/.vinext/
-/out/
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# Local OpenAI Sites binding. The internal-laptop build does not require it,
-# and a deployment-specific project identifier must not be published.
-/.openai/hosting.json
-
-# typescript
-next-env.d.ts
-*.tsbuildinfo
-/dist/
-/.wrangler/
-/outputs/
-/work/
-
-# Signalroom local state, crawl output, scheduler locks, and trained gatekeeper
-# artifacts are generated per deployment. Preserve them during upgrades, but do
-# not publish them as source.
-/backend/runtime/*
-!/backend/runtime/.gitkeep
-/backend/models/*
-!/backend/models/.gitkeep
-/backend/model_weights/**
-!/backend/model_weights/**/
-!/backend/model_weights/**/.gitignore
-
-# Local portable-release material and secrets.
-/signalroom.env.cmd
-/deployment/signalroom.env.cmd
-/scripts/windows/local-settings.ps1
-/python_embed/
-/node_embed/
-/logs/
+# Runtime JSON/state. These files can contain user activity, display names,
+# editorial decisions, and generated publisher content. The backend recreates
+# them automatically on a fresh machine.
+intelligence_store/
+history_archive/
+dropped_articles.json
+gatekeeper_restore_queue.json
+not_interested_store*.json
+region_learning*.json
+seen_registry.json
+training_dataset.csv
+usage_tracker.json
+viewer_profiles.json
+viewer_hidden_store.json
+viewer_saved_store.json
+workflow_store*.json
