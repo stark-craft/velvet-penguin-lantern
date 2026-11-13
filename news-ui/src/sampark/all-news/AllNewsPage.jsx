@@ -22,19 +22,13 @@ import { computeOptimisticVote, getCurrentVote } from '../shared/reactionHelper.
 import useAutoDismiss from '../shared/useAutoDismiss.js';
 import { createSavedHydrationController, createReactionHydrationController } from './allNewsHydration.js';
 import useBriefingFeed from './data/useBriefingFeed.js';
-import {
-  deriveFilterOptions,
-  selectFeatured,
-  selectAllNewsRail,
-  selectImportantNews,
-} from './allNewsModel.js';
+import { deriveFilterOptions, selectFeatured, selectAllNewsRail, selectLatestToday } from './allNewsModel.js';
 import CategoryTabs from './CategoryTabs.jsx';
 import FeaturedCarousel from './FeaturedCarousel.jsx';
 import AllNewsRail from './AllNewsRail.jsx';
 import LatestNews from './LatestNews.jsx';
 import FilterPanel from './FilterPanel.jsx';
 import DayWiseNews from './DayWiseNews.jsx';
-import CreateJiraAction from '../shared/CreateJiraAction.jsx';
 import './all-news.css';
 const ReportEditor = React.lazy(() => import('../report-editor/ReportEditor.jsx'));
 
@@ -139,15 +133,7 @@ export default function AllNewsPage({ capabilities=[] }){
 
   const featured = useMemo(()=> selectFeatured(filtered, 5), [filtered]);
   const railItems = useMemo(()=> selectAllNewsRail(filtered, 10), [filtered]);
-  const importantNews = useMemo(
-    () => selectImportantNews(filtered, {
-      featured,
-      votes,
-      limit: 12,
-      minimumLikes: 2,
-    }),
-    [filtered, featured, votes],
-  );
+  const latestToday = useMemo(()=> selectLatestToday(filtered), [filtered]);
 
   // day-wise grouped preserving order, sorted by date desc
   const grouped = useMemo(()=>{
@@ -495,7 +481,7 @@ export default function AllNewsPage({ capabilities=[] }){
         <AllNewsRail items={railItems} onOpen={setOpenArticle} />
       </div>
 
-      <LatestNews items={importantNews} onOpen={setOpenArticle} onLike={(it)=> handleVote(it,'like')} onDislike={(it)=> handleVote(it,'dislike')} onFollow={handleSave} onHide={handleHide} onSourceOpen={handleCardSourceOpen} votes={votes} savedKeys={savedKeys} busyMap={busy} savedHydrated={savedHydrated} reactionsHydrated={reactionsHydrated} />
+      <LatestNews items={latestToday} onOpen={setOpenArticle} onLike={(it)=> handleVote(it,'like')} onDislike={(it)=> handleVote(it,'dislike')} onFollow={handleSave} onHide={handleHide} onSourceOpen={handleCardSourceOpen} votes={votes} savedKeys={savedKeys} busyMap={busy} savedHydrated={savedHydrated} reactionsHydrated={reactionsHydrated} />
 
       <FilterPanel options={options} draft={draftFilters} setDraft={setDraftFilters} onApply={handleApply} onReset={handleReset} filteredCount={filtered.length} />
 
@@ -513,10 +499,6 @@ export default function AllNewsPage({ capabilities=[] }){
           <button className="btn-dark-primary h-9" disabled={batchBusy} onClick={()=>setBatchSelect({ title:`${selectedBatch.length} selected articles` })} type="button">Send to Review Queue</button>
           <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setReportItems(selectedBatch.slice())} type="button">Create Report</button>
           <button className="btn-dark-secondary h-9" disabled={batchBusy} onClick={()=>setDraftExportOpen(true)} type="button">Draft Export</button>
-          <CreateJiraAction
-            items={selectedBatch}
-            disabled={batchBusy}
-          />
         </div>
       </div>}
     </div>

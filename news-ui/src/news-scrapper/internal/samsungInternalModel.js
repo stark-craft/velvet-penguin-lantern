@@ -3,8 +3,6 @@
 
 const SAMSUNG_OUTLETS = /sammobile|samsung newsroom|samsung\.com|samsungmobilepress|sammyfans/i;
 const SAMSUNG_LOCAL_SOURCE = /\bsamsung[\s_-]+(?:local|india)\b/i;
-// Samsung Global requires one named publisher, even when an article has multiple sources.
-const SAMSUNG_GLOBAL_SOURCE = /\b(?:sam[\s_-]*mobile|samsung[\s_-]+newsroom)\b/i;
 const SAMPARK_SOURCE = /\bsampark\b/i;
 const SAMSUNG_TOPIC = /\b(?:samsung|galaxy|smartthings|exynos|bixby|one\s+ui|samsung\s+knox|samsung\s+display|samsung\s+electronics|samsung\s+semiconductor|samsung\s+foundry|samsung\s+sdi|harman)\b/i;
 const NON_ARTICLE_TITLE = /^(?:see\s+all(?:\s+the)?\s+latest|latest|home|news|technology|articles)$/i;
@@ -40,10 +38,6 @@ function sourceNamesOf(item) {
 
 export function isSamsungLocalSource(item) {
   return sourceNamesOf(item).some((source) => SAMSUNG_LOCAL_SOURCE.test(source));
-}
-
-export function isSamsungGlobalSource(item) {
-  return sourceNamesOf(item).some((source) => SAMSUNG_GLOBAL_SOURCE.test(source));
 }
 
 export function isSamparkSource(item) {
@@ -100,9 +94,7 @@ export function splitByScope(items) {
   const inside = [];
   (items || []).forEach((item) => {
     if (isSamparkSource(item)) inside.push(item);
-    else if (isSamsungLocalSource(item)) local.push(item);
-    else if (isSamsungGlobalSource(item)) global.push(item);
-    // Ignore general Samsung mentions in fallback Global, matching backend policy.
+    else (signalScope(item) === 'local' ? local : global).push(item);
   });
   return { global, local, inside };
 }

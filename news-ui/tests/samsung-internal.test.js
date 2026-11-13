@@ -13,7 +13,6 @@ const {
   groupSignalsByDate,
   isSamsungSignal,
   isSamsungLocalSource,
-  isSamsungGlobalSource,
   isSamparkSource,
   rankTrending,
   resolveInternalImage,
@@ -61,45 +60,13 @@ test("Scope split uses explicit Samsung Local, Samsung India and Sampark source 
   assert.equal(isSamparkSource(signal({ source: "Sampark" })), true);
 
   const { global, local, inside } = splitByScope([
-    signal({ id: "other", title: "Samsung Galaxy launch", source: "The Verge" }),
-    signal({ id: "g", source: "SamMobile" }),
-    signal({ id: "co", source: "Reuters", sources: [{ name: "Samsung Newsroom" }, { name: "Reuters" }] }),
+    signal({ id: "g", source: "The Verge" }),
     signal({ id: "l", source: "Samsung Local" }),
     signal({ id: "i", source: "Sampark" }),
   ]);
-  assert.deepEqual(global.map((item) => item.id), ["g", "co"]);
+  assert.deepEqual(global.map((item) => item.id), ["g"]);
   assert.deepEqual(local.map((item) => item.id), ["l"]);
   assert.deepEqual(inside.map((item) => item.id), ["i"]);
-});
-
-test("Samsung Global requires a named SamMobile or Samsung Newsroom source", () => {
-  assert.equal(isSamsungGlobalSource(signal({ source: "SamMobile" })), true);
-  assert.equal(isSamsungGlobalSource(signal({ source: "Sam Mobile" })), true);
-  assert.equal(isSamsungGlobalSource(signal({ source: "Samsung Newsroom" })), true);
-  assert.equal(isSamsungGlobalSource(signal({
-    source: "Reuters",
-    sources: [{ name: "The Verge" }, { name: "Samsung Newsroom" }],
-  })), true);
-  assert.equal(isSamsungGlobalSource(signal({
-    source: "Reuters",
-    source_list: [{ name: "SamMobile" }],
-  })), true);
-  assert.equal(isSamsungGlobalSource(signal({
-    title: "Samsung Newsroom announces Galaxy",
-    source: "TechRadar",
-  })), false);
-  assert.equal(isSamsungGlobalSource(signal({ source: "SammyFans" })), false);
-
-  const classified = splitByScope([
-    signal({ id: "global", source: "Samsung Newsroom" }),
-    signal({ id: "global-multi", source: "Reuters", sources: [{ name: "SamMobile" }] }),
-    signal({ id: "unrelated", title: "Samsung announces device", source: "The Verge" }),
-    signal({ id: "local", source: "Samsung India", sources: [{ name: "SamMobile" }] }),
-    signal({ id: "inside", source: "Sampark" }),
-  ]);
-  assert.deepEqual(classified.global.map(item => item.id), ["global", "global-multi"]);
-  assert.deepEqual(classified.local.map(item => item.id), ["local"]);
-  assert.deepEqual(classified.inside.map(item => item.id), ["inside"]);
 });
 
 test("signals group into newest-first daily editions", () => {

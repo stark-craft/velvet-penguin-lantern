@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Undo2, Redo2, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, ImagePlus, Scissors, Sparkles, History, Save, X, FileText, PanelLeft, Download, ChevronRight } from 'lucide-react';
+import { Undo2, Redo2, Bold, Italic, Underline, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, ImagePlus, Scissors, Sparkles, History, Save, X } from 'lucide-react';
 import useModalFocus from '../../news-scrapper/components/modals/useModalFocus.js';
 import { reportRequest } from './reportApi.js';
 import { seedReport, escapeHtml, paragraphs } from './reportModel.js';
@@ -13,9 +13,7 @@ import { startReportIntelligence } from './reportStartup.js';
 import { currentAnalysisInputs, analysisSignature, canApplyAnalysis } from './reportAnalysis.js';
 import { prepareImpactSections, reportImpactArticles, canApplyImpact, canApplyAutomaticImpact } from './reportImpact.js';
 import { IMAGE_ACCEPT, readReportImage } from './reportImages.js';
-import { updateReportLiveStates, stripReportLiveStates } from './reportLiveStates.js';
 import './report-editor.css';
-import './report-studio.css';
 
 function documentHtml(element) {
   if(!element)return '';
@@ -24,9 +22,6 @@ function documentHtml(element) {
   clone.querySelectorAll('img').forEach(image=>{
     ['data-report-selected','tabindex','role','aria-label','title'].forEach(attribute=>image.removeAttribute(attribute));
   });
-  // AI shimmer, queued, review and error indicators are ephemeral UI-only
-  // attributes. They must never end up in saved drafts or exported documents.
-  stripReportLiveStates(clone);
   return clone.innerHTML;
 }
 
@@ -86,51 +81,10 @@ export default function ReportEditor({items, onClose}) {
   const [message,setMessage] = useState('');
   const [pageCount,setPageCount] = useState(1);
   const [pageHeight,setPageHeight] = useState(630);
-  const [outlineOpen,setOutlineOpen] = useState(true);
-  const [activeSection,setActiveSection] = useState(0);
-  const [outlineItems,setOutlineItems] = useState(() => [
-    {kind:'overview',title:'Executive overview'},
-    ...(items || []).map((item,index)=>({kind:'article',title:String(item?.title || `Article ${index+1}`).trim()})),
-  ]);
-  const outlineSignature=useRef('');
   const automaticImpact=useAutomaticImpact(()=>reportImpactArticles(editor.current),applyAutomaticImpact);
   const requestClose = useCallback(()=>{if(busy || aiBusy || imageBusy) return; if(dirty) setPending({kind:'close'}); else onClose();},[busy,aiBusy,imageBusy,dirty,onClose]);
   const modal = useModalFocus(true, requestClose);
   const change = ()=>{setDirty(documentHtml(editor.current) !== savedHtml.current || title !== savedTitle.current);};
-  const navigateReport = (index) => {
-    const sections=editor.current?.querySelectorAll(':scope > section[data-kind]');
-    const target=sections?.[index];
-    if(!target)return;
-    target.scrollIntoView({behavior:'smooth',block:'start'});
-    setActiveSection(index);
-  };
-  // Outline is read-only navigation, derived from the live editable DOM.
-  // It never changes stored report HTML or inserts editor decorations.
-  useEffect(()=>{
-    const root=editor.current;
-    if(!root)return undefined;
-    const sync=()=>{
-      const headings=[...root.querySelectorAll(':scope > section[data-kind]')].map((section,index)=>({
-        kind:section.dataset.kind,
-        title:(section.querySelector(section.dataset.kind==='overview'?'h1':'h2')?.textContent || `Section ${index+1}`).trim(),
-      }));
-      const signature=JSON.stringify(headings);
-      if(signature!==outlineSignature.current){
-        outlineSignature.current=signature;
-        setOutlineItems(headings);
-      }
-    };
-    sync();
-    const observer=new MutationObserver(sync);
-    observer.observe(root,{subtree:true,childList:true,characterData:true});
-    return ()=>observer.disconnect();
-  },[]);
-  // Paint generation/error states inside the actual document sections.
-  // This only updates transient attributes; document text and AI prompts are
-  // untouched. Existing top-level retry/review controls remain available.
-  useEffect(()=>{
-    updateReportLiveStates(editor.current, automaticAnalysis, automaticImpact.state);
-  },[automaticAnalysis, automaticImpact.state]);
   const snapshot = ()=>({title,html:documentHtml(editor.current) || initial,...draft.current});
   useEffect(()=>{
     const startup=startReportIntelligence({
@@ -268,7 +222,7 @@ export default function ReportEditor({items, onClose}) {
     const previousFocus=document.activeElement;
     const selected=window.getSelection();
     const previousRange=selected?.rangeCount?selected.getRangeAt(0).cloneRange():null;
-    const scroll=editor.current.closest('.sampark-report-scroll');
+    const scroll=editor.current.parentElement;
     const scrollTop=scroll.scrollTop;
     const replacement=document.createRange();replacement.selectNodeContents(body);range.current=replacement;
     command('insertHTML',paragraphs(text));
@@ -332,122 +286,30 @@ export default function ReportEditor({items, onClose}) {
     finally {setImageBusy(false);event.target.value='';imageTarget.current=null;}
   }
   const tools=[['Undo','undo',Undo2],['Redo','redo',Redo2],['Bold','bold',Bold],['Italic','italic',Italic],['Underline','underline',Underline],['Bulleted list','insertUnorderedList',List],['Numbered list','insertOrderedList',ListOrdered],['Align left','justifyLeft',AlignLeft],['Align center','justifyCenter',AlignCenter],['Align right','justifyRight',AlignRight]];
-  const aiWorking=automaticAnalysis?.status==='loading' || Boolean(automaticImpact.state?.pending);
-  return createPortal(
-    <div className="sampark-report-overlay sr-studio-overlay">
-      <section ref={modal} className="sampark-report-workspace sr-studio" role="dialog" aria-modal="true" aria-label="Editable selected-news report" tabIndex={-1}>
-        <header className="sr-studio-header">
-          <div className="sr-studio-brand">
-            <span className="sr-studio-brand-mark"><FileText size={22}/></span>
-            <div className="sr-studio-brand-copy">
-              <span>TECHSCOUT / INTELLIGENCE</span>
-              <strong>Report Studio</strong>
-            </div>
-            <span className="sr-studio-version">EDITOR</span>
-          </div>
-          <div className="sr-studio-header-actions">
-            <span className="sr-studio-article-count">{items.length} {items.length===1?'article':'articles'}</span>
-            <span className={`sr-studio-save-state${dirty?' is-unsaved':''}`}>
-              <span className="sr-studio-state-dot"/>
-              {busy?'Working…':dirty?'Unsaved changes':'Saved privately'}
-            </span>
-            <button className="sr-studio-save" onClick={save} disabled={busy||imageBusy} type="button"><Save size={16}/> Save draft</button>
-            <button className="sr-studio-close" aria-label="Close report editor" title="Close editor" onClick={requestClose} disabled={busy||aiBusy||imageBusy} type="button"><X size={19}/></button>
-          </div>
-        </header>
-
-        <div className="sampark-report-toolbar sr-studio-toolbar">
-          <div className="sr-studio-ai-tools" role="group" aria-label="Samsung AI tools">
-            <button className={`sampark-report-ai-button sr-studio-ai-button${impact?' is-active':''}`} aria-pressed={impact} type="button" onClick={()=>{setImpact(!impact);setAi(false);setHistory(null);selectImage(null);}} disabled={busy||aiBusy||imageBusy}><Sparkles size={16}/> Samsung Impact</button>
-            <button className={`sampark-report-ai-button sr-studio-ai-button sr-studio-ask-button${ai?' is-active':''}`} aria-pressed={ai} type="button" onClick={()=>{rememberSelection();aiRange.current=range.current?.cloneRange();aiSelection.current=selection;setAi(!ai);setImpact(false);setHistory(null);}} disabled={busy||aiBusy||imageBusy}><Sparkles size={16}/> Ask AI</button>
-          </div>
-          <span className="sr-studio-toolbar-divider" aria-hidden="true"/>
-          <div className="sampark-report-tools sr-studio-format-tools" role="toolbar" aria-label="Document formatting">
-            <div className="sr-studio-format-group">
-              {tools.slice(0,2).map(([label,cmd,Glyph])=><button key={cmd} aria-label={label} title={label} onMouseDown={e=>e.preventDefault()} onClick={()=>command(cmd)} disabled={busy}><Glyph size={17}/></button>)}
-            </div>
-            <span className="sr-studio-format-divider" aria-hidden="true"/>
-            <div className="sr-studio-format-selects">
-              <select aria-label="Text style" defaultValue="p" onChange={e=>command('formatBlock',e.target.value)}><option value="p">Body</option><option value="h1">Title</option><option value="h2">Heading</option><option value="h3">Subheading</option></select>
-              <select aria-label="Font" defaultValue="Arial" onChange={e=>command('fontName',e.target.value)}>{['Arial','Calibri','Georgia'].map(f=><option key={f}>{f}</option>)}</select>
-              <select aria-label="Font size" defaultValue="3" onChange={e=>command('fontSize',e.target.value)}>{[['2','Small'],['3','Regular'],['4','Large'],['5','Extra large']].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
-            </div>
-            <span className="sr-studio-format-divider" aria-hidden="true"/>
-            <div className="sr-studio-format-group">
-              {tools.slice(2).map(([label,cmd,Glyph])=><button key={cmd} aria-label={label} title={label} onMouseDown={e=>e.preventDefault()} onClick={()=>command(cmd)} disabled={busy}><Glyph size={17}/></button>)}
-              <button title={selectedImage?'Replace selected image':'Insert image from computer'} aria-label={selectedImage?'Replace selected image':'Insert image from computer'} onMouseDown={e=>e.preventDefault()} onClick={chooseImage} disabled={busy||imageBusy}><ImagePlus size={17}/></button>
-              <button aria-label="Insert page break" title="Page break" onMouseDown={e=>e.preventDefault()} onClick={()=>command('insertHTML','<hr data-kind="page-break"><p><br></p>')}><Scissors size={17}/></button>
-            </div>
-            <input ref={imageInput} type="file" accept={IMAGE_ACCEPT} aria-label="Choose image from computer" hidden onChange={insertImage}/>
-          </div>
-          <div className="sr-studio-view-tools">
-            <button className={`sr-studio-outline-toggle${outlineOpen?' is-active':''}`} aria-pressed={outlineOpen} title="Toggle report outline" onClick={()=>setOutlineOpen(value=>!value)} type="button"><PanelLeft size={17}/><span>Outline</span></button>
-            <button className="sr-studio-history" aria-label="Draft and export history" title="History" onClick={openHistory} disabled={aiBusy||imageBusy} type="button"><History size={18}/></button>
-          </div>
-        </div>
-        <div className="sampark-report-meta sr-studio-meta">
-          <div className="sr-studio-filename">
-            <span>DOCUMENT NAME</span>
-            <input aria-label="Report filename" disabled={busy} value={title} maxLength={160} onChange={e=>{setTitle(e.target.value);setDirty(true);}} />
-          </div>
-          <div className="sr-studio-document-stats">
-            {aiWorking && <span className="sr-studio-live"><span/>AI is generating</span>}
-            <span><strong>{pageCount}</strong> estimated {pageCount===1?'page':'pages'}</span>
-            <span className="sr-studio-editable">Editable document</span>
-          </div>
-        </div>
-        {message && <div className="sampark-report-notice" role="status"><span>{message}</span><button onClick={()=>setMessage('')} aria-label="Dismiss message" type="button"><X size={15}/></button></div>}
-        <div className="sr-studio-intelligence">
-          <AutomaticAnalysisStatus state={automaticAnalysis} busy={busy||imageBusy||aiBusy} onRetry={generateAnalysis} onApply={applyAutomaticAnalysis}/>
-          <AutomaticImpactStatus state={automaticImpact.state} busy={busy||imageBusy||aiBusy} onRetry={automaticImpact.generate} onApply={automaticImpact.useProposal} onKeep={automaticImpact.dismiss}/>
-        </div>
-        {selectedImage && <div className="sampark-report-image-actions" role="group" aria-label="Selected image"><span>Article image</span><button className="sampark-report-primary" onClick={chooseImage} disabled={busy||imageBusy}><ImagePlus size={16}/>{imageBusy?'Opening image…':'Replace from computer'}</button><small>PNG, JPEG or WebP · up to 1 MB</small><button aria-label="Deselect image" onClick={()=>selectImage(null)} disabled={imageBusy}><X size={16}/></button></div>}
-        <div className="sampark-report-body sr-studio-body">
-          {outlineOpen && (
-            <aside className="sr-studio-outline" aria-label="Report outline">
-              <div className="sr-studio-outline-header">
-                <span>DOCUMENT OUTLINE</span>
-                <strong>{outlineItems.filter(item=>item.kind==='article').length} stories</strong>
-              </div>
-              <nav aria-label="Jump to report section" className="sr-studio-outline-list">
-                {outlineItems.map((item,index)=>(
-                  <button
-                    key={index}
-                    type="button"
-                    className={`sr-studio-outline-item${activeSection===index?' is-active':''}`}
-                    onClick={()=>navigateReport(index)}
-                    title={item.title}
-                  >
-                    <span className="sr-studio-outline-number">{item.kind==='overview'?<FileText size={15}/>:String(index).padStart(2,'0')}</span>
-                    <span className="sr-studio-outline-text">{item.kind==='overview'?'Overview':item.title}</span>
-                    {activeSection===index && <ChevronRight size={15}/>}
-                  </button>
-                ))}
-              </nav>
-              <div className="sr-studio-outline-tip">
-                <Sparkles size={15}/>
-                <p>AI-generated sections appear in the document as they finish. You can edit any section.</p>
-              </div>
-            </aside>
-          )}
-          <div className="sampark-report-scroll sr-studio-canvas">
-            <div className="sr-studio-paper-wrap">
-              <div className="sr-studio-paper-top"><span className="sr-studio-paper-dot"/><span>LIVE REPORT DOCUMENT</span><span className="sr-studio-paper-edit">Click anywhere to edit</span></div>
-              <div className="sampark-report-document" style={{'--report-page-height':`${pageHeight}px`}} ref={editor} contentEditable={!busy} suppressContentEditableWarning tabIndex={0} role="textbox" aria-label="Report document" aria-multiline="true" onInput={change} onClick={event=>selectImage(event.target.tagName==='IMG'?event.target:null)} onKeyDown={event=>{if(event.target.tagName==='IMG' && ['Enter',' '].includes(event.key)){event.preventDefault();selectImage(event.target);}}} onMouseUp={rememberSelection} onKeyUp={rememberSelection} onPaste={paste} onDrop={e=>e.preventDefault()} dangerouslySetInnerHTML={{__html:initial}}/>
-            </div>
-          </div>
-          {impact && <SamsungImpactPanel getArticles={()=>reportImpactArticles(editor.current)} quota={quota} setQuota={setQuota} onApply={applyImpact} onClose={()=>setImpact(false)} onBusy={setAiBusy}/>}
-          {ai && <AskAiPanel quota={quota} setQuota={setQuota} selection={aiSelection.current} getContext={()=>{const sections=[...editor.current.querySelectorAll('section')];const articles=sections.filter(s=>s.dataset.kind==='article').length;const budget=Math.max(1,Math.floor((20000-sections.length*2)/Math.max(1,articles)));return sections.length?sections.map(s=>s.innerText.slice(0,s.dataset.kind==='article'?budget:5000)).join('\n\n').slice(0,30000):editor.current.innerText.slice(0,30000);}} onApply={applyPassage} onClose={()=>setAi(false)} onBusy={setAiBusy}/>}
-          {history && <aside className="sampark-report-panel" aria-label="Private history"><div className="sampark-report-panel-head"><strong>Your history</strong><button onClick={()=>setHistory(null)} aria-label="Close history">×</button></div><h3>Saved drafts</h3>{!history.drafts.length&&<p>No saved drafts yet.</p>}{history.drafts.map(d=><div className="sampark-report-history-row" key={d.id}><button onClick={()=>dirty?setPending({kind:'open',id:d.id}):openDraft(d.id)}>{d.title}<small>{new Date(d.updated_at*1000).toLocaleString()}</small></button><button aria-label={`Delete ${d.title}`} onClick={async()=>{try{await reportRequest(`/drafts/${d.id}`,undefined,'DELETE');openHistory();}catch(e){setMessage(e.message);}}}>×</button></div>)}<h3>Exports</h3>{!history.exports.length&&<p key="empty">No exports yet.</p>}{history.exports.map((x,i)=><p key={i}>{x.title} · {x.format.toUpperCase()}<small>{new Date(x.at*1000).toLocaleString()}</small></p>)}</aside>}
-        </div>
-        <footer className="sampark-report-footer sr-studio-footer">
-          <div className="sr-studio-footer-left"><Download size={17}/><span><strong>Export report</strong><small>{aiWorking?'AI analysis in progress…':'All document edits are included'}{template && !template.available?' · PPTX needs template.pptx':''}</small></span></div>
-          <div className="sr-studio-export-buttons">
-            {[['pdf','PDF'],['html','HTML'],['pptx','PowerPoint'],['docx','Word'],['xlsx','Excel']].map(([fmt,label])=><button key={fmt} className={fmt==='pdf'?'sr-studio-export-primary':''} disabled={busy||imageBusy||automaticAnalysis?.status==='loading'||!!automaticImpact.state?.pending||!title.trim()||(fmt==='pptx' && !template?.available)} onClick={()=>requestExport(fmt)} type="button">{label}</button>)}
-          </div>
-        </footer>
-        {pending && <UnsavedPrompt pending={pending} busy={busy} onContinue={continuePending} onCancel={()=>setPending(null)} />}
-      </section>
-    </div>,document.body
-  );
+  return createPortal(<div className="sampark-report-overlay"><section ref={modal} className="sampark-report-workspace" role="dialog" aria-modal="true" aria-label="Editable selected-news report" tabIndex={-1}>
+    <header className="sampark-report-toolbar">
+      <div className="sampark-report-tools" role="toolbar" aria-label="Document formatting">
+        {tools.map(([label,cmd,Glyph])=><button key={cmd} aria-label={label} title={label} onMouseDown={e=>e.preventDefault()} onClick={()=>command(cmd)} disabled={busy}><Glyph size={17}/></button>)}
+        <select aria-label="Text style" defaultValue="p" onChange={e=>command('formatBlock',e.target.value)}><option value="p">Body</option><option value="h1">Title</option><option value="h2">Heading</option><option value="h3">Subheading</option></select>
+        <select aria-label="Font" defaultValue="Arial" onChange={e=>command('fontName',e.target.value)}>{['Arial','Calibri','Georgia'].map(f=><option key={f}>{f}</option>)}</select>
+        <select aria-label="Font size" defaultValue="3" onChange={e=>command('fontSize',e.target.value)}>{[['2','Small'],['3','Regular'],['4','Large'],['5','Extra large']].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
+        <button title={selectedImage ? 'Replace selected image' : 'Insert image from computer'} aria-label={selectedImage ? 'Replace selected image' : 'Insert image from computer'} onMouseDown={e=>e.preventDefault()} onClick={chooseImage} disabled={busy||imageBusy}><ImagePlus size={17}/></button>
+        <input ref={imageInput} type="file" accept={IMAGE_ACCEPT} aria-label="Choose image from computer" hidden onChange={insertImage}/>
+        <button aria-label="Insert page break" title="Page break" onMouseDown={e=>e.preventDefault()} onClick={()=>command('insertHTML','<hr data-kind="page-break"><p><br></p>')}><Scissors size={17}/></button>
+      </div>
+      <div className="sampark-report-tools"><button className="sampark-report-ai-button" onClick={()=>{setImpact(!impact);setAi(false);setHistory(null);selectImage(null);}} disabled={busy||aiBusy||imageBusy}><Sparkles size={16}/> Samsung impact</button><button className="sampark-report-ai-button" onClick={()=>{rememberSelection();aiRange.current=range.current?.cloneRange();aiSelection.current=selection;setAi(!ai);setImpact(false);setHistory(null);}} disabled={busy||aiBusy||imageBusy}><Sparkles size={16}/> Ask AI</button><button aria-label="Draft and export history" title="History" onClick={openHistory} disabled={aiBusy||imageBusy}><History size={18}/></button><button onClick={save} disabled={busy||imageBusy}><Save size={16}/>Save</button><button aria-label="Close report editor" onClick={requestClose} disabled={busy||aiBusy||imageBusy}><X size={19}/></button></div>
+    </header>
+    <div className="sampark-report-meta"><input aria-label="Report filename" disabled={busy} value={title} maxLength={160} onChange={e=>{setTitle(e.target.value);setDirty(true);}}/><span>{busy ? 'Working…' : dirty ? 'Unsaved changes' : 'Saved privately'} · ~{pageCount} flow page{pageCount===1?'':'s'}</span></div>
+    {message && <div className="sampark-report-notice" role="status">{message}<button onClick={()=>setMessage('')} aria-label="Dismiss message">×</button></div>}
+    <AutomaticAnalysisStatus state={automaticAnalysis} busy={busy||imageBusy||aiBusy} onRetry={generateAnalysis} onApply={applyAutomaticAnalysis}/>
+    <AutomaticImpactStatus state={automaticImpact.state} busy={busy||imageBusy||aiBusy} onRetry={automaticImpact.generate} onApply={automaticImpact.useProposal} onKeep={automaticImpact.dismiss}/>
+    {selectedImage && <div className="sampark-report-image-actions" role="group" aria-label="Selected image"><span>Article image</span><button className="sampark-report-primary" onClick={chooseImage} disabled={busy||imageBusy}><ImagePlus size={16}/>{imageBusy?'Opening image…':'Replace from computer'}</button><small>PNG, JPEG or WebP · up to 1 MB</small><button aria-label="Deselect image" onClick={()=>selectImage(null)} disabled={imageBusy}><X size={16}/></button></div>}
+    <div className="sampark-report-body"><div className="sampark-report-scroll"><div className="sampark-report-document" style={{'--report-page-height':`${pageHeight}px`}} ref={editor} contentEditable={!busy} suppressContentEditableWarning tabIndex={0} role="textbox" aria-label="Report document" aria-multiline="true" onInput={change} onClick={event=>selectImage(event.target.tagName==='IMG'?event.target:null)} onKeyDown={event=>{if(event.target.tagName==='IMG' && ['Enter',' '].includes(event.key)){event.preventDefault();selectImage(event.target);}}} onMouseUp={rememberSelection} onKeyUp={rememberSelection} onPaste={paste} onDrop={e=>e.preventDefault()} dangerouslySetInnerHTML={{__html:initial}}/></div>
+      {impact && <SamsungImpactPanel getArticles={()=>reportImpactArticles(editor.current)} quota={quota} setQuota={setQuota} onApply={applyImpact} onClose={()=>setImpact(false)} onBusy={setAiBusy}/>}
+      {ai && <AskAiPanel quota={quota} setQuota={setQuota} selection={aiSelection.current} getContext={()=>{const sections=[...editor.current.querySelectorAll('section')];const articles=sections.filter(s=>s.dataset.kind==='article').length;const budget=Math.max(1,Math.floor((20000-sections.length*2)/Math.max(1,articles)));return sections.length?sections.map(s=>s.innerText.slice(0,s.dataset.kind==='article'?budget:5000)).join('\n\n').slice(0,30000):editor.current.innerText.slice(0,30000);}} onApply={applyPassage} onClose={()=>setAi(false)} onBusy={setAiBusy}/>}
+      {history && <aside className="sampark-report-panel" aria-label="Private history"><div className="sampark-report-panel-head"><strong>Your history</strong><button onClick={()=>setHistory(null)} aria-label="Close history">×</button></div><h3>Saved drafts</h3>{!history.drafts.length&&<p>No saved drafts yet.</p>}{history.drafts.map(d=><div className="sampark-report-history-row" key={d.id}><button onClick={()=>dirty?setPending({kind:'open',id:d.id}):openDraft(d.id)}>{d.title}<small>{new Date(d.updated_at*1000).toLocaleString()}</small></button><button aria-label={`Delete ${d.title}`} onClick={async()=>{try{await reportRequest(`/drafts/${d.id}`,undefined,'DELETE');openHistory();}catch(e){setMessage(e.message);}}}>×</button></div>)}<h3>Exports</h3>{!history.exports.length&&<p>No exports yet.</p>}{history.exports.map((x,i)=><p key={i}>{x.title} · {x.format.toUpperCase()}<small>{new Date(x.at*1000).toLocaleString()}</small></p>)}</aside>}
+    </div>
+    <footer className="sampark-report-footer"><span>{automaticAnalysis?.status==='loading'||automaticImpact.state?.pending?'Preparing report analysis…':'Export current edits'}{template && !template.available ? ' · PPTX needs template.pptx' : ''}</span><div>{[['pdf','PDF'],['html','HTML'],['pptx','PowerPoint'],['docx','Word'],['xlsx','Excel']].map(([fmt,label])=><button key={fmt} disabled={busy||imageBusy||automaticAnalysis?.status==='loading'||!!automaticImpact.state?.pending||!title.trim()||(fmt==='pptx' && !template?.available)} onClick={()=>requestExport(fmt)}>{label}</button>)}</div></footer>
+    {pending && <UnsavedPrompt pending={pending} busy={busy} onContinue={continuePending} onCancel={()=>setPending(null)} />}
+  </section></div>,document.body);
 }
