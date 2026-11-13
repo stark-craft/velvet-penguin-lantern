@@ -1858,6 +1858,10 @@ def targeted_local_extract_article(item: dict, *, reason: str) -> dict:
         )
         if original.get(key) not in (None, "", [], {})
     }
+    # Local extraction must not replace an authenticated official newsroom
+    # publisher label with a generic hostname.
+    if original.get("samsung_official_newsroom") and original.get("source"):
+        preserved["source"] = original["source"]
     return {
         **original,
         **extracted,
@@ -1975,6 +1979,22 @@ def enrich_raw_articles(
         cached = cached_values.get(cache_key)
         if isinstance(cached, dict):
             enriched = dict(cached)
+            if item.get("samsung_official_newsroom"):
+                # URL-keyed cached enrichments may predate the new newsroom
+                # catalog; restore the current registry's source identity.
+                for key in (
+                    "source", "source_id", "samsung_official_newsroom",
+                    "newsroom_type", "newsroom_region", "newsroom_country",
+                    "newsroom_language", "newsroom_business",
+                ):
+                    if key in item:
+                        enriched[key] = item[key]
+                if item.get("source"):
+                    enriched["sources"] = [{
+                        "name": item["source"],
+                        "link": enriched.get("link") or item.get("link") or "",
+                        "date": enriched.get("date") or item.get("date") or "",
+                    }]
             enriched["enrichment_cache"] = "hit"
             cached_hits += 1
         else:
@@ -1993,7 +2013,13 @@ def enrich_raw_articles(
         if enriched.get("enrichment_status") == "success":
             matches = matched_pipeline_keywords(enriched, keywords)
             enriched["keywords_found"] = matches
-            if WEB_SEARCH_REQUIRE_KEYWORD_MATCH and not matches:
+            official_source = bool(item.get("samsung_official_newsroom"))
+            if official_source and not matches:
+                # The URL was already verified against the exact source by
+                # Web Search; non-English official news is not required to
+                # contain English discovery keywords.
+                enriched["official_samsung_source_match"] = True
+            if WEB_SEARCH_REQUIRE_KEYWORD_MATCH and not matches and not official_source:
                 rejected_for_keywords += 1
                 enriched["enrichment_status"] = "rejected_keyword_mismatch"
                 print(
