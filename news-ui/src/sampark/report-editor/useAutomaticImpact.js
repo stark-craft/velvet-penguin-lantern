@@ -25,11 +25,12 @@ export default function useAutomaticImpact(getArticles, onApply) {
     const targets=articles.filter(item=>!completed.current.has(item.body)).map(automaticImpactTarget);
     const proposals=state?.issues.filter(issue=>issue.status==='proposal') || [];
     if(!targets.length){setState(proposals.length?{pending:null,issues:proposals}:null);return;}
-    setState({pending:{index:1,total:targets.length,title:targets[0].title},issues:proposals});
+    const bodies = targets.map(target => target.body);
+    setState({pending:{index:1,total:targets.length,title:targets[0].title,body:targets[0].body,targets:bodies},issues:proposals});
     for(let index=0;index<targets.length;index++) {
       if(generation!==token.current)return;
       const target=targets[index];
-      setState(current=>({...current,pending:{index:index+1,total:targets.length,title:target.title}}));
+      setState(current=>({...current,pending:{index:index+1,total:targets.length,title:target.title,body:target.body,targets:bodies}}));
       try {
         const result=await reportRequest('/impact',target.input);
         if(generation!==token.current)return;
