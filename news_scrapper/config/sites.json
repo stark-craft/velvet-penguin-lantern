@@ -117,7 +117,13 @@
     "source_family": "tech_press",
     "keyword_pack": "default",
     "discovery_mode": "rss_first",
-    "legacy_profile": "default"
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "global",
+    "newsroom_region": "Global",
+    "newsroom_country": null,
+    "newsroom_language": "en",
+    "lookback_days": 7
   },
   {
     "name": "Samsung India Newsroom",
@@ -138,7 +144,12 @@
     "keyword_pack": "default",
     "discovery_mode": "rss_first",
     "lookback_days": 7,
-    "legacy_profile": "default"
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "IN",
+    "newsroom_language": "en"
   },
   {
     "name": "AnandTech",
@@ -3346,5 +3357,1283 @@
     "keyword_pack": "broadcast",
     "discovery_mode": "website",
     "legacy_profile": "broadcast"
+  },
+  {
+    "name": "Samsung Newsroom South Africa",
+    "url": "https://news.samsung.com/za/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/za/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-za",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Africa",
+    "newsroom_country": "ZA",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Middle East & North Africa",
+    "url": "https://news.samsung.com/mena/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/mena/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-mena",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "regional",
+    "newsroom_region": "Middle East",
+    "newsroom_country": null,
+    "newsroom_language": "ar",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Australia",
+    "url": "https://news.samsung.com/au/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/au/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-au",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "AU",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Indonesia",
+    "url": "https://news.samsung.com/id/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/id/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-id",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "ID",
+    "newsroom_language": "id",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Japan",
+    "url": "https://news.samsung.com/jp/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/jp/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-jp",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "JP",
+    "newsroom_language": "ja",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Korea",
+    "url": "https://news.samsung.com/kr/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/kr/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-kr",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "KR",
+    "newsroom_language": "ko",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Malaysia",
+    "url": "https://news.samsung.com/my/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/my/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-my",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "MY",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Philippines",
+    "url": "https://news.samsung.com/ph/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ph/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ph",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "PH",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Singapore",
+    "url": "https://news.samsung.com/sg/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/sg/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-sg",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "SG",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Taiwan",
+    "url": "https://news.samsung.com/tw/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/tw/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-tw",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "TW",
+    "newsroom_language": "zh-Hant",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Thailand",
+    "url": "https://news.samsung.com/th/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/th/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-th",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "TH",
+    "newsroom_language": "th",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Vietnam",
+    "url": "https://news.samsung.com/vn/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/vn/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-vn",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "VN",
+    "newsroom_language": "vi",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Austria",
+    "url": "https://news.samsung.com/at/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/at/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-at",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "AT",
+    "newsroom_language": "de",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Belgium",
+    "url": "https://news.samsung.com/be/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/be/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-be",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "BE",
+    "newsroom_language": "nl",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Belgium (French)",
+    "url": "https://news.samsung.com/be_fr/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/be_fr/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-be-fr",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "BE",
+    "newsroom_language": "fr",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Czech Republic",
+    "url": "https://news.samsung.com/cz/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/cz/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-cz",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "CZ",
+    "newsroom_language": "cs",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom France",
+    "url": "https://news.samsung.com/fr/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/fr/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-fr",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "FR",
+    "newsroom_language": "fr",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Germany",
+    "url": "https://news.samsung.com/de/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/de/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-de",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "DE",
+    "newsroom_language": "de",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Italy",
+    "url": "https://news.samsung.com/it/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/it/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-it",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "IT",
+    "newsroom_language": "it",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Kazakhstan (Kazakh)",
+    "url": "https://news.samsung.com/kz_kz/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/kz_kz/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-kz-kz",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "KZ",
+    "newsroom_language": "kk",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Kazakhstan (Russian)",
+    "url": "https://news.samsung.com/kz_ru/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/kz_ru/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-kz-ru",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "KZ",
+    "newsroom_language": "ru",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Netherlands",
+    "url": "https://news.samsung.com/nl/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/nl/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-nl",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "NL",
+    "newsroom_language": "nl",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Norway",
+    "url": "https://news.samsung.com/no/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/no/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-no",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "NO",
+    "newsroom_language": "no",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Poland",
+    "url": "https://news.samsung.com/pl/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/pl/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-pl",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "PL",
+    "newsroom_language": "pl",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Romania",
+    "url": "https://news.samsung.com/ro/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ro/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ro",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "RO",
+    "newsroom_language": "ro",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Russia",
+    "url": "https://news.samsung.com/ru/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ru/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ru",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "RU",
+    "newsroom_language": "ru",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Spain",
+    "url": "https://news.samsung.com/es/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/es/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-es",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "ES",
+    "newsroom_language": "es",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Sweden",
+    "url": "https://news.samsung.com/se/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/se/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-se",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "SE",
+    "newsroom_language": "sv",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Switzerland (German)",
+    "url": "https://news.samsung.com/ch/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ch/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ch",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "CH",
+    "newsroom_language": "de",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Switzerland (French)",
+    "url": "https://news.samsung.com/ch_fr/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ch_fr/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ch-fr",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "CH",
+    "newsroom_language": "fr",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Türkiye",
+    "url": "https://news.samsung.com/tr/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/tr/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-tr",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "TR",
+    "newsroom_language": "tr",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Ukraine",
+    "url": "https://news.samsung.com/ua/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ua/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ua",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "UA",
+    "newsroom_language": "uk",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom United Kingdom",
+    "url": "https://news.samsung.com/uk/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/uk/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-uk",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "GB",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Uzbekistan",
+    "url": "https://news.samsung.com/uz_uz/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/uz_uz/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-uz-uz",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Europe",
+    "newsroom_country": "UZ",
+    "newsroom_language": "uz",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Argentina",
+    "url": "https://news.samsung.com/ar/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ar/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ar",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Latin America",
+    "newsroom_country": "AR",
+    "newsroom_language": "es",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Brazil",
+    "url": "https://news.samsung.com/br/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/br/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-br",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Latin America",
+    "newsroom_country": "BR",
+    "newsroom_language": "pt-BR",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Chile",
+    "url": "https://news.samsung.com/cl/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/cl/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-cl",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Latin America",
+    "newsroom_country": "CL",
+    "newsroom_language": "es",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Colombia",
+    "url": "https://news.samsung.com/co/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/co/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-co",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Latin America",
+    "newsroom_country": "CO",
+    "newsroom_language": "es",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Latin America",
+    "url": "https://news.samsung.com/latin/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/latin/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-latin",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "regional",
+    "newsroom_region": "Latin America",
+    "newsroom_country": null,
+    "newsroom_language": "es",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Mexico",
+    "url": "https://news.samsung.com/mx/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/mx/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-mx",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Latin America",
+    "newsroom_country": "MX",
+    "newsroom_language": "es",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Peru",
+    "url": "https://news.samsung.com/pe/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/pe/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-pe",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Latin America",
+    "newsroom_country": "PE",
+    "newsroom_language": "es",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Canada",
+    "url": "https://news.samsung.com/ca/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ca/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ca",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "North America",
+    "newsroom_country": "CA",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom Canada (French)",
+    "url": "https://news.samsung.com/ca_fr/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/ca_fr/feed/rss",
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-ca-fr",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "North America",
+    "newsroom_country": "CA",
+    "newsroom_language": "fr",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Newsroom United States",
+    "url": "https://news.samsung.com/us/",
+    "domain": "news.samsung.com",
+    "rss_url": null,
+    "category": "Samsung / Official Regional",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-us",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "North America",
+    "newsroom_country": "US",
+    "newsroom_language": "en",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung India Newsroom (Hindi)",
+    "url": "https://news.samsung.com/bharat/",
+    "domain": "news.samsung.com",
+    "rss_url": "https://news.samsung.com/bharat/feed/rss",
+    "category": "Samsung / Local India",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-newsroom-bharat",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "rss_first",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "country",
+    "newsroom_region": "Asia-Pacific",
+    "newsroom_country": "IN",
+    "newsroom_language": "hi",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Semiconductor Newsroom",
+    "url": "https://news.samsungsemiconductor.com/global/",
+    "domain": "news.samsungsemiconductor.com",
+    "rss_url": null,
+    "category": "Samsung / Official Business",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-business-semiconductor",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "business",
+    "newsroom_region": "Global",
+    "newsroom_country": null,
+    "newsroom_language": "en",
+    "newsroom_business": "semiconductor",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Display Newsroom",
+    "url": "https://global.samsungdisplay.com/",
+    "domain": "global.samsungdisplay.com",
+    "rss_url": null,
+    "category": "Samsung / Official Business",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-business-display",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "business",
+    "newsroom_region": "Global",
+    "newsroom_country": null,
+    "newsroom_language": "en",
+    "newsroom_business": "display",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung SDI Newsroom",
+    "url": "https://news.samsungsdi.com/global/",
+    "domain": "news.samsungsdi.com",
+    "rss_url": null,
+    "category": "Samsung / Official Business",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-business-sdi",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "business",
+    "newsroom_region": "Global",
+    "newsroom_country": null,
+    "newsroom_language": "en",
+    "newsroom_business": "sdi",
+    "lookback_days": 7
+  },
+  {
+    "name": "Samsung Electro-Mechanics Newsroom",
+    "url": "https://www.sem.samsung.com/global/newsroom/news/overview.do",
+    "domain": "sem.samsung.com",
+    "rss_url": null,
+    "category": "Samsung / Official Business",
+    "enabled": true,
+    "allow_deep_scan": false,
+    "id": "samsung-business-electro-mechanics",
+    "verticals": [
+      "technology"
+    ],
+    "audiences": [
+      "all"
+    ],
+    "source_family": "tech_press",
+    "keyword_pack": "default",
+    "discovery_mode": "website",
+    "legacy_profile": "default",
+    "samsung_official_newsroom": true,
+    "newsroom_type": "business",
+    "newsroom_region": "Global",
+    "newsroom_country": null,
+    "newsroom_language": "en",
+    "newsroom_business": "electro-mechanics",
+    "lookback_days": 7
   }
 ]
