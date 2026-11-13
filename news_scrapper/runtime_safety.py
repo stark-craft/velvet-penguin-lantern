@@ -119,59 +119,130 @@ def _windows_pid_alive(pid: int) -> bool:
 
 
 class SchedulerOwnership:
-    """Cross-process lock preventing duplicate APScheduler ownership."""
+    """Crash-safe single scheduler ownership using an operating-system file lock.
+
+    The permanent ``scheduler_owner.lock.oslock`` file is only an anchor:
+    ownership is determined by the OS lock, not by its contents or a PID.
+    Windows and Unix release the lock automatically when a process exits.
+    The existing ``scheduler_owner.lock`` remains readable JSON metadata.
+
+    IMPORTANT: Stop all backend instances using the older PID-based code
+    before the first rollout. They do not coordinate using this new OS lock.
+    """
 
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
+        self.lock_path = self.path.with_name(self.path.name + ".oslock")
         self.token = secrets.token_hex(16)
         self.owned = False
+        self._handle = None
+
+    @staticmethod
+    def _try_lock(handle) -> bool:
+        handle.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return True
+        except OSError as exc:
+            # A contender must never take over an active scheduler. Unknown
+            # errors propagate and fail startup instead of bypassing the lock.
+            if exc.errno in (errno.EACCES, errno.EAGAIN, errno.EDEADLK):
+                return False
+            raise
+
+    @staticmethod
+    def _unlock(handle) -> None:
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def acquire(self) -> bool:
+        if self.owned:
+            return True
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = json.dumps(
-            {"pid": os.getpid(), "token": self.token, "created_at": time.time()}
-        ).encode("utf-8")
-        for _ in range(2):
-            try:
-                descriptor = os.open(
-                    self.path,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                    0o600,
-                )
-            except FileExistsError:
+        handle = open(self.lock_path, "a+b")
+        locked = False
+        temporary = None
+        try:
+            # Windows msvcrt locks a byte from the file's current position.
+            # Never remove the anchor, even when its previous owner crashed.
+            handle.seek(0, os.SEEK_END)
+            if handle.tell() == 0:
+                handle.write(b"0")
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            locked = self._try_lock(handle)
+            if not locked:
+                return False
+
+            # Replace old PID-only metadata after obtaining the OS lock.
+            # It can refer to an unrelated process due to Windows PID reuse.
+            payload = {
+                "pid": os.getpid(),
+                "token": self.token,
+                "created_at": time.time(),
+            }
+            temporary = self.path.with_name(
+                self.path.name + "." + self.token + ".tmp"
+            )
+            with open(temporary, "x", encoding="utf-8") as output:
+                json.dump(payload, output)
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, self.path)
+            temporary = None
+            self._handle = handle
+            self.owned = True
+            return True
+        finally:
+            if temporary is not None:
                 try:
-                    existing = json.loads(self.path.read_text(encoding="utf-8"))
-                    if _pid_alive(int(existing.get("pid") or 0)):
-                        return False
-                    self.path.unlink(missing_ok=True)
-                    continue
-                except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                    temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            if not self.owned:
+                if locked:
                     try:
-                        if time.time() - self.path.stat().st_mtime < 60:
-                            return False
-                        self.path.unlink(missing_ok=True)
-                        continue
+                        self._unlock(handle)
                     except OSError:
-                        return False
-            else:
-                with os.fdopen(descriptor, "wb") as handle:
-                    handle.write(payload)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                self.owned = True
-                return True
-        return False
+                        pass
+                handle.close()
 
     def release(self) -> None:
         if not self.owned:
             return
         try:
-            existing = json.loads(self.path.read_text(encoding="utf-8"))
-            if secrets.compare_digest(str(existing.get("token") or ""), self.token):
-                self.path.unlink(missing_ok=True)
-        except (OSError, ValueError, TypeError, json.JSONDecodeError):
-            pass
-        self.owned = False
+            try:
+                existing = json.loads(self.path.read_text(encoding="utf-8"))
+                if secrets.compare_digest(
+                    str(existing.get("token") or ""), self.token
+                ):
+                    self.path.unlink(missing_ok=True)
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                pass
+        finally:
+            handle = self._handle
+            self._handle = None
+            self.owned = False
+            if handle is not None:
+                try:
+                    self._unlock(handle)
+                finally:
+                    handle.close()
 
 
 def enforce_single_worker_configuration() -> None:
