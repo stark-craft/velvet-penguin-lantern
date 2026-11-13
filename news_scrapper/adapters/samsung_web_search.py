@@ -454,6 +454,23 @@ def enrich_article_with_web_search(
             }
         )
 
+        # First-party publisher identity comes from the configured Samsung
+        # newsroom URL, not a variable publisher string returned by Web Search.
+        # Preserve the country/business label for the existing Global channel;
+        # keep the provider's original label for diagnostics.
+        if output.get("samsung_official_newsroom"):
+            official_source = clean_text((item or {}).get("source"))
+            if official_source:
+                output["source"] = official_source
+                output["web_search_publisher"] = publisher
+                output["sources"] = [
+                    {
+                        "name": official_source,
+                        "link": final_url,
+                        "date": output.get("date", ""),
+                    }
+                ]
+
         if DEBUG:
             output["_web_search_debug"] = {
                 "reference_count": len(refs),
