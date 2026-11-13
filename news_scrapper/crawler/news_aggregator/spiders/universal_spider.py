@@ -34,6 +34,17 @@ from dateutil import parser
 from newspaper import Article, Config
 from scrapy.http import TextResponse
 
+# First-party Samsung newsroom metadata must survive discovery-only mode and
+# article extraction; future country/business feeds use the same source IDs.
+SAMSUNG_NEWSROOM_FIELDS = (
+    "samsung_official_newsroom",
+    "newsroom_type",
+    "newsroom_region",
+    "newsroom_country",
+    "newsroom_language",
+    "newsroom_business",
+)
+
 
 class NewsSpider(scrapy.Spider):
     """One spider that can crawl any configured news source list."""
@@ -291,6 +302,7 @@ class NewsSpider(scrapy.Spider):
             "site_name": site_name,
             "configured_url": configured_url,
             "source_home": self.source_home(website_url),
+            "source_website": website_url,
             "source_id": site.get("id") or "",
             "vertical": verticals[0] if verticals else "",
             "verticals": verticals,
@@ -302,6 +314,7 @@ class NewsSpider(scrapy.Spider):
             # wider catch-up window without widening the unified crawl for
             # every source. A value of 1 preserves the scheduler's range.
             "lookback_days": site.get("lookback_days"),
+            **{key: site[key] for key in SAMSUNG_NEWSROOM_FIELDS if key in site},
         }
 
     def is_in_range(self, date_obj, source_context=None):
@@ -382,9 +395,16 @@ class NewsSpider(scrapy.Spider):
         if site_name in self.common_feed_sources:
             return
         self.common_feed_sources.add(site_name)
+        # Regional Samsung editions live below /kr/, /de/, etc. Probing the
+        # domain root would discover Global Newsroom rather than that edition.
+        base = (
+            meta.get("source_website") or meta["source_home"]
+            if meta.get("samsung_official_newsroom")
+            else meta["source_home"]
+        )
         for suffix in ("feed/", "rss/", "rss.xml", "feed.xml", "index.xml"):
             yield scrapy.Request(
-                urljoin(meta["source_home"], suffix),
+                urljoin(str(base).rstrip("/") + "/", suffix),
                 callback=self.parse_feed,
                 errback=self.handle_common_feed_error,
                 meta={**meta, "common_feed_probe": True},
@@ -537,9 +557,10 @@ class NewsSpider(scrapy.Spider):
         self.fallback_sources.add(site_name)
 
         yield scrapy.Request(
-            # source_home is scheme + domain, for example:
-            # https://example.com/
-            meta["source_home"],
+            # Preserve the edition path for Samsung Newsroom locales. Other
+            # publishers keep their original domain-root fallback unchanged.
+            (meta.get("source_website") or meta["source_home"])
+            if meta.get("samsung_official_newsroom") else meta["source_home"],
             # The homepage/listing parser will inspect links and pick likely
             # article pages.
             callback=self.parse_listing_page,
@@ -809,6 +830,10 @@ class NewsSpider(scrapy.Spider):
 
         if self.discovery_only:
             found_keywords = self.find_keywords(f"{title} {seed_snippet}")
+            if not found_keywords and (source_context or {}).get("samsung_official_newsroom"):
+                # Official first-party source identity is stronger than an
+                # English-only keyword match for Japanese/Korean/etc. headlines.
+                found_keywords = ["samsung"]
             if not found_keywords:
                 return None
             discovered_date = published or self.date_from_url(
@@ -829,7 +854,7 @@ class NewsSpider(scrapy.Spider):
                 "needs_web_search_enrichment": True,
                 "top_image": "",
             }
-            for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack"):
+            for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack") + SAMSUNG_NEWSROOM_FIELDS:
                 if source_context and source_context.get(key):
                     result[key] = source_context[key]
             return result
@@ -862,6 +887,7 @@ class NewsSpider(scrapy.Spider):
                         "keyword_pack",
                         "allow_deep_scan",
                         "lookback_days",
+                        *SAMSUNG_NEWSROOM_FIELDS,
                     )
                     if source_context and key in source_context
                 },
@@ -1017,6 +1043,9 @@ class NewsSpider(scrapy.Spider):
         # bouncer model and clustering happen after raw collection.
         found_keywords = self.find_keywords(f"{title} {full_text}")
 
+        if not found_keywords and response.meta.get("samsung_official_newsroom"):
+            found_keywords = ["samsung"]
+
         if not found_keywords:
             return
 
@@ -1039,7 +1068,7 @@ class NewsSpider(scrapy.Spider):
             "word_count": len(full_text.split()),
             "method": response.meta.get("method", "Website Discovery"),
         }
-        for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack"):
+        for key in ("source_id", "vertical", "verticals", "audiences", "source_family", "keyword_pack") + SAMSUNG_NEWSROOM_FIELDS:
             if response.meta.get(key):
                 item[key] = response.meta[key]
 
