@@ -18,17 +18,23 @@ from pathlib import Path
 from typing import Iterable
 
 
-PROJECTION_CLASSIFIER_VERSION = "samsung-channels-v3-global-source-only"
+PROJECTION_CLASSIFIER_VERSION = "samsung-channels-v4-worldwide-official-sources"
 _PROJECTION_CACHE: dict[tuple, dict] = {}
 _PROJECTION_CACHE_LOCK = threading.Lock()
 
 
 SAMSUNG_LOCAL_SOURCE = re.compile(r"\bsamsung[\s_-]+(?:local|india)\b", re.I)
-# Global articles must have at least one of these actual source labels.
-SAMSUNG_GLOBAL_SOURCE = re.compile(r"\b(?:sam[\s_-]*mobile|samsung[\s_-]+newsroom)\b", re.I)
+# Official country/regional editions and business newsrooms belong to Global.
+# India is separated first by SAMSUNG_LOCAL_SOURCE during projection.
+SAMSUNG_GLOBAL_SOURCE = re.compile(
+    r"\b(?:sam[\s_-]*mobile|samsung[\s_-]+newsroom|"
+    r"samsung[\s_-]+(?:semiconductor|display|sdi|electro[\s_-]*mechanics)[\s_-]+newsroom)\b",
+    re.I,
+)
 SAMPARK_SOURCE = re.compile(r"\bsampark\b", re.I)
 SAMSUNG_OUTLET = re.compile(
-    r"sammobile|samsung\s+newsroom|samsung\.com|samsungmobilepress|sammyfans",
+    r"sammobile|samsung\s+newsroom|samsung\.com|samsungmobilepress|sammyfans|"
+    r"samsung\s+(?:semiconductor|display|sdi|electro[\s_-]*mechanics)\s+newsroom",
     re.I,
 )
 SAMSUNG_TOPIC = re.compile(
@@ -75,7 +81,7 @@ def is_samsung_local_source(article: dict) -> bool:
 
 
 def is_samsung_global_source(article: dict) -> bool:
-    """Require SamMobile or Samsung Newsroom in primary or co-sources."""
+    """Require an official worldwide/business newsroom or SamMobile source."""
     return any(
         SAMSUNG_GLOBAL_SOURCE.search(name)
         for name in source_names(article)
