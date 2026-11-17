@@ -19,6 +19,7 @@ import {
   splitByScope,
 } from '../news-scrapper/internal/samsungInternalModel.js';
 import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
+import SamparkWorldExplorer from './world-explorer/SamparkWorldExplorer.jsx';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
 
 function imageOf(item) {
@@ -77,7 +78,7 @@ const CHANNELS = [
 ];
 
 // Samsung News uses shared engagement contract: dossier_open, dossier_dwell >=5000, source_open, pause while document.visibilityState hidden, avoid duplicate, not training Gatekeeper
-export default function SamparkSamsungNews() {
+export default function SamparkSamsungNews({ worldExplorerEnabled = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [tab, setTab] = useState('internal');
@@ -202,6 +203,7 @@ export default function SamparkSamsungNews() {
   if (error) return <div className="sampark-samsung-page"><div className="sampark-samsung-error" role="alert"><Icon name="warning" size={20} /><p>{error}</p><button className="btn-primary" onClick={()=>setRetryKey((k)=>k+1)} type="button">Retry</button></div></div>;
 
   const leadership = tab==='internal' ? model.leadership : null;
+  const showWorldExplorer = tab === 'global' && Boolean(worldExplorerEnabled);
 
   return (
     <div className="sampark-samsung-page">
@@ -219,6 +221,9 @@ export default function SamparkSamsungNews() {
         ))}
       </nav>
 
+      {showWorldExplorer ? (
+        <SamparkWorldExplorer articles={model.global} onOpen={setOpenArticle} />
+      ) : <>
       {leadership && leadershipSignal && (
         <LeadershipCard record={leadership} onOpen={()=> setOpenArticle(leadershipSignal)} />
       )}
@@ -263,6 +268,8 @@ export default function SamparkSamsungNews() {
         </div>
       </section>
       )}
+
+      </>}
 
       {tab==='internal' && announcementSignals.length > 0 && (
         <section className="sampark-samsung-latest" aria-labelledby="sampark-samsung-announcements-title">
