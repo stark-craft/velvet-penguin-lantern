@@ -84,16 +84,19 @@ test('World Explorer is off by default and scoped to each viewer on this browser
 test('Sampark view toggle is only applied on Samsung Global and uses the existing dossier', () => {
   const settings = read('../src/sampark/SamparkSettingsModal.jsx');
   const app = read('../src/sampark/SamparkApp.jsx');
-  const samsung = read('../src/sampark/SamparkSamsungNews.jsx');
+  const samsung = read('../src/sampark/samsung-news/SamsungNewsPage.jsx');
+  const wrapper = read('../src/sampark/SamparkSamsungNews.jsx');
   const explorer = read('../src/sampark/world-explorer/SamparkWorldExplorer.jsx');
   assert.match(settings, /worldExplorerEnabled:\s*false/);
   assert.match(settings, /World Explorer for Samsung Global/);
   assert.match(settings, /saveWorldExplorerPreference/);
   assert.match(app, /readWorldExplorerPreference/);
   assert.match(app, /worldExplorerEnabled=\{Boolean\(settings\.worldExplorerEnabled\)\}/);
-  assert.match(samsung, /tab === 'global' && Boolean\(worldExplorerEnabled\)/);
-  assert.match(samsung, /<SamparkWorldExplorer articles=\{model\.global\} onOpen=\{setOpenArticle\}/);
-  assert.match(samsung, /SamparkSamsungDossier item=\{openArticle\}/);
+  assert.match(wrapper, /samsung-news\/SamsungNewsPage\.jsx/);
+  assert.match(samsung, /activeChannel === 'global' && worldExplorerEnabled/);
+  assert.match(samsung, /<SamparkWorldExplorer articles=\{model\.global\?\.items \|\| \[\]\} onOpen=\{setOpenArticle\}/);
+  assert.match(samsung, /SamsungDossier item=\{openArticle\}/);
+  assert.match(samsung, /SamsungChannelContent channel=\{selectedChannel\}/);
   assert.match(explorer, /Briefing Stream/);
   assert.match(explorer, /World Explorer/);
 });
