@@ -17,7 +17,7 @@ import { worldArticleLocation } from '../world-explorer/worldExplorerModel.js';
 import SamsungChannelTabs from './SamsungChannelTabs.jsx';
 import SamsungChannelContent from './SamsungChannelContent.jsx';
 import { buildSamparkSamsungModel, publishedRecordToSignal, samsungItemKey } from './samsungNewsModel.js';
-import { SAMSUNG_NEWS_FETCH_BATCH, SAMSUNG_NEWS_PAGE_SIZE } from './samsungPagination.js';
+import { SAMSUNG_NEWS_FETCH_BATCH } from './samsungPagination.js';
 import '../all-news/all-news.css';
 import './samsung-news.css';
 
@@ -68,8 +68,8 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
   const [published, setPublished] = useState([]);
   const [totals, setTotals] = useState({ global: 0, local: 0, sampark: 0 });
   const [pagingSupported, setPagingSupported] = useState(false);
-  const [channelPages, setChannelPages] = useState({ global: 1, local: 1 });
   const [pagingBusy, setPagingBusy] = useState(false);
+  const pagingBusyRef = useRef(false);
   const [pagingError, setPagingError] = useState('');
   const [worldLoading, setWorldLoading] = useState(false);
   const [worldProgress, setWorldProgress] = useState(0);
@@ -96,7 +96,6 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
     setPagingError('');
     setWorldError('');
     setPagingSupported(false);
-    setChannelPages({ global: 1, local: 1 });
     Promise.all([
       getSamsungInternalFeedPage({ limit: SAMSUNG_NEWS_FETCH_BATCH, order: 'newest' })
         .catch(() => getSamsungInternalFeed(100)).catch(async () => {
@@ -146,35 +145,40 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
 
   const model = useMemo(() => buildSamparkSamsungModel({ feed, published }), [feed, published]);
 
-  // Page Global and Local archives without transferring the whole corpus at once.
-  // The API returns up to 100 per request; offset can advance through all
-  // eligible retained news. SRI-D's published archive paginates locally.
-  const loadChannelPage = async (channelId, nextPage) => {
-    if (!['global', 'local'].includes(channelId) || pagingBusy) return;
-    const total = totals[channelId] ?? (feed[channelId] || []).length;
-    const target = Math.min(total, nextPage * SAMSUNG_NEWS_PAGE_SIZE);
-    let loaded = [...(feed[channelId] || [])];
-    if (loaded.length < target && !pagingSupported) {
+  // Samsung Global and Local reveal cards continuously and request another
+  // bounded batch only when the user scrolls to the end of the loaded archive.
+  // The backend's 100-story request limit is not a limit on total stories.
+  const loadMoreChannel = async (channelId) => {
+    if (!['global', 'local'].includes(channelId) || pagingBusyRef.current) return false;
+    const existing = feed[channelId] || [];
+    const total = totals[channelId] ?? existing.length;
+    if (existing.length >= total) return false;
+    if (!pagingSupported) {
       setPagingError('More Samsung stories require the updated Samsung feed endpoint.');
-      return;
+      return false;
     }
+    pagingBusyRef.current = true;
     setPagingBusy(true);
     setPagingError('');
     try {
-      while (loaded.length < target) {
-        const result = await getSamsungInternalFeedPage({
-          channel: channelId, limit: SAMSUNG_NEWS_FETCH_BATCH,
-          offset: loaded.length, order: 'newest',
-        });
-        const batch = Array.isArray(result?.[channelId]) ? result[channelId] : [];
-        if (!batch.length) throw new Error('The next Samsung archive page is unavailable.');
-        loaded = [...loaded, ...batch];
-      }
-      setFeed((current) => ({ ...current, [channelId]: loaded }));
-      setChannelPages((current) => ({ ...current, [channelId]: nextPage }));
-    } catch (pageError) {
-      setPagingError(pageError?.message || 'Could not load more Samsung stories.');
+      const response = await getSamsungInternalFeedPage({
+        channel: channelId,
+        limit: SAMSUNG_NEWS_FETCH_BATCH,
+        offset: existing.length,
+        order: 'newest',
+      });
+      const batch = Array.isArray(response?.[channelId]) ? response[channelId] : [];
+      if (!batch.length) throw new Error('Could not retrieve more retained Samsung stories.');
+      setFeed((current) => ({
+        ...current,
+        [channelId]: [...(current[channelId] || []), ...batch],
+      }));
+      return true;
+    } catch (loadError) {
+      setPagingError(loadError?.message || 'Could not load more Samsung stories.');
+      return false;
     } finally {
+      pagingBusyRef.current = false;
       setPagingBusy(false);
     }
   };
@@ -322,10 +326,10 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
         channel={selectedChannel}
         onOpen={setOpenArticle}
         nowMs={nowMs}
-        page={channelPages[activeChannel] || 1}
+        continuous={activeChannel === 'global' || activeChannel === 'local'}
         totalCount={activeChannel === 'internal' ? undefined : totals[activeChannel]}
         pagingBusy={pagingBusy}
-        onPageChange={(nextPage) => loadChannelPage(activeChannel, nextPage)}
+        onLoadMore={() => loadMoreChannel(activeChannel)}
       />}
       <SamsungDossier item={openArticle} onClose={() => setOpenArticle(null)} />
     </div>
