@@ -20,6 +20,7 @@ import {
 } from '../news-scrapper/internal/samsungInternalModel.js';
 import ArticleModal from '../news-scrapper/components/modals/ArticleModal.jsx';
 import SamparkWorldExplorer from './world-explorer/SamparkWorldExplorer.jsx';
+import { worldArticleLocation } from './world-explorer/worldExplorerModel.js';
 import { useArticleEngagement } from './shared/useArticleEngagement.js';
 
 function imageOf(item) {
@@ -100,8 +101,17 @@ export default function SamparkSamsungNews({ worldExplorerEnabled = false }) {
     Promise.all([
       getSamsungInternalFeed(100).catch(async ()=>{
         const briefingData = await getSharedBriefing().catch(()=> getLatestBriefing());
-        const all = normalizeList(briefingData?.result || briefingData?.results || briefingData?.articles || briefingData || []).filter(isSamsungSignal);
-        return splitByScope(all);
+        const all = normalizeList(briefingData?.result || briefingData?.results || briefingData?.articles || briefingData || [])
+          .filter((item) => isSamsungSignal(item) || worldArticleLocation(item).kind !== 'worldwide');
+        const grouped = splitByScope(all);
+        // Fallback to the shared briefing must retain official specialist newsrooms
+        // even when the legacy client-side Samsung source matcher does not know them.
+        const alreadyGrouped = new Set([...grouped.global, ...grouped.local, ...grouped.inside]);
+        return {
+          ...grouped,
+          global: [...grouped.global, ...all.filter((item) =>
+            !alreadyGrouped.has(item) && worldArticleLocation(item).kind !== 'worldwide')],
+        };
       }),
       getPublishedInternalContent().then((recs)=>({ recs, err: '' })).catch((e)=>({ recs: [], err: e?.message || 'Published could not be verified.' })),
     ]).then(([feed, pubRes])=>{
