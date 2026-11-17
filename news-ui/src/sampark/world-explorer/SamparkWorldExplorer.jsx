@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 import { buildWorldCoverage, WORLD_MARKETS } from './worldExplorerModel.js';
 import { rankTrending } from '../../news-scrapper/internal/samsungInternalModel.js';
