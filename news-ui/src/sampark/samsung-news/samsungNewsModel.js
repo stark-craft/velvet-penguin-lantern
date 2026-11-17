@@ -141,8 +141,11 @@ function normalizeFeedChannel(items, channel) {
     };
   });
 }
-function buildChannel({ id, label, items, hero, stream }) {
-  const cards = newestFirst(dedupe(items));
+function buildChannel({ id, label, items, hero, stream, retainOrder = false }) {
+  // The paginated endpoint has already sorted Global/Local newest first.
+  // Do not reorder new batches after append, or articles would shift pages.
+  const unique = dedupe(items);
+  const cards = retainOrder ? unique : newestFirst(unique);
   const trending = rankTrending(cards);
   return {
     id, label, items: cards,
@@ -153,6 +156,7 @@ function buildChannel({ id, label, items, hero, stream }) {
   };
 }
 export function buildSamparkSamsungModel({ feed, published }) {
+  const pagedChronologicalFeed = feed?.order === 'newest';
   const global = normalizeFeedChannel(feed?.global || [], 'global');
   const local = normalizeFeedChannel(feed?.local || [], 'local');
   const inside = normalizeFeedChannel(feed?.sampark || feed?.inside || [], 'internal');
@@ -177,7 +181,7 @@ export function buildSamparkSamsungModel({ feed, published }) {
       id: 'internal', label: 'SRI-D Tech AXis', items: internalItems,
       hero: internalHero, stream: internalStream,
     }),
-    global: buildChannel({ id: 'global', label: 'Samsung Global', items: global }),
-    local: buildChannel({ id: 'local', label: 'Samsung Local', items: local }),
+    global: buildChannel({ id: 'global', label: 'Samsung Global', items: global, retainOrder: pagedChronologicalFeed }),
+    local: buildChannel({ id: 'local', label: 'Samsung Local', items: local, retainOrder: pagedChronologicalFeed }),
   };
 }
