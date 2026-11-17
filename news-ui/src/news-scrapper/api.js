@@ -191,6 +191,21 @@ export const getLatestBriefing = () => cachedJsonFetch('/latest-briefing', { sta
 export const getSharedBriefing = () => cachedJsonFetch('/briefing/shared/latest', { staleMs: 30_000 });
 export const getSamsungInternalFeed = (limit = 100) =>
   cachedJsonFetch(`/internal-content/samsung-feed?limit=${Math.max(1, Math.min(Number(limit) || 100, 100))}`, { staleMs: 60_000 });
+
+// Samsung News only: each request is bounded, but offset can reach all
+// eligible records retained in the Samsung briefing archive.
+export const getSamsungInternalFeedPage = ({
+  limit = 100, offset = 0, channel = '', order = 'newest', focus = '',
+} = {}) => {
+  const params = new URLSearchParams({
+    limit: String(Math.max(1, Math.min(100, Math.trunc(Number(limit) || 100)))),
+    offset: String(Math.max(0, Math.trunc(Number(offset) || 0))),
+    order: order === 'ranked' ? 'ranked' : 'newest',
+  });
+  if (['global', 'local', 'sampark'].includes(channel)) params.set('channel', channel);
+  if (focus) params.set('focus', String(focus));
+  return cachedJsonFetch('/internal-content/samsung-feed?' + params.toString(), { staleMs: 60_000 });
+};
 export const getBriefingMeta   = () => cachedJsonFetch('/briefing/meta', { staleMs: 30_000 });
 export const removeFromBriefing  = (title)   => jsonFetch('/briefing/remove',  { method:'POST', body: JSON.stringify({ title }) });
 export const restoreToBriefing   = (article) => jsonFetch('/briefing/restore', { method:'POST', body: JSON.stringify({ article }) });
