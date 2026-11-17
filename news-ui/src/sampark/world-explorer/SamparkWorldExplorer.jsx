@@ -1,6 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 import { buildWorldCoverage, WORLD_MARKETS } from './worldExplorerModel.js';
+import SamsungPageControls from '../samsung-news/SamsungPageControls.jsx';
+import { samsungPageItems, samsungPageCount } from '../samsung-news/samsungPagination.js';
 import './world-explorer.css';
 
 const SOURCE_LABEL = (item) => item?.source || item?.src || 'Samsung Newsroom';
@@ -23,6 +25,9 @@ function BackTrail({ page, region, country, onHome, onRegion }) {
 }
 
 function StoryCollection({ articles, name, subtitle, onOpen }) {
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [name]);
+  const currentPage = Math.min(page, Math.max(1, samsungPageCount(articles.length)));
   if (!articles.length) return (
     <div className="swe-no-coverage" role="status">
       <span className="swe-no-coverage-icon"><Icon name="inbox" size={23} /></span>
@@ -66,7 +71,7 @@ function StoryCollection({ articles, name, subtitle, onOpen }) {
     <section className="sampark-samsung-latest swe-story-list" aria-label="Latest newsroom articles">
       <header><h3>All stories <span className="sampark-samsung-count">({articles.length})</span></h3><span className="sampark-samsung-hint">Open a story to read its dossier</span></header>
       <div className="sampark-samsung-latest-scroll">
-        {articles.map((item, i) => (
+        {samsungPageItems(articles, currentPage).map((item, i) => (
           <article className="sampark-samsung-latest-card" key={articleKey(item, i)}>
             <button className="sampark-samsung-latest-media"
               onClick={() => onOpen(item)} type="button" aria-label={'Read ' + item.title}
@@ -79,6 +84,8 @@ function StoryCollection({ articles, name, subtitle, onOpen }) {
         ))}
       </div>
     </section>
+    <SamsungPageControls page={currentPage} total={articles.length}
+      onChange={setPage} label={name + ' stories'} />
   </>;
 }
 
@@ -185,6 +192,6 @@ export default function SamparkWorldExplorer({ articles = [], onOpen }) {
       <StoryCollection articles={coverage.all} name="Combined Samsung Global" subtitle="Coverage from every Global newsroom in the current briefing" onOpen={onOpen} />
     </>}
 
-    <p className="swe-coverage-note"><Icon name="clock" size={13} /> Coverage reflects the latest Global briefing (up to 100 stories). Markets without recent coverage remain available in the directory.</p>
+    <p className="swe-coverage-note"><Icon name="clock" size={13} /> Coverage reflects all currently retained Samsung Global briefing stories. Markets without recent coverage remain available in the directory.</p>
   </section>;
 }
