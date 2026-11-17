@@ -304,6 +304,10 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
       </div>}
       {/* SRI-D / Samsung Global / Samsung Local */}
       <SamsungChannelTabs activeChannel={activeChannel} model={model} totals={totals} onChange={setActiveChannel} />
+      {!pagingSupported && <div className="samsung-news-notice" role="alert">
+        <Icon name="warning" size={14} />
+        <span>The server is returning a legacy Samsung feed. Complete Global and Local archives require the updated Samsung feed endpoint with offset and total_counts support.</span>
+      </div>}
       {pagingError && <div className="samsung-news-notice" role="alert">
         <Icon name="warning" size={14} /><span>{pagingError}</span>
       </div>}
@@ -323,6 +327,7 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
           coverageComplete={pagingSupported && !worldIncomplete}
         />}
       </> : <SamsungChannelContent
+        key={activeChannel}
         channel={selectedChannel}
         onOpen={setOpenArticle}
         nowMs={nowMs}
