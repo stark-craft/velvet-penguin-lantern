@@ -61,7 +61,7 @@ test('Sampark shell mounts only allowed Search/Settings integrations and viewer 
   assert.match(read('../src/sampark/all-news/AllNewsPage.jsx'), /getSharedBriefing|getLatestBriefing|useBriefingFeed/);
   assert.match(read('../src/sampark/all-news/data/useBriefingFeed.js'), /getSharedBriefing|getLatestBriefing/);
   assert.match(read('../src/sampark/SamparkResearch.jsx') + read('../src/sampark/research/ResearchArchiveSearch.jsx'), /searchExtractedIntelligence/);
-  assert.match(read('../src/sampark/SamparkSamsungNews.jsx'), /getSamsungInternalFeed|getPublishedInternalContent/);
+  assert.match(read('../src/sampark/samsung-news/SamsungNewsPage.jsx'), /getSamsungInternalFeedPage|getPublishedInternalContent/);
   assert.match(read('../src/sampark/SamparkCreate.jsx'), /createContributionDraft|submitContributionDraft/);
   assert.match(read('../src/sampark/SamparkSearchResults.jsx'), /searchExtractedIntelligence/);
   assert.match(read('../src/sampark/SamparkSearchResults.jsx'), /groupedByDate/);
@@ -341,15 +341,19 @@ test('Sampark Samsung News uses real Samsung feed and published internal content
   const app = read('../src/sampark/SamparkApp.jsx');
   assert.match(app, /path="\/samsung-news"/);
   assert.match(app, /SamparkSamsungNews/);
-  const samsung = read('../src/sampark/SamparkSamsungNews.jsx');
-  assert.match(samsung, /getSamsungInternalFeed/);
+  const samsung = read('../src/sampark/samsung-news/SamsungNewsPage.jsx');
+  const channel = read('../src/sampark/samsung-news/SamsungChannelContent.jsx');
+  const model = read('../src/sampark/samsung-news/samsungNewsModel.js');
+  assert.match(read('../src/sampark/SamparkSamsungNews.jsx'), /samsung-news\/SamsungNewsPage/);
+  assert.match(samsung, /getSamsungInternalFeedPage/);
   assert.match(samsung, /getPublishedInternalContent/);
-  assert.match(samsung, /SRI-D|Local|Global/);
-  assert.match(samsung, /Briefing Stream|SRI-D News|Samsung News/);
-  assert.match(samsung, /sampark-samsung-page|sampark-samsung-hero/);
-  assert.match(samsung, /SamparkSamsungDossier|sampark-dossier/);
-  assert.match(samsung, /isSamsungSignal|splitByScope|rankTrending/);
-  assert.match(read('../src/sampark/sampark.css'), /sampark-samsung-page/);
+  assert.match(samsung, /SamsungChannelTabs|SamsungChannelContent/);
+  assert.match(channel, /Briefing Stream/);
+  assert.match(channel, /SRI-D Tech AXis|samsung-news-featured-rail/);
+  assert.match(samsung, /SamsungDossier|ArticleModal/);
+  assert.match(samsung, /isSamsungSignal|splitByScope/);
+  assert.match(model, /rankTrending|publishedRecordToSignal/);
+  assert.match(read('../src/sampark/samsung-news/samsung-news.css'), /samsung-news-page/);
 });
 
 test('Sampark Create News workflow is capability-gated with templates, preview and real submission', () => {
