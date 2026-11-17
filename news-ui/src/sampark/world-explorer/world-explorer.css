@@ -1,8 +1,13 @@
 /* Samsung World Explorer — Sampark-only editorial extension.
    Uses the same Samsung blue, typography, cards, spacing and theme tokens. */
 .swe { display: grid; gap: 19px; min-width: 0; color: var(--text); }
-.swe button { color: inherit; }
-.swe button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+/* Only World Explorer navigation gets these overrides. Shared Classical
+   story controls must retain their own exact colors and focus styling. */
+.swe-region-card, .swe-business-card, .swe-market-card, .swe-regional-desk-list button { color: inherit; }
+.swe-region-card:focus-visible, .swe-business-card:focus-visible,
+.swe-market-card:focus-visible, .swe-regional-desk-list button:focus-visible,
+.swe-breadcrumbs button:focus-visible, .swe-text-action:focus-visible,
+.swe-editorial-note button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .swe-intro {
   position: relative; display: flex; justify-content: space-between; align-items: end;
   gap: 24px; padding: 24px 27px; overflow: hidden;
@@ -73,8 +78,6 @@
 .swe-regional-desk-list button span { flex: 1; min-width: 0; font-size: 13px; font-weight: 650; }
 .swe-regional-desk-list button small { color: var(--muted); font-size: 11px; }
 .swe-regional-desk-list button svg { color: var(--primary); }
-.swe-story-hero { min-width: 0; }
-.swe-story-list { margin-top: 1px; }
 .swe-no-coverage { display: grid; justify-items: center; gap: 7px; padding: 42px 16px; border-radius: 12px; border: 1px dashed var(--line); background: var(--surface-soft); text-align: center; }
 .swe-no-coverage-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 50%; background: var(--surface-blue); color: var(--primary); }
 .swe-no-coverage h3 { margin: 5px 0 0; font-size: 15px; }
@@ -107,7 +110,6 @@ html[data-theme="dark"] .swe-business-card:hover, html[data-theme="dark"] .swe-m
   .swe-editorial-note { gap: 7px; }
   .swe-editorial-note > span { font-size: 0; }
   .swe-editorial-note > span svg { width: 17px; height: 17px; }
-  .swe-story-hero .sampark-samsung-featured, .swe-story-hero .sampark-samsung-featured-media { min-height: 280px; }
   .swe-coverage-note { align-items: start; }
 }
 @media (prefers-reduced-motion: reduce) { .swe-region-card { transition: none; } .swe-region-card:hover { transform: none; } }
