@@ -5129,6 +5129,17 @@ def get_samsung_internal_feed(
         for file_path in get_profile_history_files(profile)
         if os.path.basename(file_path).startswith("briefing_")
     ]
+    # Preserve the original fast, capped response for existing callers.
+    # Only Samsung News's opt-in paging/order/focus queries scan uncapped.
+    if offset == 0 and channel is None and order == "ranked" and not focus:
+        legacy = build_samsung_internal_feed(archive_files, limit=limit)
+        for channel_id in ("global", "local", "sampark"):
+            visible = filter_viewer_hidden(legacy[channel_id], request, profile)
+            legacy[channel_id] = apply_learned_regions(visible, profile)
+            legacy["counts"][channel_id] = len(legacy[channel_id])
+        legacy["profile"] = public_profile_name(profile)
+        return legacy
+
     payload = build_samsung_internal_feed(archive_files, limit=None)
     totals = {}
     focus_match = None
