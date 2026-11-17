@@ -89,7 +89,7 @@ function StoryCollection({ articles, name, subtitle, onOpen }) {
   </>;
 }
 
-export default function SamparkWorldExplorer({ articles = [], onOpen }) {
+export default function SamparkWorldExplorer({ articles = [], onOpen, coverageComplete = true }) {
   const coverage = useMemo(() => buildWorldCoverage(articles), [articles]);
   const [page, setPage] = useState({ kind: 'home' });
   const openHome = () => setPage({ kind: 'home' });
@@ -192,6 +192,10 @@ export default function SamparkWorldExplorer({ articles = [], onOpen }) {
       <StoryCollection articles={coverage.all} name="Combined Samsung Global" subtitle="Coverage from every Global newsroom in the current briefing" onOpen={onOpen} />
     </>}
 
-    <p className="swe-coverage-note"><Icon name="clock" size={13} /> Coverage reflects all currently retained Samsung Global briefing stories. Markets without recent coverage remain available in the directory.</p>
+    <p className="swe-coverage-note"><Icon name="clock" size={13} />
+      {coverageComplete
+        ? 'Coverage reflects all currently retained Samsung Global briefing stories. Markets without recent coverage remain available in the directory.'
+        : 'Showing only the Global stories currently loaded. Update the Samsung feed endpoint to retrieve all retained articles.'}
+    </p>
   </section>;
 }
