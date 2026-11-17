@@ -5105,14 +5105,22 @@ def _article_source_names(article: dict):
 
 
 @app.get("/internal-content/samsung-feed")
-def get_samsung_internal_feed(request: Request, limit: int = Query(100, ge=1, le=100)):
-    """Return Samsung channels projected from the one retained corpus.
+def get_samsung_internal_feed(
+    request: Request,
+    limit: int = Query(100, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    channel: str | None = Query(None, pattern="^(global|local|sampark)$"),
+    order: str = Query("ranked", pattern="^(ranked|newest)$"),
+    focus: str | None = Query(None, max_length=2048),
+):
+    """Page the complete retained Samsung archive; do not start a crawl.
 
-    This endpoint is read-only.  It never starts Scrapy, enrichment, or a
-    scheduler run: it scans the already-generated briefing history and applies
-    the explicit source contracts used by Samsung Internal.
+    Legacy callers still receive at most 100 ranked entries per channel.
+    New Samsung News callers can retrieve any later page with offset and order,
+    without imposing a 100-article ceiling on the available corpus.
+    Viewer-hidden items are filtered BEFORE page boundaries and counts.
+    This route is exclusive to Samsung News and does not change All News.
     """
-
     from news_scrapper.samsung_internal_feed import build_samsung_internal_feed
 
     profile = get_profile_for_request(request)
@@ -5121,11 +5129,48 @@ def get_samsung_internal_feed(request: Request, limit: int = Query(100, ge=1, le
         for file_path in get_profile_history_files(profile)
         if os.path.basename(file_path).startswith("briefing_")
     ]
-    payload = build_samsung_internal_feed(archive_files, limit=limit)
-    for channel in ("global", "local", "sampark"):
-        visible = filter_viewer_hidden(payload[channel], request, profile)
-        payload[channel] = apply_learned_regions(visible, profile)
-        payload["counts"][channel] = len(payload[channel])
+    payload = build_samsung_internal_feed(archive_files, limit=None)
+    totals = {}
+    focus_match = None
+    focus_channel = None
+    requested_focus = str(focus or "").strip()
+    for channel_id in ("global", "local", "sampark"):
+        visible = filter_viewer_hidden(payload[channel_id], request, profile)
+        visible = apply_learned_regions(visible, profile)
+        if order == "newest":
+            # The projection is already ranked. Stable date sort makes each
+            # subsequent offset page older, retaining quality order for ties.
+            visible = sorted(
+                visible,
+                key=lambda item: str(
+                    item.get("samsung_internal_date")
+                    or item.get("published_at")
+                    or item.get("date")
+                    or item.get("first_seen")
+                    or ""
+                )[:10],
+                reverse=True,
+            )
+        totals[channel_id] = len(visible)
+        if requested_focus and focus_match is None:
+            for item in visible:
+                if requested_focus in {
+                    str(item.get(key) or "") for key in (
+                        "id", "canonical_link", "link", "url", "title"
+                    )
+                }:
+                    focus_match = item
+                    focus_channel = channel_id
+                    break
+        paged = visible[offset:offset + limit] if channel in (None, channel_id) else []
+        payload[channel_id] = paged
+        payload["counts"][channel_id] = len(paged)
+    payload["total_counts"] = totals
+    payload["offset"] = offset
+    payload["limit_per_channel"] = limit
+    payload["order"] = order
+    payload["focus_match"] = focus_match
+    payload["focus_channel"] = focus_channel
     payload["profile"] = public_profile_name(profile)
     return payload
 
