@@ -5,6 +5,9 @@ import AllNewsRail from '../all-news/AllNewsRail.jsx';
 import LeadershipMessageHero from './LeadershipMessageHero.jsx';
 import SriDDocumentCard from './SriDDocumentCard.jsx';
 import { isRecentlyPublishedSamsungItem, samsungItemKey } from './samsungNewsModel.js';
+import { groupSignalsByDate } from '../../news-scrapper/internal/samsungInternalModel.js';
+import { samsungPageItems } from './samsungPagination.js';
+import SamsungPageControls from './SamsungPageControls.jsx';
 
 function imageOf(item) { return item?.image_url || item?.top_image || ''; }
 function localDateKey(date) {
@@ -198,7 +201,12 @@ function SriDTypeSection({ section, onOpen, nowMs }) {
     </section>
   );
 }
-export default function SamsungChannelContent({ channel, onOpen, nowMs }) {
+export default function SamsungChannelContent({
+  channel, onOpen, nowMs, page = 1, onPageChange, totalCount, pagingBusy = false,
+}) {
+  // SRI-D's published archive is kept locally; only Samsung Global and Local
+  // request more retained briefing batches from the backend.
+  const [internalPage, setInternalPage] = useState(1);
   if (!channel) return null;
   const isInternal = channel.id === 'internal';
   const heroItems = isInternal
@@ -207,7 +215,11 @@ export default function SamsungChannelContent({ channel, onOpen, nowMs }) {
   const streamItems = isInternal
     ? (channel.stream || []).map((item) => ({ ...item, category: contentTypeLabel(item) }))
     : channel.stream;
-  const sridSections = isInternal ? buildSriDSections(channel.groups) : [];
+  const archivePage = isInternal ? internalPage : page;
+  const archiveTotal = isInternal ? channel.count : (totalCount ?? channel.count);
+  const archiveItems = samsungPageItems(channel.items, archivePage);
+  const visibleGroups = groupSignalsByDate(archiveItems);
+  const sridSections = isInternal ? buildSriDSections(visibleGroups) : [];
   return (
     <div className={`samsung-channel-content${isInternal ? ' is-internal' : ''}`}>
       <div className="tsan-featured-rail samsung-news-featured-rail">
@@ -226,11 +238,11 @@ export default function SamsungChannelContent({ channel, onOpen, nowMs }) {
             <span className="samsung-channel-kicker">{isInternal ? 'Internal publishing' : 'Samsung News'}</span>
             <h2 id="samsung-channel-news-heading">{isInternal ? 'SRI-D Tech AXis' : `${channel.label} News`}</h2>
           </div>
-          <span className="samsung-channel-total">{channel.count} {isInternal
-            ? channel.count === 1 ? 'item' : 'items'
-            : channel.count === 1 ? 'story' : 'stories'}</span>
+          <span className="samsung-channel-total">{archiveTotal} {isInternal
+            ? archiveTotal === 1 ? 'item' : 'items'
+            : archiveTotal === 1 ? 'story' : 'stories'}</span>
         </header>
-        {!channel.groups?.length ? (
+        {!visibleGroups.length ? (
           <div className="tsan-empty">{isInternal
             ? 'No SRI-D content is currently available.'
             : 'No stories are currently available in this channel.'}</div>
@@ -241,7 +253,7 @@ export default function SamsungChannelContent({ channel, onOpen, nowMs }) {
           </div>
         ) : (
           <div className="tsan-daywise">
-            {channel.groups.map((group) => (
+            {visibleGroups.map((group) => (
               <section aria-label={`${channel.label} news for ${group.date}`}
                 className="tsan-day-section" key={group.date}>
                 <header className="tsan-day-header">
@@ -258,6 +270,13 @@ export default function SamsungChannelContent({ channel, onOpen, nowMs }) {
           </div>
         )}
       </section>
+      <SamsungPageControls
+        page={archivePage}
+        total={archiveTotal}
+        onChange={isInternal ? setInternalPage : onPageChange}
+        busy={pagingBusy}
+        label={channel.label}
+      />
     </div>
   );
 }
