@@ -12,6 +12,8 @@ import {
 import { isSamsungSignal, splitByScope } from '../../news-scrapper/internal/samsungInternalModel.js';
 import { normalizeList } from '../../news-scrapper/utils/normalize.js';
 import { useArticleEngagement } from '../shared/useArticleEngagement.js';
+import SamparkWorldExplorer from '../world-explorer/SamparkWorldExplorer.jsx';
+import { worldArticleLocation } from '../world-explorer/worldExplorerModel.js';
 import SamsungChannelTabs from './SamsungChannelTabs.jsx';
 import SamsungChannelContent from './SamsungChannelContent.jsx';
 import { buildSamparkSamsungModel, publishedRecordToSignal, samsungItemKey } from './samsungNewsModel.js';
@@ -57,7 +59,7 @@ function SamsungDossier({ item, onClose }) {
     onSourceOpen={() => engagement.onSourceOpen()} />;
 }
 
-export default function SamsungNewsPage() {
+export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeChannel, setActiveChannel] = useState('internal');
@@ -87,9 +89,19 @@ export default function SamsungNewsPage() {
         const briefing = await getSharedBriefing().catch(() => getLatestBriefing());
         const all = normalizeList(
           briefing?.result || briefing?.results || briefing?.articles || briefing || [],
-        ).filter(isSamsungSignal);
+        ).filter((item) => isSamsungSignal(item) || worldArticleLocation(item).kind !== 'worldwide');
         const split = splitByScope(all);
-        return { global: split.global, local: split.local, inside: split.inside, sampark: split.inside };
+        // Keep newly added official country and business sources in the fallback
+        // when the legacy source matcher doesn't recognize their labels.
+        const classified = new Set([...split.global, ...split.local, ...split.inside]);
+        const additionalGlobal = all.filter((item) =>
+          !classified.has(item) && worldArticleLocation(item).kind !== 'worldwide');
+        return {
+          global: [...split.global, ...additionalGlobal],
+          local: split.local,
+          inside: split.inside,
+          sampark: split.inside,
+        };
       }),
       getPublishedInternalContent().then((response) => ({
         records: publishedRecordsFromResponse(response), error: '',
@@ -167,7 +179,9 @@ export default function SamsungNewsPage() {
       </div>}
       {/* SRI-D / Samsung Global / Samsung Local */}
       <SamsungChannelTabs activeChannel={activeChannel} model={model} onChange={setActiveChannel} />
-      <SamsungChannelContent channel={selectedChannel} onOpen={setOpenArticle} nowMs={nowMs} />
+      {activeChannel === 'global' && worldExplorerEnabled
+        ? <SamparkWorldExplorer articles={model.global?.items || []} onOpen={setOpenArticle} />
+        : <SamsungChannelContent channel={selectedChannel} onOpen={setOpenArticle} nowMs={nowMs} />}
       <SamsungDossier item={openArticle} onClose={() => setOpenArticle(null)} />
     </div>
   );
