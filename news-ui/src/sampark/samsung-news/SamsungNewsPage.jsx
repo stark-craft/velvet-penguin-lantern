@@ -261,7 +261,9 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
       if (match && ['global', 'local', 'sampark'].includes(channel)) {
         setActiveChannel(channel === 'sampark' ? 'internal' : channel);
         setFocusMissed('');
-        setOpenArticle(match);
+        setOpenArticle(channel === 'sampark'
+          ? { ...match, samsung_internal_channel: 'internal', region: 'SRI-D' }
+          : match);
       } else {
         setFocusMissed(focus);
       }
