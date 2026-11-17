@@ -321,7 +321,7 @@ export default function SamsungChannelContent({
           {hasMore && !loadStopped && <div ref={sentinelRef}
             className="samsung-continuous-sentinel" aria-hidden="true" />}
           {pagingBusy && <span role="status">Loading more Samsung stories…</span>}
-          {hasMore && !pagingBusy && (
+          {hasMore && !pagingBusy && (loadStopped || typeof IntersectionObserver === 'undefined') && (
             <button className="btn-secondary" type="button"
               onClick={() => {
                 if (loadStopped) setLoadStopped(false);
