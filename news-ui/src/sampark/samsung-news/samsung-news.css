@@ -1404,3 +1404,39 @@ Keep reload inside the reader; do not reload the Samsung News page.
   top: 0;
   right: 0;
 }
+
+/* Samsung News only: archive pagination (Classic, SRI-D and World Explorer). */
+.samsung-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 17px 0 5px;
+  margin-top: 5px;
+  border-top: 1px solid #e5e9f0;
+}
+.samsung-pagination-range,
+.samsung-pagination-pages {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.samsung-pagination-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.samsung-pagination-controls .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 13px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+.samsung-pagination-controls .btn-secondary:disabled { opacity: .52; cursor: not-allowed; }
+.samsung-pagination-controls .btn-secondary:focus-visible { outline: 2px solid #1428a0; outline-offset: 2px; }
+@media (max-width: 600px) {
+  .samsung-pagination { flex-direction: column; align-items: stretch; }
+  .samsung-pagination-controls { justify-content: space-between; gap: 8px; }
+}
