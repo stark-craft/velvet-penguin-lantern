@@ -154,9 +154,10 @@ test('WS6 every Sampark article surface uses the original TechScout dossier', ()
   assert.match(dossier, /aria-modal/);
   assert.match(dossier, /aria-labelledby/);
   assert.match(dossier, /Close dossier/);
-  for (const surface of ['SamparkHistory.jsx', 'SamparkFollowing.jsx', 'SamparkSearchResults.jsx', 'SamparkForYou.jsx', 'SamparkSamsungNews.jsx']) {
+  for (const surface of ['SamparkHistory.jsx', 'SamparkFollowing.jsx', 'SamparkSearchResults.jsx', 'SamparkForYou.jsx']) {
     assert.match(read(`../src/sampark/${surface}`), /ArticleModal/);
   }
+  assert.match(read('../src/sampark/samsung-news/SamsungNewsPage.jsx'), /ArticleModal/);
   const history = read('../src/sampark/SamparkHistory.jsx');
   assert.match(history, /ArticleModal/);
   const forYou = read('../src/sampark/SamparkForYou.jsx');
@@ -195,13 +196,15 @@ test('WS2 review shows full submission and requires Send Back note', ()=>{
 });
 
 test('WS2 published projection keeps body separate and lists announcements', ()=>{
-  const samsung = read('../src/sampark/SamparkSamsungNews.jsx');
-  assert.match(samsung, /announcements/);
-  assert.match(samsung, /Announcements/);
-  assert.match(samsung, /body: r\.body/);
-  assert.match(samsung, /findPublishedFocusRecord/);
+  const samsung = read('../src/sampark/samsung-news/SamsungNewsPage.jsx');
+  const model = read('../src/sampark/samsung-news/samsungNewsModel.js');
+  const content = read('../src/sampark/samsung-news/SamsungChannelContent.jsx');
+  assert.match(content, /announcement/);
+  assert.match(content, /Announcements/);
+  assert.match(model, /body: record\.body/);
+  assert.match(samsung, /publishedMatch/);
   assert.match(samsung, /focus/);
-  assert.doesNotMatch(samsung, /summary: r\.summary \|\| r\.body/);
+  assert.doesNotMatch(model, /summary: record\.summary \|\| record\.body/);
   const dossier = read('../src/sampark/shared/SamparkArticleDossier.jsx');
   assert.match(dossier, /Full article/);
 });
@@ -386,10 +389,11 @@ test('Search shell clear stays in Search via shared targets', ()=>{
 });
 
 test('Samsung focus explains unresolvable items after loading', ()=>{
-  const samsung = read('../src/sampark/SamparkSamsungNews.jsx');
+  const samsung = read('../src/sampark/samsung-news/SamsungNewsPage.jsx');
   assert.match(samsung, /focusMissed/);
   assert.match(samsung, /no longer published or is unavailable/);
   assert.match(samsung, /Return to Samsung News/);
   assert.match(samsung, /handledFocusRef/);
-  assert.match(samsung, /findPublishedFocusRecord/);
+  assert.match(samsung, /publishedMatch/);
+  assert.match(samsung, /focus_match/);
 });
