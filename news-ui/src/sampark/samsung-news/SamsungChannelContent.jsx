@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 import FeaturedCarousel from '../all-news/FeaturedCarousel.jsx';
 import AllNewsRail from '../all-news/AllNewsRail.jsx';
@@ -6,7 +6,7 @@ import LeadershipMessageHero from './LeadershipMessageHero.jsx';
 import SriDDocumentCard from './SriDDocumentCard.jsx';
 import { isRecentlyPublishedSamsungItem, samsungItemKey } from './samsungNewsModel.js';
 import { groupSignalsByDate } from '../../news-scrapper/internal/samsungInternalModel.js';
-import { samsungPageItems } from './samsungPagination.js';
+import { samsungPageItems, SAMSUNG_NEWS_PAGE_SIZE } from './samsungPagination.js';
 import SamsungPageControls from './SamsungPageControls.jsx';
 
 function imageOf(item) { return item?.image_url || item?.top_image || ''; }
@@ -203,12 +203,56 @@ function SriDTypeSection({ section, onOpen, nowMs }) {
 }
 export default function SamsungChannelContent({
   channel, onOpen, nowMs, page = 1, onPageChange, totalCount, pagingBusy = false,
+  continuous = false, onLoadMore,
 }) {
-  // SRI-D's published archive is kept locally; only Samsung Global and Local
-  // request more retained briefing batches from the backend.
+  // SRI-D's published archive retains its existing page controls.
+  // Global, Local and World Explorer can reveal stories continuously.
   const [internalPage, setInternalPage] = useState(1);
+  const [visibleCount, setVisibleCount] = useState(SAMSUNG_NEWS_PAGE_SIZE);
+  const [loadStopped, setLoadStopped] = useState(false);
+  const loadingRef = useRef(false);
+  const sentinelRef = useRef(null);
+  const isInternal = channel?.id === 'internal';
+  const continuousArchive = continuous && !isInternal;
+  const loadedCount = channel?.items?.length || 0;
+  const archiveTotal = isInternal ? channel?.count || 0 : (totalCount ?? channel?.count ?? 0);
+  const hasMore = continuousArchive && visibleCount < archiveTotal;
+
+  const revealMore = useCallback(async () => {
+    if (!continuousArchive || !hasMore || pagingBusy || loadingRef.current || loadStopped) return;
+    // Reveal already-downloaded stories in small chunks; fetch another batch
+    // only after reaching the end of the stories loaded for this channel.
+    if (visibleCount < loadedCount) {
+      setVisibleCount((current) => Math.min(current + SAMSUNG_NEWS_PAGE_SIZE, loadedCount));
+      return;
+    }
+    if (typeof onLoadMore !== 'function') {
+      setLoadStopped(true);
+      return;
+    }
+    loadingRef.current = true;
+    try {
+      const loaded = await onLoadMore();
+      if (loaded === false) setLoadStopped(true);
+    } catch {
+      setLoadStopped(true);
+    } finally {
+      loadingRef.current = false;
+    }
+  }, [continuousArchive, hasMore, pagingBusy, loadStopped, visibleCount, loadedCount, onLoadMore]);
+
+  useEffect(() => {
+    if (!hasMore || loadStopped || typeof IntersectionObserver === 'undefined') return undefined;
+    const target = sentinelRef.current;
+    if (!target) return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) revealMore();
+    }, { rootMargin: '0px 0px 400px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadStopped, revealMore]);
+
   if (!channel) return null;
-  const isInternal = channel.id === 'internal';
   const heroItems = isInternal
     ? (channel.hero || []).map((item) => ({ ...item, category: contentTypeLabel(item) }))
     : channel.hero;
@@ -216,8 +260,9 @@ export default function SamsungChannelContent({
     ? (channel.stream || []).map((item) => ({ ...item, category: contentTypeLabel(item) }))
     : channel.stream;
   const archivePage = isInternal ? internalPage : page;
-  const archiveTotal = isInternal ? channel.count : (totalCount ?? channel.count);
-  const archiveItems = samsungPageItems(channel.items, archivePage);
+  const archiveItems = continuousArchive
+    ? channel.items.slice(0, visibleCount)
+    : samsungPageItems(channel.items, archivePage);
   const visibleGroups = groupSignalsByDate(archiveItems);
   const sridSections = isInternal ? buildSriDSections(visibleGroups) : [];
   return (
@@ -270,13 +315,31 @@ export default function SamsungChannelContent({
           </div>
         )}
       </section>
-      <SamsungPageControls
-        page={archivePage}
-        total={archiveTotal}
-        onChange={isInternal ? setInternalPage : onPageChange}
-        busy={pagingBusy}
-        label={channel.label}
-      />
+      {continuousArchive ? (
+        <div className="samsung-continuous-status" aria-live="polite">
+          <span>Showing {archiveItems.length} of {archiveTotal} stories</span>
+          {hasMore && !loadStopped && <div ref={sentinelRef}
+            className="samsung-continuous-sentinel" aria-hidden="true" />}
+          {pagingBusy && <span role="status">Loading more Samsung stories…</span>}
+          {hasMore && !pagingBusy && (
+            <button className="btn-secondary" type="button"
+              onClick={() => {
+                if (loadStopped) setLoadStopped(false);
+                else revealMore();
+              }}>
+              {loadStopped ? 'Retry loading stories' : 'Load more stories'}
+            </button>
+          )}
+        </div>
+      ) : (
+        <SamsungPageControls
+          page={archivePage}
+          total={archiveTotal}
+          onChange={isInternal ? setInternalPage : onPageChange}
+          busy={pagingBusy}
+          label={channel.label}
+        />
+      )}
     </div>
   );
 }
