@@ -21,11 +21,8 @@ function BackTrail({ page, region, country, onHome, onRegion }) {
 }
 
 function StoryCollection({ articles, name, subtitle, onOpen }) {
-  const [page, setPage] = useState(1);
-  useEffect(() => setPage(1), [name]);
-
-  // Share the *actual* Classical Samsung Global presentation rather than
-  // duplicating its hero, rail, card layout or pagination styling.
+  // Share the actual Classical Samsung Global presentation and infinite
+  // scroll archive; World Explorer has already loaded the Global corpus.
   const channel = useMemo(() => {
     const items = Array.isArray(articles) ? articles : [];
     const trending = rankTrending(items);
@@ -56,8 +53,7 @@ function StoryCollection({ articles, name, subtitle, onOpen }) {
       key={name}
       channel={channel}
       onOpen={onOpen}
-      page={page}
-      onPageChange={setPage}
+      continuous
       totalCount={channel.count}
     />
   </>;
