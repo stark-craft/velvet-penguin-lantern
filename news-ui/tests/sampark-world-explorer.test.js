@@ -94,9 +94,13 @@ test('Sampark view toggle is only applied on Samsung Global and uses the existin
   assert.match(app, /worldExplorerEnabled=\{Boolean\(settings\.worldExplorerEnabled\)\}/);
   assert.match(wrapper, /samsung-news\/SamsungNewsPage\.jsx/);
   assert.match(samsung, /activeChannel === 'global' && worldExplorerEnabled/);
-  assert.match(samsung, /<SamparkWorldExplorer articles=\{model\.global\?\.items \|\| \[\]\} onOpen=\{setOpenArticle\}/);
+  assert.match(samsung, /<SamparkWorldExplorer/);
+  assert.match(samsung, /articles=\{model\.global\?\.items \|\| \[\]\}/);
+  assert.match(samsung, /coverageComplete=\{pagingSupported && !worldIncomplete\}/);
   assert.match(samsung, /SamsungDossier item=\{openArticle\}/);
-  assert.match(samsung, /SamsungChannelContent channel=\{selectedChannel\}/);
+  assert.match(samsung, /<SamsungChannelContent/);
+  assert.match(samsung, /getSamsungInternalFeedPage/);
+  assert.match(explorer, /samsungPageItems\(articles, currentPage\)/);
   assert.match(explorer, /Briefing Stream/);
   assert.match(explorer, /World Explorer/);
 });
