@@ -7,6 +7,7 @@ export default function SamsungChannelTabs({
   activeChannel,
   model,
   onChange,
+  totals = {},
 }) {
   return (
     <nav
@@ -19,8 +20,9 @@ export default function SamsungChannelTabs({
             activeChannel ===
             channel.id;
           const count =
-            model?.[channel.id]
-              ?.count || 0;
+            channel.id === 'internal'
+              ? (model?.internal?.count || 0)
+              : (totals?.[channel.id] ?? model?.[channel.id]?.count ?? 0);
           return (
             <button
               aria-pressed={active}
