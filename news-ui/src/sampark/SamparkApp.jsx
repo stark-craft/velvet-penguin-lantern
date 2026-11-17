@@ -27,7 +27,6 @@ import SamparkSources from './SamparkSources.jsx';
 import SamparkScheduler from './SamparkScheduler.jsx';
 import SamparkAnalytics from './SamparkAnalytics.jsx';
 import SamparkAccess from './SamparkAccess.jsx';
-import GutterMonkey from './mascot/GutterMonkey.jsx';
 import './sampark.css';
 const SEARCH_HISTORY_KEY = 'sampark-search-history-v1';
 const LEGACY_SEARCH_HISTORY_KEY = 'sampark-search-history-v1';
@@ -62,7 +61,7 @@ function ForYouStructure() {
   return <SamparkForYou />;
 }
 
-function AllNewsStructure({ capabilities=[] }) {
+function AllNewsStructure({ capabilities = [] }) {
   return <SamparkAllNews capabilities={capabilities} />;
 }
 
@@ -75,8 +74,6 @@ function SamsungStructure({ worldExplorerEnabled = false }) {
 }
 
 export default function SamparkApp() {
-  const brandRef = useRef(null);
-  const workspaceRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
   const query = new URLSearchParams(location.search).get('q') || '';
@@ -91,9 +88,21 @@ export default function SamparkApp() {
   const { language, setLanguage, translationState } = useLanguage();
 
   useEffect(() => {
-    setSearchDraft(location.pathname === '/search' ? query : '');
-    if (location.pathname !== '/search') returnPath.current = location.pathname;
-  }, [location.pathname, query]);
+    setSearchDraft(
+      location.pathname === '/search'
+        ? query
+        : '',
+    );
+    if (location.pathname !== '/search') {
+      returnPath.current =
+        `${location.pathname}${location.search || ''}${location.hash || ''}`;
+    }
+  }, [
+    location.pathname,
+    location.search,
+    location.hash,
+    query,
+  ]);
 
   const auth = (() => {
     try { return useSamparkAuth(); } catch { return null; }
@@ -114,7 +123,7 @@ export default function SamparkApp() {
     }
   }, [viewer?.principal]);
 
-  // World Explorer is optional and viewer-scoped; Classic remains the default.
+  // World Explorer is a viewer-scoped opt-in. Classic stays the default.
   useEffect(() => {
     const enabled = readWorldExplorerPreference(viewer);
     setSettings((current) => current.worldExplorerEnabled === enabled ? current : { ...current, worldExplorerEnabled: enabled });
@@ -126,7 +135,7 @@ export default function SamparkApp() {
     getRecommendationStatus().then((result) => {
       if (cancelled) return;
       setSettings((current) => ({ ...current, personalizedFeed: result?.mode !== 'paused' }));
-    }).catch(() => {});
+    }).catch(() => { });
     getViewerPreferences().then((result) => {
       if (cancelled) return;
       const pref = result?.preferences || {};
@@ -144,11 +153,11 @@ export default function SamparkApp() {
           try {
             window.localStorage.removeItem(getNamespacedHistoryKey(viewer));
             window.localStorage.removeItem(SEARCH_HISTORY_KEY);
-          } catch {}
+          } catch { }
           setSearchHistory([]);
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
     return () => { cancelled = true; };
   }, [viewer?.principal]);
 
@@ -183,7 +192,25 @@ export default function SamparkApp() {
     if (!clean) {
       // Inside Search, an empty submit stays in the workspace (empty prompt);
       // elsewhere it returns to the previous route.
-      navigate(searchSubmitTarget(location.pathname, '', returnPath.current));
+      const target =
+        searchSubmitTarget(
+          location.pathname,
+          '',
+          returnPath.current,
+        );
+      navigate(
+        target,
+        {
+          state: {
+            ...(location.state || {}),
+            searchReturnPath:
+              location.pathname === '/search'
+                ? location.state?.searchReturnPath ||
+                returnPath.current
+                : returnPath.current,
+          },
+        },
+      );
       return;
     }
     if (settings.saveSearchHistory) {
@@ -191,7 +218,25 @@ export default function SamparkApp() {
       setSearchHistory(next);
       window.localStorage.setItem(getNamespacedHistoryKey(viewer), JSON.stringify(next));
     }
-    navigate(searchSubmitTarget(location.pathname, clean, returnPath.current));
+    const target =
+      searchSubmitTarget(
+        location.pathname,
+        clean,
+        returnPath.current,
+      );
+    navigate(
+      target,
+      {
+        state: {
+          ...(location.state || {}),
+          searchReturnPath:
+            location.pathname === '/search'
+              ? location.state?.searchReturnPath ||
+              returnPath.current
+              : returnPath.current,
+        },
+      },
+    );
   };
 
   const clearSearch = () => {
@@ -205,8 +250,8 @@ export default function SamparkApp() {
     setLanguage(nextLanguage);
   };
 
-  const tabClass = (target) => ({ isActive }) => `main-tab${isActive || (target === '/all-news' && location.pathname === '/search') ? ' active' : ''}`;
-  const rawDisplayName = String(viewer?.display_name || '').trim();
+  const tabClass = () => ({ isActive }) =>
+    `main-tab${isActive ? ' active' : ''}`; const rawDisplayName = String(viewer?.display_name || '').trim();
   const hasName = rawDisplayName.length >= 2;
   const displayName = hasName ? rawDisplayName : '';
   const canWriteOrPublishNews = capabilities.some((capability) => [
@@ -220,7 +265,7 @@ export default function SamparkApp() {
     <a className="skip-link" href="#news-main-content">Skip to news</a>
     {/* Sampark supplies the surrounding portal chrome; TechScout begins here. */}
     <header className="techscout-header">
-      <div className="techscout-brand-row"><NavLink className="techscout-logo gutter-monkey-brand" ref={brandRef} to="/for-you"><span className="logo-samsung">Samsung</span><span className="logo-techscout">TechScout</span></NavLink><div className="techscout-greeting"><p>{hasName ? <>Hi <span data-no-translate>{displayName}</span>! Your Personalized Technology briefing</> : 'Your Personalized Technology briefing'}</p></div></div>
+      <div className="techscout-brand-row"><NavLink className="techscout-logo" to="/for-you"><span className="logo-samsung">Samsung</span><span className="logo-techscout">TechScout</span></NavLink><div className="techscout-greeting"><p>{hasName ? <>Hi <span data-no-translate>{displayName}</span>! Your Personalized Technology briefing</> : 'Your Personalized Technology briefing'}</p></div></div>
       <div className="techscout-actions">
         <form className="search-bar" onSubmit={submitSearch} role="search"><button aria-label="Search Technologies News" className="search-submit" type="submit"><Icon name="search" size={16} /></button><input aria-label="Search all archived news" list="sampark-search-history" onChange={(event) => setSearchDraft(event.target.value)} placeholder="Search Technologies News" type="search" value={searchDraft} />{searchDraft && <button aria-label="Clear search" className="search-clear" onClick={clearSearch} type="button"><Icon name="x" size={14} /></button>}<datalist id="sampark-search-history">{searchHistory.map((item) => <option key={item} value={item} />)}</datalist><span style={{ display: 'none' }}>Search Technologies News</span></form>
         <label className="lang-btn" data-no-translate><Icon name="globe" size={16} /><select aria-label="Language" onChange={(event) => changeLanguage(event.target.value)} value={language}><option value="en">English</option><option value="ko">한국어</option></select></label>
@@ -231,23 +276,24 @@ export default function SamparkApp() {
     </header>
     {serviceError && <div className="shell-status is-error" role="alert">{serviceError}</div>}
     {language === 'ko' && (translationState.translating || translationState.error) && <div className={`shell-status${translationState.error ? ' is-error' : ''}`} data-no-translate role={translationState.error ? 'alert' : 'status'}>{translationState.error ? <><span>{translationState.error}</span><button onClick={translationState.retry} type="button">Retry</button></> : <span>{translationState.phase === 'downloading' ? `한국어 번역 준비 중${translationState.downloadProgress === null ? '' : ` · ${translationState.downloadProgress}%`}` : `한국어로 번역 중 · ${translationState.completed}/${translationState.total}`}</span>}</div>}
-    <div className="main-card-container" ref={workspaceRef}>
+    <div className="main-card-container">
       {/* White product-tab row inside the rounded workspace — exactly four pills */}
       <nav aria-label="TechScout sections" className="main-tabs"><NavLink className={tabClass('/for-you')} to="/for-you"><Icon name="sparkle" size={16} />For You</NavLink><NavLink className={tabClass('/all-news')} to="/all-news"><Icon name="globe" size={16} />All News</NavLink><NavLink className={tabClass('/research')} to="/research"><Icon name="file" size={16} />Research</NavLink><NavLink className={tabClass('/samsung-news')} to="/samsung-news"><Icon name="layers" size={16} />Samsung News</NavLink></nav>
       <main className="content-area" id="news-main-content" tabIndex={-1}>
         <Routes location={backgroundLocation || location}>
-          <Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure capabilities={capabilities} />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/research/*" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure worldExplorerEnabled={Boolean(settings.worldExplorerEnabled)} />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/create" element={<SamparkCreate />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} onAccessChanged={refreshAccess} />} /><Route path="/search" element={<SamparkSearchResults query={query} />} /><Route path="*" element={<Navigate replace to="/for-you" />} />
+          <Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure capabilities={capabilities} />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/research/*" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure worldExplorerEnabled={Boolean(settings.worldExplorerEnabled)} />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/create" element={<SamparkCreate />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory capabilities={capabilities} />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} onAccessChanged={refreshAccess} />} /><Route path="/search" element={<SamparkSearchResults query={query} />} /><Route path="*" element={<Navigate replace to="/for-you" />} />
         </Routes>
         {backgroundLocation && (
           <Routes>
-            <Route path="/create" element={<SamparkCreateModal onClose={()=> navigate(-1)} />} />
+            <Route path="/create" element={<SamparkCreateModal onClose={() => navigate(-1)} />} />
           </Routes>
         )}
       </main>
     </div>
-    <GutterMonkey brandRef={brandRef} workspaceRef={workspaceRef} />
-    <SamparkSettingsModal capabilities={capabilities} privilegedSessionActive={Boolean(auth?.privilegedSessionActive)} sessionRole={auth?.sessionRole || ''} onAccessChanged={refreshAccess} onClose={() => setSettingsOpen(false)} onSaved={async (nextSettings, nextViewer) => { setSettings(nextSettings); setViewer(nextViewer); if (auth?.refresh) await auth.refresh(); if (!nextSettings.saveSearchHistory) { setSearchHistory([]); window.localStorage.removeItem(getNamespacedHistoryKey(nextViewer || viewer)); window.localStorage.removeItem(SEARCH_HISTORY_KEY); } else if (nextViewer?.principal) { // refresh namespaced history after viewer change
+    <SamparkSettingsModal capabilities={capabilities} privilegedSessionActive={Boolean(auth?.privilegedSessionActive)} sessionRole={auth?.sessionRole || ''} onAccessChanged={refreshAccess} onClose={() => setSettingsOpen(false)} onSaved={async (nextSettings, nextViewer) => {
+      setSettings(nextSettings); setViewer(nextViewer); if (auth?.refresh) await auth.refresh(); if (!nextSettings.saveSearchHistory) { setSearchHistory([]); window.localStorage.removeItem(getNamespacedHistoryKey(nextViewer || viewer)); window.localStorage.removeItem(SEARCH_HISTORY_KEY); } else if (nextViewer?.principal) { // refresh namespaced history after viewer change
         setSearchHistory(readSearchHistoryForViewer(nextViewer));
-      } }} open={settingsOpen} settings={settings} viewer={viewer} />
+      }
+    }} open={settingsOpen} settings={settings} viewer={viewer} />
   </div>;
 }
