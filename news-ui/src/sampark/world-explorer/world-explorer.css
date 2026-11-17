@@ -1,0 +1,113 @@
+/* Samsung World Explorer — Sampark-only editorial extension.
+   Uses the same Samsung blue, typography, cards, spacing and theme tokens. */
+.swe { display: grid; gap: 19px; min-width: 0; color: var(--text); }
+.swe button { color: inherit; }
+.swe button:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.swe-intro {
+  position: relative; display: flex; justify-content: space-between; align-items: end;
+  gap: 24px; padding: 24px 27px; overflow: hidden;
+  border: 1px solid #d8e1fa; border-radius: 14px;
+  background: linear-gradient(117deg, #f4f7ff 0%, #f9fbff 58%, #edf2ff 100%);
+}
+.swe-intro::after { content: ''; position: absolute; right: -42px; top: -83px; width: 280px; height: 280px; pointer-events: none; border: 1px solid rgba(20,40,160,.1); border-radius: 50%; box-shadow: 0 0 0 42px rgba(20,40,160,.025), 0 0 0 85px rgba(20,40,160,.018); }
+.swe-intro-copy, .swe-stat-bar { position: relative; z-index: 1; }
+.swe-eyebrow { display: inline-flex; align-items: center; gap: 7px; color: var(--primary); font-size: 11px; font-weight: 750; letter-spacing: .085em; line-height: 1.3; }
+.swe-intro h2 { margin: 10px 0 7px; font-size: clamp(22px, 2.5vw, 33px); font-weight: 700; line-height: 1.18; letter-spacing: -.035em; }
+.swe-title-dot { color: #1428a0; }
+.swe-intro p { margin: 0; max-width: 620px; color: #667085; font-size: 13px; line-height: 1.6; }
+.swe-stat-bar { display: flex; flex: none; gap: 18px; padding: 12px 0; }
+.swe-stat-bar > div { min-width: 65px; text-align: center; }
+.swe-stat-bar > div + div { padding-left: 18px; border-left: 1px solid #d9e2f5; }
+.swe-stat-bar strong { display: block; font-size: 23px; line-height: 1.05; letter-spacing: -.04em; color: #1428a0; }
+.swe-stat-bar span { display: block; margin-top: 6px; color: #667085; font-size: 10px; white-space: nowrap; }
+.swe-home-actions { display: flex; align-items: end; justify-content: space-between; gap: 14px; }
+.swe-home-actions h3, .swe-section-line h3 { margin: 3px 0 2px; font-size: 19px; font-weight: 700; line-height: 1.25; letter-spacing: -.02em; }
+.swe-home-actions p, .swe-section-line p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.swe-text-action { display: inline-flex; align-items: center; justify-content: center; flex: none; gap: 7px; padding: 8px 0; border-bottom: 1px solid var(--primary); background: transparent; color: var(--primary) !important; font-size: 12px; font-weight: 700; }
+.swe-region-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.swe-region-card { display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 177px; padding: 17px 18px 13px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; transition: border-color .18s, transform .18s, box-shadow .18s; }
+.swe-region-card:hover { transform: translateY(-2px); border-color: #aab7f4; box-shadow: 0 9px 22px rgba(20,40,160,.07); }
+.swe-region-card-top { display: flex; justify-content: space-between; align-items: center; color: var(--primary); }
+.swe-region-number { font-size: 11px; letter-spacing: .06em; color: var(--faint); }
+.swe-region-card strong { margin: 14px 0 4px; font-size: 17px; line-height: 1.25; letter-spacing: -.015em; }
+.swe-region-description { display: block; flex: 1; max-width: 320px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.swe-region-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 15px; padding-top: 11px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.swe-region-footer svg { color: var(--primary); }
+.swe-business-heading { margin-top: 8px; }
+.swe-business-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.swe-business-card { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 14px 12px; text-align: left; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.swe-business-card:hover, .swe-market-card:hover, .swe-regional-desk-list button:hover { border-color: #aab7f4; background: var(--surface-blue); }
+.swe-business-mark { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 9px; background: var(--surface-blue); color: var(--primary); }
+.swe-business-card > span:nth-child(2) { flex: 1; min-width: 0; }
+.swe-business-card strong, .swe-business-card small { display: block; overflow: hidden; text-overflow: ellipsis; }
+.swe-business-card strong { font-size: 12px; line-height: 1.4; font-weight: 650; }
+.swe-business-card small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.swe-business-card > svg { flex: none; color: var(--primary); }
+.swe-editorial-note { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 12px 15px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.swe-editorial-note > span { display: inline-flex; align-items: center; flex: none; gap: 7px; color: var(--primary); font-size: 11px; font-weight: 750; white-space: nowrap; }
+.swe-editorial-note button { padding: 0; text-align: left; background: none; font-size: 12px; font-weight: 600; }
+.swe-editorial-note button:nth-child(2) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swe-editorial-note button:last-child { color: var(--primary); }
+.swe-breadcrumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 1px 0 -5px; color: var(--muted); font-size: 12px; }
+.swe-breadcrumbs button { padding: 2px 0; background: transparent; color: var(--primary); font-weight: 600; }
+.swe-breadcrumbs svg { color: var(--faint); }
+.swe-breadcrumbs [aria-current="page"] { font-weight: 650; color: var(--text); }
+.swe-section-line { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
+.swe-detail-heading h3 { font-size: 24px; }
+.swe-detail-label { display: flex; align-items: center; gap: 9px; margin-bottom: -7px; color: var(--primary); font-size: 11px; font-weight: 750; letter-spacing: .055em; }
+.swe-count-label { flex: none; padding: 6px 10px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface-soft); color: var(--muted); font-size: 11px; white-space: nowrap; }
+.swe-market-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.swe-market-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 80px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); text-align: left; }
+.swe-market-main, .swe-market-end { display: flex; align-items: center; min-width: 0; gap: 8px; }
+.swe-market-main { flex: 1; }
+.swe-market-main > span:last-child { min-width: 0; }
+.swe-flag { flex: none; font-family: "Apple Color Emoji", "Segoe UI Emoji", sans-serif; font-size: 25px; line-height: 1; }
+.swe-market-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 650; }
+.swe-market-main small { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+.swe-market-end { flex: none; color: var(--faint); font-size: 10px; }
+.swe-market-end svg { color: var(--primary); }
+.swe-count-active { color: var(--primary); font-weight: 700; }
+.swe-count-muted { color: var(--faint); }
+.swe-regional-desk-list { display: grid; gap: 8px; }
+.swe-regional-desk-list button { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); text-align: left; }
+.swe-regional-desk-list button span { flex: 1; min-width: 0; font-size: 13px; font-weight: 650; }
+.swe-regional-desk-list button small { color: var(--muted); font-size: 11px; }
+.swe-regional-desk-list button svg { color: var(--primary); }
+.swe-story-hero { min-width: 0; }
+.swe-story-list { margin-top: 1px; }
+.swe-no-coverage { display: grid; justify-items: center; gap: 7px; padding: 42px 16px; border-radius: 12px; border: 1px dashed var(--line); background: var(--surface-soft); text-align: center; }
+.swe-no-coverage-icon { display: grid; place-items: center; width: 43px; height: 43px; border-radius: 50%; background: var(--surface-blue); color: var(--primary); }
+.swe-no-coverage h3 { margin: 5px 0 0; font-size: 15px; }
+.swe-no-coverage p { margin: 0; max-width: 500px; color: var(--muted); font-size: 12px; }
+.swe-coverage-note { display: flex; align-items: center; gap: 6px; margin: 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--faint); font-size: 11px; }
+html[data-theme="dark"] .swe-intro { border-color: var(--line); background: linear-gradient(117deg, #20243b 0%, #171722 58%, #22263f 100%); }
+html[data-theme="dark"] .swe-intro p, html[data-theme="dark"] .swe-stat-bar span { color: var(--muted); }
+html[data-theme="dark"] .swe-stat-bar strong, html[data-theme="dark"] .swe-title-dot { color: var(--primary); }
+html[data-theme="dark"] .swe-stat-bar > div + div { border-color: var(--line); }
+html[data-theme="dark"] .swe-region-card:hover { border-color: var(--primary); }
+html[data-theme="dark"] .swe-business-card:hover, html[data-theme="dark"] .swe-market-card:hover, html[data-theme="dark"] .swe-regional-desk-list button:hover { border-color: var(--primary); }
+@media (max-width: 1150px) {
+  .swe-business-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .swe-intro { align-items: start; flex-direction: column; }
+  .swe-stat-bar { width: 100%; justify-content: flex-start; }
+}
+@media (max-width: 850px) {
+  .swe-region-grid, .swe-market-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 570px) {
+  .swe { gap: 15px; }
+  .swe-intro { padding: 19px; }
+  .swe-stat-bar { justify-content: space-between; gap: 8px; }
+  .swe-stat-bar > div { min-width: 0; }
+  .swe-stat-bar > div + div { padding-left: 12px; }
+  .swe-region-grid, .swe-market-grid, .swe-business-grid { grid-template-columns: 1fr; }
+  .swe-region-card { min-height: 156px; }
+  .swe-home-actions { align-items: start; flex-direction: column; }
+  .swe-market-end { gap: 4px; }
+  .swe-editorial-note { gap: 7px; }
+  .swe-editorial-note > span { font-size: 0; }
+  .swe-editorial-note > span svg { width: 17px; height: 17px; }
+  .swe-story-hero .sampark-samsung-featured, .swe-story-hero .sampark-samsung-featured-media { min-height: 280px; }
+  .swe-coverage-note { align-items: start; }
+}
+@media (prefers-reduced-motion: reduce) { .swe-region-card { transition: none; } .swe-region-card:hover { transform: none; } }
