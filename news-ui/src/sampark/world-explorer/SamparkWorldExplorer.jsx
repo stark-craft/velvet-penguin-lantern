@@ -1,13 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 import { buildWorldCoverage, WORLD_MARKETS } from './worldExplorerModel.js';
-import SamsungPageControls from '../samsung-news/SamsungPageControls.jsx';
-import { samsungPageItems, samsungPageCount } from '../samsung-news/samsungPagination.js';
+import { rankTrending } from '../../news-scrapper/internal/samsungInternalModel.js';
+import SamsungChannelContent from '../samsung-news/SamsungChannelContent.jsx';
 import './world-explorer.css';
-
-const SOURCE_LABEL = (item) => item?.source || item?.src || 'Samsung Newsroom';
-const articleKey = (article, index) => article?.canonical_link || article?.link || article?.url || article?.id || (article?.title || '') + index;
-const imageOf = (article) => article?.image_url || article?.top_image || '';
 
 function Flag({ code }) {
   if (!/^[A-Z]{2}$/.test(code || '')) return <Icon name="globe" size={18} />;
@@ -27,8 +23,23 @@ function BackTrail({ page, region, country, onHome, onRegion }) {
 function StoryCollection({ articles, name, subtitle, onOpen }) {
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [name]);
-  const currentPage = Math.min(page, Math.max(1, samsungPageCount(articles.length)));
-  if (!articles.length) return (
+
+  // Share the *actual* Classical Samsung Global presentation rather than
+  // duplicating its hero, rail, card layout or pagination styling.
+  const channel = useMemo(() => {
+    const items = Array.isArray(articles) ? articles : [];
+    const trending = rankTrending(items);
+    return {
+      id: 'world-explorer',
+      label: name,
+      items,
+      hero: trending.slice(0, 5),
+      stream: trending.slice(0, 10),
+      count: items.length,
+    };
+  }, [articles, name]);
+
+  if (!channel.items.length) return (
     <div className="swe-no-coverage" role="status">
       <span className="swe-no-coverage-icon"><Icon name="inbox" size={23} /></span>
       <h3>No recent newsroom stories in this edition</h3>
@@ -36,56 +47,19 @@ function StoryCollection({ articles, name, subtitle, onOpen }) {
     </div>
   );
 
-  const lead = articles[0];
-  const leadImage = imageOf(lead);
   return <>
     <div className="swe-section-line">
       <div><span className="swe-eyebrow">THE LATEST</span><h3>{name}</h3><p>{subtitle}</p></div>
-      <span className="swe-count-label">{articles.length} {articles.length === 1 ? 'story' : 'stories'}</span>
+      <span className="swe-count-label">{channel.count} {channel.count === 1 ? 'story' : 'stories'}</span>
     </div>
-    <div className="sampark-samsung-hero swe-story-hero">
-      <section className="sampark-samsung-featured" aria-label={'Featured story from ' + name}>
-        <button className="sampark-samsung-featured-media" onClick={() => onOpen(lead)}
-          style={leadImage ? { backgroundImage: 'url("' + leadImage + '")' } : undefined}
-          type="button">
-          <div className="sampark-samsung-featured-overlay">
-            <span className="sampark-samsung-featured-kicker">{SOURCE_LABEL(lead)} · {lead.date || 'Latest'}</span>
-            <h3>{lead.title}</h3>
-            <small>{String(lead.master_summary || lead.summary || lead.snippet || '').slice(0, 180)}</small>
-          </div>
-        </button>
-      </section>
-      <aside className="sampark-samsung-stream" aria-label={'Briefing stream for ' + name}>
-        <h3>Briefing Stream</h3>
-        <div className="sampark-samsung-stream-list">
-          {articles.slice(1, 9).length ? articles.slice(1, 9).map((item, i) => (
-            <button key={articleKey(item, i)} className="sampark-samsung-stream-item" onClick={() => onOpen(item)} type="button">
-              <span className="sampark-samsung-stream-category">{item.category || 'Samsung News'}</span>
-              <strong>{item.title}</strong>
-              <small>{SOURCE_LABEL(item)} · {item.date || 'Latest'}</small>
-            </button>
-          )) : <p className="sampark-samsung-empty">More stories will appear with the next briefing.</p>}
-        </div>
-      </aside>
-    </div>
-    <section className="sampark-samsung-latest swe-story-list" aria-label="Latest newsroom articles">
-      <header><h3>All stories <span className="sampark-samsung-count">({articles.length})</span></h3><span className="sampark-samsung-hint">Open a story to read its dossier</span></header>
-      <div className="sampark-samsung-latest-scroll">
-        {samsungPageItems(articles, currentPage).map((item, i) => (
-          <article className="sampark-samsung-latest-card" key={articleKey(item, i)}>
-            <button className="sampark-samsung-latest-media"
-              onClick={() => onOpen(item)} type="button" aria-label={'Read ' + item.title}
-              style={imageOf(item) ? { backgroundImage: 'url("' + imageOf(item) + '")' } : undefined}>
-              {!imageOf(item) && <Icon name="layers" size={24} />}
-            </button>
-            <div className="sampark-samsung-latest-tags">{SOURCE_LABEL(item)} · {item.date || 'Latest'}</div>
-            <button className="sampark-samsung-latest-title" onClick={() => onOpen(item)} type="button">{item.title}</button>
-          </article>
-        ))}
-      </div>
-    </section>
-    <SamsungPageControls page={currentPage} total={articles.length}
-      onChange={setPage} label={name + ' stories'} />
+    <SamsungChannelContent
+      key={name}
+      channel={channel}
+      onOpen={onOpen}
+      page={page}
+      onPageChange={setPage}
+      totalCount={channel.count}
+    />
   </>;
 }
 
