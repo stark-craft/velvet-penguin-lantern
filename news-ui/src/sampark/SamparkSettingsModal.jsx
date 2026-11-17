@@ -122,12 +122,15 @@ export default function SamparkSettingsModal({ capabilities, privilegedSessionAc
       let nextViewer = viewer;
       const cleanName = name.trim();
       const cleanEmail = email.trim();
-      if (cleanName.length < 2) {
+      const profileChanged = cleanName !== String(viewer?.display_name || '').trim() || cleanEmail !== String(viewer?.email || '').trim();
+      // A view-only change must remain saveable even if the optional viewer
+      // profile has not been filled in yet.
+      if (profileChanged && cleanName.length < 2) {
         const msg = 'Display name must contain at least 2 characters.';
         setFieldError(msg);
         throw new Error(msg);
       }
-      if (cleanName !== String(viewer?.display_name || '').trim() || cleanEmail !== String(viewer?.email || '').trim()) {
+      if (profileChanged) {
         try {
           const response = await updateViewerProfile({ display_name: cleanName, email: cleanEmail });
           if (response?.status !== 'success') throw new Error(response?.detail || response?.message || 'Profile could not be saved.');
