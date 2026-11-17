@@ -197,7 +197,7 @@ def _read_archives(paths: Iterable[str | os.PathLike[str]]) -> tuple[list[dict],
     }
 
 
-def _rank_deduplicate(records: Iterable[dict], limit: int) -> list[dict]:
+def _rank_deduplicate(records: Iterable[dict], limit: int | None) -> list[dict]:
     best: dict[str, dict] = {}
     for record in records:
         identity = _article_identity(record)
@@ -206,7 +206,8 @@ def _rank_deduplicate(records: Iterable[dict], limit: int) -> list[dict]:
         existing = best.get(identity)
         if existing is None or _rank_key(record) > _rank_key(existing):
             best[identity] = record
-    return sorted(best.values(), key=_rank_key, reverse=True)[:limit]
+    ranked = sorted(best.values(), key=_rank_key, reverse=True)
+    return ranked if limit is None else ranked[:limit]
 
 
 def _projection_signature(paths: Iterable[str | os.PathLike[str]], limit: int) -> tuple:
@@ -224,19 +225,19 @@ def _projection_signature(paths: Iterable[str | os.PathLike[str]], limit: int) -
 def build_samsung_internal_feed(
     archive_files: Iterable[str | os.PathLike[str]],
     *,
-    limit: int = 100,
+    limit: int | None = 100,
 ) -> dict:
     """Project all retained archives into explicit Samsung Internal channels.
 
     The retained archive already obeys the configured 30-day history policy,
-    so the reader scans every available briefing.  This lets a thin news day
-    reach back one or two weeks (or farther within retention) to fill the top
-    100 without launching a second crawl or scheduler.
+    so the reader scans every available briefing.  A numeric limit preserves
+    the legacy top-N projection.  None returns every qualifying, deduplicated
+    article for the Samsung-only paginated endpoint.  No new crawl is started.
     """
 
-    safe_limit = max(1, min(int(limit), 100))
+    safe_limit = None if limit is None else max(1, min(int(limit), 100))
     archive_paths = list(archive_files)
-    signature = _projection_signature(archive_paths, safe_limit)
+    signature = _projection_signature(archive_paths, -1 if safe_limit is None else safe_limit)
     with _PROJECTION_CACHE_LOCK:
         cached = _PROJECTION_CACHE.get(signature)
         if cached is not None:
