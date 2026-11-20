@@ -39,38 +39,185 @@ function currentSection(pathname) {
   return allowed.has(seg) ? seg : 'overview';
 }
 
-function SectionLanes({ title, items, emptyHint, onOpen, onWatch, onCompare, watchMap, compareMap, pendingWatch }) {
-  const [query, setQuery] = useState('');
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items || [];
-    return (items || []).filter((a) => `${a.title} ${a.summary} ${a.category}`.toLowerCase().includes(q));
-  }, [items, query]);
+function SectionLanes({
+  sectionKey,
+  title,
+  items,
+  emptyHint,
+  onOpen,
+  onWatch,
+  onCompare,
+  watchMap,
+  compareMap,
+  pendingWatch,
+}) {
+  const [
+    query,
+    setQuery,
+  ] = useState('');
+  /*
+   * A lane page is reused by React when navigating:
+   *
+   * Papers -> Repositories -> Models -> etc.
+   *
+   * Reset any page-local state when the actual
+   * Research section changes.
+   */
+  useEffect(() => {
+    setQuery('');
+  }, [sectionKey]);
+  const safeItems =
+    Array.isArray(items)
+      ? items
+      : [];
+  const filtered =
+    useMemo(() => {
+      const normalizedQuery =
+        query
+          .trim()
+          .toLowerCase();
+      if (!normalizedQuery) {
+        return safeItems;
+      }
+      return safeItems.filter(
+        (artifact) =>
+          `${artifact?.title || ''} ${artifact?.summary || ''
+            } ${artifact?.category || ''
+            }`
+            .toLowerCase()
+            .includes(
+              normalizedQuery,
+            ),
+      );
+    }, [
+      safeItems,
+      query,
+    ]);
   return (
-    <section className="sampark-research-lane-page">
+    <section
+      className="sampark-research-lane-page"
+      data-research-section={
+        sectionKey
+      }
+    >
       <header className="sampark-research-lane-head">
         <div>
-          <h2>{title}</h2>
-          <small>{filtered.length} of {(items || []).length} signals</small>
+          <h2>
+            {title}
+          </h2>
+          <small>
+            {filtered.length}
+            {' of '}
+            {safeItems.length}
+            {' signals'}
+          </small>
         </div>
         <label className="sampark-research-lane-filter">
-          <Icon name="search" size={14} />
-          <input aria-label={`Filter ${title}`} placeholder={`Filter ${title.toLowerCase()}`} value={query} onChange={(e) => setQuery(e.target.value)} />
-          {query && <button aria-label="Clear filter" onClick={() => setQuery('')} type="button"><Icon name="x" size={12} /></button>}
+          <Icon
+            name="search"
+            size={14}
+          />
+          <input
+            aria-label={
+              `Filter ${title}`
+            }
+            onChange={(
+              event,
+            ) =>
+              setQuery(
+                event.target.value,
+              )
+            }
+            placeholder={
+              `Filter ${title.toLowerCase()}`
+            }
+            value={query}
+          />
+          {query && (
+            <button
+              aria-label="Clear filter"
+              onClick={() =>
+                setQuery('')
+              }
+              type="button"
+            >
+              <Icon
+                name="x"
+                size={12}
+              />
+            </button>
+          )}
         </label>
       </header>
       {filtered.length ? (
         <div className="sampark-research-discovery-grid">
-          {filtered.map((art) => (
-            <ResearchArtifactCard key={`${art.kind}:${art.id}`} artifact={art} onOpen={onOpen} onWatch={onWatch} onCompare={onCompare} watched={watchMap?.has(`${art.kind}:${art.id}`)} compared={compareMap?.has(`${art.kind}:${art.id}`)} watchPending={pendingWatch?.has(`${art.kind}:${art.id}`)} />
-          ))}
+          {filtered.map(
+            (artifact) => {
+              const artifactKey =
+                `${sectionKey
+                }:${artifact?.kind ||
+                'artifact'
+                }:${artifact?.id ||
+                artifact?.title ||
+                ''
+                }`;
+              const engagementKey =
+                `${artifact?.kind
+                }:${artifact?.id
+                }`;
+              return (
+                <ResearchArtifactCard
+                  artifact={
+                    artifact
+                  }
+                  compared={
+                    compareMap?.has(
+                      engagementKey,
+                    )
+                  }
+                  key={
+                    artifactKey
+                  }
+                  onCompare={
+                    onCompare
+                  }
+                  onOpen={
+                    onOpen
+                  }
+                  onWatch={
+                    onWatch
+                  }
+                  watched={
+                    watchMap?.has(
+                      engagementKey,
+                    )
+                  }
+                  watchPending={
+                    pendingWatch?.has(
+                      engagementKey,
+                    )
+                  }
+                />
+              );
+            },
+          )}
         </div>
       ) : (
-        <div className="sampark-workspace-empty"><Icon name="layers" size={20} /><p>{emptyHint || 'No signals match this filter.'}</p></div>
+        <div className="sampark-workspace-empty">
+          <Icon
+            name="layers"
+            size={20}
+          />
+          <p>
+            {emptyHint ||
+              'No signals match this filter.'}
+          </p>
+        </div>
       )}
     </section>
   );
 }
+
 
 export default function SamparkResearch() {
   const location = useLocation();
@@ -101,15 +248,13 @@ export default function SamparkResearch() {
 
   useAutoDismiss(notice, () => setNotice(''));
 
-  // Gate actual external Hugging Face links across every Research section:
-  // cards, model/dataset dossiers, and connected provider links. Other URLs
-  // keep their existing navigation behavior.
+  // Intercept only Hugging Face links within Research. Other external sources
+  // (GitHub, arXiv, etc.) keep their existing navigation behavior.
   const handleResearchLinkClick = (event) => {
-    // Middle-click should also show the notice; ignore right-click actions.
     if (event.type === 'auxclick' && event.button !== 1) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
-    // The approval dialog's own two links must never be intercepted again.
+    // The notice's own approval and exception links must open normally.
     if (target.closest('.research-hf-notice')) return;
     const link = target.closest('a[href]');
     if (!link) return;
@@ -286,15 +431,112 @@ export default function SamparkResearch() {
     const lanes = discovery?.lanes || {};
     const commonProps = { onOpen: (a) => openDossier(a.kind, a.id), onWatch: handleWatch, onCompare: handleCompareToggle, watchMap, compareMap, pendingWatch: pendingWatchKeys };
 
-    if (section === 'papers') return <SectionLanes title="Papers" items={lanes.papers} emptyHint="No paper signals are cached yet. Sync live data." {...commonProps} />;
-    if (section === 'repositories') return <SectionLanes title="Repositories" items={lanes.repositories} emptyHint="No repository signals are available." {...commonProps} />;
-    if (section === 'models') return <SectionLanes title="Models" items={lanes.models} emptyHint="No model records are cached yet." {...commonProps} />;
-    if (section === 'datasets') return <SectionLanes title="Datasets" items={lanes.datasets} emptyHint="No dataset records are cached yet." {...commonProps} />;
-    if (section === 'patents') {
-      const available = discovery?.providers?.epo?.available !== false;
-      if (!available) return <div className="sampark-workspace-empty"><Icon name="note" size={20} /><h3>Patent intelligence unavailable</h3><p>EPO OPS credentials are not configured. Patent discovery remains dormant without credentials.</p></div>;
-      return <SectionLanes title="Patents" items={lanes.patents} emptyHint="No patent records are available." {...commonProps} />;
+    if (
+      section === 'papers'
+    ) {
+      return (
+        <SectionLanes
+          key="papers"
+          sectionKey="papers"
+          title="Papers"
+          items={
+            lanes.papers
+          }
+          emptyHint="No paper signals are cached yet. Sync live data."
+          {...commonProps}
+        />
+      );
     }
+    if (
+      section ===
+      'repositories'
+    ) {
+      return (
+        <SectionLanes
+          key="repositories"
+          sectionKey="repositories"
+          title="Repositories"
+          items={
+            lanes.repositories
+          }
+          emptyHint="No repository signals are available."
+          {...commonProps}
+        />
+      );
+    }
+    if (
+      section === 'models'
+    ) {
+      return (
+        <SectionLanes
+          key="models"
+          sectionKey="models"
+          title="Models"
+          items={
+            lanes.models
+          }
+          emptyHint="No model records are cached yet."
+          {...commonProps}
+        />
+      );
+    }
+    if (
+      section === 'datasets'
+    ) {
+      return (
+        <SectionLanes
+          key="datasets"
+          sectionKey="datasets"
+          title="Datasets"
+          items={
+            lanes.datasets
+          }
+          emptyHint="No dataset records are cached yet."
+          {...commonProps}
+        />
+      );
+    }
+    if (
+      section === 'patents'
+    ) {
+      const available =
+        discovery
+          ?.providers
+          ?.epo
+          ?.available !==
+        false;
+      if (!available) {
+        return (
+          <div className="sampark-workspace-empty">
+            <Icon
+              name="note"
+              size={20}
+            />
+            <h3>
+              Patent intelligence unavailable
+            </h3>
+            <p>
+              EPO OPS credentials are not configured.
+              Patent discovery remains dormant without
+              credentials.
+            </p>
+          </div>
+        );
+      }
+      return (
+        <SectionLanes
+          key="patents"
+          sectionKey="patents"
+          title="Patents"
+          items={
+            lanes.patents
+          }
+          emptyHint="No patent records are available."
+          {...commonProps}
+        />
+      );
+    }
+
     if (section === 'radar') {
       const radar = intelligence?.radar || [];
       if (!radar.length) return <div className="sampark-workspace-empty"><Icon name="radar" size={20} /><p>Technology radar is building. Refresh discovery to see scored themes.</p></div>;
@@ -394,20 +636,16 @@ export default function SamparkResearch() {
 
   return (
     <div className="sampark-research-workspace" onClickCapture={handleResearchLinkClick} onAuxClickCapture={handleResearchLinkClick}>
-      <header className="sampark-research-header">
-        <div>
-          <span className="sampark-research-kicker">Research · technical artifacts and evidence</span>
-          <h1>Research Intelligence</h1>
-          <p>Technical artifacts and evidence — papers, repositories, models, datasets, patents, and the technology radar.</p>
-        </div>
-      </header>
-
-      <ResearchNavigation />
-
+      <ResearchNavigation
+        showFollowing={watchlist.length > 0}
+      />
       {notice && <div className="sampark-workspace-note is-warning" role="status"><Icon name="warning" size={14} /> {notice} <button className="btn-secondary" onClick={() => setNotice('')} type="button">Dismiss</button></div>}
       {intelligenceError && intelligence && <div className="sampark-workspace-note is-warning" role="status"><Icon name="warning" size={14} /> Intelligence could not be refreshed: {intelligenceError} <button className="btn-secondary" onClick={() => setRetryKey((k) => k + 1)} type="button">Retry intelligence</button></div>}
 
-      <div className="sampark-research-content">
+      <div
+        className="sampark-research-content"
+        key={section}
+      >
         {renderSection()}
       </div>
 
