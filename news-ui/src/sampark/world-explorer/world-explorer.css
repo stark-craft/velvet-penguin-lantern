@@ -58,6 +58,8 @@
 .swe-breadcrumbs svg { color: var(--faint); }
 .swe-breadcrumbs [aria-current="page"] { font-weight: 650; color: var(--text); }
 .swe-section-line { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
+.swe-section-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 14px; }
+.swe-section-actions .swe-text-action { white-space: nowrap; }
 .swe-detail-heading h3 { font-size: 24px; }
 .swe-detail-label { display: flex; align-items: center; gap: 9px; margin-bottom: -7px; color: var(--primary); font-size: 11px; font-weight: 750; letter-spacing: .055em; }
 .swe-count-label { flex: none; padding: 6px 10px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface-soft); color: var(--muted); font-size: 11px; white-space: nowrap; }
@@ -106,6 +108,8 @@ html[data-theme="dark"] .swe-business-card:hover, html[data-theme="dark"] .swe-m
   .swe-region-grid, .swe-market-grid, .swe-business-grid { grid-template-columns: 1fr; }
   .swe-region-card { min-height: 156px; }
   .swe-home-actions { align-items: start; flex-direction: column; }
+  .swe-section-line:has(.swe-section-actions) { align-items: start; flex-direction: column; }
+  .swe-section-actions { width: 100%; justify-content: space-between; }
   .swe-market-end { gap: 4px; }
   .swe-editorial-note { gap: 7px; }
   .swe-editorial-note > span { font-size: 0; }
