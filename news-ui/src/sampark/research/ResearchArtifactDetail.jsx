@@ -45,8 +45,9 @@ function isInternalSynthesized(url) {
   return u.startsWith('/') && (u.includes('/venturelens') || u.includes('/radar') || u.includes('/research'));
 }
 
-export default function ResearchArtifactDetail({ artifact, detail, loading, error, onClose, onRetry, watched, watchPending, onWatch, onCompare, compared }) {
-  const dialogRef = useModalFocus(Boolean(artifact || loading || error), onClose);
+export default function ResearchArtifactDetail({ artifact, detail, loading, error, onClose, onRetry, watched, watchPending, onWatch, onCompare, compared, accessNoticeOpen = false }) {
+  // Pause this dossier's focus trap while the Hugging Face notice is on top.
+  const dialogRef = useModalFocus(Boolean(artifact || loading || error) && !accessNoticeOpen, onClose);
   const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
 
