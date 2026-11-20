@@ -391,7 +391,7 @@ export default function SamparkResearch() {
   };
 
   return (
-    <div className="sampark-research-workspace" onClickCapture={handleResearchLinkClick}>
+    <div className="sampark-research-workspace" onClickCapture={handleResearchLinkClick} onAuxClickCapture={handleResearchLinkClick}>
       <header className="sampark-research-header">
         <div>
           <span className="sampark-research-kicker">Research · technical artifacts and evidence</span>
