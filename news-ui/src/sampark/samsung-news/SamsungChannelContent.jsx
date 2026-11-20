@@ -132,7 +132,7 @@ function SamsungStoryCard({ item, internal = false, local = false, onOpen, nowMs
       <div className="tsan-news-card-body">
         <button className="tsan-news-card-title" onClick={() => onOpen?.(item)} type="button">{item?.title || ''}</button>
         {!internal && <div className="tsan-news-card-footer is-source-only">
-          <span className="tsan-news-card-source" title={source}>{source}</span>
+          <span className="tsan-news-card-source" title={local ? source : undefined}>{source}</span>
           {local && (publicationDate.iso
             ? <time className="samsung-local-card-date" dateTime={publicationDate.iso}>{publicationDate.label}</time>
             : <span className="samsung-local-card-date">{publicationDate.label}</span>)}
