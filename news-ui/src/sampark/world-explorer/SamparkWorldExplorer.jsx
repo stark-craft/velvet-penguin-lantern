@@ -36,16 +36,22 @@ function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions }) {
     };
   }, [articles, name]);
 
-  if (!channel.items.length) return (
+  if (!channel.items.length) return <>
+    {onShowRegions && <div className="swe-section-line has-action">
+      <div><span className="swe-eyebrow">THE LATEST</span><h3>{name}</h3><p>{subtitle}</p></div>
+      <button className="swe-text-action" type="button" onClick={onShowRegions}>
+        View Region-wise Feed <Icon name="chevR" size={16} />
+      </button>
+    </div>}
     <div className="swe-no-coverage" role="status">
       <span className="swe-no-coverage-icon"><Icon name="inbox" size={23} /></span>
       <h3>No recent newsroom stories in this edition</h3>
       <p>This market is indexed, but has no articles in the current Global briefing. Explore another market or the combined feed.</p>
     </div>
-  );
+  </>;
 
   return <>
-    <div className="swe-section-line">
+    <div className={`swe-section-line${onShowRegions ? ' has-action' : ''}`}>
       <div><span className="swe-eyebrow">THE LATEST</span><h3>{name}</h3><p>{subtitle}</p></div>
       <div className="swe-section-actions">
         {onShowRegions && <button className="swe-text-action" type="button" onClick={onShowRegions}>
