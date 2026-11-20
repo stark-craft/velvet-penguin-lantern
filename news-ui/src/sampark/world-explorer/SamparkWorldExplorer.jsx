@@ -20,7 +20,7 @@ function BackTrail({ page, region, country, onHome, onRegion }) {
   </nav>;
 }
 
-function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions }) {
+function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions, compactArchive = false }) {
   // Share the actual Classical Samsung Global presentation and infinite
   // scroll archive; World Explorer has already loaded the Global corpus.
   const channel = useMemo(() => {
@@ -65,6 +65,7 @@ function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions }) {
       channel={channel}
       onOpen={onOpen}
       continuous
+      compactArchive={compactArchive}
       totalCount={channel.count}
     />
   </>;
@@ -155,17 +156,17 @@ export default function SamparkWorldExplorer({ articles = [], onOpen, coverageCo
       <div className="swe-detail-label"><Flag code={country.code} /><span>COUNTRY NEWSROOM / {country.code}</span></div>
       <StoryCollection articles={coverage.byCountry[country.code] || []} name={'Samsung ' + country.name}
         subtitle={'From ' + country.sources.length + (country.sources.length === 1 ? ' official newsroom edition' : ' official newsroom editions')}
-        onOpen={onOpen} />
+        onOpen={onOpen} compactArchive />
     </>}
 
     {page.kind === 'business' && business && <>
       <BackTrail page={business.name} onHome={openHome} />
-      <StoryCollection articles={business.articles} name={business.name} subtitle="Samsung specialist business newsroom" onOpen={onOpen} />
+      <StoryCollection articles={business.articles} name={business.name} subtitle="Samsung specialist business newsroom" onOpen={onOpen} compactArchive />
     </>}
 
     {page.kind === 'regional' && regionalDesk && <>
       <BackTrail page={regionalDesk.name} onHome={openHome} onRegion={openRegion} region={coverage.regions.find((r) => r.source === regionalDesk.region)} />
-      <StoryCollection articles={regionalDesk.articles} name={regionalDesk.name} subtitle="Regional Samsung newsroom" onOpen={onOpen} />
+      <StoryCollection articles={regionalDesk.articles} name={regionalDesk.name} subtitle="Regional Samsung newsroom" onOpen={onOpen} compactArchive />
     </>}
 
     {page.kind === 'all' && <>
