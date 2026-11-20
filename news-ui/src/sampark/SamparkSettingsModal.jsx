@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../news-scrapper/components/Icon.jsx';
 import { applySamparkTheme, readSamparkTheme, saveSamparkTheme } from './theme.js';
-import { readWorldExplorerPreference, saveWorldExplorerPreference } from './world-explorer/worldExplorerPreference.js';
 import useModalFocus from '../news-scrapper/components/modals/useModalFocus.js';
 import {
   getViewerPreferences,
@@ -18,12 +17,22 @@ export const SAMPARK_SETTINGS_KEY = 'sampark-shell-settings-v1';
 export const DEFAULT_SAMPARK_SETTINGS = {
   saveSearchHistory: true,
   personalizedFeed: true,
-  worldExplorerEnabled: false,
 };
+
+// Ignore the obsolete World Explorer setting from older browser storage:
+// Samsung Global always uses World Explorer now.
+function withoutLegacyWorldExplorerSetting(value) {
+  const next = value && typeof value === 'object' && !Array.isArray(value) ? { ...value } : {};
+  delete next.worldExplorerEnabled;
+  return next;
+}
 
 export function readSamparkSettings() {
   try {
-    return { ...DEFAULT_SAMPARK_SETTINGS, ...JSON.parse(window.localStorage.getItem(SAMPARK_SETTINGS_KEY) || '{}'), worldExplorerEnabled: readWorldExplorerPreference(null) };
+    return {
+      ...DEFAULT_SAMPARK_SETTINGS,
+      ...withoutLegacyWorldExplorerSetting(JSON.parse(window.localStorage.getItem(SAMPARK_SETTINGS_KEY) || '{}')),
+    };
   } catch {
     return { ...DEFAULT_SAMPARK_SETTINGS };
   }
@@ -187,15 +196,10 @@ export default function SamparkSettingsModal({ capabilities, privilegedSessionAc
       } else {
         parts.history = 'unchanged';
       }
-      if (Boolean(draft.worldExplorerEnabled) !== Boolean(settings.worldExplorerEnabled)) {
-        if (!saveWorldExplorerPreference(nextViewer, draft.worldExplorerEnabled)) {
-          throw new Error('World Explorer preference could not be saved on this browser.');
-        }
-      }
       setSectionStatus(parts);
       themeSavedRef.current = true;
       saveSamparkTheme(theme);
-      const { worldExplorerEnabled: _worldView, ...sharedSettings } = draft;
+      const sharedSettings = withoutLegacyWorldExplorerSetting(draft);
       window.localStorage.setItem(SAMPARK_SETTINGS_KEY, JSON.stringify(sharedSettings));
       // re-read server to ensure authoritative state
       try {
@@ -204,7 +208,7 @@ export default function SamparkSettingsModal({ capabilities, privilegedSessionAc
         const serverRemember = typeof pref.remember_search_history === 'boolean' ? pref.remember_search_history : null;
         if (serverRemember !== null && serverRemember !== draft.saveSearchHistory) {
           const corrected = { ...draft, saveSearchHistory: serverRemember };
-          const { worldExplorerEnabled: _worldView, ...sharedCorrected } = corrected;
+          const sharedCorrected = withoutLegacyWorldExplorerSetting(corrected);
           window.localStorage.setItem(SAMPARK_SETTINGS_KEY, JSON.stringify(sharedCorrected));
           onSaved(corrected, nextViewer);
           onClose();
@@ -261,8 +265,6 @@ export default function SamparkSettingsModal({ capabilities, privilegedSessionAc
         <section className="settings-section"><h3><Icon name="layers" size={16} />Appearance</h3>
           <label className="settings-field"><span>Theme (preview now, keep with Save Settings)</span><select aria-label="Color theme" onChange={(event) => { const next = event.target.value; setTheme(next); applySamparkTheme(next); }} value={theme}><option value="light">Light</option><option value="dark">Dark</option><option value="system">System</option></select></label>
           <p className="settings-note">Applies to dialogs, cards, tables, and controls on this browser. Choosing a theme previews it; Cancel restores the previous theme.</p>
-          <ToggleRow checked={Boolean(draft.worldExplorerEnabled)} focusKey="world_explorer" onChange={(value) => setOption('worldExplorerEnabled', value)}>World Explorer for Samsung Global</ToggleRow>
-          <p className="settings-note">Off by default: see the familiar Classic Samsung Global feed. Turn on to browse regions, countries and Samsung business newsrooms. Save Settings to apply the change; this preference stays on this browser for your viewer.</p>
         </section>
         <section className="settings-section"><h3><Icon name="layers" size={16} />Workspaces</h3><div className="settings-links"><Link to="/following" onClick={cancelWithoutSave}>Saved & Following</Link><Link to="/hidden" onClick={cancelWithoutSave}>Hidden News</Link><Link to="/history" onClick={cancelWithoutSave}>Briefing Archives</Link><Link to="/voc" onClick={cancelWithoutSave}>Feedback</Link>{capabilities?.includes('review.news.view') && <Link to="/review" onClick={cancelWithoutSave}>Review Queue</Link>}{capabilities?.includes('approved.view') && <Link to="/approved" onClick={cancelWithoutSave}>Approved Briefing</Link>}{capabilities?.includes('gatekeeper.review') && <Link to="/gatekeeper" onClick={cancelWithoutSave}>Gatekeeper Review</Link>}{capabilities?.includes('sources.view') && <Link to="/sources" onClick={cancelWithoutSave}>Source Control</Link>}{capabilities?.includes('scheduler.view') && <Link to="/scheduler" onClick={cancelWithoutSave}>Scheduler</Link>}{capabilities?.includes('analytics.view') && <Link to="/analytics" onClick={cancelWithoutSave}>Analytics</Link>}{capabilities?.includes('access.manage') && <Link to="/access" onClick={cancelWithoutSave}>Access Management</Link>}</div></section>
         {message && <p className="settings-message" role={message.includes('could not') || message.startsWith('Enter') || message.includes('Failed') ? 'alert' : 'status'}>{message}</p>}
