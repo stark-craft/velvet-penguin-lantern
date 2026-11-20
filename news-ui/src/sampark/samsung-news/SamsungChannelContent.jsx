@@ -94,9 +94,9 @@ function localStoryDate(item) {
     : { label: 'Date unavailable', iso: '' };
 }
 
-function SamsungStoryCard({ item, internal = false, local = false, onOpen, nowMs }) {
+function SamsungStoryCard({ item, internal = false, showPublicationDate = false, onOpen, nowMs }) {
   const image = imageOf(item);
-  const publicationDate = local ? localStoryDate(item) : null;
+  const publicationDate = showPublicationDate ? localStoryDate(item) : null;
   const source = item?.src || item?.source || 'Samsung';
   const region = regionOf(item);
   const category = typeof item?.category === 'object'
@@ -132,8 +132,8 @@ function SamsungStoryCard({ item, internal = false, local = false, onOpen, nowMs
       <div className="tsan-news-card-body">
         <button className="tsan-news-card-title" onClick={() => onOpen?.(item)} type="button">{item?.title || ''}</button>
         {!internal && <div className="tsan-news-card-footer is-source-only">
-          <span className="tsan-news-card-source" title={local ? source : undefined}>{source}</span>
-          {local && (publicationDate.iso
+          <span className="tsan-news-card-source" title={showPublicationDate ? source : undefined}>{source}</span>
+          {showPublicationDate && (publicationDate.iso
             ? <time className="samsung-local-card-date" dateTime={publicationDate.iso}>{publicationDate.label}</time>
             : <span className="samsung-local-card-date">{publicationDate.label}</span>)}
         </div>}
@@ -217,7 +217,7 @@ function SriDTypeSection({ section, onOpen, nowMs }) {
 }
 export default function SamsungChannelContent({
   channel, onOpen, nowMs, page = 1, onPageChange, totalCount, pagingBusy = false,
-  continuous = false, onLoadMore,
+  continuous = false, onLoadMore, compactArchive = false,
 }) {
   // SRI-D's published archive retains its existing page controls.
   // Global, Local and World Explorer can reveal stories continuously.
@@ -228,6 +228,10 @@ export default function SamsungChannelContent({
   const sentinelRef = useRef(null);
   const isInternal = channel?.id === 'internal';
   const isLocal = channel?.id === 'local';
+  // The compact archive is always used by Local and is opt-in only for
+  // individual World Explorer country, regional newsroom and business feeds.
+  const isWorldCompact = channel?.id === 'world-explorer' && compactArchive;
+  const isCompactArchive = isLocal || isWorldCompact;
   const continuousArchive = continuous && !isInternal;
   const loadedCount = channel?.items?.length || 0;
   const archiveTotal = isInternal ? channel?.count || 0 : (totalCount ?? channel?.count ?? 0);
@@ -278,12 +282,12 @@ export default function SamsungChannelContent({
   const archiveItems = continuousArchive
     ? channel.items.slice(0, visibleCount)
     : samsungPageItems(channel.items, archivePage);
-  // Samsung Local is the only channel with a flat, newest-first archive grid.
-  // Every other article collection retains its original date-grouped layout.
-  const visibleGroups = isLocal ? [] : groupSignalsByDate(archiveItems);
+  // The Combined Global feed and SRI-D retain their existing date groups.
+  // Only Samsung Local and selected World Explorer collections use one flat grid.
+  const visibleGroups = isCompactArchive ? [] : groupSignalsByDate(archiveItems);
   const sridSections = isInternal ? buildSriDSections(visibleGroups) : [];
   return (
-    <div className={`samsung-channel-content${isInternal ? ' is-internal' : ''}${isLocal ? ' is-local' : ''}`}>
+    <div className={`samsung-channel-content${isInternal ? ' is-internal' : ''}${isLocal ? ' is-local' : ''}${isWorldCompact ? ' is-world-compact' : ''}`}>
       <div className="tsan-featured-rail samsung-news-featured-rail">
         {isInternal && heroItems?.[0]?.contentType === 'leadership' ? (
           <LeadershipMessageHero item={heroItems[0]} onOpen={onOpen} />
@@ -313,10 +317,10 @@ export default function SamsungChannelContent({
             {sridSections.map((section) => <SriDTypeSection
               key={section.key} section={section} onOpen={onOpen} nowMs={nowMs} />)}
           </div>
-        ) : isLocal ? (
+        ) : isCompactArchive ? (
           <div className="tsan-day-grid samsung-local-news-grid">
             {archiveItems.map((item) => <SamsungStoryCard
-              local item={item} key={samsungItemKey(item)} onOpen={onOpen} />)}
+              showPublicationDate item={item} key={samsungItemKey(item)} onOpen={onOpen} />)}
           </div>
         ) : (
           <div className="tsan-daywise">
