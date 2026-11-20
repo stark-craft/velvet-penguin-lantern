@@ -1459,3 +1459,28 @@ Keep reload inside the reader; do not reload the Samsung News page.
   pointer-events: none;
 }
 .samsung-continuous-status .btn-secondary { font-size: 12px; }
+
+
+/* Samsung Local archive ONLY: dates live on each card instead of dividing
+   sparse India newsroom stories into separate day rows. Shared Samsung
+   Global, World Explorer, SRI-D and All News cards are not restyled. */
+.samsung-channel-content.is-local .samsung-local-news-grid { min-width: 0; }
+.samsung-channel-content.is-local .samsung-news-card .tsan-news-card-footer.is-source-only {
+  gap: 8px;
+  min-width: 0;
+}
+.samsung-channel-content.is-local .samsung-news-card .tsan-news-card-source {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.samsung-channel-content.is-local .samsung-local-card-date {
+  flex: 0 0 auto;
+  color: #8b94a5;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
