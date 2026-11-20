@@ -60,7 +60,7 @@ function SamsungDossier({ item, onClose }) {
     onSourceOpen={() => engagement.onSourceOpen()} />;
 }
 
-export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
+export default function SamsungNewsPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeChannel, setActiveChannel] = useState('internal');
@@ -186,7 +186,7 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
   // Country/region counts must use the full Global archive, not just its
   // first 100 records. Only fetch the remaining pages on World Explorer entry.
   useEffect(() => {
-    if (loading || error || !worldExplorerEnabled || activeChannel !== 'global') return;
+    if (loading || error || activeChannel !== 'global') return;
     if (!pagingSupported) {
       setWorldError('The Samsung backend must be updated to enable complete World Explorer coverage.');
       return;
@@ -226,7 +226,7 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
     // feed.global is deliberately captured when opening World Explorer; do not
     // restart the archive walk after each downloaded batch or page render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, error, activeChannel, worldExplorerEnabled, pagingSupported, totals.global, retryKey, worldRetry]);
+  }, [loading, error, activeChannel, pagingSupported, totals.global, retryKey, worldRetry]);
   // Preserve ?focus=<id> deep links. Published records always route to SRI-D.
   useEffect(() => {
     if (loading) return;
@@ -277,7 +277,7 @@ export default function SamsungNewsPage({ worldExplorerEnabled = false }) {
   }, [loading, location.search, model, openArticle, published]);
 
   const selectedChannel = model[activeChannel];
-  const showWorldExplorer = activeChannel === 'global' && worldExplorerEnabled;
+  const showWorldExplorer = activeChannel === 'global';
   const worldIncomplete = pagingSupported && (feed.global || []).length < totals.global;
   const showWorldProgress = showWorldExplorer && !worldError && (worldLoading || worldIncomplete);
   if (loading) return <div className="samsung-news-page">
