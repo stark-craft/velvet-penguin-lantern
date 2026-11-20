@@ -105,6 +105,8 @@ export default function SamparkResearch() {
   // cards, model/dataset dossiers, and connected provider links. Other URLs
   // keep their existing navigation behavior.
   const handleResearchLinkClick = (event) => {
+    // Middle-click should also show the notice; ignore right-click actions.
+    if (event.type === 'auxclick' && event.button !== 1) return;
     const target = event.target;
     if (!(target instanceof Element)) return;
     // The approval dialog's own two links must never be intercepted again.
