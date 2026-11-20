@@ -15,6 +15,7 @@ from typing import Iterable
 from core.settings import VENTURE_LENS_RUNTIME_DIR
 from core.storage import JsonStore
 from venture_lens.catalog import GITHUB_CATEGORIES
+from venture_lens.discovery import venture_discovery_service
 
 
 PAPER_TO_TECH = {
@@ -226,9 +227,15 @@ class VentureIntelligenceService:
         }
 
     def paper_dossier(self, paper_id: str) -> dict | None:
-        repositories, papers = self._source_data()
+        repositories, legacy_papers = self._source_data()
+        # The Research cards show the combined arXiv + OpenAlex discovery feed.
+        # Resolve dossiers against those same normalized IDs, not arXiv alone.
+        papers = venture_discovery_service.discovery().get("lanes", {}).get("papers") or []
         paper = next((item for item in papers if str(item.get("id")) == paper_id), None)
-        if not paper:
+        if paper is None:
+            # Keep direct links to legacy arXiv records working.
+            paper = next((item for item in legacy_papers if str(item.get("id")) == paper_id), None)
+        if paper is None:
             return None
         view = _paper_view(paper)
         technology_id = PAPER_TO_TECH.get(str(paper.get("category")), "machine-learning")
@@ -249,6 +256,8 @@ class VentureIntelligenceService:
                 "Operational cost, reproducibility and production constraints may not be fully represented in the abstract.",
             ],
             "metrics": {
+                # Preserve OpenAlex citation counts and other provider evidence.
+                **(paper.get("metrics") or {}),
                 "momentum": view["momentum_score"],
                 "recency": round(_recency(paper.get("published_at"), 540) * 100),
                 "evidence_depth": min(99, round(len(summary) / 11)),
