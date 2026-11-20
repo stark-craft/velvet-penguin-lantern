@@ -5,6 +5,7 @@ import ResearchNavigation from './research/ResearchNavigation.jsx';
 import ResearchOverview from './research/ResearchOverview.jsx';
 import ResearchArtifactCard from './research/ResearchArtifactCard.jsx';
 import ResearchArtifactDetail from './research/ResearchArtifactDetail.jsx';
+import ResearchHuggingFaceNotice, { isHuggingFaceResearchUrl } from './research/ResearchHuggingFaceNotice.jsx';
 import ResearchArchiveSearch from './research/ResearchArchiveSearch.jsx';
 import { apiRequest } from '../shared/api/client.js';
 import { evaluateReloadResult } from './shared/researchHelper.js';
@@ -89,6 +90,7 @@ export default function SamparkResearch() {
   const [dossierError, setDossierError] = useState('');
   const [dossierRequest, setDossierRequest] = useState(null);
   const [notice, setNotice] = useState('');
+  const [huggingFaceUrl, setHuggingFaceUrl] = useState('');
 
   const [watchlist, setWatchlist] = useState([]);
   const [pendingWatchKeys, setPendingWatchKeys] = useState(() => new Set());
@@ -98,6 +100,23 @@ export default function SamparkResearch() {
   const dossierRef = useRef({ token: 0, controller: null });
 
   useAutoDismiss(notice, () => setNotice(''));
+
+  // Gate actual external Hugging Face links across every Research section:
+  // cards, model/dataset dossiers, and connected provider links. Other URLs
+  // keep their existing navigation behavior.
+  const handleResearchLinkClick = (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    // The approval dialog's own two links must never be intercepted again.
+    if (target.closest('.research-hf-notice')) return;
+    const link = target.closest('a[href]');
+    if (!link) return;
+    const url = link.href;
+    if (!isHuggingFaceResearchUrl(url)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setHuggingFaceUrl(url);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -372,7 +391,7 @@ export default function SamparkResearch() {
   };
 
   return (
-    <div className="sampark-research-workspace">
+    <div className="sampark-research-workspace" onClickCapture={handleResearchLinkClick}>
       <header className="sampark-research-header">
         <div>
           <span className="sampark-research-kicker">Research · technical artifacts and evidence</span>
@@ -397,6 +416,7 @@ export default function SamparkResearch() {
           loading={dossierLoading}
           error={dossierError}
           onClose={closeDossier}
+          accessNoticeOpen={Boolean(huggingFaceUrl)}
           onRetry={() => dossierRequest && openDossier(dossierRequest.kind, dossierRequest.id)}
           watched={dossier ? watchMap.has(`${dossier.kind}:${dossier.id}`) : false}
           watchPending={dossier ? pendingWatchKeys.has(`${dossier.kind}:${dossier.id}`) : false}
@@ -405,6 +425,11 @@ export default function SamparkResearch() {
           onCompare={handleCompareToggle}
         />
       )}
+      {huggingFaceUrl && <ResearchHuggingFaceNotice
+        key={huggingFaceUrl}
+        url={huggingFaceUrl}
+        onClose={() => setHuggingFaceUrl('')}
+      />}
     </div>
   );
 }
