@@ -107,3 +107,119 @@
 .sampark-research-compare-card { padding: 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f5f7fa; }
 .sampark-research-watch-grid { display: grid; gap: 12px; }
 .sampark-research-watch-item { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+
+
+/* Research-only Hugging Face proxy exception guidance. The overlay stays
+   above an open research dossier and follows Sampark light/dark theme tokens. */
+.research-hf-overlay { z-index: 120; }
+.research-hf-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  width: min(94vw, 590px);
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .22);
+}
+.research-hf-header { display: flex; justify-content: space-between; align-items: center; }
+.research-hf-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  color: var(--primary);
+  background: var(--surface-blue);
+}
+.research-hf-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  color: var(--muted);
+  background: transparent;
+}
+.research-hf-close:hover { background: var(--surface-soft); }
+.research-hf-eyebrow {
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .095em;
+}
+.research-hf-notice h2 { margin: -5px 0 0; font-size: 21px; line-height: 1.3; }
+.research-hf-notice p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }
+.research-hf-link-block, .research-hf-steps {
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+.research-hf-link-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.research-hf-link-header strong, .research-hf-steps > strong { font-size: 12px; font-weight: 700; }
+.research-hf-link-header button {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 5px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  color: var(--primary);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 650;
+}
+.research-hf-link-header button:hover { background: var(--surface-blue); }
+.research-hf-url {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  user-select: text;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.65;
+}
+.research-hf-copy-status { color: var(--muted); font-size: 11px; }
+.research-hf-steps ol { margin: 0; padding-left: 19px; color: var(--text); font-size: 12px; line-height: 1.8; }
+.research-hf-steps li + li { margin-top: 3px; }
+.research-hf-steps small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.research-hf-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 3px; }
+.research-hf-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1 1 210px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+.research-hf-action.is-primary { border-color: #1428a0; background: #1428a0; color: #fff; }
+.research-hf-action.is-primary:hover { background: #263eb9; }
+.research-hf-action.is-secondary { background: var(--surface); color: var(--primary); border-color: var(--primary); }
+.research-hf-action.is-secondary:hover { background: var(--surface-blue); }
+.research-hf-notice a:focus-visible, .research-hf-notice button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+html[data-theme="dark"] .research-hf-action.is-primary { background: var(--primary); color: #101018; border-color: var(--primary); }
+html[data-theme="dark"] .research-hf-action.is-primary:hover { filter: brightness(1.08); }
+@media (max-width: 600px) {
+  .research-hf-overlay { padding: 14px; }
+  .research-hf-notice { padding: 18px; gap: 12px; }
+  .research-hf-notice h2 { font-size: 19px; }
+  .research-hf-action { flex-basis: 100%; }
+  .research-hf-link-header { align-items: flex-start; }
+}
