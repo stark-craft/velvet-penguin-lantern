@@ -47,8 +47,8 @@ export default function ResearchHuggingFaceNotice({ url, onClose }) {
         <span className="research-hf-eyebrow">EXTERNAL RESEARCH ACCESS</span>
         <h2 id="research-hf-title">Before opening Hugging Face</h2>
         <p id="research-hf-description">
-          Hugging Face may be restricted under your company's network access policy.
-          If you have not already received an approved proxy exception, please request
+          Hugging Face access is restricted under the company's network access policy.
+          If you do not already have an approved proxy exception, please request
           access through the IT4U portal before opening this source.
         </p>
         <div className="research-hf-link-block">
