@@ -30,7 +30,74 @@
 .swe-home-actions p, .swe-section-line p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .swe-text-action { display: inline-flex; align-items: center; justify-content: center; flex: none; gap: 7px; padding: 8px 0; border-bottom: 1px solid var(--primary); background: transparent; color: var(--primary) !important; font-size: 12px; font-weight: 700; }
 .swe-region-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.swe-region-card { display: flex; flex-direction: column; align-items: stretch; min-width: 0; min-height: 177px; padding: 17px 18px 13px; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; transition: border-color .18s, transform .18s, box-shadow .18s; }
+/* Region cards keep their established geometry and content. A muted,
+   CSS-only cartographic texture adds depth without remote photo assets. */
+.swe-region-card {
+  --swe-region-tint: #eff4fc;
+  --swe-region-halo: rgba(89, 133, 198, .13);
+  --swe-region-line: rgba(52, 92, 151, .105);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 0;
+  min-height: 177px;
+  padding: 17px 18px 13px;
+  text-align: left;
+  background:
+    radial-gradient(ellipse 72% 115% at 102% -8%, var(--swe-region-halo), transparent 80%),
+    linear-gradient(125deg, var(--surface) 9%, var(--swe-region-tint) 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  transition: border-color .18s, transform .18s, box-shadow .18s;
+}
+/* Latitude-like concentric contours and faint meridian lines live behind
+   the existing text; motion occurs only on hover or keyboard focus. */
+.swe-region-card::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  right: -75px;
+  top: -104px;
+  width: 262px;
+  height: 262px;
+  border: 1px solid var(--swe-region-line);
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(ellipse at center, transparent 0 19px, var(--swe-region-line) 20px, transparent 21px 39px),
+    repeating-linear-gradient(90deg, transparent 0 37px, var(--swe-region-line) 38px, transparent 39px 75px);
+  opacity: .78;
+  pointer-events: none;
+  transform: rotate(-22deg);
+  transition: transform .65s cubic-bezier(.2,.7,.2,1), opacity .65s ease;
+}
+.swe-region-card::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  right: -39px;
+  top: 3px;
+  width: 179px;
+  height: 170px;
+  background: repeating-linear-gradient(135deg, transparent 0 29px, var(--swe-region-line) 30px, transparent 31px 59px);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 5%, transparent 73%);
+  mask-image: radial-gradient(ellipse at center, #000 5%, transparent 73%);
+  opacity: .65;
+  pointer-events: none;
+}
+.swe-region-card > * { position: relative; z-index: 1; }
+.swe-region-card:hover::before,
+.swe-region-card:focus-visible::before { transform: translate(-7px, 7px) rotate(-18deg); opacity: .95; }
+/* Six deliberately low-chroma palettes, aligned with Sampark's cool white
+   surfaces and Samsung blue rather than saturated stock photography. */
+.swe-region-card[data-region='asia-pacific'] { --swe-region-tint: #ebf6f6; --swe-region-halo: rgba(58, 158, 162, .145); --swe-region-line: rgba(38, 117, 128, .11); }
+.swe-region-card[data-region='europe'] { --swe-region-tint: #eff1fd; --swe-region-halo: rgba(105, 113, 190, .14); --swe-region-line: rgba(82, 94, 163, .11); }
+.swe-region-card[data-region='north-america'] { --swe-region-tint: #edf5fb; --swe-region-halo: rgba(73, 137, 197, .15); --swe-region-line: rgba(54, 107, 167, .11); }
+.swe-region-card[data-region='latin-america'] { --swe-region-tint: #edf7f1; --swe-region-halo: rgba(77, 156, 121, .135); --swe-region-line: rgba(52, 119, 93, .11); }
+.swe-region-card[data-region='africa'] { --swe-region-tint: #faf5ed; --swe-region-halo: rgba(177, 133, 72, .13); --swe-region-line: rgba(150, 112, 67, .11); }
+.swe-region-card[data-region='middle-east'] { --swe-region-tint: #f6f1f8; --swe-region-halo: rgba(137, 113, 166, .135); --swe-region-line: rgba(116, 88, 143, .11); }
 .swe-region-card:hover { transform: translateY(-2px); border-color: #aab7f4; box-shadow: 0 9px 22px rgba(20,40,160,.07); }
 .swe-region-card-top { display: flex; justify-content: space-between; align-items: center; color: var(--primary); }
 .swe-region-number { font-size: 11px; letter-spacing: .06em; color: var(--faint); }
@@ -89,6 +156,18 @@ html[data-theme="dark"] .swe-intro { border-color: var(--line); background: line
 html[data-theme="dark"] .swe-intro p, html[data-theme="dark"] .swe-stat-bar span { color: var(--muted); }
 html[data-theme="dark"] .swe-stat-bar strong, html[data-theme="dark"] .swe-title-dot { color: var(--primary); }
 html[data-theme="dark"] .swe-stat-bar > div + div { border-color: var(--line); }
+/* Preserve the same restrained regional identities in dark mode. */
+html[data-theme="dark"] .swe-region-card {
+  --swe-region-tint: #22283b;
+  --swe-region-halo: rgba(112, 139, 196, .12);
+  --swe-region-line: rgba(143, 162, 207, .105);
+}
+html[data-theme="dark"] .swe-region-card[data-region='asia-pacific'] { --swe-region-tint: #1b2c31; --swe-region-halo: rgba(76, 156, 159, .11); }
+html[data-theme="dark"] .swe-region-card[data-region='europe'] { --swe-region-tint: #25263b; --swe-region-halo: rgba(124, 126, 191, .12); }
+html[data-theme="dark"] .swe-region-card[data-region='north-america'] { --swe-region-tint: #1e2b3b; --swe-region-halo: rgba(79, 139, 193, .12); }
+html[data-theme="dark"] .swe-region-card[data-region='latin-america'] { --swe-region-tint: #1d3029; --swe-region-halo: rgba(88, 158, 120, .11); }
+html[data-theme="dark"] .swe-region-card[data-region='africa'] { --swe-region-tint: #302b25; --swe-region-halo: rgba(165, 128, 78, .11); }
+html[data-theme="dark"] .swe-region-card[data-region='middle-east'] { --swe-region-tint: #2c2733; --swe-region-halo: rgba(143, 112, 176, .11); }
 html[data-theme="dark"] .swe-region-card:hover { border-color: var(--primary); }
 html[data-theme="dark"] .swe-business-card:hover, html[data-theme="dark"] .swe-market-card:hover, html[data-theme="dark"] .swe-regional-desk-list button:hover { border-color: var(--primary); }
 @media (max-width: 1150px) {
@@ -116,4 +195,4 @@ html[data-theme="dark"] .swe-business-card:hover, html[data-theme="dark"] .swe-m
   .swe-editorial-note > span svg { width: 17px; height: 17px; }
   .swe-coverage-note { align-items: start; }
 }
-@media (prefers-reduced-motion: reduce) { .swe-region-card { transition: none; } .swe-region-card:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .swe-region-card, .swe-region-card::before { transition: none; } .swe-region-card:hover { transform: none; } .swe-region-card:hover::before, .swe-region-card:focus-visible::before { transform: rotate(-22deg); } }
