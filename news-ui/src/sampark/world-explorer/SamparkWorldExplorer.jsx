@@ -106,7 +106,7 @@ export default function SamparkWorldExplorer({ articles = [], onOpen, coverageCo
       </div>
       <div className="swe-region-grid">
         {coverage.regions.map((item, index) => (
-          <button className="swe-region-card" key={item.id} onClick={() => openRegion(item.id)} type="button">
+          <button className="swe-region-card" data-region={item.id} key={item.id} onClick={() => openRegion(item.id)} type="button">
             <span className="swe-region-card-top"><span className="swe-region-number">{String(index + 1).padStart(2, '0')}</span><Icon name="globe" size={21} /></span>
             <strong>{item.name}</strong>
             <span className="swe-region-description">{item.description}</span>
