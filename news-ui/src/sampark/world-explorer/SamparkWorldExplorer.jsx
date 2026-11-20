@@ -20,7 +20,7 @@ function BackTrail({ page, region, country, onHome, onRegion }) {
   </nav>;
 }
 
-function StoryCollection({ articles, name, subtitle, onOpen }) {
+function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions }) {
   // Share the actual Classical Samsung Global presentation and infinite
   // scroll archive; World Explorer has already loaded the Global corpus.
   const channel = useMemo(() => {
@@ -47,7 +47,12 @@ function StoryCollection({ articles, name, subtitle, onOpen }) {
   return <>
     <div className="swe-section-line">
       <div><span className="swe-eyebrow">THE LATEST</span><h3>{name}</h3><p>{subtitle}</p></div>
-      <span className="swe-count-label">{channel.count} {channel.count === 1 ? 'story' : 'stories'}</span>
+      <div className="swe-section-actions">
+        {onShowRegions && <button className="swe-text-action" type="button" onClick={onShowRegions}>
+          View Region-wise Feed <Icon name="chevR" size={16} />
+        </button>}
+        <span className="swe-count-label">{channel.count} {channel.count === 1 ? 'story' : 'stories'}</span>
+      </div>
     </div>
     <SamsungChannelContent
       key={name}
@@ -61,7 +66,7 @@ function StoryCollection({ articles, name, subtitle, onOpen }) {
 
 export default function SamparkWorldExplorer({ articles = [], onOpen, coverageComplete = true }) {
   const coverage = useMemo(() => buildWorldCoverage(articles), [articles]);
-  const [page, setPage] = useState({ kind: 'home' });
+  const [page, setPage] = useState({ kind: 'all' });
   const openHome = () => setPage({ kind: 'home' });
   const openRegion = (id) => setPage({ kind: 'region', id });
   const openCountry = (id) => setPage({ kind: 'country', id });
@@ -159,7 +164,7 @@ export default function SamparkWorldExplorer({ articles = [], onOpen, coverageCo
 
     {page.kind === 'all' && <>
       <BackTrail page="Combined Global feed" onHome={openHome} />
-      <StoryCollection articles={coverage.all} name="Combined Samsung Global" subtitle="Coverage from every Global newsroom in the current briefing" onOpen={onOpen} />
+      <StoryCollection articles={coverage.all} name="Combined Samsung Global" subtitle="Coverage from every Global newsroom in the current briefing" onOpen={onOpen} onShowRegions={openHome} />
     </>}
 
     <p className="swe-coverage-note"><Icon name="clock" size={13} />
