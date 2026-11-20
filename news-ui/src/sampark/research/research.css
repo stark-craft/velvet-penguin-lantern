@@ -1,113 +1,1870 @@
-/* Sampark Research workspace — occupies same usable width as For You / All News / Samsung News */
-.sampark-research-workspace { display: grid; gap: 16px; width: 100%; min-width: 0; margin: 0; padding: 0 16px; box-sizing: border-box; }
+/* ============================================================
+   SAMPARK TECHSCOUT — RESEARCH INTELLIGENCE
+   Visual rules:
+   - same white surface language as For You / All News
+   - Samsung blue interaction/accent
+   - subtle gray borders
+   - soft shadows
+   - no dashboard gradients
+   - no fake stock imagery
+   - technical artifacts remain visually distinct from news
+   ============================================================ */
+/* ============================================================
+   ROOT
+   ============================================================ */
+.sampark-research-workspace {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    gap: 22px;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    box-sizing: border-box;
+}
 
-/* Navigation */
-.sampark-research-nav { overflow: hidden; border-radius: 12px; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.sampark-research-nav-scroll { display: flex; gap: 2px; overflow-x: auto; padding: 6px; scrollbar-width: thin; }
-.sampark-research-nav-item { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 20px; background: #f5f7fa; color: #6b7280; font-size: 13px; font-weight: 500; white-space: nowrap; text-decoration: none; border: 1px solid transparent; }
-.sampark-research-nav-item:hover { background: #eef2ff; color: #1428a0; }
-.sampark-research-nav-item.is-active { background: #1428a0; color: #fff; }
-.sampark-research-nav-item:focus-visible { outline: 3px solid rgba(20,40,160,.24); outline-offset: 2px; }
+.sampark-research-content {
+    width: 100%;
+    min-width: 0;
+}
 
-/* Intro */
-.sampark-research-intro { display: flex; gap: 20px; align-items: flex-start; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
-.sampark-research-intro h1 { margin: 6px 0 8px; font-size: 22px; line-height: 1.25; }
-.sampark-research-intro p { margin: 0; color: #6b7280; font-size: 14px; line-height: 1.55; max-width: 680px; }
-.sampark-research-providers { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-.sampark-research-provider { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; background: #f5f7fa; font-size: 12px; font-weight: 600; color: #6b7280; }
-.sampark-research-provider.is-live { background: #ecfdf5; color: #065f46; }
-.sampark-research-provider.is-stale { background: #fffbeb; color: #92400e; }
-.sampark-research-provider.is-unavailable { background: #fff1f2; color: #9f1239; }
-.sampark-provider-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.sampark-research-freshness-note { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; color: #92400e; font-size: 12px; }
-.sampark-research-intro-actions { display: grid; gap: 6px; justify-items: end; flex: none; }
-.sampark-research-intro-actions small { color: #9ca3af; font-size: 11px; }
+.sampark-research-overview,
+.sampark-research-page,
+.sampark-research-lane-page,
+.sampark-research-radar,
+.sampark-research-watch-grid,
+.sampark-research-compare,
+.sampark-research-briefs,
+.sampark-research-archive {
+    width: 100%;
+    min-width: 0;
+}
 
-/* Sections */
-.sampark-research-section-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-.sampark-research-section-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
-.sampark-research-section-meta { color: #9ca3af; font-size: 12px; }
+/* ============================================================
+   RESEARCH NAVIGATION
+   Same visual philosophy as:
+   All / AI / Devices / Compute / Robotics / Media
+   Not a gray pill dashboard anymore.
+   ============================================================ */
+.sampark-research-nav {
+    width: 100%;
+    overflow: hidden;
+    border: 0;
+    border-bottom: 1px solid #e6e8ec;
+    border-radius: 0;
+    background: #ffffff;
+    box-shadow: none;
+}
 
-/* Discovery grid — 3 cols desktop, 2 medium, 1 narrow */
-.sampark-research-discovery-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-@media (max-width: 1020px) { .sampark-research-discovery-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 640px) { .sampark-research-discovery-grid { grid-template-columns: 1fr; } }
+.sampark-research-nav-scroll {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    padding: 0;
+    scrollbar-width: thin;
+}
 
-/* Artifact card */
-.sampark-research-artifact { overflow: hidden; border-radius: 12px; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 1px 3px rgba(0,0,0,.06); display: flex; flex-direction: column; transition: box-shadow .2s, transform .2s; }
-.sampark-research-artifact:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); transform: translateY(-2px); }
-.sampark-research-artifact-visual { position: relative; display: grid; place-items: center; width: 100%; height: 140px; border: 0; padding: 0; overflow: hidden; background: linear-gradient(135deg, #eef2ff, #e0e7ff); }
-.sampark-research-visual-icon { width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; background: #fff; color: #1428a0; box-shadow: 0 4px 12px rgba(20,40,160,.12); }
-.sampark-research-visual-icon.is-paper { color: #1e40af; }
-.sampark-research-visual-icon.is-repository { color: #059669; }
-.sampark-research-visual-icon.is-model { color: #7c3aed; }
-.sampark-research-visual-icon.is-dataset { color: #e65100; }
-.sampark-research-visual-icon.is-patent { color: #6b7280; }
-.sampark-research-visual-icon.is-technology { color: #1428a0; }
-.sampark-research-visual-icon.is-large { width: 64px; height: 64px; }
-.sampark-research-source-badge { position: absolute; left: 10px; bottom: 10px; padding: 4px 9px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: rgba(10,18,45,.58); color: #fff; font-size: 10px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; box-shadow: 0 1px 5px rgba(0,0,0,.16); backdrop-filter: blur(5px); }
-.sampark-research-starter-badge { position: absolute; right: 10px; top: 10px; padding: 3px 8px; border-radius: 10px; background: #fffbeb; color: #92400e; font-size: 11px; font-weight: 700; border: 1px solid #fde68a; }
-.sampark-research-artifact-body { padding: 14px 16px; display: flex; flex-direction: column; flex: 1; gap: 8px; }
-.sampark-research-artifact-kicker { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #6b7280; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.sampark-research-momentum { font-size: 11px; font-weight: 700; }
-.sampark-research-momentum.is-up { color: #059669; }
-.sampark-research-momentum.is-down { color: #dc2626; }
-.sampark-research-momentum.is-neutral { color: #9ca3af; }
-.sampark-research-artifact-title { background: transparent; text-align: left; padding: 0; width: 100%; }
-.sampark-research-artifact-title h4 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.sampark-research-artifact-summary { margin: 0; color: #6b7280; font-size: 13px; line-height: 1.5; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
-.sampark-research-artifact-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9ca3af; font-size: 12px; }
-.sampark-research-artifact-meta a { color: #1428a0; font-weight: 600; display: inline-flex; gap: 4px; align-items: center; }
-.sampark-research-artifact-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-.sampark-research-mini-action { display: inline-flex; gap: 6px; align-items: center; padding: 6px 10px; border-radius: 20px; background: #f5f7fa; color: #6b7280; font-size: 12px; font-weight: 500; border: 1px solid #e5e7eb; }
-.sampark-research-mini-action.is-active { background: #eef2ff; color: #1428a0; border-color: #c7d2fe; }
-.sampark-research-mini-action.is-primary { background: #1428a0; color: #fff; border-color: #1428a0; }
-.sampark-research-mini-action:disabled { opacity: .5; cursor: wait; }
+.sampark-research-nav-item {
+    position: relative;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding:
+        10px 15px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #6b7280;
+    font-size: 14px;
+    font-weight: 550;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+        color 150ms ease,
+        background 150ms ease;
+}
 
-/* Lanes */
-.sampark-research-lanes { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
-@media (max-width: 1020px) { .sampark-research-lanes { grid-template-columns: repeat(2, minmax(0,1fr)); } }
-@media (max-width: 640px) { .sampark-research-lanes { grid-template-columns: 1fr; } }
-.sampark-research-lane { padding: 14px; border: 1px solid #e5e7eb; border-radius: 12px; background: #fff; display: grid; gap: 10px; }
-.sampark-research-lane header { display: flex; align-items: center; gap: 8px; }
-.sampark-research-lane header h3 { margin: 0; font-size: 14px; flex: 1; }
-.sampark-research-lane header small { color: #9ca3af; font-size: 12px; }
-.sampark-research-lane-preview { display: grid; gap: 8px; }
-.sampark-research-lane-item { text-align: left; padding: 10px; border-radius: 8px; background: #f5f7fa; border: 1px solid transparent; display: grid; gap: 2px; }
-.sampark-research-lane-item:hover { border-color: #1428a0; background: #f8f9ff; }
-.sampark-research-lane-item strong { font-size: 13px; line-height: 1.35; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.sampark-research-lane-item small { color: #9ca3af; font-size: 11px; }
-.sampark-research-lane-empty { color: #9ca3af; font-size: 12px; margin: 0; }
+.sampark-research-nav-item svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+}
 
-/* Archive intro */
-.sampark-research-archive-intro { display: flex; gap: 16px; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; flex-wrap: wrap; }
-.sampark-research-archive-intro h2 { margin: 4px 0 6px; font-size: 18px; }
-.sampark-research-archive-intro p { margin: 0; color: #6b7280; font-size: 13px; max-width: 620px; }
+.sampark-research-nav-item:hover {
+    background: #f8f9fc;
+    color: #1428a0;
+}
 
-/* Detail */
-.sampark-research-detail-visual { display: flex; gap: 12px; align-items: center; padding: 16px; background: linear-gradient(135deg, #eef2ff, #f5f7fa); border-bottom: 1px solid #e5e7eb; }
-.sampark-research-detail-visual strong { display: block; font-size: 14px; }
-.sampark-research-detail-visual small { color: #6b7280; font-size: 12px; }
-.sampark-research-detail-metrics h3, .sampark-research-detail-block h3, .sampark-research-detail-limitations h3 { margin: 14px 0 8px; font-size: 13px; font-weight: 700; }
-.sampark-research-metrics-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
-.sampark-research-metric { padding: 10px; border-radius: 8px; background: #f5f7fa; border: 1px solid #e5e7eb; display: grid; gap: 2px; }
-.sampark-research-metric span { color: #6b7280; font-size: 11px; text-transform: capitalize; }
-.sampark-research-metric strong { font-size: 14px; }
-.sampark-research-metrics-note { color: #9ca3af; font-size: 11px; }
-.sampark-research-detail-links { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
-.sampark-research-detail-venue { color: #6b7280; font-size: 12px; }
-.sampark-research-detail-doi { color: #6b7280; font-size: 12px; margin: 4px 0 0; }
+.sampark-research-nav-item.is-active {
+    background: transparent;
+    color: #1428a0;
+    font-weight: 650;
+}
 
-/* Page wrappers */
-.sampark-research-page { display: grid; gap: 16px; }
-.sampark-research-overview { display: grid; gap: 18px; }
-.sampark-research-lane-filter { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-.sampark-research-lane-filter input { height: 38px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 0 12px; flex: 1; min-width: 200px; }
-.sampark-research-compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.sampark-research-compare-card { padding: 14px; border: 1px solid #e5e7eb; border-radius: 10px; background: #f5f7fa; }
-.sampark-research-watch-grid { display: grid; gap: 12px; }
-.sampark-research-watch-item { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; background: #fff; }
+.sampark-research-nav-item.is-active::after {
+    content: "";
+    position: absolute;
+    right: 12px;
+    bottom: 0;
+    left: 12px;
+    height: 3px;
+    border-radius:
+        3px 3px 0 0;
+    background: #1428a0;
+}
 
+.sampark-research-nav-item:focus-visible {
+    outline:
+        3px solid rgba(20, 40, 160, 0.20);
+    outline-offset: -3px;
+}
+
+/* ============================================================
+   RESEARCH INTRO
+   ============================================================ */
+.sampark-research-overview {
+    display: grid;
+    gap: 26px;
+}
+
+.sampark-research-intro {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 28px;
+    padding:
+        20px 22px;
+    border:
+        1px solid #e8ebf0;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow:
+        0 4px 14px rgba(15, 23, 42, 0.07);
+    flex-wrap: wrap;
+}
+
+.sampark-research-intro>div:first-child {
+    min-width: 0;
+    flex: 1 1 620px;
+}
+
+.sampark-research-kicker {
+    display: block;
+    margin-bottom: 5px;
+    color: #1428a0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.065em;
+    text-transform: uppercase;
+}
+
+.sampark-research-intro h1 {
+    margin:
+        0 0 8px;
+    color: #1b1d25;
+    font-size: 24px;
+    font-weight: 650;
+    line-height: 1.25;
+}
+
+.sampark-research-intro p {
+    max-width: 760px;
+    margin: 0;
+    color: #687181;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.sampark-research-intro-copy {
+    width: 100%;
+    min-width: 0;
+}
+
+.sampark-research-intro-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin: 6px 0 8px;
+}
+
+.sampark-research-intro-title-row h1 {
+    margin: 0;
+}
+
+.sampark-research-refresh-btn {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid #d8deea;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #1428a0;
+    font-size: 12px;
+    font-weight: 650;
+    box-shadow:
+        0 1px 3px rgba(15, 23, 42, 0.05);
+    transition:
+        border-color 0.16s ease,
+        background 0.16s ease,
+        box-shadow 0.16s ease;
+}
+
+.sampark-research-refresh-btn:hover:not(:disabled) {
+    border-color: #b9c4e7;
+    background: #f7f8ff;
+    box-shadow:
+        0 3px 8px rgba(15, 23, 42, 0.07);
+}
+
+.sampark-research-refresh-btn:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+@media (max-width: 640px) {
+    .sampark-research-intro-title-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+}
+
+/* ============================================================
+   PROVIDER STATUS
+   ============================================================ */
+.sampark-research-providers {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.sampark-research-provider {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 30px;
+    padding:
+        5px 10px;
+    border:
+        1px solid #e5e8ed;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #677181;
+    font-size: 12px;
+    font-weight: 600;
+    box-shadow:
+        0 1px 4px rgba(15, 23, 42, 0.045);
+}
+
+.sampark-provider-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.sampark-research-provider.is-live {
+    color: #087a57;
+    border-color: #cdeadd;
+}
+
+.sampark-research-provider.is-stale {
+    color: #9a6100;
+    border-color: #f0dfb2;
+}
+
+.sampark-research-provider.is-unavailable {
+    color: #aa3346;
+    border-color: #efd1d6;
+}
+
+.sampark-research-freshness-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    color: #93620c;
+    font-size: 12px;
+}
+
+/* ============================================================
+   INTRO ACTIONS
+   ============================================================ */
+.sampark-research-intro-actions {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 9px;
+    flex: 0 1 auto;
+    flex-wrap: wrap;
+}
+
+.sampark-research-intro-actions .btn-primary,
+.sampark-research-intro-actions .btn-secondary {
+    min-height: 39px;
+    border-radius: 8px;
+}
+
+.sampark-research-intro-actions small {
+    flex-basis: 100%;
+    color: #9aa1ac;
+    font-size: 11px;
+    text-align: right;
+}
+
+/* ============================================================
+   SECTION HEADINGS
+   UI typography is larger.
+   Artifact/backend content remains its original scale.
+   ============================================================ */
+.sampark-research-section-head,
+.sampark-research-lane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+
+.sampark-research-section-head h2,
+.sampark-research-lane-head h2 {
+    margin: 0;
+    color: #1e2028;
+    font-size: 20px;
+    font-weight: 650;
+    line-height: 1.3;
+}
+
+.sampark-research-section-head small,
+.sampark-research-section-meta,
+.sampark-research-lane-head small {
+    color: #969eaa;
+    font-size: 12px;
+}
+
+/* ============================================================
+   FEATURED / EVIDENCE SPACING
+   ============================================================ */
+.sampark-research-featured-section,
+.sampark-research-stream-section {
+    width: 100%;
+    display: grid;
+    gap: 0;
+}
+
+/* ============================================================
+   ARTIFACT GRID
+   Same density philosophy as Sampark News:
+   4 cards on large desktop
+   3 on normal desktop/laptop
+   2 on smaller layouts
+   ============================================================ */
+.sampark-research-discovery-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+@media (min-width: 1600px) {
+    .sampark-research-discovery-grid {
+        grid-template-columns:
+            repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1080px) {
+    .sampark-research-discovery-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 660px) {
+    .sampark-research-discovery-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   ARTIFACT CARD
+   Research has no legitimate image for these artifacts.
+   Do NOT fabricate stock images.
+   Instead the upper visual panel plays the same structural role
+   as the image area on All News cards.
+   ============================================================ */
+.sampark-research-artifact {
+    min-width: 0;
+    min-height: 340px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border:
+        1px solid #e8ebf0;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow:
+        0 3px 11px rgba(15, 23, 42, 0.065);
+    transition:
+        transform 170ms ease,
+        box-shadow 170ms ease,
+        border-color 170ms ease;
+}
+
+.sampark-research-artifact:hover {
+    transform:
+        translateY(-2px);
+    border-color: #dce1e8;
+    box-shadow:
+        0 8px 22px rgba(15, 23, 42, 0.11);
+}
+
+/*
+ * Equivalent to the image region in All News.
+ *
+ * Roughly 40–45% of the card visually.
+ */
+.sampark-research-artifact-visual {
+    position: relative;
+    width: 100%;
+    height:
+        clamp(142px,
+            9vw,
+            172px);
+    min-height:
+        clamp(142px,
+            9vw,
+            172px);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    border-bottom:
+        1px solid #edf0f4;
+    background: #f8f9fc;
+    cursor: pointer;
+}
+
+/*
+ * Extremely subtle Samsung-blue visual detail.
+ * Not a gradient dashboard.
+ */
+.sampark-research-artifact-visual::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 38%;
+    height: 100%;
+    background:
+        linear-gradient(135deg,
+            transparent,
+            rgba(20, 40, 160, 0.035));
+    pointer-events: none;
+}
+
+.sampark-research-visual-icon {
+    position: relative;
+    z-index: 1;
+    width: 62px;
+    height: 62px;
+    display: grid;
+    place-items: center;
+    border:
+        1px solid #e1e5ed;
+    border-radius: 16px;
+    background: #ffffff;
+    color: #1428a0;
+    box-shadow:
+        0 5px 15px rgba(15, 23, 42, 0.09);
+}
+
+/*
+ * Keep different artifact kinds identifiable,
+ * but keep them restrained.
+ */
+.sampark-research-visual-icon.is-paper,
+.sampark-research-visual-icon.is-repository,
+.sampark-research-visual-icon.is-model,
+.sampark-research-visual-icon.is-dataset,
+.sampark-research-visual-icon.is-patent,
+.sampark-research-visual-icon.is-technology {
+    color: #1428a0;
+}
+
+.sampark-research-source-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    z-index: 2;
+    max-width: calc(100% - 20px);
+    padding:
+        4px 9px;
+    overflow: hidden;
+    border:
+        1px solid #e2e5eb;
+    border-radius: 999px;
+    background:
+        rgba(255, 255, 255, 0.94);
+    color: #5e6878;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.035em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+    box-shadow:
+        0 2px 7px rgba(15, 23, 42, 0.07);
+}
+
+.sampark-research-starter-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 2;
+    padding:
+        4px 8px;
+    border:
+        1px solid #efdfae;
+    border-radius: 999px;
+    background: #fffdf6;
+    color: #96650e;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+/* ============================================================
+   CARD BODY
+   ============================================================ */
+.sampark-research-artifact-body {
+    min-width: 0;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 9px;
+    padding:
+        13px 15px 15px;
+    background: #ffffff;
+}
+
+.sampark-research-artifact-kicker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: #818a98;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.045em;
+    text-transform: uppercase;
+}
+
+.sampark-research-momentum {
+    flex: none;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.sampark-research-momentum.is-up {
+    color: #07815a;
+}
+
+.sampark-research-momentum.is-down {
+    color: #c83d4e;
+}
+
+.sampark-research-momentum.is-neutral {
+    color: #a0a7b1;
+}
+
+/*
+ * Backend artifact title/content:
+ * keep compact, just like article-card content.
+ */
+.sampark-research-artifact-title {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+}
+
+.sampark-research-artifact-title h4 {
+    margin: 0;
+    overflow: hidden;
+    color: #22252d;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.sampark-research-artifact-summary {
+    margin: 0;
+    overflow: hidden;
+    color: #697281;
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+.sampark-research-artifact-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: auto;
+    color: #9aa1ad;
+    font-size: 11px;
+}
+
+.sampark-research-artifact-meta a,
+.sampark-research-source-internal {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #1428a0;
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* ============================================================
+   CARD ACTIONS
+   ============================================================ */
+.sampark-research-artifact-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 3px;
+    flex-wrap: wrap;
+}
+
+.sampark-research-mini-action {
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding:
+        5px 10px;
+    border:
+        1px solid #e2e6ec;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #626c7a;
+    font-size: 11px;
+    font-weight: 550;
+    box-shadow:
+        0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.sampark-research-mini-action:hover {
+    border-color: #cbd2dd;
+    color: #1428a0;
+    box-shadow:
+        0 3px 8px rgba(15, 23, 42, 0.07);
+}
+
+.sampark-research-mini-action.is-active {
+    border-color: #c9d2ff;
+    background: #f7f8ff;
+    color: #1428a0;
+}
+
+.sampark-research-mini-action.is-primary {
+    border-color: #1428a0;
+    background: #1428a0;
+    color: #ffffff;
+    box-shadow:
+        0 3px 8px rgba(20, 40, 160, 0.16);
+}
+
+.sampark-research-mini-action:disabled {
+    opacity: 0.5;
+    cursor: wait;
+}
+/* ============================================================
+   RESEARCH ARTIFACT CARDS
+   Papers / Repositories / Models / Datasets / Patents
+
+   These are evidence cards, not news/image cards.
+   There is intentionally no fake image area.
+   ============================================================ */
+
+.sampark-research-artifact {
+  --artifact-accent: #1428a0;
+  --artifact-soft: #f3f5ff;
+
+  position: relative;
+
+  display: flex;
+  min-width: 0;
+  min-height: 310px;
+  flex-direction: column;
+
+  overflow: hidden;
+
+  border: 1px solid #e5e9f0;
+  border-radius: 14px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.055);
+
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease,
+    transform .18s ease;
+}
+
+
+/* Small artifact-type accent rather than fake imagery. */
+
+.sampark-research-artifact::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+
+  height: 3px;
+
+  background: var(--artifact-accent);
+
+  content: '';
+}
+
+
+.sampark-research-artifact:hover {
+  border-color: #d7dce6;
+
+  box-shadow:
+    0 9px 26px rgba(15, 23, 42, 0.09);
+
+  transform:
+    translateY(-2px);
+}
+
+
+/* ------------------------------------------------------------
+   Artifact type identity colors
+   ------------------------------------------------------------ */
+
+.sampark-research-artifact.is-paper {
+  --artifact-accent: #3157b8;
+  --artifact-soft: #f2f5ff;
+}
+
+
+.sampark-research-artifact.is-repository {
+  --artifact-accent: #168260;
+  --artifact-soft: #effaf6;
+}
+
+
+.sampark-research-artifact.is-model {
+  --artifact-accent: #7650b5;
+  --artifact-soft: #f7f3fc;
+}
+
+
+.sampark-research-artifact.is-dataset {
+  --artifact-accent: #c56a20;
+  --artifact-soft: #fff7ef;
+}
+
+
+.sampark-research-artifact.is-patent {
+  --artifact-accent: #596579;
+  --artifact-soft: #f4f6f8;
+}
+
+
+.sampark-research-artifact.is-technology {
+  --artifact-accent: #1428a0;
+  --artifact-soft: #f3f5ff;
+}
+
+
+/* ------------------------------------------------------------
+   Compact identity header
+   Replaces previous 140px fake visual / gradient slab.
+   ------------------------------------------------------------ */
+
+.sampark-research-artifact-visual {
+  display: flex;
+  width: 100%;
+  min-height: 74px;
+
+  align-items: center;
+  gap: 11px;
+
+  padding:
+    17px 16px
+    13px;
+
+  border: 0;
+  border-bottom: 1px solid #edf0f4;
+
+  background: #ffffff;
+
+  color: #111827;
+
+  text-align: left;
+
+  cursor: pointer;
+}
+
+
+.sampark-research-artifact-visual:hover {
+  background:
+    var(--artifact-soft);
+}
+
+
+/* Main artifact icon */
+
+.sampark-research-visual-icon {
+  display: grid;
+
+  width: 38px;
+  height: 38px;
+
+  flex: 0 0 38px;
+
+  place-items: center;
+
+  border: 1px solid
+    color-mix(
+      in srgb,
+      var(--artifact-accent) 18%,
+      #ffffff
+    );
+
+  border-radius: 10px;
+
+  background:
+    var(--artifact-soft);
+
+  color:
+    var(--artifact-accent);
+
+  box-shadow: none;
+}
+
+
+/*
+ * Keep this for ResearchArtifactDetail,
+ * which also uses the same icon class.
+ */
+
+.sampark-research-visual-icon.is-large {
+  width: 64px;
+  height: 64px;
+
+  flex-basis: 64px;
+
+  border-radius: 14px;
+}
+
+
+/* Type + category */
+
+.sampark-research-artifact-identity {
+  display: grid;
+
+  min-width: 0;
+
+  flex: 1;
+
+  gap: 2px;
+}
+
+
+.sampark-research-artifact-identity strong {
+  overflow: hidden;
+
+  color:
+    var(--artifact-accent);
+
+  font-size: 12px;
+  font-weight: 750;
+
+  letter-spacing: .045em;
+
+  text-overflow: ellipsis;
+
+  text-transform: uppercase;
+
+  white-space: nowrap;
+}
+
+
+.sampark-research-artifact-identity small {
+  overflow: hidden;
+
+  color: #7b8494;
+
+  font-size: 11px;
+  font-weight: 500;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+/* Provider label: GitHub / Hugging Face / OpenAlex / EPO */
+
+.sampark-research-artifact-provider {
+  max-width: 120px;
+
+  overflow: hidden;
+
+  padding: 4px 8px;
+
+  border: 1px solid #e5e9ef;
+  border-radius: 999px;
+
+  background: #fafbfc;
+
+  color: #6b7280;
+
+  font-size: 10px;
+  font-weight: 650;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+/* Starter state remains available without dominating the card. */
+
+.sampark-research-starter-badge {
+  flex: none;
+
+  padding: 4px 7px;
+
+  border: 1px solid #f2dda2;
+  border-radius: 999px;
+
+  background: #fffaf0;
+
+  color: #8a641c;
+
+  font-size: 10px;
+  font-weight: 700;
+}
+
+
+/* ------------------------------------------------------------
+   Main body
+   ------------------------------------------------------------ */
+
+.sampark-research-artifact-body {
+  display: flex;
+
+  min-width: 0;
+
+  flex: 1;
+  flex-direction: column;
+
+  gap: 11px;
+
+  padding:
+    16px 17px
+    15px;
+}
+
+
+/* Old kicker no longer rendered, keep harmless compatibility. */
+
+.sampark-research-artifact-kicker {
+  display: none;
+}
+
+
+/* ------------------------------------------------------------
+   Title
+   ------------------------------------------------------------ */
+
+.sampark-research-artifact-title {
+  width: 100%;
+
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #111827;
+
+  text-align: left;
+
+  cursor: pointer;
+}
+
+
+.sampark-research-artifact-title h4 {
+  display: -webkit-box;
+
+  margin: 0;
+
+  overflow: hidden;
+
+  color: #111827;
+
+  font-size: 15px;
+  font-weight: 680;
+  line-height: 1.42;
+
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+
+.sampark-research-artifact-title:hover h4 {
+  color:
+    var(--artifact-accent);
+}
+
+
+/* ------------------------------------------------------------
+   Summary
+   ------------------------------------------------------------ */
+
+.sampark-research-artifact-summary {
+  display: -webkit-box;
+
+  margin: 0;
+
+  overflow: hidden;
+
+  color: #667085;
+
+  font-size: 12.5px;
+  line-height: 1.58;
+
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+
+/* ------------------------------------------------------------
+   Evidence / metrics
+   ------------------------------------------------------------ */
+
+.sampark-research-evidence-row {
+  display: flex;
+
+  min-width: 0;
+
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 10px;
+
+  padding:
+    9px 10px;
+
+  border: 1px solid #edf0f4;
+  border-radius: 9px;
+
+  background: #fafbfc;
+}
+
+
+.sampark-research-primary-metric {
+  overflow: hidden;
+
+  color: #344054;
+
+  font-size: 11.5px;
+  font-weight: 650;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+.sampark-research-momentum {
+  display: inline-flex;
+
+  flex: none;
+
+  align-items: baseline;
+
+  gap: 3px;
+
+  font-size: 11px;
+  font-weight: 750;
+}
+
+
+.sampark-research-momentum small {
+  color: #98a2b3;
+
+  font-size: 9px;
+  font-weight: 550;
+}
+
+
+.sampark-research-momentum.is-up {
+  color: #0a7a58;
+}
+
+
+.sampark-research-momentum.is-down {
+  color: #c33b4e;
+}
+
+
+.sampark-research-momentum.is-neutral {
+  color: #7b8494;
+}
+
+
+/* ------------------------------------------------------------
+   Provider / source row
+   ------------------------------------------------------------ */
+
+.sampark-research-artifact-meta {
+  display: flex;
+
+  min-width: 0;
+
+  align-items: center;
+
+  gap: 8px;
+
+  color: #98a2b3;
+
+  font-size: 11px;
+}
+
+
+.sampark-research-provider-name {
+  min-width: 0;
+
+  flex: 1;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+}
+
+
+.sampark-research-artifact-meta a,
+.sampark-research-source-internal {
+  display: inline-flex;
+
+  flex: none;
+
+  align-items: center;
+
+  gap: 4px;
+
+  padding: 0;
+
+  border: 0;
+
+  background: transparent;
+
+  color: #1428a0;
+
+  font-size: 11px;
+  font-weight: 650;
+
+  text-decoration: none;
+
+  cursor: pointer;
+}
+
+
+.sampark-research-artifact-meta a:hover,
+.sampark-research-source-internal:hover {
+  text-decoration: underline;
+}
+
+
+/* ------------------------------------------------------------
+   Bottom actions
+   ------------------------------------------------------------ */
+
+.sampark-research-artifact-actions {
+  display: flex;
+
+  align-items: center;
+  justify-content: flex-end;
+
+  gap: 7px;
+
+  margin-top: auto;
+  padding-top: 3px;
+}
+
+
+.sampark-research-mini-action {
+  display: inline-flex;
+
+  min-height: 31px;
+
+  align-items: center;
+  justify-content: center;
+
+  gap: 5px;
+
+  padding:
+    0 11px;
+
+  border: 1px solid #dde2e9;
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #596273;
+
+  font-size: 11.5px;
+  font-weight: 650;
+
+  cursor: pointer;
+
+  transition:
+    border-color .16s ease,
+    background .16s ease,
+    color .16s ease,
+    box-shadow .16s ease;
+}
+
+
+.sampark-research-mini-action:hover {
+  border-color: #cbd2dd;
+
+  background: #f8f9fb;
+
+  color: #222b3a;
+}
+
+
+.sampark-research-mini-action.is-active {
+  border-color: #c5cff2;
+
+  background: #f2f4ff;
+
+  color: #1428a0;
+}
+
+
+.sampark-research-mini-action.is-primary {
+  border-color: #1428a0;
+
+  background: #1428a0;
+
+  color: #ffffff;
+}
+
+
+.sampark-research-mini-action.is-primary:hover {
+  border-color: #102181;
+
+  background: #102181;
+
+  color: #ffffff;
+}
+
+
+.sampark-research-mini-action:disabled {
+  cursor: wait;
+
+  opacity: .5;
+}
+
+
+/* ------------------------------------------------------------
+   Responsive card behavior
+   ------------------------------------------------------------ */
+
+@media (max-width: 640px) {
+
+  .sampark-research-artifact {
+    min-height: 0;
+  }
+
+
+  .sampark-research-artifact-visual {
+    flex-wrap: wrap;
+  }
+
+
+  .sampark-research-artifact-provider {
+    max-width: 100px;
+  }
+
+
+  .sampark-research-artifact-actions {
+    justify-content: stretch;
+  }
+
+
+  .sampark-research-mini-action {
+    flex: 1;
+  }
+
+}
+
+/* ============================================================
+   INDIVIDUAL LANE PAGE + FILTER
+   ============================================================ */
+.sampark-research-lane-page {
+    display: grid;
+    gap: 14px;
+}
+
+.sampark-research-lane-head {
+    align-items: flex-end;
+    margin-bottom: 0;
+}
+
+.sampark-research-lane-head>div {
+    display: grid;
+    gap: 3px;
+}
+
+.sampark-research-lane-filter {
+    min-width: 280px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding:
+        0 11px;
+    border:
+        1px solid #dfe3e9;
+    border-radius: 9px;
+    background: #ffffff;
+    box-shadow:
+        0 2px 7px rgba(15, 23, 42, 0.05);
+}
+
+.sampark-research-lane-filter:focus-within {
+    border-color: #1428a0;
+    box-shadow:
+        0 0 0 3px rgba(20, 40, 160, 0.10);
+}
+
+.sampark-research-lane-filter input {
+    min-width: 0;
+    height: 40px;
+    flex: 1;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #262a32;
+    font-size: 13px;
+}
+
+.sampark-research-lane-filter button {
+    padding: 4px;
+    border: 0;
+    background: transparent;
+    color: #8b94a2;
+}
+
+/* ============================================================
+   OVERVIEW LANE SUMMARY CARDS
+   ============================================================ */
+.sampark-research-lanes {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.sampark-research-lane {
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+    padding: 15px;
+    border:
+        1px solid #e8ebf0;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow:
+        0 3px 10px rgba(15, 23, 42, 0.055);
+}
+
+.sampark-research-lane header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sampark-research-lane header h3 {
+    margin: 0;
+    flex: 1;
+    color: #23262e;
+    font-size: 15px;
+    font-weight: 650;
+}
+
+.sampark-research-lane header small {
+    color: #9aa1ac;
+    font-size: 11px;
+}
+
+.sampark-research-lane-preview {
+    display: grid;
+    gap: 8px;
+}
+
+.sampark-research-lane-item {
+    display: grid;
+    gap: 3px;
+    padding:
+        10px 11px;
+    border:
+        1px solid #edf0f4;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #24272f;
+    text-align: left;
+    box-shadow:
+        0 1px 4px rgba(15, 23, 42, 0.04);
+}
+
+.sampark-research-lane-item:hover {
+    border-color: #d4d9e1;
+    box-shadow:
+        0 4px 10px rgba(15, 23, 42, 0.075);
+}
+
+.sampark-research-lane-item strong {
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.sampark-research-lane-item small,
+.sampark-research-lane-empty {
+    color: #969eaa;
+    font-size: 11px;
+}
+
+/* ============================================================
+   RADAR
+   ============================================================ */
+.sampark-research-radar {
+    display: grid;
+    gap: 14px;
+}
+
+.sampark-research-radar-card {
+    min-width: 0;
+    padding: 16px;
+    border:
+        1px solid #e7eaf0;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow:
+        0 3px 10px rgba(15, 23, 42, 0.06);
+}
+
+.sampark-research-radar-card header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.sampark-research-radar-score {
+    color: #1428a0;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.sampark-research-radar-card em {
+    padding:
+        4px 8px;
+    border:
+        1px solid #dfe4ec;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #6d7684;
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.sampark-research-radar-card h3 {
+    margin:
+        12px 0 5px;
+    color: #252832;
+    font-size: 15px;
+}
+
+.sampark-research-radar-card p {
+    margin: 0;
+    color: #7d8694;
+    font-size: 12px;
+}
+
+/* ============================================================
+   WATCHLIST
+   ============================================================ */
+.sampark-research-watch-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.sampark-research-watch-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding:
+        14px 16px;
+    border:
+        1px solid #e7eaf0;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow:
+        0 2px 8px rgba(15, 23, 42, 0.055);
+}
+
+/* ============================================================
+   COMPARE
+   ============================================================ */
+.sampark-research-compare {
+    display: grid;
+    gap: 14px;
+}
+
+.sampark-research-compare-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.sampark-research-compare-card {
+    display: grid;
+    gap: 8px;
+    padding: 14px;
+    border:
+        1px solid #e7eaf0;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow:
+        0 2px 8px rgba(15, 23, 42, 0.055);
+}
+
+.sampark-research-compare-card>span {
+    color: #1428a0;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.sampark-research-compare-card strong {
+    color: #292c34;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.sampark-research-comparison-result {
+    border-color: #e7eaf0 !important;
+    background: #ffffff !important;
+    box-shadow:
+        0 3px 12px rgba(15, 23, 42, 0.06);
+}
+
+/* ============================================================
+   BRIEFS
+   ============================================================ */
+.sampark-research-briefs {
+    width: 100%;
+}
+
+.sampark-research-briefs .sampark-research-artifact {
+    background: #ffffff;
+}
+
+/* ============================================================
+   ARCHIVE SEARCH
+   ============================================================ */
+.sampark-research-archive {
+    display: grid;
+    gap: 16px;
+}
+
+.sampark-research-archive-intro {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    padding:
+        18px 20px;
+    border:
+        1px solid #e8ebf0;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow:
+        0 3px 11px rgba(15, 23, 42, 0.06);
+    flex-wrap: wrap;
+}
+
+.sampark-research-archive-intro h2 {
+    margin:
+        3px 0 6px;
+    color: #24272e;
+    font-size: 20px;
+    font-weight: 650;
+}
+
+.sampark-research-archive-intro p {
+    max-width: 700px;
+    margin: 0;
+    color: #6d7684;
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.sampark-research-search,
+.sampark-research-filters {
+    background: #ffffff;
+}
+
+.sampark-research-query {
+    border-color: #dfe3e9 !important;
+    background: #ffffff !important;
+    box-shadow:
+        0 2px 7px rgba(15, 23, 42, 0.05);
+}
+
+.sampark-research-field input {
+    background: #ffffff;
+}
+
+/*
+ * Archive-result article cards:
+ * preserve their real news imagery but use the same white card language.
+ */
+.sampark-research-card {
+    overflow: hidden;
+    border:
+        1px solid #e8ebf0;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow:
+        0 3px 11px rgba(15, 23, 42, 0.065);
+}
+
+.sampark-research-card:hover {
+    box-shadow:
+        0 8px 22px rgba(15, 23, 42, 0.11);
+}
+
+.sampark-research-card-body {
+    background: #ffffff;
+}
+
+/* ============================================================
+   RESEARCH DOSSIER
+   Match the white modal language already established
+   in All News / Samsung News.
+   ============================================================ */
+.sampark-research-workspace .sampark-dossier {
+    background: #ffffff !important;
+    box-shadow:
+        0 26px 70px rgba(0, 0, 0, 0.22),
+        0 4px 18px rgba(0, 0, 0, 0.10);
+}
+
+.sampark-research-workspace .sampark-dossier-header,
+.sampark-research-workspace .sampark-dossier-scroll,
+.sampark-research-workspace .sampark-dossier-body {
+    background: #ffffff !important;
+}
+
+.sampark-research-detail-visual {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    padding:
+        16px 18px;
+    border-bottom:
+        1px solid #e8ebf0;
+    background: #ffffff;
+}
+
+.sampark-research-detail-visual .sampark-research-visual-icon {
+    width: 64px;
+    height: 64px;
+}
+
+.sampark-research-detail-visual strong {
+    display: block;
+    color: #252830;
+    font-size: 14px;
+}
+
+.sampark-research-detail-visual small {
+    color: #818a97;
+    font-size: 12px;
+}
+
+/*
+ * Dossier content sections become white cards,
+ * not gray slabs.
+ */
+.sampark-research-workspace .sampark-dossier-section {
+    margin-top: 12px;
+    padding:
+        14px 16px;
+    border:
+        1px solid #eceff3;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow:
+        0 2px 8px rgba(15, 23, 42, 0.05);
+}
+
+.sampark-research-workspace .sampark-dossier-section h3 {
+    margin:
+        0 0 8px;
+    color: #252832;
+    font-size: 14px;
+    font-weight: 650;
+}
+
+.sampark-research-workspace .sampark-dossier-summary {
+    background: #ffffff !important;
+}
+
+/* Metrics also stay white */
+.sampark-research-metrics-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.sampark-research-metric {
+    display: grid;
+    gap: 3px;
+    padding: 11px;
+    border:
+        1px solid #e8ebf0;
+    border-radius: 9px;
+    background: #ffffff;
+    box-shadow:
+        0 1px 5px rgba(15, 23, 42, 0.045);
+}
+
+.sampark-research-metric span {
+    color: #808896;
+    font-size: 11px;
+    text-transform: capitalize;
+}
+
+.sampark-research-metric strong {
+    color: #262932;
+    font-size: 14px;
+}
+
+/* ============================================================
+   NOTES / ERRORS / EMPTY STATES
+   ============================================================ */
+.sampark-workspace-note,
+.sampark-workspace-empty,
+.sampark-workspace-loading,
+.sampark-refresh-status {
+    border-radius: 12px;
+}
+
+.sampark-workspace-empty {
+    background: #ffffff;
+    border:
+        1px solid #e8ebf0;
+    box-shadow:
+        0 2px 8px rgba(15, 23, 42, 0.045);
+}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1120px) {
+    .sampark-research-lanes {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+
+    .sampark-research-compare-grid {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .sampark-research-intro {
+        padding:
+            16px;
+    }
+
+    .sampark-research-intro h1 {
+        font-size: 21px;
+    }
+
+    .sampark-research-section-head,
+    .sampark-research-lane-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .sampark-research-lane-filter {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .sampark-research-lanes,
+    .sampark-research-compare-grid,
+    .sampark-research-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sampark-research-watch-item {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
 
 /* Research-only Hugging Face proxy exception guidance. The overlay stays
    above an open research dossier and follows Sampark light/dark theme tokens. */
