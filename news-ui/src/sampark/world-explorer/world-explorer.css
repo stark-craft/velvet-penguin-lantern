@@ -108,7 +108,7 @@ html[data-theme="dark"] .swe-business-card:hover, html[data-theme="dark"] .swe-m
   .swe-region-grid, .swe-market-grid, .swe-business-grid { grid-template-columns: 1fr; }
   .swe-region-card { min-height: 156px; }
   .swe-home-actions { align-items: start; flex-direction: column; }
-  .swe-section-line:has(.swe-section-actions) { align-items: start; flex-direction: column; }
+  .swe-section-line.has-action { align-items: start; flex-direction: column; }
   .swe-section-actions { width: 100%; justify-content: space-between; }
   .swe-market-end { gap: 4px; }
   .swe-editorial-note { gap: 7px; }
