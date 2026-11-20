@@ -6,7 +6,6 @@ import { useLanguage } from '../news-scrapper/translation/LanguageProvider.jsx';
 import { useSamparkAuth } from './auth/SamparkAuthContext.jsx';
 import SamparkSearchResults from './SamparkSearchResults.jsx';
 import SamparkSettingsModal, { readSamparkSettings } from './SamparkSettingsModal.jsx';
-import { readWorldExplorerPreference } from './world-explorer/worldExplorerPreference.js';
 import SamparkForYou from './SamparkForYou.jsx';
 import SamparkAllNews from './all-news/AllNewsPage.jsx';
 import SamparkResearch from './SamparkResearch.jsx';
@@ -69,8 +68,8 @@ function ResearchStructure() {
   return <SamparkResearch />;
 }
 
-function SamsungStructure({ worldExplorerEnabled = false }) {
-  return <SamparkSamsungNews worldExplorerEnabled={worldExplorerEnabled} />;
+function SamsungStructure() {
+  return <SamparkSamsungNews />;
 }
 
 export default function SamparkApp() {
@@ -121,12 +120,6 @@ export default function SamparkApp() {
     if (viewer?.principal) {
       setSearchHistory(readSearchHistoryForViewer(viewer));
     }
-  }, [viewer?.principal]);
-
-  // World Explorer is a viewer-scoped opt-in. Classic stays the default.
-  useEffect(() => {
-    const enabled = readWorldExplorerPreference(viewer);
-    setSettings((current) => current.worldExplorerEnabled === enabled ? current : { ...current, worldExplorerEnabled: enabled });
   }, [viewer?.principal]);
 
   // Recommendation status remains viewer-specific, fetched once; also mirror server authoritative search history preference
@@ -281,7 +274,7 @@ export default function SamparkApp() {
       <nav aria-label="TechScout sections" className="main-tabs"><NavLink className={tabClass('/for-you')} to="/for-you"><Icon name="sparkle" size={16} />For You</NavLink><NavLink className={tabClass('/all-news')} to="/all-news"><Icon name="globe" size={16} />All News</NavLink><NavLink className={tabClass('/research')} to="/research"><Icon name="file" size={16} />Research</NavLink><NavLink className={tabClass('/samsung-news')} to="/samsung-news"><Icon name="layers" size={16} />Samsung News</NavLink></nav>
       <main className="content-area" id="news-main-content" tabIndex={-1}>
         <Routes location={backgroundLocation || location}>
-          <Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure capabilities={capabilities} />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/research/*" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure worldExplorerEnabled={Boolean(settings.worldExplorerEnabled)} />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/create" element={<SamparkCreate />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory capabilities={capabilities} />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} onAccessChanged={refreshAccess} />} /><Route path="/search" element={<SamparkSearchResults query={query} />} /><Route path="*" element={<Navigate replace to="/for-you" />} />
+          <Route path="/" element={<Navigate replace to="/for-you" />} /><Route path="/index.html" element={<Navigate replace to="/for-you" />} /><Route path="/for-you" element={<ForYouStructure />} /><Route path="/all-news" element={<AllNewsStructure capabilities={capabilities} />} /><Route path="/home" element={<Navigate replace to="/all-news" />} /><Route path="/research" element={<ResearchStructure />} /><Route path="/research/*" element={<ResearchStructure />} /><Route path="/samsung-news" element={<SamsungStructure />} /><Route path="/samsung-internal" element={<Navigate replace to="/samsung-news" />} /><Route path="/create" element={<SamparkCreate />} /><Route path="/login" element={<SamparkLogin />} /><Route path="/following" element={<SamparkFollowing />} /><Route path="/hidden" element={<SamparkHidden />} /><Route path="/history" element={<SamparkHistory capabilities={capabilities} />} /><Route path="/voc" element={<SamparkVoc />} /><Route path="/review" element={<SamparkReview capabilities={capabilities} />} /><Route path="/approved" element={<SamparkApproved capabilities={capabilities} />} /><Route path="/gatekeeper" element={<SamparkGatekeeper capabilities={capabilities} />} /><Route path="/sources" element={<SamparkSources capabilities={capabilities} />} /><Route path="/scheduler" element={<SamparkScheduler capabilities={capabilities} />} /><Route path="/analytics" element={<SamparkAnalytics capabilities={capabilities} />} /><Route path="/access" element={<SamparkAccess capabilities={capabilities} onAccessChanged={refreshAccess} />} /><Route path="/search" element={<SamparkSearchResults query={query} />} /><Route path="*" element={<Navigate replace to="/for-you" />} />
         </Routes>
         {backgroundLocation && (
           <Routes>
