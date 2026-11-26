@@ -217,7 +217,7 @@ function SriDTypeSection({ section, onOpen, nowMs }) {
 }
 export default function SamsungChannelContent({
   channel, onOpen, nowMs, page = 1, onPageChange, totalCount, pagingBusy = false,
-  continuous = false, onLoadMore, compactArchive = false,
+  continuous = false, onLoadMore, compactArchive = false, hideRegionTags = false,
 }) {
   // SRI-D's published archive retains its existing page controls.
   // Global, Local and World Explorer can reveal stories continuously.
@@ -229,7 +229,7 @@ export default function SamsungChannelContent({
   const isInternal = channel?.id === 'internal';
   const isLocal = channel?.id === 'local';
   // Channel tabs already identify these feeds; avoid repeating Local/Global on cards.
-  const hideScopeBadge = channel?.id === 'local' || channel?.id === 'global';
+  const hideScopeBadge = hideRegionTags || channel?.id === 'local' || channel?.id === 'global';
   // The compact archive is always used by Local and is opt-in only for
   // individual World Explorer country, regional newsroom and business feeds.
   const isWorldCompact = channel?.id === 'world-explorer' && compactArchive;
