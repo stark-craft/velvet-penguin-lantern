@@ -94,7 +94,7 @@ function localStoryDate(item) {
     : { label: 'Date unavailable', iso: '' };
 }
 
-function SamsungStoryCard({ item, internal = false, showPublicationDate = false, onOpen, nowMs }) {
+function SamsungStoryCard({ item, internal = false, showPublicationDate = false, showRegionTag = true, onOpen, nowMs }) {
   const image = imageOf(item);
   const publicationDate = showPublicationDate ? localStoryDate(item) : null;
   const source = item?.src || item?.source || 'Samsung';
@@ -124,7 +124,7 @@ function SamsungStoryCard({ item, internal = false, showPublicationDate = false,
           </span>}
           <span className="tsan-news-card-category-badge">{internal ? contentTypeLabel(item) : category}</span>
         </span>
-        <span className={`tsan-news-card-region-tag ${regionClass}`}>{region}</span>
+        {showRegionTag && <span className={`tsan-news-card-region-tag ${regionClass}`}>{region}</span>}
         {internal && isRecentlyPublishedSamsungItem(item, nowMs) && (
           <span className="samsung-published-new-badge is-story">NEW</span>
         )}
@@ -228,6 +228,8 @@ export default function SamsungChannelContent({
   const sentinelRef = useRef(null);
   const isInternal = channel?.id === 'internal';
   const isLocal = channel?.id === 'local';
+  // Channel tabs already identify these feeds; avoid repeating Local/Global on cards.
+  const hideScopeBadge = channel?.id === 'local' || channel?.id === 'global';
   // The compact archive is always used by Local and is opt-in only for
   // individual World Explorer country, regional newsroom and business feeds.
   const isWorldCompact = channel?.id === 'world-explorer' && compactArchive;
@@ -292,7 +294,7 @@ export default function SamsungChannelContent({
         {isInternal && heroItems?.[0]?.contentType === 'leadership' ? (
           <LeadershipMessageHero item={heroItems[0]} onOpen={onOpen} />
         ) : (
-          <FeaturedCarousel items={heroItems} onOpen={onOpen} />
+          <FeaturedCarousel items={heroItems} onOpen={onOpen} showRegionTag={!hideScopeBadge} />
         )}
         <AllNewsRail ariaLabel={`${channel.label} Briefing Stream`}
           emptyText={`No ${channel.label} briefing items are available right now.`}
@@ -320,7 +322,7 @@ export default function SamsungChannelContent({
         ) : isCompactArchive ? (
           <div className="tsan-day-grid samsung-local-news-grid">
             {archiveItems.map((item) => <SamsungStoryCard
-              showPublicationDate item={item} key={samsungItemKey(item)} onOpen={onOpen} />)}
+              showPublicationDate showRegionTag={!hideScopeBadge} item={item} key={samsungItemKey(item)} onOpen={onOpen} />)}
           </div>
         ) : (
           <div className="tsan-daywise">
@@ -334,7 +336,7 @@ export default function SamsungChannelContent({
                 </header>
                 <div className="tsan-day-grid">
                   {group.signals.map((item) => <SamsungStoryCard
-                    item={item} key={samsungItemKey(item)} onOpen={onOpen} />)}
+                    item={item} showRegionTag={!hideScopeBadge} key={samsungItemKey(item)} onOpen={onOpen} />)}
                 </div>
               </section>
             ))}
