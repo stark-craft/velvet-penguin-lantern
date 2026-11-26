@@ -20,7 +20,7 @@ function BackTrail({ page, region, country, onHome, onRegion }) {
   </nav>;
 }
 
-function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions, compactArchive = false }) {
+function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions, compactArchive = false, hideRegionTags = false }) {
   // Share the actual Classical Samsung Global presentation and infinite
   // scroll archive; World Explorer has already loaded the Global corpus.
   const channel = useMemo(() => {
@@ -66,6 +66,7 @@ function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions, comp
       onOpen={onOpen}
       continuous
       compactArchive={compactArchive}
+      hideRegionTags={hideRegionTags}
       totalCount={channel.count}
     />
   </>;
@@ -171,7 +172,7 @@ export default function SamparkWorldExplorer({ articles = [], onOpen, coverageCo
 
     {page.kind === 'all' && <>
       <BackTrail page="Combined Global feed" onHome={openHome} />
-      <StoryCollection articles={coverage.all} name="Combined Samsung Global" subtitle="Coverage from every Global newsroom in the current briefing" onOpen={onOpen} onShowRegions={openHome} />
+      <StoryCollection articles={coverage.all} name="Combined Samsung Global" subtitle="Coverage from every Global newsroom in the current briefing" onOpen={onOpen} onShowRegions={openHome} hideRegionTags />
     </>}
 
     <p className="swe-coverage-note"><Icon name="clock" size={13} />
