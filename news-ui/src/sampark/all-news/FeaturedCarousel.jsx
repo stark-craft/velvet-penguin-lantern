@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import Icon from '../../news-scrapper/components/Icon.jsx';
 import { imageOf } from './allNewsModel.js';
 
-export default function FeaturedCarousel({ items=[], onOpen }){
+export default function FeaturedCarousel({ items=[], onOpen, showRegionTag = true }){
   const safeItems = (items || []).filter(Boolean);
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -60,7 +60,7 @@ export default function FeaturedCarousel({ items=[], onOpen }){
         <div className="tsan-featured-tags" aria-label="Story details">
           <span>{sourceCount} Source{sourceCount === 1 ? '' : 's'}</span>
           <span>{category}</span>
-          <span>{region}</span>
+          {showRegionTag && <span>{region}</span>}
         </div>
         <span className="tsan-featured-kicker">{source} · {time}</span>
         <button className="tsan-featured-title" onClick={()=> onOpen?.(item)} type="button"><h3>{item.title}</h3></button>
