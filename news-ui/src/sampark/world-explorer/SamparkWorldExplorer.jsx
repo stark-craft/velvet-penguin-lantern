@@ -20,7 +20,7 @@ function BackTrail({ page, region, country, onHome, onRegion }) {
   </nav>;
 }
 
-function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions, compactArchive = false, hideRegionTags = false }) {
+function StoryCollection({ articles, name, subtitle, onOpen, onShowRegions, compactArchive = false, hideRegionTags = true }) {
   // Share the actual Classical Samsung Global presentation and infinite
   // scroll archive; World Explorer has already loaded the Global corpus.
   const channel = useMemo(() => {
