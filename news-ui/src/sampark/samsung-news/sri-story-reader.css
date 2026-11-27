@@ -25,13 +25,11 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-/* The dossier section class supplies reading typography, but its shared
-   theme divider is for separate article sections, not authored templates. */
+/* Retain the shared document-style horizontal section divider. */
 .sri-story-reader .sri-story-template-content.dossier-section {
   margin-top: 24px !important;
-  padding: 0;
-  border-top: 0 !important;
-  border-bottom: 0 !important;
+  padding: 22px 0 0;
+  border-top: 1px solid var(--line-soft, var(--line, #e3e8ef)) !important;
 }
 .sri-story-reader .sampark-create-rendered-column p,
 .sri-story-reader .sampark-create-rendered-list-content p,
@@ -108,15 +106,18 @@
   gap: 20px;
   padding: 0;
 }
-/* List View: stack the entries, pairing each image with its own text.
-   Use whitespace rather than horizontal rules between entries. */
+/* List View: pair each image with its own text and retain row dividers. */
 .sri-story-reader .sampark-create-rendered-list > .sampark-create-rendered-list-item {
   display: grid;
   grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
   align-items: start;
   gap: 24px;
-  padding: 0;
-  border: 0 !important;
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--line, #e3e8ef);
+}
+.sri-story-reader .sampark-create-rendered-list > .sampark-create-rendered-list-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 .sri-story-reader .sampark-create-rendered-list-item:not(:has(.sampark-create-rendered-list-media)),
 .sri-story-reader .sampark-create-rendered-list-item:not(:has(.sampark-create-rendered-list-content)) {
@@ -153,8 +154,7 @@
 .sri-story-reader .sampark-create-rendered-copy {
   padding: 0;
 }
-/* Text Top: full-width text followed by a full-width, natural-height
-   image. No artificial divider between the text and image. */
+/* Text Top: full-width text followed by a full-width, natural-height image. */
 .sri-story-reader .sampark-create-rendered.is-text-top .sampark-create-rendered-copy {
   margin-bottom: 20px;
 }
