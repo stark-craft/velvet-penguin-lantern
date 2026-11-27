@@ -61,6 +61,8 @@ export default function SriDStoryModal({ item, onClose }) {
                 'two-column'
               }
               mode="published"
+              dossierReader
+              publicationDate={item.date && item.date !== 'Latest' ? item.date : ''}
               secondaryCoverPreview={
                 item.secondaryCover
                   ?.url ||
