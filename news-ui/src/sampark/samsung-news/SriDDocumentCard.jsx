@@ -28,13 +28,14 @@ return candidates.find((value) => typeof value === 'string' && value.trim())?.tr
 * typically owner_name; published records may use author or ownerName.
 * Avoid exposing the viewer's internal owner_id.
 */
-function documentContributorOf(item) {
+function documentContributorOf(item, isStory = false) {
 const record = item?.record || item?.draft || item;
 const name = [
 item?.owner_name, item?.ownerName, item?.author,
 record?.owner_name, record?.ownerName, record?.author,
 ].find((value) => typeof value === 'string' && value.trim());
 if (name) return 'By ' + name.trim();
+if (isStory) return 'SRI-D story';
 const count = record?.source_document?.page_count ?? record?.sourceDocument?.pageCount
 ?? item?.source_document?.page_count ?? item?.sourceDocument?.pageCount;
 if (Number.isInteger(Number(count)) && Number(count) > 0)
@@ -42,9 +43,13 @@ return Number(count) + (Number(count) === 1 ? ' page' : ' pages');
 return 'SRI-D document';
 }
 
-export default function SriDDocumentCard({ item, onOpen, preview = false, nowMs }) {
+// Authored stories can opt into the same card; existing PDF and preview callers are unchanged.
+export default function SriDDocumentCard({ item, onOpen, preview = false, nowMs, kind = 'document' }) {
 const [imageFailed, setImageFailed] = useState(false);
 const imageUrl = documentImageOf(item);
+const isStory = kind === 'story';
+const contributor = documentContributorOf(item, isStory);
+const fallbackTitle = isStory ? 'Untitled story' : 'Untitled document';
 const canOpen = typeof onOpen === 'function';
 useEffect(() => { setImageFailed(false); }, [imageUrl]);
 if (!item) return null;
@@ -55,27 +60,27 @@ return (
 <img alt="" loading={preview ? 'eager' : 'lazy'} onError={() => setImageFailed(true)} src={imageUrl} />
 ) : (
 <span aria-hidden="true" className="samsung-document-card-media-placeholder">
-<Icon name="file" size={36} />
+<Icon name={isStory ? "layers" : "file"} size={36} />
 </span>
 )}
 <span className="samsung-document-card-media-badge">
-<Icon name="file" size={12} /> PDF
+<Icon name={isStory ? "layers" : "file"} size={12} /> {isStory ? "Story" : "PDF"}
 </span>
 {!preview && isRecentlyPublishedSamsungItem(item, nowMs) && (
 <span className="samsung-published-new-badge is-document">NEW</span>
 )}
 </div>
 <div className="samsung-document-card-body">
-<h3 className="samsung-document-card-title">{item?.title || 'Untitled document'}</h3>
+<h3 className="samsung-document-card-title">{item?.title || fallbackTitle}</h3>
 <div className="samsung-document-card-footer">
-<span className="samsung-document-card-contributor" title={documentContributorOf(item)}>
-{documentContributorOf(item)}
+<span className="samsung-document-card-contributor" title={contributor}>
+{contributor}
 </span>
 <span className="samsung-document-card-action">View details <Icon name="chevR" size={13} /></span>
 </div>
 </div>
 {/* Single keyboard-accessible hit target, without nested buttons. */}
-<button aria-label={'View document: ' + (item?.title || 'Untitled document')}
+<button aria-label={(isStory ? 'View story: ' : 'View document: ') + (item?.title || fallbackTitle)}
 className="samsung-document-card-open-hitarea" disabled={!canOpen}
 onClick={() => onOpen?.(item)} type="button" />
 </article>
