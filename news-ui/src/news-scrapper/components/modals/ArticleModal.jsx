@@ -77,7 +77,7 @@ function WorkflowBlock({ item, onSelect, onApprove, onRemove, onHide, onRestore,
   );
 }
 
-function ForYouActions({ item, onHide, onVote, onSave, isSaved }) {
+function ForYouActions({ item, onHide, onVote, onSave, onViewDocument, isSaved, isDocument = false, documentNotice = '', reactionReady = true, onRetryReaction }) {
   const reactions = item?.reactions || {};
   const current = reactions.viewer_reaction || 'neutral';
   const likes = Number(reactions.like_count || 0);
@@ -88,29 +88,42 @@ function ForYouActions({ item, onHide, onVote, onSave, isSaved }) {
     <section className="dossier-section dossier-for-you-actions">
       <div className="dossier-for-you-actions-head">
         <h4>Your actions</h4>
-        <span>Personalize your news</span>
+        <span>{isDocument ? 'Document feedback' : 'Personalize your news'}</span>
       </div>
       <div className="dossier-for-you-action-row">
         <button
           aria-pressed={current === 'like'}
           className={`dossier-inline-action is-like${current === 'like' ? ' is-active' : ''}`}
+          disabled={!onVote}
           onClick={() => choose('like')}
           type="button"
         >
           <Icon name="thumbsUp" size={16} />
           <span>Like</span>
-          <strong>{likes}</strong>
+          <strong>{isDocument && !reactionReady ? '—' : likes}</strong>
         </button>
         <button
           aria-pressed={current === 'dislike'}
           className={`dossier-inline-action is-dislike${current === 'dislike' ? ' is-active' : ''}`}
+          disabled={!onVote}
           onClick={() => choose('dislike')}
           type="button"
         >
           <Icon name="thumbsDown" size={16} />
           <span>Dislike</span>
-          <strong>{dislikes}</strong>
+          <strong>{isDocument && !reactionReady ? '—' : dislikes}</strong>
         </button>
+        {onViewDocument && (
+          <button
+            className="dossier-inline-action is-follow"
+            onClick={() => onViewDocument(item)}
+            type="button"
+          >
+            <Icon name="file" size={16} />
+            <span>View Document</span>
+            <Icon name="external" size={13} />
+          </button>
+        )}
         {onSave && (
           <button
             aria-pressed={isSaved}
@@ -129,6 +142,14 @@ function ForYouActions({ item, onHide, onVote, onSave, isSaved }) {
           </button>
         )}
       </div>
+      {isDocument && documentNotice && (
+        <div className="sri-document-action-alert" role="alert">
+          <span>{documentNotice}</span>
+          {onRetryReaction && (
+            <button onClick={onRetryReaction} type="button">Retry reactions</button>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -249,10 +270,15 @@ export default function ArticleModal({
   isSaved = false,
   onSourceOpen,
   onWhyThisStory,
+  onViewDocument,
+  documentNotice = '',
+  reactionReady = true,
+  onRetryReaction,
+  hideWhyThisMatters = false,
   variant = 'default',
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+  const [sourcesExpanded, setSourcesExpanded] = useState(variant === 'document');
   const [reasonsExpanded, setReasonsExpanded] = useState(false);
   const [whyMatters, setWhyMatters] = useState('');
   const [insightLoading, setInsightLoading] = useState(false);
@@ -260,14 +286,14 @@ export default function ArticleModal({
 
   useEffect(() => {
     setExpanded(false);
-    setSourcesExpanded(false);
+    setSourcesExpanded(variant === 'document');
     setReasonsExpanded(false);
-  }, [item?.id, item?.url, item?.title]);
+  }, [item?.id, item?.url, item?.title, variant]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!item) {
+    if (!item || hideWhyThisMatters) {
       setWhyMatters('');
       setInsightLoading(false);
       return undefined;
@@ -275,6 +301,14 @@ export default function ArticleModal({
 
     if (item.why_matters) {
       setWhyMatters(item.why_matters);
+      setInsightLoading(false);
+      return undefined;
+    }
+
+    // Internal PDFs are not articles from the briefing. Never ask the
+    // news insight service to invent an implication for a PDF.
+    if (variant === 'document') {
+      setWhyMatters('No extracted impact statement is available for this document.');
       setInsightLoading(false);
       return undefined;
     }
@@ -301,7 +335,7 @@ export default function ArticleModal({
     return () => {
       cancelled = true;
     };
-  }, [item?.id, item?.title, item?.summary, item?.why_matters]);
+  }, [item?.id, item?.title, item?.summary, item?.why_matters, variant, hideWhyThisMatters]);
 
   useEffect(() => {
     if (!item) return undefined;
@@ -323,8 +357,9 @@ export default function ArticleModal({
     ? item.summary_points.filter(Boolean)
     : [];
   const isForYou = variant === 'for-you';
+  const isDocument = variant === 'document';
   const isAllBriefings = variant === 'all-briefings';
-  const isStreamlined = isForYou || isAllBriefings;
+  const isStreamlined = isForYou || isAllBriefings || isDocument;
 
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
@@ -339,7 +374,7 @@ export default function ArticleModal({
       >
         <div className="head dossier-head">
           <div>
-            <h3 id="intelligence-dossier-title">{isStreamlined ? 'Article Details' : 'Intelligence Dossier'}</h3>
+            <h3 id="intelligence-dossier-title">{isDocument ? 'Document Details' : isStreamlined ? 'Article Details' : 'Intelligence Dossier'}</h3>
             {!isStreamlined && (
               <div className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 {score >= 80 ? 'High Signal' : 'Signal'} · {item.source_count || sources.length || 1} sources · {item.date || 'Latest'}
@@ -353,10 +388,10 @@ export default function ArticleModal({
           <div className="dossier-reading overflow-y-auto p-5 sm:p-6">
             <SignalVisual item={item} className="dossier-hero h-72 rounded-[24px]" />
             <div className="mt-6 flex flex-wrap gap-2">
-              <span className="signal-chip">{item.category || 'News'}</span>
-              <span className="signal-chip">{item.region || 'Global'}</span>
+              <span className="signal-chip">{item.category || (isDocument ? 'Internal Document' : 'News')}</span>
+              {!isDocument && <span className="signal-chip">{item.region || 'Global'}</span>}
               {!isStreamlined && <span className="signal-chip">Score {score}</span>}
-              <span className="signal-chip">{item.source_count || sources.length || 1} sources</span>
+              {!isDocument && <span className="signal-chip">{item.source_count || sources.length || 1} sources</span>}
             </div>
             <h2 className="dossier-title mt-5 text-3xl font-semibold leading-tight text-white sm:text-4xl">{item.title}</h2>
             <div className="mt-3 text-sm text-slate-500">
@@ -386,7 +421,7 @@ export default function ArticleModal({
 
             <section className="dossier-section mt-8">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">AI Summary</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">{isDocument ? 'Document Summary' : 'AI Summary'}</h4>
                 {item.summarized_by === 'samsung_chat' && (
                   <span className="signal-chip">Samsung Chat</span>
                 )}
@@ -413,18 +448,20 @@ export default function ArticleModal({
               )}
             </section>
 
-            <section className="dossier-section mt-8">
-              <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Why This Matters</h4>
-              <p className="mt-3 text-base leading-8 text-slate-300">
-                {insightLoading
-                  ? 'Generating strategic implication...'
-                  : whyMatters || (isStreamlined
-                    ? (isForYou
-                      ? 'This article was selected for its relevance to your interests and recent activity.'
-                      : 'This article highlights developments that may affect the wider technology landscape.')
-                    : `This signal is ranked at ${score}/100 from ${item.source_count || sources.length || 1} source${(item.source_count || sources.length || 1) === 1 ? '' : 's'}, with category and regional context for briefing review.`)}
-              </p>
-            </section>
+            {!hideWhyThisMatters && (
+              <section className="dossier-section mt-8">
+                <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Why This Matters</h4>
+                <p className="mt-3 text-base leading-8 text-slate-300">
+                  {insightLoading
+                    ? 'Generating strategic implication...'
+                    : whyMatters || (isStreamlined
+                      ? (isForYou
+                        ? 'This article was selected for its relevance to your interests and recent activity.'
+                        : 'This article highlights developments that may affect the wider technology landscape.')
+                      : `This signal is ranked at ${score}/100 from ${item.source_count || sources.length || 1} source${(item.source_count || sources.length || 1) === 1 ? '' : 's'}, with category and regional context for briefing review.`)}
+                </p>
+              </section>
+            )}
 
             <section className={`dossier-section dossier-sources mt-8${isStreamlined ? ' is-collapsible' : ''}`}>
               {isStreamlined ? (
@@ -472,7 +509,7 @@ export default function ArticleModal({
 
             {isStreamlined && (
               <>
-                <ForYouActions item={item} onHide={onHide} onVote={onVote} onSave={onSave} isSaved={isSaved} />
+                <ForYouActions item={item} onHide={onHide} onVote={onVote} onSave={onSave} onViewDocument={isDocument ? onViewDocument : undefined} isDocument={isDocument} isSaved={isSaved} documentNotice={documentNotice} reactionReady={reactionReady} onRetryReaction={onRetryReaction} />
                 {isForYou && item.recommendation?.reasons?.length > 0 && (
                   <section className="dossier-section dossier-why-seen">
                     <button
