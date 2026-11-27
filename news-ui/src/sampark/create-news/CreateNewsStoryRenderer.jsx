@@ -53,9 +53,14 @@ export default function CreateNewsStoryRenderer({
   displaySection = '',
 
   mode = 'preview',
+
+  dossierReader = false,
+
+  publicationDate = '',
 }) {
   const isPreview =
     mode === 'preview';
+  const isDossierReader = !isPreview && dossierReader;
 
 
   const desc0 =
@@ -152,6 +157,8 @@ export default function CreateNewsStoryRenderer({
    * show only real author/team information.
    */
   function renderFooter() {
+    // The dossier header already carries the actual publication byline.
+    if (isDossierReader) return null;
     const authorText =
       author ||
       (
@@ -197,6 +204,29 @@ export default function CreateNewsStoryRenderer({
   }
 
 
+  // Match the published PDF reader's category, title, metadata and summary
+  // using its existing dossier classes, not the authoring-preview typography.
+  function renderDossierHeader(intro) {
+    const metadata = [publicationDate, author, team].filter(Boolean).join(' · ');
+    return (
+      <header className="sri-story-dossier-header">
+        <div className="mt-6 flex flex-wrap gap-2">
+          <span className="signal-chip">{category || 'Story'}</span>
+        </div>
+        <h2 className="dossier-title mt-5 text-3xl font-semibold leading-tight text-white sm:text-4xl">
+          {title || 'Samsung Internal Update'}
+        </h2>
+        {metadata && <div className="mt-3 text-sm text-slate-500">{metadata}</div>}
+        {intro && (
+          <section className="dossier-section mt-8">
+            <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Story Summary</h4>
+            <p className="mt-4 text-lg font-medium leading-8 text-slate-100">{intro}</p>
+          </section>
+        )}
+      </header>
+    );
+  }
+
   /**
    * ============================================================
    * TWO COLUMN
@@ -212,32 +242,34 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        <header className="sampark-create-rendered-title">
-          <span>
-            {category ||
-              (
-                isPreview
-                  ? 'SRI-D News'
-                  : ''
+        {isDossierReader ? renderDossierHeader(intro) : (
+          <header className="sampark-create-rendered-title">
+            <span>
+              {category ||
+                (
+                  isPreview
+                    ? 'SRI-D News'
+                    : ''
+                )}
+            </span>
+  
+            <h2>
+              {previewCopy(
+                title,
+                'Your news title will appear here',
               )}
-          </span>
-
-          <h2>
-            {previewCopy(
-              title,
-              'Your news title will appear here',
+            </h2>
+  
+            {intro && (
+              <p>
+                {intro}
+              </p>
             )}
-          </h2>
-
-          {intro && (
-            <p>
-              {intro}
-            </p>
-          )}
-        </header>
+          </header>
+        )}
 
 
-        <div className="sampark-create-rendered-columns is-two-column">
+        <div className={`sampark-create-rendered-columns is-two-column${isDossierReader ? ' dossier-section sri-story-template-content' : ''}`}>
 
           <div className="sampark-create-rendered-column">
 
@@ -332,32 +364,34 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        <header className="sampark-create-rendered-title">
-          <span>
-            {category ||
-              (
-                isPreview
-                  ? 'SRI-D News'
-                  : ''
+        {isDossierReader ? renderDossierHeader(intro) : (
+          <header className="sampark-create-rendered-title">
+            <span>
+              {category ||
+                (
+                  isPreview
+                    ? 'SRI-D News'
+                    : ''
+                )}
+            </span>
+  
+            <h2>
+              {previewCopy(
+                title,
+                'Your news title will appear here',
               )}
-          </span>
-
-          <h2>
-            {previewCopy(
-              title,
-              'Your news title will appear here',
+            </h2>
+  
+            {intro && (
+              <p>
+                {intro}
+              </p>
             )}
-          </h2>
-
-          {intro && (
-            <p>
-              {intro}
-            </p>
-          )}
-        </header>
+          </header>
+        )}
 
 
-        <div className="sampark-create-rendered-list">
+        <div className={`sampark-create-rendered-list${isDossierReader ? ' dossier-section sri-story-template-content' : ''}`}>
 
           {showFirstItem && (
             <div className="sampark-create-rendered-list-item">
@@ -442,32 +476,34 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        <header className="sampark-create-rendered-title">
-          <span>
-            {category ||
-              (
-                isPreview
-                  ? 'SRI-D News'
-                  : ''
+        {isDossierReader ? renderDossierHeader(intro) : (
+          <header className="sampark-create-rendered-title">
+            <span>
+              {category ||
+                (
+                  isPreview
+                    ? 'SRI-D News'
+                    : ''
+                )}
+            </span>
+  
+            <h2>
+              {previewCopy(
+                title,
+                'Your news title will appear here',
               )}
-          </span>
-
-          <h2>
-            {previewCopy(
-              title,
-              'Your news title will appear here',
+            </h2>
+  
+            {intro && (
+              <p>
+                {intro}
+              </p>
             )}
-          </h2>
-
-          {intro && (
-            <p>
-              {intro}
-            </p>
-          )}
-        </header>
+          </header>
+        )}
 
 
-        <div className="sampark-create-rendered-feature-card">
+        <div className={`sampark-create-rendered-feature-card${isDossierReader ? ' dossier-section sri-story-template-content' : ''}`}>
 
           <div className="sampark-create-rendered-feature-main">
 
@@ -528,35 +564,37 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        <header className="sampark-create-rendered-title">
-          <span>
-            {category ||
-              (
-                isPreview
-                  ? 'SRI-D News'
-                  : ''
+        {isDossierReader ? renderDossierHeader(intro) : (
+          <header className="sampark-create-rendered-title">
+            <span>
+              {category ||
+                (
+                  isPreview
+                    ? 'SRI-D News'
+                    : ''
+                )}
+            </span>
+  
+            <h2>
+              {previewCopy(
+                title,
+                'Your news title will appear here',
               )}
-          </span>
-
-          <h2>
-            {previewCopy(
-              title,
-              'Your news title will appear here',
+            </h2>
+  
+            {intro && (
+              <p>
+                {intro}
+              </p>
             )}
-          </h2>
-
-          {intro && (
-            <p>
-              {intro}
-            </p>
-          )}
-        </header>
+          </header>
+        )}
 
 
         {desc0 &&
           summary &&
           desc0 !== summary && (
-            <div className="sampark-create-rendered-copy">
+            <div className={`sampark-create-rendered-copy${isDossierReader ? ' dossier-section sri-story-template-content' : ''}`}>
               <p>
                 {desc0}
               </p>
@@ -596,30 +634,32 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        <header className="sampark-create-rendered-title">
-
-          {category && (
-            <span>
-              {category}
-            </span>
-          )}
-
-          <h2>
-            {title ||
-              (
-                isPreview
-                  ? 'Your news title will appear here'
-                  : 'Samsung Internal Update'
-              )}
-          </h2>
-
-          {fallbackSummary && (
-            <p>
-              {fallbackSummary}
-            </p>
-          )}
-
-        </header>
+        {isDossierReader ? renderDossierHeader(fallbackSummary) : (
+          <header className="sampark-create-rendered-title">
+  
+            {category && (
+              <span>
+                {category}
+              </span>
+            )}
+  
+            <h2>
+              {title ||
+                (
+                  isPreview
+                    ? 'Your news title will appear here'
+                    : 'Samsung Internal Update'
+                )}
+            </h2>
+  
+            {fallbackSummary && (
+              <p>
+                {fallbackSummary}
+              </p>
+            )}
+  
+          </header>
+        )}
 
 
         {coverPreview && (
