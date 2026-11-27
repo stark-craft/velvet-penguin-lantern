@@ -57,18 +57,16 @@ function contentTypeLabel(item) {
 function typeCountLabel(type, count) {
   if (type === 'leadership') return count === 1 ? 'Leadership Message' : 'Leadership Messages';
   if (type === 'announcement') return count === 1 ? 'Announcement' : 'Announcements';
-  if (type === 'document') return count === 1 ? 'Document' : 'Documents';
   return count === 1 ? 'Story' : 'Stories';
 }
-// Archive grouping: Content Type -> Publication Date.
+// Archive grouping: combined Stories (authored stories + PDFs), announcements and leadership, then publication date.
 function buildSriDSections(groups) {
   const definitions = [
-    { key: 'document', label: 'Documents' },
-    { key: 'announcement', label: 'Announcements' },
     { key: 'story', label: 'Stories' },
+    { key: 'announcement', label: 'Announcements' },
     { key: 'leadership', label: 'Leadership Messages' },
   ];
-  const buckets = { document: [], announcement: [], story: [], leadership: [] };
+  const buckets = { story: [], announcement: [], leadership: [] };
   (groups || []).forEach((group) => {
     (group?.signals || []).forEach((item) => {
       if (!item) return;
@@ -76,7 +74,8 @@ function buildSriDSections(groups) {
       const rawDate = group?.date || item?.published_at || item?.publishedAt ||
         item?.date || 'undated';
       const date = String(rawDate).slice(0, 10) || 'undated';
-      buckets[type].push({ item, date });
+      const sectionKey = type === 'document' ? 'story' : type;
+      buckets[sectionKey].push({ item, date });
     });
   });
   return definitions.map((definition) => ({
@@ -181,7 +180,7 @@ function SriDTypeSection({ section, onOpen, nowMs }) {
   const visibleEntries = selectedDate === 'all'
     ? section.entries : section.entries.filter((entry) => entry.date === selectedDate);
   const gridClass = section.key === 'announcement' ? 'samsung-announcement-grid'
-    : section.key === 'document' ? 'samsung-document-grid' : 'tsan-day-grid';
+    : section.key === 'story' ? 'samsung-document-grid' : 'tsan-day-grid';
   const headingId = `samsung-srid-${section.key}-heading`;
   return (
     <section aria-labelledby={headingId}
@@ -207,7 +206,7 @@ function SriDTypeSection({ section, onOpen, nowMs }) {
           const key = samsungItemKey(item);
           if (section.key === 'announcement')
             return <SamsungAnnouncementCard item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
-          if (section.key === 'document')
+          if (contentTypeKey(item) === 'document')
             return <SriDDocumentCard item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
           return <SamsungStoryCard internal item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
         })}
