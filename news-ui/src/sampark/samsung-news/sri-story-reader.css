@@ -1,0 +1,183 @@
+/* Published SRI-D stories only. The document dossier, Create News preview,
+   and other news readers keep their current styles. The outer shell uses the
+   existing dossier--for-you dimensions, header, scrolling and theme. */
+.sri-story-reader .sampark-create-rendered.is-published {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-family: inherit;
+}
+.sri-story-reader .sampark-create-rendered-title {
+  padding: 0;
+  margin: 0 0 28px;
+}
+.sri-story-reader .sampark-create-rendered-title > span {
+  display: inline-flex;
+  padding: 5px 10px;
+  border: 1px solid var(--line, #d9e2ef);
+  border-radius: 999px;
+  background: var(--surface-soft, #edf2fa);
+  color: var(--accent-ink, #1428a0);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.sri-story-reader .sampark-create-rendered-title > span:empty {
+  display: none;
+}
+.sri-story-reader .sampark-create-rendered-title h2 {
+  max-width: 32ch;
+  margin: 20px 0 14px;
+  color: var(--text, inherit);
+  font-family: "General Sans", "Geist", "Inter", sans-serif;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -.018em;
+  overflow-wrap: anywhere;
+}
+.sri-story-reader .sampark-create-rendered-title p {
+  margin: 0;
+  color: var(--text, inherit);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.78;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sri-story-reader .sampark-create-rendered-column p,
+.sri-story-reader .sampark-create-rendered-list-content p,
+.sri-story-reader .sampark-create-rendered-feature-copy p,
+.sri-story-reader .sampark-create-rendered-copy p {
+  margin: 0;
+  color: var(--text-secondary, inherit);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.sri-story-reader .sampark-create-rendered-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+  padding: 0;
+}
+.sri-story-reader .sampark-create-rendered-column,
+.sri-story-reader .sampark-create-rendered-feature-main {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+.sri-story-reader .sampark-create-rendered-media,
+.sri-story-reader .sampark-create-rendered-list-media {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line, #e3e8ef);
+  border-radius: 18px;
+  background: var(--surface-soft, #f2f5f9);
+}
+.sri-story-reader .sampark-create-rendered-media img,
+.sri-story-reader .sampark-create-rendered-list-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 390px;
+  object-fit: contain;
+}
+.sri-story-reader .sampark-create-rendered-list {
+  display: grid;
+  gap: 20px;
+  padding: 0;
+}
+.sri-story-reader .sampark-create-rendered-list > .sampark-create-rendered-list-item {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  align-items: start;
+  gap: 24px;
+  padding: 0 0 20px;
+  border-bottom: 1px solid var(--line, #e3e8ef);
+}
+.sri-story-reader .sampark-create-rendered-list > .sampark-create-rendered-list-item:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.sri-story-reader .sampark-create-rendered-list-item:not(:has(.sampark-create-rendered-list-media)),
+.sri-story-reader .sampark-create-rendered-list-item:not(:has(.sampark-create-rendered-list-content)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.sri-story-reader .sampark-create-rendered-list-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.sri-story-reader .sampark-create-rendered-list-content > span {
+  color: var(--accent-ink, #1428a0);
+  font-size: 12px;
+  font-weight: 700;
+}
+.sri-story-reader .sampark-create-rendered-feature-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.sri-story-reader .sampark-create-rendered-feature-card:has(.sampark-create-rendered-feature-side) {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+.sri-story-reader .sampark-create-rendered-feature-side {
+  min-width: 0;
+}
+.sri-story-reader .sampark-create-rendered-feature-copy,
+.sri-story-reader .sampark-create-rendered-copy {
+  padding: 0;
+}
+.sri-story-reader .sampark-create-rendered.is-text-top .sampark-create-rendered-copy {
+  margin-bottom: 20px;
+}
+.sri-story-reader .sampark-create-rendered footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 28px;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line, #e3e8ef);
+  color: var(--text-muted, inherit);
+  font-size: 14px;
+  line-height: 1.5;
+}
+html[data-theme="dark"] .sri-story-reader .sampark-create-rendered-title h2,
+html[data-theme="dark"] .sri-story-reader .sampark-create-rendered-title p {
+  color: var(--text, #eceaf4);
+}
+html[data-theme="dark"] .sri-story-reader .sampark-create-rendered-title > span,
+html[data-theme="dark"] .sri-story-reader .sampark-create-rendered-list-content > span {
+  color: var(--accent-ink, #b2a5ff);
+}
+@media (max-width: 720px) {
+  .sri-story-reader .sampark-create-rendered-title h2 {
+    font-size: 30px;
+  }
+  .sri-story-reader .sampark-create-rendered-title p {
+    font-size: 17px;
+  }
+  .sri-story-reader .sampark-create-rendered-columns,
+  .sri-story-reader .sampark-create-rendered-list > .sampark-create-rendered-list-item,
+  .sri-story-reader .sampark-create-rendered-feature-card:has(.sampark-create-rendered-feature-side) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
