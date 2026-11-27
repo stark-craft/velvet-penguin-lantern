@@ -25,8 +25,13 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
-.sri-story-reader .sri-story-template-content {
-  margin-top: 24px;
+/* The dossier section class supplies reading typography, but its shared
+   theme divider is for separate article sections, not authored templates. */
+.sri-story-reader .sri-story-template-content.dossier-section {
+  margin-top: 24px !important;
+  padding: 0;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
 }
 .sri-story-reader .sampark-create-rendered-column p,
 .sri-story-reader .sampark-create-rendered-list-content p,
@@ -47,11 +52,21 @@
   gap: 24px;
   padding: 0;
 }
+/* Two Column: independent, top-aligned image/text pairs. A missing
+   column must not reserve half the reader. */
 .sri-story-reader .sampark-create-rendered-column,
 .sri-story-reader .sampark-create-rendered-feature-main {
   display: grid;
   min-width: 0;
+  align-content: start;
   gap: 18px;
+}
+.sri-story-reader .sampark-create-rendered-columns > .sampark-create-rendered-column:empty,
+.sri-story-reader .sampark-create-rendered-feature-card > .sampark-create-rendered-feature-main:empty {
+  display: none;
+}
+.sri-story-reader .sampark-create-rendered-columns:has(> .sampark-create-rendered-column:empty) {
+  grid-template-columns: minmax(0, 1fr);
 }
 /* Keep the document reader's SignalVisual shadow and rounded corners.
    Let each story image fill its template column at its natural aspect ratio. */
@@ -72,6 +87,7 @@
   height: auto !important;
   min-height: 0;
   max-height: none;
+  border: 0 !important;
 }
 /* Put the image back into normal flow so its intrinsic aspect ratio
    determines the frame height. Override the fixed-height news hero and
@@ -92,17 +108,15 @@
   gap: 20px;
   padding: 0;
 }
+/* List View: stack the entries, pairing each image with its own text.
+   Use whitespace rather than horizontal rules between entries. */
 .sri-story-reader .sampark-create-rendered-list > .sampark-create-rendered-list-item {
   display: grid;
   grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
   align-items: start;
   gap: 24px;
-  padding: 0 0 20px;
-  border-bottom: 1px solid var(--line, #e3e8ef);
-}
-.sri-story-reader .sampark-create-rendered-list > .sampark-create-rendered-list-item:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
+  padding: 0;
+  border: 0 !important;
 }
 .sri-story-reader .sampark-create-rendered-list-item:not(:has(.sampark-create-rendered-list-media)),
 .sri-story-reader .sampark-create-rendered-list-item:not(:has(.sampark-create-rendered-list-content)) {
@@ -118,6 +132,8 @@
   font-size: 12px;
   font-weight: 700;
 }
+/* Feature Card: emphasize the primary image without forcing the
+   secondary image into an identical height or aspect ratio. */
 .sri-story-reader .sampark-create-rendered-feature-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -127,6 +143,9 @@
 .sri-story-reader .sampark-create-rendered-feature-card:has(.sampark-create-rendered-feature-side) {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
+.sri-story-reader .sampark-create-rendered-feature-card:has(> .sampark-create-rendered-feature-main:empty) {
+  grid-template-columns: minmax(0, 1fr);
+}
 .sri-story-reader .sampark-create-rendered-feature-side {
   min-width: 0;
 }
@@ -134,8 +153,13 @@
 .sri-story-reader .sampark-create-rendered-copy {
   padding: 0;
 }
+/* Text Top: full-width text followed by a full-width, natural-height
+   image. No artificial divider between the text and image. */
 .sri-story-reader .sampark-create-rendered.is-text-top .sampark-create-rendered-copy {
   margin-bottom: 20px;
+}
+.sri-story-reader .sampark-create-rendered.is-text-top > .sampark-create-rendered-media {
+  width: 100%;
 }
 .sri-story-reader .sampark-create-rendered footer {
   display: flex;
