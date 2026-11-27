@@ -113,6 +113,7 @@ export default function SriDDocumentModal({ item, onClose }) {
         item={visibleSignal}
         onClose={onClose}
         variant="document"
+        hideWhyThisMatters
         onVote={published && reactions && !reactionBusy ? voteDocument : undefined}
         onViewDocument={viewOriginalDocument}
         reactionReady={Boolean(reactions)}
