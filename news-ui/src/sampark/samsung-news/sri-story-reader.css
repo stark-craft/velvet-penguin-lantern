@@ -53,9 +53,8 @@
   min-width: 0;
   gap: 18px;
 }
-/* Use the document reader's actual SignalVisual and dossier-hero classes.
-   Keep the template's image slots; do not clip the shared hero shadow or
-   override its responsive height, image fit, background or theme. */
+/* Keep the document reader's SignalVisual shadow, rounded corners and
+   responsive height, but show the complete authored image in Stories. */
 .sri-story-reader .sampark-create-rendered-media,
 .sri-story-reader .sampark-create-rendered-list-media {
   display: block;
@@ -70,6 +69,12 @@
 .sri-story-reader .sampark-create-rendered-list-media > .dossier-hero {
   width: 100%;
   min-width: 0;
+}
+/* SignalVisual defaults to object-cover for news; authored story images
+   must not be cropped, including screenshots, posters and diagrams. */
+.sri-story-reader .dossier-hero .signal-bg-image {
+  object-fit: contain !important;
+  object-position: center;
 }
 .sri-story-reader .sampark-create-rendered-list {
   display: grid;
