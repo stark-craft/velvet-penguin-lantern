@@ -1,6 +1,7 @@
 import React from 'react';
 
 import Icon from '../../news-scrapper/components/Icon.jsx';
+import { SignalVisual } from '../../news-scrapper/components/ArticleCard.jsx';
 
 import {
   STORY_TEMPLATES,
@@ -119,6 +120,15 @@ export default function CreateNewsStoryRenderer({
     fallbackIcon = true,
   ) {
     if (imageSrc) {
+      if (isDossierReader) {
+        return (
+          <SignalVisual
+            item={{ image_url: imageSrc, category }}
+            className="dossier-hero h-72 rounded-[24px]"
+            label={false}
+          />
+        );
+      }
       return (
         <img
           alt=""
@@ -204,9 +214,8 @@ export default function CreateNewsStoryRenderer({
   }
 
 
-  // Match the published PDF reader's category, title, metadata and summary
-  // using its existing dossier classes, not the authoring-preview typography.
-  function renderDossierHeader(intro) {
+  // Match the PDF reader's title and metadata without a separate Story Summary.
+  function renderDossierHeader() {
     const metadata = [publicationDate, author, team].filter(Boolean).join(' · ');
     return (
       <header className="sri-story-dossier-header">
@@ -217,12 +226,6 @@ export default function CreateNewsStoryRenderer({
           {title || 'Samsung Internal Update'}
         </h2>
         {metadata && <div className="mt-3 text-sm text-slate-500">{metadata}</div>}
-        {intro && (
-          <section className="dossier-section mt-8">
-            <h4 className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-200">Story Summary</h4>
-            <p className="mt-4 text-lg font-medium leading-8 text-slate-100">{intro}</p>
-          </section>
-        )}
       </header>
     );
   }
@@ -242,7 +245,7 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        {isDossierReader ? renderDossierHeader(intro) : (
+        {isDossierReader ? renderDossierHeader() : (
           <header className="sampark-create-rendered-title">
             <span>
               {category ||
@@ -364,7 +367,7 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        {isDossierReader ? renderDossierHeader(intro) : (
+        {isDossierReader ? renderDossierHeader() : (
           <header className="sampark-create-rendered-title">
             <span>
               {category ||
@@ -476,7 +479,7 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        {isDossierReader ? renderDossierHeader(intro) : (
+        {isDossierReader ? renderDossierHeader() : (
           <header className="sampark-create-rendered-title">
             <span>
               {category ||
@@ -564,7 +567,7 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        {isDossierReader ? renderDossierHeader(intro) : (
+        {isDossierReader ? renderDossierHeader() : (
           <header className="sampark-create-rendered-title">
             <span>
               {category ||
@@ -592,8 +595,7 @@ export default function CreateNewsStoryRenderer({
 
 
         {desc0 &&
-          summary &&
-          desc0 !== summary && (
+          (isDossierReader || (summary && desc0 !== summary)) && (
             <div className={`sampark-create-rendered-copy${isDossierReader ? ' dossier-section sri-story-template-content' : ''}`}>
               <p>
                 {desc0}
@@ -634,7 +636,7 @@ export default function CreateNewsStoryRenderer({
 
     return (
       <>
-        {isDossierReader ? renderDossierHeader(fallbackSummary) : (
+        {isDossierReader ? renderDossierHeader() : (
           <header className="sampark-create-rendered-title">
   
             {category && (
@@ -661,6 +663,12 @@ export default function CreateNewsStoryRenderer({
           </header>
         )}
 
+
+        {isDossierReader && desc0 && (
+          <div className="sampark-create-rendered-copy dossier-section sri-story-template-content">
+            <p>{desc0}</p>
+          </div>
+        )}
 
         {coverPreview && (
           <div className="sampark-create-rendered-media">
