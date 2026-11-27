@@ -53,8 +53,8 @@
   min-width: 0;
   gap: 18px;
 }
-/* Keep the document reader's SignalVisual shadow, rounded corners and
-   responsive height, but show the complete authored image in Stories. */
+/* Keep the document reader's SignalVisual shadow and rounded corners.
+   Let each story image fill its template column at its natural aspect ratio. */
 .sri-story-reader .sampark-create-rendered-media,
 .sri-story-reader .sampark-create-rendered-list-media {
   display: block;
@@ -69,10 +69,21 @@
 .sri-story-reader .sampark-create-rendered-list-media > .dossier-hero {
   width: 100%;
   min-width: 0;
+  height: auto !important;
+  min-height: 0;
+  max-height: none;
 }
-/* SignalVisual defaults to object-cover for news; authored story images
-   must not be cropped, including screenshots, posters and diagrams. */
-.sri-story-reader .dossier-hero .signal-bg-image {
+/* Put the image back into normal flow so its intrinsic aspect ratio
+   determines the frame height. Override the fixed-height news hero and
+   preview image sizing without changing the shared visual component. */
+.sri-story-reader .sampark-create-rendered-media > .dossier-hero > .signal-bg-image,
+.sri-story-reader .sampark-create-rendered-list-media > .dossier-hero > .signal-bg-image {
+  display: block;
+  position: static;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  max-height: none;
   object-fit: contain !important;
   object-position: center;
 }
