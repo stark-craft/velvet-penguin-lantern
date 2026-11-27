@@ -206,8 +206,8 @@ function SriDTypeSection({ section, onOpen, nowMs }) {
           const key = samsungItemKey(item);
           if (section.key === 'announcement')
             return <SamsungAnnouncementCard item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
-          if (contentTypeKey(item) === 'document')
-            return <SriDDocumentCard item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
+          if (section.key === 'story')
+            return <SriDDocumentCard item={item} key={key} kind={contentTypeKey(item) === 'document' ? 'document' : 'story'} onOpen={onOpen} nowMs={nowMs} />;
           return <SamsungStoryCard internal item={item} key={key} onOpen={onOpen} nowMs={nowMs} />;
         })}
       </div>
