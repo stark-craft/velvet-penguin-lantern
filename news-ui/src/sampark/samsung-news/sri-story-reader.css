@@ -13,7 +13,7 @@
   color: inherit;
   font-family: inherit;
 }
-/* Use exactly the shared dossier title, chip, summary and byline styles.
+/* Use exactly the shared dossier title, chip and byline styles.
    Only add whitespace and wrapping specific to authored content. */
 .sri-story-reader .sri-story-dossier-header {
   margin: 0 0 28px;
@@ -21,8 +21,7 @@
 .sri-story-reader .sri-story-dossier-header > div:first-child {
   margin-top: 0;
 }
-.sri-story-reader .sri-story-dossier-header .dossier-title,
-.sri-story-reader .sri-story-dossier-header .dossier-section p {
+.sri-story-reader .sri-story-dossier-header .dossier-title {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -54,24 +53,23 @@
   min-width: 0;
   gap: 18px;
 }
+/* Use the document reader's actual SignalVisual and dossier-hero classes.
+   Keep the template's image slots; do not clip the shared hero shadow or
+   override its responsive height, image fit, background or theme. */
 .sri-story-reader .sampark-create-rendered-media,
 .sri-story-reader .sampark-create-rendered-list-media {
-  display: grid;
+  display: block;
   min-width: 0;
   min-height: 0;
-  place-items: center;
-  overflow: hidden;
-  border: 1px solid var(--line, #e3e8ef);
-  border-radius: 24px;
-  background: var(--surface-soft, #f2f5f9);
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-.sri-story-reader .sampark-create-rendered-media img,
-.sri-story-reader .sampark-create-rendered-list-media img {
-  display: block;
+.sri-story-reader .sampark-create-rendered-media > .dossier-hero,
+.sri-story-reader .sampark-create-rendered-list-media > .dossier-hero {
   width: 100%;
-  height: auto;
-  max-height: 390px;
-  object-fit: contain;
+  min-width: 0;
 }
 .sri-story-reader .sampark-create-rendered-list {
   display: grid;
